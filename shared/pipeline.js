@@ -411,11 +411,53 @@ async function readFile(file) {
 // 전체 실행
 // ─────────────────────────────────────────────────────────────
 
-export async function runPipeline({ files, aliases = {} }) {
+// 내용이 완전히 같은 파일은 한 번만 센다.
+//
+// 담당자는 "아까 올린 게 맞나?" 싶으면 반드시 다시 올린다. 그때 같은 파일이
+// 두 번 들어가면 매출이 정확히 두 배가 되는데, 그럴듯한 숫자라 아무도
+// 눈치채지 못한다. 파일 이름이 아니라 **내용의 지문**으로 판단한다 —
+// 이름만 바꿔 저장한 같은 파일도 잡아야 한다.
+async function fingerprint(buffer) {
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
+async function dedupeFiles(files) {
+  const seen = new Map()
+  const unique = []
+  const skipped = []
+
+  for (const file of files) {
+    const hash = await fingerprint(file.buffer)
+    if (seen.has(hash)) {
+      skipped.push({ name: file.name, sameAs: seen.get(hash) })
+      continue
+    }
+    seen.set(hash, file.name)
+    unique.push({ ...file, hash })
+  }
+  return { unique, skipped }
+}
+
+export async function runPipeline({ files: inputFiles, aliases = {} }) {
   const started = Date.now()
   const rows = []
   const quarantine = []
   const fileReports = []
+
+  const { unique: files, skipped } = await dedupeFiles(inputFiles)
+  for (const s of skipped) {
+    fileReports.push({
+      name: s.name,
+      ok: true,
+      skippedDuplicate: true,
+      rowsIn: 0,
+      rowsOut: 0,
+      quarantined: 0,
+      note: `${s.sameAs}와 내용이 완전히 같아 한 번만 셌습니다.`,
+    })
+  }
 
   for (const file of files) {
     let tables
@@ -554,7 +596,8 @@ export async function runPipeline({ files, aliases = {} }) {
     duplicates,
     files: fileReports,
     stats: {
-      filesRead: files.length,
+      filesRead: inputFiles.length,
+      duplicateFilesSkipped: skipped.length,
       sheetsRead: fileReports.length,
       rowsOut: rows.length,
       quarantined: quarantine.length,

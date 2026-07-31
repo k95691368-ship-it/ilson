@@ -1259,6 +1259,59 @@
   word-break: break-all;
 }
 
+/* ===== 5단계 베타 테스트 ===== */
+.result-card {
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  border: 1px solid;
+}
+.result-pass {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+.result-fail {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+.result-hold {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.result-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  font-size: 12px;
+  font-weight: 800;
+  flex: none;
+}
+.result-pass .result-mark {
+  background: var(--success);
+  color: var(--on-accent);
+}
+.result-fail .result-mark {
+  background: var(--danger);
+  color: var(--on-accent);
+}
+.result-hold .result-mark {
+  background: var(--border);
+  color: var(--text-muted);
+}
+
+/* 판정만 있으면 어디를 고쳐야 할지 알 수 없다. 근거를 함께 남긴다. */
+.result-evidence {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--border);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;
