@@ -1029,6 +1029,120 @@
   margin-bottom: 1px;
 }
 
+/* ===== 3단계 협의안 ===== */
+.stake-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.stake-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.meeting {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  margin-bottom: 10px;
+  background: var(--bg);
+}
+
+.minutes-preview {
+  margin-top: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text);
+}
+
+/* 부딪히는 요구 두 개를 나란히. 위아래로 두면 어느 쪽이 A인지 헷갈린다. */
+.conflict-pair {
+  display: grid;
+  gap: 6px;
+  font-size: 14px;
+  color: var(--text-h);
+  line-height: 1.55;
+}
+.conflict-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 11px;
+  font-weight: 800;
+  margin-right: 5px;
+}
+
+.criterion-pick {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-weight: 500;
+}
+.criterion-pick:hover:not(:disabled) {
+  border-color: var(--accent-border);
+  background: var(--surface);
+}
+.criterion-pick strong {
+  display: block;
+  color: var(--text-h);
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 3px;
+}
+
+/* ===== 스톱워치 ===== */
+.stopwatch {
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  background: var(--bg);
+  text-align: center;
+}
+.stopwatch.running {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.stopwatch-time {
+  font-family: var(--mono);
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.stopwatch.running .stopwatch-time {
+  color: var(--accent);
+}
+.stopwatch .row,
+.stopwatch p {
+  text-align: left;
+}
+
+.baseline-sealed {
+  border: 1px solid var(--success-border);
+  background: var(--success-bg);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;
