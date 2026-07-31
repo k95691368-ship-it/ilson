@@ -1,0 +1,232 @@
+{
+  "brand": "누리에(NURIE) — 가상 브랜드. 실존하지 않는다.",
+  "fx": {
+    "KRW": 1.0,
+    "USD": 1385.0,
+    "JPY": 8.9
+  },
+  "period": {
+    "start": "2026-06-01",
+    "days": 30
+  },
+  "skus": [
+    {
+      "canonical_code": "NR-CM-100",
+      "name_ko": "콜라겐 래핑 마스크",
+      "line": "래핑",
+      "volume_ml": 100,
+      "std_cogs_krw": 3400,
+      "shelf_life_months": 30,
+      "list_price_krw": 13700
+    },
+    {
+      "canonical_code": "NR-PA-030",
+      "name_ko": "펩타이드 앰플",
+      "line": "앰플",
+      "volume_ml": 30,
+      "std_cogs_krw": 7200,
+      "shelf_life_months": 24,
+      "list_price_krw": 24300
+    },
+    {
+      "canonical_code": "NR-EG-050",
+      "name_ko": "EGF 리페어 세럼",
+      "line": "세럼",
+      "volume_ml": 50,
+      "std_cogs_krw": 9800,
+      "shelf_life_months": 24,
+      "list_price_krw": 39400
+    },
+    {
+      "canonical_code": "NR-CC-075",
+      "name_ko": "시카 진정 크림",
+      "line": "크림",
+      "volume_ml": 75,
+      "std_cogs_krw": 5600,
+      "shelf_life_months": 30,
+      "list_price_krw": 17900
+    },
+    {
+      "canonical_code": "NR-VT-200",
+      "name_ko": "비타민 브라이트 토너",
+      "line": "토너",
+      "volume_ml": 200,
+      "std_cogs_krw": 4100,
+      "shelf_life_months": 36,
+      "list_price_krw": 15400
+    },
+    {
+      "canonical_code": "NR-RE-020",
+      "name_ko": "리페어 아이크림",
+      "line": "크림",
+      "volume_ml": 20,
+      "std_cogs_krw": 6300,
+      "shelf_life_months": 24,
+      "list_price_krw": 24200
+    },
+    {
+      "canonical_code": "NR-CO-150",
+      "name_ko": "딥 클렌징 오일",
+      "line": "클렌징",
+      "volume_ml": 150,
+      "std_cogs_krw": 3900,
+      "shelf_life_months": 36,
+      "list_price_krw": 14600
+    },
+    {
+      "canonical_code": "NR-SC-050",
+      "name_ko": "데일리 선크림 SPF50",
+      "line": "선케어",
+      "volume_ml": 50,
+      "std_cogs_krw": 4700,
+      "shelf_life_months": 30,
+      "list_price_krw": 18900
+    }
+  ],
+  "channels": [
+    {
+      "name": "자사몰",
+      "type": "D2C",
+      "nominal_commission_rate": 0.032,
+      "settlement_cycle_days": 3,
+      "currency": "KRW",
+      "effective_extra_rate": 0.0,
+      "country": "KR"
+    },
+    {
+      "name": "올리브영",
+      "type": "오프라인",
+      "nominal_commission_rate": 0.335,
+      "settlement_cycle_days": 60,
+      "currency": "KRW",
+      "effective_extra_rate": 0.018,
+      "country": "KR"
+    },
+    {
+      "name": "쿠팡",
+      "type": "오픈마켓",
+      "nominal_commission_rate": 0.108,
+      "settlement_cycle_days": 45,
+      "currency": "KRW",
+      "effective_extra_rate": 0.011,
+      "country": "KR"
+    },
+    {
+      "name": "Amazon US",
+      "type": "해외",
+      "nominal_commission_rate": 0.15,
+      "settlement_cycle_days": 14,
+      "currency": "USD",
+      "effective_extra_rate": 0.007,
+      "country": "US"
+    },
+    {
+      "name": "Qoo10 JP",
+      "type": "해외",
+      "nominal_commission_rate": 0.12,
+      "settlement_cycle_days": 30,
+      "currency": "JPY",
+      "effective_extra_rate": 0.004,
+      "country": "JP"
+    }
+  ],
+  "alias": {
+    "자사몰": {
+      "NR-CM-100": "NR-CM-100",
+      "NR-PA-030": "NR-PA-030",
+      "NR-EG-050": "NR-EG-050",
+      "NR-CC-075": "NR-CC-075",
+      "NR-VT-200": "NR-VT-200",
+      "NR-RE-020": "NR-RE-020",
+      "NR-CO-150": "NR-CO-150",
+      "NR-SC-050": "NR-SC-050"
+    },
+    "올리브영": {
+      "NR-CM-100": "OY1024881",
+      "NR-PA-030": "OY1024882",
+      "NR-EG-050": "OY1024883",
+      "NR-CC-075": "OY1024884",
+      "NR-VT-200": "OY1024885",
+      "NR-RE-020": "OY1024886",
+      "NR-CO-150": "OY1024887",
+      "NR-SC-050": "OY1024888"
+    },
+    "쿠팡": {
+      "NR-CM-100": "87123401",
+      "NR-PA-030": "87123402",
+      "NR-EG-050": "87123403",
+      "NR-CC-075": "87123404",
+      "NR-VT-200": "87123405",
+      "NR-RE-020": "87123406",
+      "NR-CO-150": "87123407",
+      "NR-SC-050": "87123408"
+    },
+    "Amazon US": {
+      "NR-CM-100": "NURIE-NRCM100-US",
+      "NR-PA-030": "NURIE-NRPA030-US",
+      "NR-EG-050": "NURIE-NREG050-US",
+      "NR-CC-075": "NURIE-NRCC075-US",
+      "NR-VT-200": "NURIE-NRVT200-US",
+      "NR-RE-020": "NURIE-NRRE020-US",
+      "NR-CO-150": "NURIE-NRCO150-US",
+      "NR-SC-050": "NURIE-NRSC050-US"
+    },
+    "Qoo10 JP": {
+      "NR-CM-100": "NR_CM_100_JP",
+      "NR-PA-030": "NR_PA_030_JP",
+      "NR-EG-050": "NR_EG_050_JP",
+      "NR-CC-075": "NR_CC_075_JP",
+      "NR-VT-200": "NR_VT_200_JP",
+      "NR-RE-020": "NR_RE_020_JP",
+      "NR-CO-150": "NR_CO_150_JP",
+      "NR-SC-050": "NR_SC_050_JP"
+    }
+  },
+  "unknown_aliases": [
+    {
+      "channel": "올리브영",
+      "code": "OY1099001",
+      "label": "누리에 마스크 5매 기획세트"
+    },
+    {
+      "channel": "올리브영",
+      "code": "OY1099002",
+      "label": "누리에 앰플 미니 10ml"
+    },
+    {
+      "channel": "쿠팡",
+      "code": "87199001",
+      "label": "[단독] 누리에 마스크 10매"
+    },
+    {
+      "channel": "쿠팡",
+      "code": "87199002",
+      "label": "누리에 선크림 2개 묶음"
+    },
+    {
+      "channel": "쿠팡",
+      "code": "87199003",
+      "label": "누리에 토너 리필형"
+    },
+    {
+      "channel": "Amazon US",
+      "code": "NURIE-BUNDLE-3PC-US",
+      "label": "NURIE Trial Kit 3pc"
+    },
+    {
+      "channel": "Amazon US",
+      "code": "NURIE-CM100-2P-US",
+      "label": "NURIE Collagen Mask Twin Pack"
+    },
+    {
+      "channel": "Qoo10 JP",
+      "code": "NR_SET_A_JP",
+      "label": "ヌリエ トライアルセット"
+    },
+    {
+      "channel": "Qoo10 JP",
+      "code": "NR_CM_100_LTD_JP",
+      "label": "ヌリエ マスク 限定版"
+    }
+  ]
+}

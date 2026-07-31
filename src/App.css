@@ -1,0 +1,782 @@
+/* ============================================================
+   일손 — 화면 구성 요소
+   토큰은 index.css. 여기는 그 토큰으로 쌓은 부품들이다.
+
+   이 파일을 관통하는 규칙 하나:
+   AI가 낸 것(.draft)은 보라 점선, 사람이 확정한 것(.decided)은 실선.
+   화면 어디에서든 이 두 가지가 눈으로 구분되어야 한다.
+   ============================================================ */
+
+/* ===== 셸 ===== */
+.app-shell {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 26px 22px 72px;
+}
+
+.app-main-bare {
+  max-width: 760px;
+  padding-top: 44px;
+}
+
+.page-loading {
+  padding: 80px 0;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* ===== 상단바 ===== */
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 12px 22px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border);
+}
+
+.topbar-brand {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 9px;
+  font-weight: 800;
+  font-size: 17px;
+  letter-spacing: -0.03em;
+  color: var(--text-h);
+  text-decoration: none;
+}
+.topbar-brand:hover {
+  text-decoration: none;
+}
+
+.topbar-logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 800;
+  transform: translateY(3px);
+}
+
+.topbar-brand-sub {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text-muted);
+  letter-spacing: -0.01em;
+}
+
+.topbar-nav {
+  display: flex;
+  gap: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.topbar-nav::-webkit-scrollbar {
+  display: none;
+}
+
+.topbar-link {
+  padding: 7px 13px;
+  border-radius: 10px;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.topbar-link:hover {
+  background: var(--surface);
+  color: var(--text-h);
+  text-decoration: none;
+}
+.topbar-link.active {
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.topbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    padding: 11px 16px;
+  }
+  .topbar-nav {
+    order: 3;
+    flex-basis: 100%;
+    padding: 2px 0 4px;
+    -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent);
+    mask-image: linear-gradient(90deg, #000 92%, transparent);
+  }
+  .topbar-right {
+    margin-left: auto;
+  }
+  .topbar-brand-sub {
+    display: none;
+  }
+}
+
+/* ===== 푸터 ===== */
+.app-footer {
+  border-top: 1px solid var(--border);
+  background: var(--social-bg);
+  padding: 36px 22px 24px;
+  font-size: 13.5px;
+  color: var(--text-muted);
+}
+
+.footer-grid {
+  max-width: 1180px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr;
+  gap: 32px;
+}
+
+@media (max-width: 860px) {
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+}
+
+.footer-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 7px;
+}
+
+.footer-text {
+  line-height: 1.65;
+}
+
+.footer-bottom {
+  max-width: 1180px;
+  margin: 26px auto 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  font-size: 12.5px;
+}
+
+.footer-link {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* ===== 페이지 머리 ===== */
+.page-head {
+  margin-bottom: 22px;
+}
+
+.page-eyebrow {
+  display: inline-block;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+
+.page-sub {
+  color: var(--text-muted);
+  font-size: 15px;
+  max-width: 74ch;
+  line-height: 1.6;
+}
+
+/* ===== 카드 ===== */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.card-flat {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 18px 20px;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.card-title {
+  font-size: 16.5px;
+  font-weight: 700;
+  color: var(--text-h);
+  letter-spacing: -0.016em;
+}
+
+.card-note {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+.grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.grid-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 940px) {
+  .grid-2,
+  .grid-3,
+  .grid-side {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.stack-sm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.spacer {
+  flex: 1;
+}
+
+/* ===== AI 초안 vs 사람 결정 — 이 앱의 핵심 시각 규칙 ===== */
+.draft {
+  border: 1.5px dashed var(--draft-border);
+  background: var(--draft-bg);
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+}
+
+.decided {
+  border: 1.5px solid var(--human-border);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+}
+
+.rejected {
+  border: 1.5px solid var(--border);
+  background: transparent;
+  border-radius: var(--radius-sm);
+  padding: 13px 15px;
+  opacity: 0.62;
+}
+.rejected .item-body {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-muted);
+}
+
+.origin-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin-bottom: 6px;
+}
+.origin-ai {
+  color: var(--draft);
+}
+.origin-human {
+  color: var(--text-h);
+}
+
+.item-body {
+  color: var(--text-h);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.item-quote {
+  margin-top: 7px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border);
+  font-size: 13.5px;
+  color: var(--text-muted);
+  font-style: normal;
+}
+
+.item-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+/* ===== 8단계 레일 ===== */
+.rail {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+  padding: 4px 0 10px;
+  margin-bottom: 20px;
+}
+
+.rail-step {
+  flex: 1 0 auto;
+  min-width: 118px;
+  position: relative;
+  padding: 11px 14px 11px 18px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-right: none;
+  color: var(--text-muted);
+  text-decoration: none;
+  font-size: 13.5px;
+  font-weight: 600;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.rail-step:first-child {
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+.rail-step:last-child {
+  border-right: 1px solid var(--border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.rail-step:hover {
+  color: var(--text-h);
+  text-decoration: none;
+}
+.rail-step.done {
+  color: var(--success-text);
+  background: var(--success-bg);
+}
+.rail-step.current {
+  color: var(--on-accent);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.rail-step.blocked {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+}
+
+.rail-num {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  opacity: 0.75;
+  margin-bottom: 1px;
+}
+
+/* ===== 통계 타일 ===== */
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.stat-tile {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+}
+
+.stat-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.stat-value {
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-h);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-note {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+/* 표본이 모자라 판단을 보류한 위젯. 숫자를 죽여 눈에 덜 띄게 한다. */
+.stat-tile.held .stat-value {
+  color: var(--text-muted);
+  opacity: 0.55;
+}
+.stat-tile.held {
+  border-style: dashed;
+}
+
+/* ===== 표 ===== */
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.data-table {
+  width: 100%;
+  font-size: 13.5px;
+  min-width: 560px;
+}
+
+.data-table th,
+.data-table td {
+  padding: 9px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.data-table thead th {
+  background: var(--surface);
+  color: var(--text-muted);
+  font-weight: 700;
+  font-size: 12.5px;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.data-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.data-table tbody tr.clickable {
+  cursor: pointer;
+}
+.data-table tbody tr.clickable:hover td {
+  background: var(--accent-bg);
+}
+.data-table tbody tr.selected td {
+  background: var(--accent-bg);
+}
+
+.num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+.mono {
+  font-family: var(--mono);
+  font-size: 12.5px;
+}
+
+/* ===== 칩 ===== */
+.chip-row {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  padding: 6px 13px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.chip:hover:not(:disabled) {
+  background: var(--border);
+  color: var(--text-h);
+}
+.chip.on {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+/* ===== 정의/근거 펼침 ===== */
+.disclose {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+.disclose > summary {
+  cursor: pointer;
+  padding: 9px 13px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  list-style: none;
+}
+.disclose > summary::-webkit-details-marker {
+  display: none;
+}
+.disclose > summary::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 6px;
+  transition: transform 0.15s ease;
+}
+.disclose[open] > summary::before {
+  transform: rotate(90deg);
+}
+.disclose > summary:hover {
+  color: var(--text-h);
+}
+.disclose-body {
+  padding: 4px 14px 14px;
+  font-size: 13.5px;
+  color: var(--text);
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 14px;
+  font-size: 13.5px;
+}
+.kv dt {
+  color: var(--text-muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.kv dd {
+  margin: 0;
+  color: var(--text-h);
+}
+
+/* ===== 알림 상자 ===== */
+.notice {
+  border-radius: var(--radius-sm);
+  padding: 12px 15px;
+  font-size: 13.5px;
+  line-height: 1.6;
+  border: 1px solid transparent;
+}
+.notice-info {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+  color: var(--text-h);
+}
+.notice-warn {
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--text-h);
+}
+.notice-danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+  color: var(--text-h);
+}
+.notice-success {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--text-h);
+}
+.notice-title {
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 3px;
+}
+
+/* 인수인계 게이트가 막았을 때의 판정문. 이 화면이 제품의 중심 동작이라
+   가장 큰 목소리를 갖는다. */
+.verdict {
+  border-radius: var(--radius);
+  padding: 18px 20px;
+  border: 2px solid;
+}
+.verdict-blocked {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+}
+.verdict-passed {
+  background: var(--success-bg);
+  border-color: var(--success);
+}
+.verdict-head {
+  font-size: 19px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  margin-bottom: 6px;
+}
+.verdict-body {
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text-h);
+}
+
+/* ===== 빈 상태 ===== */
+.empty {
+  text-align: center;
+  padding: 46px 20px;
+  color: var(--text-muted);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.empty-title {
+  font-size: 15.5px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 4px;
+}
+.empty-sub {
+  font-size: 13.5px;
+}
+
+/* ===== 토스트 ===== */
+.toast-viewport {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  pointer-events: none;
+}
+.toast-viewport > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+.toast {
+  pointer-events: auto;
+  max-width: 380px;
+  text-align: left;
+  padding: 11px 16px;
+  border-radius: var(--radius-sm);
+  color: var(--toast-text);
+  border: 1px solid var(--toast-border);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 600;
+  animation: toast-in 0.18s ease;
+}
+.toast:hover {
+  filter: brightness(1.08);
+}
+.toast-success {
+  background: var(--toast-success);
+}
+.toast-error {
+  background: var(--toast-danger);
+}
+.toast-info {
+  background: var(--toast-info);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ===== 모달 ===== */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+.modal-content {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 22px 24px;
+  width: min(620px, 100%);
+  max-height: 86svh;
+  overflow-y: auto;
+  text-align: left;
+}
+
+/* ===== 오류 경계 ===== */
+.error-boundary {
+  max-width: 620px;
+  margin: 80px auto;
+  padding: 26px;
+  border: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  border-radius: var(--radius);
+  text-align: left;
+}
+
+/* ===== 찾을 수 없음 ===== */
+.notfound {
+  text-align: center;
+  padding: 90px 20px;
+}

@@ -1,0 +1,11 @@
+name = "ilson"
+compatibility_date = "2025-01-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ilson"
+database_id = "PLACEHOLDER_SET_IN_DASHBOARD"
+
+[[r2_buckets]]
+binding = "SOURCES"
+bucket_name = "ilson"

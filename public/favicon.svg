@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="일손">
+  <rect width="64" height="64" rx="15" fill="#4d94ff" />
+  <!-- 여덟 단계 레일. 다섯 번째까지 지나온 상태를 점으로 표시한다. -->
+  <g fill="#10131a">
+    <circle cx="13" cy="48" r="3" />
+    <circle cx="22" cy="48" r="3" />
+    <circle cx="31" cy="48" r="3" />
+    <circle cx="40" cy="48" r="3" />
+    <circle cx="49" cy="48" r="3" opacity="0.35" />
+  </g>
+  <!-- '일'의 ㅇ + ㅣ + ㄹ 을 단순화한 글리프 -->
+  <path d="M18 14h28v7H35v16h-7V21H18z" fill="#10131a" />
+</svg>

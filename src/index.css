@@ -1,0 +1,451 @@
+/* ============================================================
+   일손 — 디자인 토큰
+
+   7월 18일 프로젝트의 토큰 체계를 그대로 잇는다. 다른 점은 하나 —
+   **어두운 화면이 기본값**이다. 이 앱은 종일 띄워 두고 표와 로그를 읽는
+   작업대라서 흰 바탕이 눈에 부담을 준다. 밝은 화면을 원하는 사람은 우상단
+   토글로 언제든 바꿀 수 있고, 그 선택은 저장된다.
+   ============================================================ */
+
+:root {
+  color-scheme: dark;
+
+  --text: #b0b8c1;
+  --text-h: #f2f4f6;
+  --text-muted: #98a2ad;
+  --bg: #17171c;
+  --surface: #23232a;
+  --border: #33333d;
+  --code-bg: #23232a;
+
+  --accent: #4d94ff;
+  --accent-bg: rgba(77, 148, 255, 0.14);
+  --accent-border: rgba(77, 148, 255, 0.45);
+  --accent-hover: #6ba6ff;
+
+  --danger: #ff6b76;
+  --danger-bg: rgba(255, 107, 118, 0.14);
+  --danger-border: rgba(255, 107, 118, 0.4);
+
+  --success: #2ee08f;
+  --success-bg: rgba(46, 224, 143, 0.14);
+  --success-border: rgba(46, 224, 143, 0.4);
+
+  --warning: #ffb84d;
+  --warning-bg: rgba(255, 184, 77, 0.14);
+  --warning-border: rgba(255, 184, 77, 0.4);
+
+  /* 면·테두리에 쓰는 색을 그대로 글자에 쓰면 읽히지 않는다. 글자로 쓸 때는 아래 값. */
+  --danger-text: #ff8e97;
+  --success-text: #4ee7a2;
+  --warning-text: #ffc670;
+
+  /* 이 앱을 관통하는 시각 규칙: AI가 낸 것과 사람이 확정한 것을 색과 테두리로
+     구분한다. AI 초안은 보라 점선, 사람 결정은 잉크색 실선. */
+  --draft: #b9a4ff;
+  --draft-bg: rgba(185, 164, 255, 0.12);
+  --draft-border: rgba(185, 164, 255, 0.45);
+  --human-border: var(--text-h);
+
+  /* 강조색 면 위에 얹는 글자색. 어두운 화면에서는 --accent가 밝아지므로
+     그 위의 글자는 어두워야 읽힌다 (흰 글자는 2.6:1로 미달, 이 값은 7.5:1). */
+  --on-accent: #10131a;
+
+  --toast-text: #fff;
+  --toast-success: #00875a;
+  --toast-danger: #cf2637;
+  --toast-info: #2b2f36;
+  --toast-border: rgba(255, 255, 255, 0.22);
+  --overlay: rgba(0, 0, 0, 0.66);
+
+  --social-bg: rgba(255, 255, 255, 0.04);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow: rgba(0, 0, 0, 0.6) 0 10px 15px -3px, rgba(0, 0, 0, 0.4) 0 4px 6px -2px;
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-full: 9999px;
+
+  --sans: 'Pretendard Variable', Pretendard, system-ui, 'Segoe UI', Roboto, sans-serif;
+  --heading: var(--sans);
+  --mono: ui-monospace, 'Cascadia Mono', Consolas, 'D2Coding', monospace;
+
+  font: 17px/150% var(--sans);
+  letter-spacing: -0.01em;
+  color: var(--text);
+  background: var(--bg);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  @media (max-width: 1024px) {
+    font-size: 15.5px;
+  }
+}
+
+/* 밝은 화면 — 사용자가 직접 고른 경우에만 적용된다.
+   (선택은 <html data-theme="light"> 로 표시된다) */
+:root[data-theme='light'] {
+  color-scheme: light;
+
+  --text: #4e5968;
+  --text-h: #191f28;
+  --text-muted: #6b7684;
+  --bg: #ffffff;
+  --surface: #f2f4f6;
+  --border: #e5e8eb;
+  --code-bg: #f2f4f6;
+
+  --accent: #0064ff;
+  --accent-bg: rgba(0, 100, 255, 0.08);
+  --accent-border: rgba(0, 100, 255, 0.35);
+  --accent-hover: #0052d6;
+
+  --danger: #f04452;
+  --danger-bg: rgba(240, 68, 82, 0.08);
+  --danger-border: rgba(240, 68, 82, 0.3);
+
+  --success: #00c471;
+  --success-bg: rgba(0, 196, 113, 0.08);
+  --success-border: rgba(0, 196, 113, 0.3);
+
+  --warning: #ff9f1a;
+  --warning-bg: rgba(255, 159, 26, 0.1);
+  --warning-border: rgba(255, 159, 26, 0.35);
+
+  --danger-text: #d0323f;
+  --success-text: #00885a;
+  --warning-text: #a35c00;
+
+  --draft: #6b4ee6;
+  --draft-bg: rgba(107, 78, 230, 0.08);
+  --draft-border: rgba(107, 78, 230, 0.35);
+  --human-border: var(--text-h);
+
+  --on-accent: #ffffff;
+  --toast-border: transparent;
+  --overlay: rgba(15, 23, 42, 0.5);
+
+  --social-bg: rgba(244, 243, 236, 0.5);
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow: rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* 움직임을 줄여 달라고 설정한 사람에게는 움직이지 않는다.
+   전정기관 장애가 있으면 미끄러져 들어오는 알림이나 커지고 작아지는 버튼이
+   어지럼과 메스꺼움을 일으킬 수 있다. 완전히 없애지 않고 아주 짧게 남기는 것은,
+   0으로 만들면 애니메이션 종료를 기다리는 코드가 멈춰 버리기 때문이다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  button:active:not(:disabled) {
+    transform: none;
+  }
+  .toast {
+    animation: none;
+  }
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+#root {
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+/* 건너뛴 뒤 초점이 본문에 있다는 것만 알리고, 마우스 사용자에게는 테두리를 남기지 않는다 */
+#main:focus {
+  outline: none;
+}
+
+/* 키보드로 탭을 눌렀을 때만 나타나는 건너뛰기 링크 */
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -100px;
+  z-index: 100;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+  text-decoration: none;
+  transition: top 0.15s ease;
+}
+.skip-link:focus {
+  top: 12px;
+  text-decoration: none;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+  color: var(--text-h);
+  font-size: 16px;
+  line-height: 1;
+}
+.theme-toggle:hover:not(:disabled) {
+  background: var(--border);
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--heading);
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+h1 {
+  font-size: 34px;
+  line-height: 1.2;
+  letter-spacing: -0.03em;
+  margin: 0 0 10px;
+  @media (max-width: 1024px) {
+    font-size: 27px;
+  }
+}
+h2 {
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -0.024em;
+  margin: 0 0 8px;
+  @media (max-width: 1024px) {
+    font-size: 19px;
+  }
+}
+h3 {
+  font-size: 16.5px;
+  letter-spacing: -0.016em;
+  margin: 0 0 4px;
+}
+h4 {
+  font-size: 14.5px;
+  letter-spacing: -0.012em;
+  margin: 0 0 4px;
+  color: var(--text-muted);
+  text-transform: none;
+}
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+code {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  line-height: 1.35;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--text-h);
+  background: var(--code-bg);
+}
+
+pre {
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+  color: var(--text-h);
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+button {
+  appearance: none;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  border-radius: var(--radius-full);
+  padding: 9px 18px;
+  color: var(--text-h);
+  background: var(--surface);
+  transition:
+    background 0.15s ease,
+    transform 0.1s ease,
+    box-shadow 0.15s ease,
+    opacity 0.15s ease;
+}
+button:hover:not(:disabled) {
+  background: var(--border);
+}
+button:active:not(:disabled) {
+  transform: scale(0.97);
+}
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+  box-shadow: var(--shadow-sm);
+}
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.btn-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+}
+.btn-danger:hover:not(:disabled) {
+  background: var(--danger);
+  color: var(--on-accent);
+}
+.btn-ghost {
+  background: transparent;
+}
+.btn-ghost:hover:not(:disabled) {
+  background: var(--surface);
+}
+.btn-sm {
+  padding: 6px 13px;
+  font-size: 13px;
+}
+.btn-block {
+  width: 100%;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  padding: 11px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  color: var(--text-h);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-bg);
+}
+/* 마우스로 눌렀을 때는 테두리 강조만, 키보드로 왔을 때는 외곽선까지 남긴다.
+   (이 규칙이 위 :focus보다 뒤에 있어야 외곽선이 지워지지 않는다) */
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
+input:disabled,
+select:disabled,
+textarea:disabled {
+  background: var(--surface);
+  color: var(--text-muted);
+}
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  accent-color: var(--accent);
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+.badge-neutral {
+  background: var(--surface);
+  color: var(--text-muted);
+  border-color: var(--border);
+}
+.badge-accent {
+  background: var(--accent-bg);
+  color: var(--accent);
+  border-color: var(--accent-border);
+}
+.badge-success {
+  background: var(--success-bg);
+  color: var(--success-text);
+  border-color: var(--success-border);
+}
+.badge-danger {
+  background: var(--danger-bg);
+  color: var(--danger-text);
+  border-color: var(--danger-border);
+}
+.badge-warning {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  border-color: var(--warning-border);
+}
+/* AI가 낸 것에는 항상 이 배지가 붙는다 */
+.badge-draft {
+  background: var(--draft-bg);
+  color: var(--draft);
+  border-color: var(--draft-border);
+}
+
+/* 스크린리더 전용 텍스트 — 보이지 않되 읽히게 한다.
+   display:none이나 visibility:hidden으로 숨기면 스크린리더도 읽지 못한다. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

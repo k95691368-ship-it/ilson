@@ -1,0 +1,41 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+.functions-build
+*.local
+
+# Wrangler / Cloudflare local state and secrets
+.wrangler
+.dev.vars
+.dev.vars.*
+
+# R2에서 내려받은 객체가 작업 트리에 떨어지는 경로.
+# `wrangler r2 object get portfolio/applications/...` 는 R2 키를 그대로 상대
+# 경로로 삼아 파일을 만든다. 여기에 들어오는 것은 지원자 이력서·포트폴리오와
+# 서명된 계약서라, 실수로 커밋되면 개인정보가 저장소 이력에 영구히 남는다.
+#
+# 반드시 맨 앞에 /를 붙여 저장소 루트로 고정한다. 그러지 않으면 같은 이름의
+# 소스 디렉터리(functions/api/applications)까지 무시되어, 그 아래 새로 만든
+# 파일이 커밋에서 조용히 빠진다.
+/applications/
+/contracts/
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
