@@ -581,6 +581,202 @@
   align-self: center;
 }
 
+/* ===== 폼 ===== */
+.field {
+  margin-bottom: 16px;
+}
+.field:last-child {
+  margin-bottom: 0;
+}
+
+.field-label {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 6px;
+}
+.field-required {
+  color: var(--danger-text);
+}
+/* 도움말은 라벨 옆에 둔다. 입력칸 아래에 두면 다 적은 뒤에야 읽게 된다. */
+.field-hint {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.field input,
+.field select,
+.field textarea {
+  width: 100%;
+}
+.field textarea {
+  resize: vertical;
+  min-height: 72px;
+  line-height: 1.6;
+}
+
+.field.has-error input,
+.field.has-error select,
+.field.has-error textarea {
+  border-color: var(--danger);
+}
+
+.field-foot {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 5px;
+  min-height: 0;
+}
+.field-error {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--danger-text);
+}
+.field-count {
+  margin-left: auto;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.field-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0 14px;
+}
+
+/* ===== 파일 넣는 자리 ===== */
+.dropzone {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 18px 20px;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.dropzone:hover {
+  border-color: var(--accent-border);
+}
+
+.peek {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  background: var(--bg);
+}
+.peek-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.peek-name {
+  color: var(--text-h);
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46%;
+}
+.peek-note {
+  margin: 8px 0 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--warning-text);
+}
+.peek-meta {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.peek-table {
+  margin-top: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+.peek-table .data-table {
+  min-width: 0;
+  font-size: 12.5px;
+}
+.peek-table .data-table th,
+.peek-table .data-table td {
+  padding: 6px 10px;
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ===== 접수 완료 ===== */
+.receipt {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 18px 20px;
+  border: 1px solid var(--success-border);
+  border-radius: var(--radius);
+  background: var(--success-bg);
+}
+.receipt-mark {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--success);
+  color: var(--on-accent);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+}
+.receipt-title {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-h);
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.receipt-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-h);
+  margin: 0 0 4px;
+}
+
+/* ===== 접수된 신청서 목록 ===== */
+.app-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.app-item {
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.app-item-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+.app-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+  line-height: 1.45;
+  margin-bottom: 3px;
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;
