@@ -1312,6 +1312,135 @@
   color: var(--text);
 }
 
+/* ===== 6단계 사용법서 ===== */
+.manual-doc {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 32px 36px;
+  line-height: 1.75;
+}
+@media (max-width: 700px) {
+  .manual-doc {
+    padding: 22px 20px;
+  }
+}
+
+.manual-doc h1 {
+  font-size: 26px;
+  margin-bottom: 4px;
+}
+.manual-doc h2 {
+  font-size: 18px;
+  margin: 28px 0 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.manual-doc h2:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+.manual-doc p {
+  margin-bottom: 10px;
+  color: var(--text);
+}
+.manual-intro {
+  font-size: 15.5px;
+  color: var(--text-h);
+}
+.manual-doc hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 24px 0 14px;
+}
+
+.manual-steps {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.manual-steps li {
+  line-height: 1.65;
+}
+.manual-steps strong {
+  color: var(--text-h);
+}
+
+.manual-list {
+  margin: 0 0 10px;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.manual-faq {
+  margin: 0;
+}
+.manual-faq > div {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.manual-faq > div:last-child {
+  border-bottom: none;
+}
+.manual-faq dt {
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 4px;
+}
+.manual-faq dd {
+  margin: 0;
+  color: var(--text);
+}
+
+/* 인쇄할 때는 문서만 남긴다.
+   부서 담당자가 종이로 뽑거나 PDF로 저장해 자기 폴더에 보관할 것이라,
+   편집 화면과 상단 목차가 같이 나오면 안 된다. */
+@media print {
+  .topbar,
+  .app-footer,
+  .no-print,
+  .stage-head,
+  .toast-viewport {
+    display: none !important;
+  }
+  .app-main {
+    padding: 0;
+    max-width: none;
+  }
+  .manual-doc {
+    border: none;
+    padding: 0;
+    background: #fff;
+    color: #000;
+  }
+  .manual-doc h1,
+  .manual-doc h2,
+  .manual-doc strong {
+    color: #000;
+  }
+  .manual-doc p,
+  .manual-doc li,
+  .manual-doc dd {
+    color: #222;
+  }
+  .data-table th,
+  .data-table td {
+    border-color: #ccc;
+    color: #000;
+  }
+  .table-wrap {
+    overflow: visible;
+    border-color: #ccc;
+  }
+  .card-note {
+    color: #555;
+  }
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;

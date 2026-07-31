@@ -50,6 +50,7 @@ function withJson(method, body) {
 export const api = {
   get: (path) => send(path),
   post: (path, body) => send(path, withJson('POST', body)),
+  put: (path, body) => send(path, withJson('PUT', body)),
   patch: (path, body) => send(path, withJson('PATCH', body)),
   remove: (path, body) => send(path, withJson('DELETE', body)),
   // 파일이 섞인 폼은 Content-Type을 우리가 정하면 안 된다.
