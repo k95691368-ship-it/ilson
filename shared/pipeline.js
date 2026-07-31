@@ -108,6 +108,24 @@ export const CHANNEL_RULES_PUBLIC = CHANNEL_RULES.map((r) => ({
   columns: Object.entries(COLUMN_MAP[r.channel] ?? {}).map(([from, to]) => ({ from, to })),
 }))
 
+// 없으면 아예 처리할 수 없는 칸.
+const REQUIRED_FIELDS = ['date', 'sku', 'qty', 'gross']
+
+// 없으면 금액이 조용히 틀리는 칸.
+//
+// 이걸 따로 구분하는 이유가 있다. 예전에는 위 네 개만 확인하고 나머지는 없어도
+// 그냥 진행했다. 그래서 채널이 '할인액'을 '할인금액'으로 바꿔 보내면, 채널은
+// 그대로 알아보고 줄도 전부 처리하는데 할인이 0으로 잡혀 순매출이 부풀려졌다.
+// 실제로 재 보니 자사몰 한 채널에서만 25만원이 늘었다. 검토함에도 안 가고
+// 경고도 없어서 아무도 모른다.
+//
+// 이런 종류의 오류가 가장 나쁘다. 터지면 알기라도 하는데, 그럴듯한 숫자가
+// 나오면 회의에서 지적받은 뒤에야 발견된다.
+const MONEY_FIELDS = ['discount']
+
+// 없어도 금액에 영향이 없는 칸. 없으면 알려만 준다.
+const COSMETIC_FIELDS = ['name', 'store', 'currency', 'reported_commission', 'reported_commission_rate']
+
 // 머리글 배열에서 "우리 이름 → 몇 번째 칸" 표를 만든다.
 export function buildColumnIndex(channel, header) {
   const map = COLUMN_MAP[channel] ?? {}
@@ -121,10 +139,28 @@ export function buildColumnIndex(channel, header) {
     else if (name) unmapped.push(name)
   })
 
-  const required = ['date', 'sku', 'qty', 'gross']
-  const missing = required.filter((f) => index[f] === undefined)
+  // 이 채널 정의에 있는 칸 중 파일에서 못 찾은 것.
+  const definedFields = new Set(Object.values(map))
+  const notFound = [...definedFields].filter((f) => index[f] === undefined)
 
-  return { index, unmapped, missing }
+  const missing = notFound.filter((f) => REQUIRED_FIELDS.includes(f))
+  const missingMoney = notFound.filter((f) => MONEY_FIELDS.includes(f))
+  const missingCosmetic = notFound.filter((f) => COSMETIC_FIELDS.includes(f))
+
+  // 원래 이름이 무엇이었는지 함께 돌려준다. 사람이 "아, 저 컬럼 이름이
+  // 바뀌었구나"를 바로 알 수 있어야 한다.
+  const originalNameOf = (field) =>
+    Object.entries(map).find(([, to]) => to === field)?.[0] ?? field
+
+  return {
+    index,
+    unmapped,
+    missing,
+    missingMoney,
+    missingCosmetic,
+    missingNames: [...missing, ...missingMoney, ...missingCosmetic].map(originalNameOf),
+    moneyMissingNames: missingMoney.map(originalNameOf),
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -511,21 +547,44 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
       }
 
       const columns = buildColumnIndex(channel, table.header)
-      if (columns.missing.length > 0) {
+
+      // 처리에 꼭 필요한 칸이 없거나, 금액에 들어가는 칸이 없으면 이 시트를
+      // 통째로 멈춘다. 두 번째가 중요하다 — 없는 채로 진행하면 그 칸이 0으로
+      // 잡혀 금액이 조용히 틀리고, 그럴듯한 숫자라 아무도 모른다.
+      if (columns.missing.length > 0 || columns.missingMoney.length > 0) {
+        const names = columns.missing.length > 0 ? columns.missingNames : columns.moneyMissingNames
+        const why =
+          columns.missing.length > 0
+            ? `${names.join(', ')} 칸을 찾지 못했습니다. 이 칸이 없으면 처리할 수 없습니다.`
+            : `${names.join(', ')} 칸을 찾지 못했습니다. 이대로 처리하면 그 값이 0으로 잡혀 금액이 틀립니다. 채널이 컬럼 이름을 바꿨는지 확인해주세요.`
+
         quarantine.push({
           reason: 'missing_columns',
           source: { ...source0, rowNo: table.headerRowNo },
           raw: table.header,
-          note: `${columns.missing.join(', ')} 컬럼을 찾지 못했습니다.`,
+          note: why,
         })
         fileReports.push({
           name: file.name,
           sheet: table.sheetName,
           ok: false,
           channel,
-          note: `필요한 컬럼이 없습니다: ${columns.missing.join(', ')}`,
+          note: why,
+          missingColumns: names,
         })
         continue
+      }
+
+      // 금액에 영향은 없지만 없어진 칸. 막지는 않고 알려만 준다.
+      if (columns.missingCosmetic.length > 0) {
+        fileReports.push({
+          name: file.name,
+          sheet: table.sheetName,
+          ok: true,
+          channel,
+          warnOnly: true,
+          note: `${columns.missingNames.join(', ')} 칸이 없습니다. 금액에는 영향이 없어 그대로 진행했습니다.`,
+        })
       }
 
       // 다른 달 시트면 통째로 뺀다. 한 줄씩 판단하지 않는 이유는 위 주석에 있다.

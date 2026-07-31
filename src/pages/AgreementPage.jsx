@@ -73,8 +73,11 @@ function Agreement({ id }) {
       await reload()
       return r
     } catch (err) {
+      // 여기서 다시 던지면 버튼 onClick이 받아 주는 곳이 없어 브라우저 콘솔에
+      // 처리되지 않은 오류로 남는다. 사용자에게는 이미 알림으로 알렸으므로
+      // null을 돌려주고, 이어서 할 일이 있는 곳만 그 값을 확인하면 된다.
       toast.error(err.message)
-      throw err
+      return null
     }
   }
 
