@@ -95,14 +95,40 @@
 }
 
 .topbar-link {
-  padding: 7px 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 11px;
   border-radius: 10px;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text);
   text-decoration: none;
   white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+/* 목차가 여덟 개다. 번호가 있어야 "몇 번째 단계인지"가 즉시 읽히고,
+   순서가 있는 과정이라는 것이 이름만 늘어놓는 것보다 잘 전달된다. */
+.topbar-link-no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 17px;
+  height: 17px;
+  flex: none;
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10.5px;
+  font-weight: 800;
+}
+.topbar-link:hover .topbar-link-no {
+  background: var(--bg);
+}
+.topbar-link.active .topbar-link-no {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 .topbar-link:hover {
   background: var(--surface);
@@ -365,61 +391,194 @@
   margin-top: 10px;
 }
 
-/* ===== 8단계 레일 ===== */
-.rail {
+/* ===== 단계 화면 머리 ===== */
+.stage-head {
+  margin-bottom: 24px;
+}
+
+.stage-head-top {
   display: flex;
-  gap: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
-  padding: 4px 0 10px;
-  margin-bottom: 20px;
+  gap: 16px;
+  align-items: flex-start;
 }
 
-.rail-step {
-  flex: 1 0 auto;
-  min-width: 118px;
-  position: relative;
-  padding: 11px 14px 11px 18px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-right: none;
-  color: var(--text-muted);
-  text-decoration: none;
-  font-size: 13.5px;
-  font-weight: 600;
-  transition: background 0.15s ease, color 0.15s ease;
-}
-.rail-step:first-child {
-  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
-}
-.rail-step:last-child {
-  border-right: 1px solid var(--border);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-}
-.rail-step:hover {
-  color: var(--text-h);
-  text-decoration: none;
-}
-.rail-step.done {
-  color: var(--success-text);
-  background: var(--success-bg);
-}
-.rail-step.current {
-  color: var(--on-accent);
+/* 단계 번호를 크게 두는 이유: 상단 목차에서 몇 번을 눌렀는지가 화면에서
+   한 번 더 확인되어야, 여덟 개를 오가며 길을 잃지 않는다. */
+.stage-no {
+  flex: none;
+  width: 46px;
+  height: 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
   background: var(--accent);
-  border-color: var(--accent);
-}
-.rail-step.blocked {
-  color: var(--danger-text);
-  background: var(--danger-bg);
+  color: var(--on-accent);
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
 }
 
-.rail-num {
-  display: block;
-  font-size: 11px;
+.stage-head-text h1 {
+  margin: 0 0 6px;
+}
+
+.stage-head-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+/* 이 포트폴리오에서 가장 흐려지기 쉬운 것이 "누가 한 일인가"다.
+   그래서 단계마다 주인을 적어 둔다. */
+.stage-owner {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
   font-weight: 700;
-  opacity: 0.75;
-  margin-bottom: 1px;
+  color: var(--text-h);
+}
+.stage-owner-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  letter-spacing: 0;
+}
+
+.stage-nav-link {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  padding: 5px 11px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+.stage-nav-link:hover {
+  color: var(--text-h);
+  background: var(--border);
+  text-decoration: none;
+}
+
+/* ===== 아직 만들지 않은 자리 =====
+   무엇이 들어올지를 적어 두면 뼈대만으로도 전체 그림이 읽힌다.
+   빈 화면에 "준비 중"만 있는 것보다 계획이 보이는 편이 정직하다. */
+.planned {
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--social-bg);
+  padding: 20px 22px;
+}
+.planned-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  margin-bottom: 12px;
+  letter-spacing: 0.01em;
+}
+.planned-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.planned-list li {
+  position: relative;
+  padding-left: 20px;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.planned-list li::before {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 10px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--border);
+}
+
+/* ===== 첫 화면의 여덟 단계 목록 ===== */
+.flow-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.flow-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+.flow-card:hover {
+  text-decoration: none;
+  border-color: var(--accent-border);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.flow-no {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.flow-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.flow-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-h);
+  letter-spacing: -0.018em;
+}
+.flow-owner {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+.flow-summary {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-muted);
+  margin-top: 3px;
+}
+
+.flow-go {
+  flex: none;
+  color: var(--text-muted);
+  font-size: 18px;
+  align-self: center;
 }
 
 /* ===== 통계 타일 ===== */

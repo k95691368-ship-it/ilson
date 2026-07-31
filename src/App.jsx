@@ -1,23 +1,23 @@
 import { Suspense, lazy } from 'react'
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
 import ThemeToggle from './components/ThemeToggle.jsx'
-import { getView, orderedNav } from './lib/view.js'
+import { STAGES } from './lib/stages.js'
 
-const DeskPage = lazy(() => import('./pages/DeskPage.jsx'))
-const RequestPage = lazy(() => import('./pages/RequestPage.jsx'))
+const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
+const ApplyPage = lazy(() => import('./pages/ApplyPage.jsx'))
+const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'))
+const AgreementPage = lazy(() => import('./pages/AgreementPage.jsx'))
+const BuildPage = lazy(() => import('./pages/BuildPage.jsx'))
+const BetaPage = lazy(() => import('./pages/BetaPage.jsx'))
+const ManualPage = lazy(() => import('./pages/ManualPage.jsx'))
+const DeployPage = lazy(() => import('./pages/DeployPage.jsx'))
+const ResultPage = lazy(() => import('./pages/ResultPage.jsx'))
 const ToolPage = lazy(() => import('./pages/ToolPage.jsx'))
-const MetricsPage = lazy(() => import('./pages/MetricsPage.jsx'))
-const QualityPage = lazy(() => import('./pages/QualityPage.jsx'))
-const DecisionLogPage = lazy(() => import('./pages/DecisionLogPage.jsx'))
-const HonestyPage = lazy(() => import('./pages/HonestyPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
-const view = getView()
-const nav = orderedNav(view)
-
-// 인수인계된 도구(/t/:slug)는 현업 담당자가 열 화면이다. 제작 과정도 상단 탭도
-// 보일 이유가 없다 — 드롭존과 실행 버튼만 있으면 된다. 그래서 이 경로에서는
-// 상단바를 지운다.
+// 인수인계된 도구(/t/:slug)는 현업 담당자가 여는 화면이다. 제작 과정도 상단
+// 목차도 보일 이유가 없다 — 파일을 넣고 결과를 받으면 된다. 그래서 이 경로에서는
+// 셸을 지운다.
 function useBareLayout() {
   return useLocation().pathname.startsWith('/t/')
 }
@@ -33,23 +33,25 @@ export default function App() {
 
       {!bare && (
         <header className="topbar">
-          <Link to={view.home} className="topbar-brand">
+          <Link to="/" className="topbar-brand">
             <span className="topbar-logo" aria-hidden="true">
               일
             </span>
             일손
-            <span className="topbar-brand-sub">사내 반복업무 인수인계</span>
+            <span className="topbar-brand-sub">부서 병목을 도구로 바꾸는 여덟 단계</span>
           </Link>
 
-          <nav className="topbar-nav" aria-label="주요 화면">
-            {nav.map((item) => (
+          <nav className="topbar-nav" aria-label="진행 단계">
+            {STAGES.map((s) => (
               <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
+                key={s.key}
+                to={s.path}
                 className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
               >
-                {item.label}
+                <span className="topbar-link-no" aria-hidden="true">
+                  {s.no}
+                </span>
+                {s.label}
               </NavLink>
             ))}
           </nav>
@@ -63,14 +65,16 @@ export default function App() {
       <main className={bare ? 'app-main app-main-bare' : 'app-main'} id="main">
         <Suspense fallback={<div className="page-loading">불러오는 중…</div>}>
           <Routes>
-            <Route path="/" element={<DeskPage />} />
-            <Route path="/req/:id" element={<RequestPage />} />
-            <Route path="/req/:id/:stage" element={<RequestPage />} />
+            <Route path="/" element={<FlowPage />} />
+            <Route path="/apply" element={<ApplyPage />} />
+            <Route path="/review" element={<ReviewPage />} />
+            <Route path="/agreement" element={<AgreementPage />} />
+            <Route path="/build" element={<BuildPage />} />
+            <Route path="/beta" element={<BetaPage />} />
+            <Route path="/manual" element={<ManualPage />} />
+            <Route path="/deploy" element={<DeployPage />} />
+            <Route path="/result" element={<ResultPage />} />
             <Route path="/t/:slug" element={<ToolPage />} />
-            <Route path="/metrics" element={<MetricsPage />} />
-            <Route path="/quality" element={<QualityPage />} />
-            <Route path="/log" element={<DecisionLogPage />} />
-            <Route path="/honesty" element={<HonestyPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
@@ -82,31 +86,28 @@ export default function App() {
             <div className="footer-col">
               <div className="footer-title">일손 (ILSON)</div>
               <p className="footer-text">
-                현업의 불평 한 줄을 받아 부서와 회의하고, AI와 함께 도구로 만들어,
-                합격 기준을 통과시킨 뒤 인수인계하는 과정 전체를 운영하는 작업대입니다.
+                각 부서가 병목을 신청서로 적어 내면, AX 담당자가 검토하고 협의해 도구로 만들고,
+                베타 테스트를 거쳐 사용법서와 함께 넘기고, 기준선 대비 성과를 정리하기까지의
+                과정 전체입니다.
               </p>
             </div>
             <div className="footer-col">
-              <div className="footer-title">사람이 하는 일</div>
+              <div className="footer-title">여덟 단계</div>
               <p className="footer-text">
-                우선순위 판단 · 부서 회의 · 요구 충돌 판정 · 기준선 실측 ·
-                블록 승인 · 합격 기준 정의 · 성과 지표 정의 · 인수인계 승인
+                {STAGES.map((s) => `${s.no} ${s.label}`).join(' · ')}
               </p>
             </div>
             <div className="footer-col">
-              <div className="footer-title">AI가 하는 일</div>
+              <div className="footer-title">AI를 쓰는 자리</div>
               <p className="footer-text">
-                회의 질문지 초안 · 회의록에서 요구 추출 · 충돌 후보 탐지 ·
-                실행 계획 초안 · 잔여 컬럼 매핑 · 수리 제안 · 서술 채점.
-                <strong> 확정은 하지 않습니다.</strong>
+                초안 작성과 분류를 돕습니다. 우선순위·반려·합격 기준·성과 정의 등
+                <strong> 확정은 사람이 합니다.</strong> 화면에서 AI 초안과 사람의 결정이 구분됩니다.
               </p>
             </div>
           </div>
           <div className="footer-bottom">
             <span>Claude Opus 5 · Cloudflare Pages Functions · D1 · R2</span>
-            <Link to="/honesty" className="footer-link">
-              이 포트폴리오가 증명하지 못하는 것
-            </Link>
+            <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>
         </footer>
       )}
