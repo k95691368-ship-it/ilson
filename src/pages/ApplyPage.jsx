@@ -105,6 +105,9 @@ export default function ApplyPage() {
             {receipt.saved_files?.length > 0 && (
               <p className="card-note">첨부 {receipt.saved_files.length}개 저장됨</p>
             )}
+            <a className="btn-ghost btn-sm" href={`/track?no=${receipt.ticket_no}`}>
+              지금 진행 상황 보기
+            </a>
           </div>
           <button type="button" className="btn-ghost btn-sm" onClick={() => setReceipt(null)}>
             닫기
@@ -351,7 +354,9 @@ export default function ApplyPage() {
                         <span className="badge badge-neutral">{a.dept}</span>
                         <span className={`badge ${statusTone(a.status)}`}>{a.status}</span>
                         <span className="spacer" />
-                        <span className="mono card-note">{a.ticket_no}</span>
+                        <a className="mono card-note" href={`/track?no=${a.ticket_no}`} title="진행 상황 보기">
+                          {a.ticket_no}
+                        </a>
                       </div>
                       <div className="app-item-title">{a.title}</div>
                       <div className="card-note">

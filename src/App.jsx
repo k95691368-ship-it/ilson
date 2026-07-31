@@ -13,13 +13,14 @@ const ManualPage = lazy(() => import('./pages/ManualPage.jsx'))
 const DeployPage = lazy(() => import('./pages/DeployPage.jsx'))
 const ResultPage = lazy(() => import('./pages/ResultPage.jsx'))
 const ToolPage = lazy(() => import('./pages/ToolPage.jsx'))
+const TrackPage = lazy(() => import('./pages/TrackPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
-// 인수인계된 도구(/t/:slug)는 현업 담당자가 여는 화면이다. 제작 과정도 상단
-// 목차도 보일 이유가 없다 — 파일을 넣고 결과를 받으면 된다. 그래서 이 경로에서는
-// 셸을 지운다.
+// 부서 담당자가 여는 화면 둘 — 넘겨받은 도구(/t/:slug)와 내 신청서 조회(/track).
+// 제작 과정도 상단 목차도 보일 이유가 없다. 자기 일만 하면 된다.
 function useBareLayout() {
-  return useLocation().pathname.startsWith('/t/')
+  const path = useLocation().pathname
+  return path.startsWith('/t/') || path === '/track'
 }
 
 export default function App() {
@@ -75,6 +76,7 @@ export default function App() {
             <Route path="/deploy" element={<DeployPage />} />
             <Route path="/result" element={<ResultPage />} />
             <Route path="/t/:slug" element={<ToolPage />} />
+            <Route path="/track" element={<TrackPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

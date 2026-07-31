@@ -1560,6 +1560,224 @@
   color: var(--text-h);
 }
 
+/* ===== 접수번호로 조회 (부서 담당자용) ===== */
+.track-page {
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.track-form {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.track-input {
+  flex: 1;
+  min-width: 200px;
+  font-size: 20px;
+  letter-spacing: 0.12em;
+  text-align: center;
+  padding: 14px 16px;
+}
+
+.track-head {
+  padding: 18px 20px;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.track-head.refused {
+  border-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+
+/* 여덟 단계를 세로 선 하나로 잇는다. 지금 어디쯤인지가 눈으로 보여야
+   "제가 낸 거 어떻게 됐나요"라는 전화가 사라진다. */
+.track-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.track-step {
+  position: relative;
+  display: flex;
+  gap: 14px;
+  padding: 0 0 18px 0;
+}
+.track-step:last-child {
+  padding-bottom: 0;
+}
+/* 단계를 잇는 세로 선 */
+.track-step::before {
+  content: '';
+  position: absolute;
+  left: 11px;
+  top: 24px;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+}
+.track-step:last-child::before {
+  display: none;
+}
+.track-step.done::before {
+  background: var(--success);
+}
+
+.track-mark {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+  background: var(--surface);
+  border: 2px solid var(--border);
+  color: var(--text-muted);
+  z-index: 1;
+}
+.track-step.done .track-mark {
+  background: var(--success);
+  border-color: var(--success);
+  color: var(--on-accent);
+}
+.track-step.now .track-mark {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  box-shadow: 0 0 0 4px var(--accent-bg);
+}
+.track-step.back .track-mark {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: var(--on-accent);
+}
+
+.track-body {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+.track-stage {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+  margin-bottom: 3px;
+}
+.track-step.wait .track-stage {
+  color: var(--text-muted);
+  font-weight: 600;
+}
+.track-summary {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.track-step.wait .track-summary {
+  color: var(--text-muted);
+}
+
+.track-detail {
+  margin-top: 9px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  font-size: 13px;
+}
+
+.track-foot {
+  text-align: center;
+  padding: 14px 0 0;
+  border-top: 1px solid var(--border);
+}
+
+/* ===== 첫 화면 현황 ===== */
+.flow-count {
+  margin-left: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-bg);
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  vertical-align: middle;
+}
+
+/* 어느 단계에 몇 건이 머물러 있는지. 병목은 신청서에만 있는 게 아니다 —
+   협의안에서 멈춰 있는 것이 다섯 건이면 그게 이 조직의 병목이다. */
+.stage-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stage-bar {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+.stage-bar-label {
+  color: var(--text);
+  font-weight: 600;
+  text-align: right;
+}
+.stage-bar-track {
+  height: 18px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+.stage-bar-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  min-width: 3px;
+}
+.stage-bar.refused .stage-bar-fill {
+  background: var(--danger);
+}
+.stage-bar.held .stage-bar-fill {
+  background: var(--warning);
+}
+.stage-bar-value {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.refuse-mix {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+}
+.refuse-mix li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+.refuse-mix strong {
+  color: var(--text-h);
+  white-space: nowrap;
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;
