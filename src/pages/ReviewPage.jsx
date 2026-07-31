@@ -6,8 +6,7 @@ import { api } from '../api/client.js'
 import { ago, duration, num, krw } from '../lib/format.js'
 import {
   VERDICTS,
-  REFUSE_CODES,
-  REFUSE_LABELS,
+  REFUSE_REASONS,
   IMPACT_SCALE,
   DIFFICULTY_SCALE,
 } from '../../shared/review.js'
@@ -165,7 +164,6 @@ function Detail({ id, onSaved }) {
   const [form, setForm] = useState(EMPTY_FORM)
   const [fieldErrors, setFieldErrors] = useState({})
   const [saving, setSaving] = useState(false)
-  const [drafting, setDrafting] = useState(false)
 
   // 신청서를 바꾸면 폼을 그 신청서의 상태로 되돌린다. 이전 신청서에 적던
   // 내용이 다음 신청서 폼에 남아 있으면, 그대로 저장해 버리는 사고가 난다.
@@ -196,19 +194,6 @@ function Detail({ id, onSaved }) {
     if (fieldErrors[key]) setFieldErrors((e) => ({ ...e, [key]: undefined }))
   }
 
-  async function askAi() {
-    setDrafting(true)
-    try {
-      await api.post(`/applications/${id}/ai-draft`, {})
-      toast.success('초안이 왔습니다. 그대로 쓰지 마시고 확인하고 고쳐 주세요.')
-      await reload()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setDrafting(false)
-    }
-  }
-
   async function save(e) {
     e.preventDefault()
     setSaving(true)
@@ -230,7 +215,6 @@ function Detail({ id, onSaved }) {
   if (!data) return null
 
   const a = data.application
-  const d = data.aiDraft
 
   return (
     <div className="stack">
@@ -292,99 +276,6 @@ function Detail({ id, onSaved }) {
                 {f.name}
               </span>
             ))}
-          </div>
-        )}
-      </section>
-
-      <section className={d ? 'draft' : 'card'}>
-        <div className="card-head">
-          <span className={d ? 'origin-label origin-ai' : 'card-title'}>
-            {d ? '◇ AI 초안 — 판정이 아니라 참고입니다' : 'AI 초안'}
-          </span>
-          <button type="button" className="btn-ghost btn-sm" onClick={askAi} disabled={drafting}>
-            {drafting ? '부르는 중…' : d ? '다시 부르기' : '초안 부르기'}
-          </button>
-        </div>
-
-        {!d && (
-          <p className="card-note">
-            신청서를 읽고 요약·가능여부·점수 제안·겹치는 신청서를 한 번에 받아 옵니다. 받아 온 값은
-            그대로 저장되지 않고, 아래 폼에 <strong>가져와서 고쳐야</strong> 판정이 됩니다.
-          </p>
-        )}
-
-        {d && (
-          <div className="stack-sm">
-            <p className="item-body">{d.summary}</p>
-
-            <div className={`feasible-box ${d.feasible ? 'yes' : 'no'}`}>
-              <strong>{d.feasible ? '만들 수 있는 종류의 일로 봄' : '범위 밖으로 봄'}</strong>
-              {!d.feasible && d.blocked_by && (
-                <span className="badge badge-danger" style={{ marginLeft: 8 }}>
-                  {REFUSE_LABELS[d.blocked_by] ?? d.blocked_by}
-                </span>
-              )}
-              <div style={{ marginTop: 6 }}>{d.feasible_reason}</div>
-              {d.partial_note && (
-                <div className="feasible-partial">
-                  <strong>경계</strong> — {d.partial_note}
-                </div>
-              )}
-              {d.suggested_alternative && (
-                <div className="feasible-alt">
-                  <strong>대안 제안</strong> — {d.suggested_alternative}
-                </div>
-              )}
-            </div>
-
-            <div className="row">
-              <span className="badge badge-draft">
-                임팩트 제안 {d.suggested_impact}
-              </span>
-              <span className="badge badge-draft">
-                난이도 제안 {d.suggested_difficulty}
-              </span>
-              {d.confidence != null && (
-                <span className="badge badge-neutral">확신도 {d.confidence}</span>
-              )}
-              <span className="spacer" />
-              <button
-                type="button"
-                className="btn-ghost btn-sm"
-                onClick={() => {
-                  setForm((f) => ({
-                    ...f,
-                    impact_score: String(d.suggested_impact ?? f.impact_score),
-                    impact_reason: d.suggested_impact_reason ?? f.impact_reason,
-                    difficulty_score: String(d.suggested_difficulty ?? f.difficulty_score),
-                    difficulty_reason: d.suggested_difficulty_reason ?? f.difficulty_reason,
-                    refuse_code: d.feasible ? f.refuse_code : d.blocked_by ?? f.refuse_code,
-                    refuse_alternative: d.suggested_alternative ?? f.refuse_alternative,
-                  }))
-                  toast.info('폼에 가져왔습니다. 그대로 두지 마시고 확인해 주세요.')
-                }}
-              >
-                아래 폼에 가져오기
-              </button>
-            </div>
-
-            {d.missing_info?.length > 0 && (
-              <div className="notice notice-warn">
-                <div className="notice-title">신청서만으로는 알 수 없는 것</div>
-                <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-                  {d.missing_info.map((m, i) => (
-                    <li key={i}>{m}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {d.similar_ids?.length > 0 && (
-              <div className="notice notice-info">
-                <div className="notice-title">같은 병목일 수 있는 신청서 {d.similar_ids.length}건</div>
-                <p>부서만 다르고 실은 같은 일인 경우가 흔합니다. 직접 열어 확인해 주세요.</p>
-              </div>
-            )}
           </div>
         )}
       </section>
@@ -476,9 +367,9 @@ function Detail({ id, onSaved }) {
             <Field label="무엇이 범위 밖인가" error={fieldErrors.refuse_code}>
               <select value={form.refuse_code} onChange={(e) => set('refuse_code', e.target.value)}>
                 <option value="">고르세요</option>
-                {REFUSE_CODES.map((c) => (
-                  <option key={c} value={c}>
-                    {REFUSE_LABELS[c]}
+                {REFUSE_REASONS.map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.label}
                   </option>
                 ))}
               </select>

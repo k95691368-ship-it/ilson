@@ -98,15 +98,16 @@ export default function App() {
               </p>
             </div>
             <div className="footer-col">
-              <div className="footer-title">AI를 쓰는 자리</div>
+              <div className="footer-title">여기에 마법은 없습니다</div>
               <p className="footer-text">
-                초안 작성과 분류를 돕습니다. 우선순위·반려·합격 기준·성과 정의 등
-                <strong> 확정은 사람이 합니다.</strong> 화면에서 AI 초안과 사람의 결정이 구분됩니다.
+                파일을 읽고 합치고 검산하는 일은 전부 <strong>정해진 규칙</strong>이 합니다.
+                같은 파일을 넣으면 언제나 같은 결과가 나오고, 어느 숫자든 눌러서 원본
+                파일의 몇 번째 줄에서 왔는지까지 되짚을 수 있습니다.
               </p>
             </div>
           </div>
           <div className="footer-bottom">
-            <span>Claude Opus 5 · Cloudflare Pages Functions · D1 · R2</span>
+            <span>Cloudflare Pages Functions · D1 · R2 · 외부 서비스 호출 없음</span>
             <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>
         </footer>

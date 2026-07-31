@@ -7,13 +7,12 @@
 // 있다 — 503으로 끊으면 원인이 아니라 증상만 보인다.
 
 import { jsonResponse } from '../_lib/http.js'
-import { hasApiKey, MODEL, PROMPT_VERSION } from '../_lib/claude.js'
 
 // 이 표들이 있으면 스키마가 적용된 것으로 본다.
-const CORE_TABLES = ['users', 'sessions', 'rate_limit_hits', 'audit_log', 'decision_log', 'notifications', 'ai_call']
+const CORE_TABLES = ['users', 'sessions', 'rate_limit_hits', 'audit_log', 'decision_log', 'notifications']
 
 export async function onRequestGet({ env }) {
-  const checks = { db: false, schema: false, r2: false, claudeKey: hasApiKey(env) }
+  const checks = { db: false, schema: false, r2: false }
   const notes = []
   let tables = []
 
@@ -48,16 +47,11 @@ export async function onRequestGet({ env }) {
     }
   }
 
-  if (!checks.claudeKey) {
-    notes.push('CLAUDE_API_KEY가 없습니다. AI 초안 기능만 막히고 나머지는 그대로 동작합니다.')
-  }
-
-  const ready = checks.db && checks.schema && checks.r2 && checks.claudeKey
+  const ready = checks.db && checks.schema && checks.r2
   return jsonResponse({
     ready,
     checks,
     tables,
     notes,
-    engine: { model: MODEL, promptVersion: PROMPT_VERSION },
   })
 }
