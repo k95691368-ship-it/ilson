@@ -1,0 +1,129 @@
+// 부서에 넘긴 도구가 열리는 자리.
+//
+// 이 화면은 현업 담당자가 연다. 로그인이 없다 — 계정을 만들게 하면 안 쓴다.
+// 대신 하루 실행 횟수를 제한하고, 남은 횟수를 화면에 항상 보여 준다.
+//
+// 계산 자체는 브라우저에서 돈다. 여기는 "누가 언제 돌렸고 무엇이 나왔는지"를
+// 기록으로 남기는 자리다. 그 기록이 8단계 성과의 재료가 된다.
+
+import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { checkRateLimit, remainingQuota } from '../../_lib/rateLimit.js'
+import { newId } from '../../_lib/ids.js'
+
+const DAY_SECONDS = 86400
+
+async function findHandover(env, slug) {
+  return env.DB.prepare(
+    `SELECT h.*, a.title AS application_title, a.dept AS application_dept
+     FROM handover h JOIN application a ON a.id = h.application_id
+     WHERE h.slug = ?`
+  )
+    .bind(slug)
+    .first()
+}
+
+export async function onRequestGet({ env, params, request }) {
+  const h = await findHandover(env, params.slug)
+  if (!h) return jsonError('그런 도구가 없습니다. 주소를 확인해주세요.', 404)
+
+  if (h.rolled_back_at) {
+    return jsonResponse(
+      {
+        rolledBack: true,
+        title: h.title,
+        reason: h.rollback_reason,
+        message: '이 도구는 잠시 내려가 있습니다. 담당자에게 문의해주세요.',
+      },
+      200
+    )
+  }
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
+  const bucket = `tool:${h.slug}:${ip}`
+
+  try {
+    const [remaining, manual, recent] = await Promise.all([
+      remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS),
+      env.DB.prepare(
+        'SELECT title, intro, when_to_run, what_to_do_after, contact FROM manual WHERE application_id = ?'
+      )
+        .bind(h.application_id)
+        .first(),
+      env.DB.prepare(
+        'SELECT used_at, rows_out, quarantined, duration_ms, ok FROM tool_use WHERE application_id = ? ORDER BY used_at DESC LIMIT 5'
+      )
+        .bind(h.application_id)
+        .all(),
+    ])
+
+    return jsonResponse({
+      slug: h.slug,
+      title: h.title,
+      handedTo: { dept: h.handed_to_dept, person: h.handed_to_person },
+      handedAt: h.handed_at,
+      acceptedAt: h.accepted_at,
+      limits: {
+        dailyLimit: h.daily_limit,
+        remainingToday: remaining,
+        maxFileMb: h.max_file_mb,
+      },
+      manual: manual ?? null,
+      note: h.note,
+      recent: recent.results,
+    })
+  } catch (err) {
+    return jsonError(`도구를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+  }
+}
+
+// 브라우저에서 계산이 끝난 뒤 결과를 기록한다.
+export async function onRequestPost({ env, params, request }) {
+  const h = await findHandover(env, params.slug)
+  if (!h) return jsonError('그런 도구가 없습니다.', 404)
+  if (h.rolled_back_at) return jsonError('이 도구는 잠시 내려가 있습니다.', 409)
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
+  const bucket = `tool:${h.slug}:${ip}`
+
+  const ticket = await checkRateLimit(env, bucket, h.daily_limit, DAY_SECONDS)
+  if (!ticket) {
+    return jsonError(
+      `오늘 실행 횟수를 다 쓰셨습니다(하루 ${h.daily_limit}회). 내일 다시 하시거나 담당자에게 말씀해주세요.`,
+      429
+    )
+  }
+
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return jsonError('요청 형식이 올바르지 않습니다.', 400)
+  }
+
+  try {
+    const id = newId('use')
+    await env.DB.prepare(
+      `INSERT INTO tool_use
+         (id, application_id, actor_label, files_json, rows_out, quarantined,
+          duration_ms, ok, fail_reason)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(
+        id,
+        h.application_id,
+        String(body.actor_label ?? h.handed_to_person).slice(0, 40),
+        JSON.stringify(body.files ?? []),
+        Number(body.rows_out) || 0,
+        Number(body.quarantined) || 0,
+        Number(body.duration_ms) || null,
+        body.ok === false ? 0 : 1,
+        String(body.fail_reason ?? '').slice(0, 200) || null
+      )
+      .run()
+
+    const remaining = await remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS)
+    return jsonResponse({ ok: true, id, remainingToday: remaining }, 201)
+  } catch (err) {
+    return jsonError(`기록하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+  }
+}

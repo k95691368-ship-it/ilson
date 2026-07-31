@@ -1441,6 +1441,125 @@
   }
 }
 
+/* ===== 7단계 인수인계 ===== */
+.handed-card {
+  border: 1px solid var(--success-border);
+  background: var(--success-bg);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+}
+.handed-to strong {
+  font-size: 16px;
+  color: var(--text-h);
+  margin-right: 6px;
+}
+.handed-link {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 8px;
+  padding: 8px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+}
+
+/* 부서가 여는 도구 화면의 한도 표시. 늘 보여야 한다 —
+   갑자기 안 될 때 이유를 모르면 도구를 안 믿게 된다. */
+.tool-limits {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+.tool-limits strong {
+  color: var(--text-h);
+}
+
+.tool-foot {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+/* ===== 8단계 성과 ===== */
+.outcome-headline {
+  border-radius: var(--radius);
+  padding: 20px 22px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+.outcome-headline.tone-ok {
+  border-color: var(--success-border);
+  background: var(--success-bg);
+}
+.outcome-headline.tone-warn {
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
+}
+
+.outcome-number {
+  font-size: 38px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-h);
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.outcome-warn {
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--warning-text);
+  font-weight: 600;
+}
+
+/* 계산식을 접지 않는다. 접어 두면 아무도 안 펼치고,
+   안 펼치면 그 숫자는 근거가 아니라 주장이 된다. */
+.formula {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  overflow: hidden;
+}
+.formula-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 13px;
+  border-bottom: 1px solid var(--border);
+  font-size: 13.5px;
+}
+.formula-row:last-child {
+  border-bottom: none;
+}
+.formula-row.strong {
+  background: var(--surface);
+  font-weight: 700;
+  color: var(--text-h);
+  font-size: 15px;
+}
+.formula-label {
+  color: var(--text);
+}
+.formula-row.strong .formula-label {
+  color: var(--text-h);
+}
+.formula-value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--text-h);
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;
