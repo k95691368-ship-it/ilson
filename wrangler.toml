@@ -1,11 +1,25 @@
+# Cloudflare Pages 설정.
+#
+# 바인딩을 대시보드에서 손으로 넣지 않고 이 파일에 둔다. 그래야 세 가지가 좋다.
+#   - 무엇이 연결되어 있는지가 코드와 함께 기록으로 남는다
+#   - 배포본을 새로 만들 때 바인딩을 다시 클릭하지 않아도 된다
+#   - 대시보드에서 누가 잘못 바꿔도 다음 배포에서 이 파일이 이긴다
+#
+# 단 하나, API 키는 여기 두지 않는다. 시크릿은 저장소에 들어가면 안 되므로
+# 대시보드의 Variables and Secrets에만 등록한다.
+
 name = "ilson"
 compatibility_date = "2025-01-01"
+pages_build_output_dir = "dist"
 
+# 신청서·협의안·제작 기록·평가·성과가 전부 여기 들어간다.
 [[d1_databases]]
 binding = "DB"
 database_name = "ilson"
-database_id = "PLACEHOLDER_SET_IN_DASHBOARD"
+database_id = "5fb7c8cd-4138-4c11-9e07-b077e2c60284"
 
+# 부서가 올린 원본 파일을 그대로 보관한다. 결과의 숫자를 눌렀을 때
+# "원본 파일 몇 번째 행"까지 되짚으려면 원본이 살아 있어야 한다.
 [[r2_buckets]]
 binding = "SOURCES"
 bucket_name = "ilson"
