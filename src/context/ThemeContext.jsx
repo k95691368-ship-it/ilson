@@ -1,3 +1,8 @@
+// 이 파일은 Provider 컴포넌트와 useTheme 훅을 함께 내보낸다.
+// 검사 도구는 "한 파일에 컴포넌트만 두라"고 경고하지만(.oxlintrc.json에서 꺼 뒀다),
+// 둘을 갈라 놓으면 쓰는 쪽에서 매번 두 파일을 불러와야 한다. 실제 손해는 개발 중
+// 화면 즉시 반영이 한 번 더 도는 것뿐이라 나눠서 얻는 것보다 잃는 게 크다.
+
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import { resolveTheme, nextTheme, readStoredTheme, writeStoredTheme } from '../lib/theme.js'
 
