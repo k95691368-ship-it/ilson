@@ -429,9 +429,12 @@ def build_coupang() -> None:
 # ---------------------------------------------------------------------------
 def build_amazon() -> None:
     name = "04_amazon-settlement-2026-06.csv"
+    # 실제 Amazon 정산 리포트의 필드 이름을 그대로 쓴다.
+    # posted-date가 건별 날짜다. settlement-start-date는 정산 묶음의 시작일이라
+    # 모든 줄이 같은 값이며, 이걸 주문일로 쓰면 매출이 한 주에 몰린다.
     headers = [
-        "settlement-id", "settlement-start-date", "settlement-end-date", "currency",
-        "sku", "quantity-purchased", "item-price", "item-promotion-discount",
+        "settlement-id", "settlement-start-date", "settlement-end-date", "posted-date",
+        "currency", "sku", "quantity-purchased", "item-price", "item-promotion-discount",
         "commission", "order-id",
     ]
     lines = [",".join(headers)]
@@ -449,7 +452,8 @@ def build_amazon() -> None:
         row_no += 1
         lines.append(
             f"{sid},{PERIOD_START.strftime('%m/%d/%Y')},"
-            f"{(PERIOD_START + timedelta(days=PERIOD_DAYS - 1)).strftime('%m/%d/%Y')},USD,"
+            f"{(PERIOD_START + timedelta(days=PERIOD_DAYS - 1)).strftime('%m/%d/%Y')},"
+            f"{day.strftime('%m/%d/%Y')},USD,"
             f"{ALIAS['Amazon US'][canonical]},{qty},{gross},{promo},{commission},"
             f"111-{RNG.randrange(1000000, 9999999)}-{RNG.randrange(1000000, 9999999)}"
         )
@@ -464,7 +468,8 @@ def build_amazon() -> None:
         g = round(RNG.uniform(20, 60), 2)
         lines.append(
             f"{sid},{PERIOD_START.strftime('%m/%d/%Y')},"
-            f"{(PERIOD_START + timedelta(days=PERIOD_DAYS - 1)).strftime('%m/%d/%Y')},USD,"
+            f"{(PERIOD_START + timedelta(days=PERIOD_DAYS - 1)).strftime('%m/%d/%Y')},"
+            f"{rand_day().strftime('%m/%d/%Y')},USD,"
             f"{code},1,{g},0.00,{round(-g * 0.15, 2)},"
             f"111-{RNG.randrange(1000000, 9999999)}-{RNG.randrange(1000000, 9999999)}"
         )

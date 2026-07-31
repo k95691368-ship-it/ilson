@@ -11787,29 +11787,6 @@
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
    "source_row_no": 4,
-   "date": "2026-06-26",
-   "iso_week": "2026-W26",
-   "sku": "NR-RE-020",
-   "channel": "Qoo10 JP",
-   "country": "JP",
-   "qty": 4,
-   "return_qty": 0,
-   "src_currency": "JPY",
-   "fx_rate": 8.9,
-   "gross_krw": 96796.4,
-   "discount_krw": 0.0,
-   "return_krw": 0.0,
-   "net_revenue_krw": 96796.4,
-   "commission_krw": 12002.75,
-   "cogs_krw": 25200,
-   "logistics_krw": 10000,
-   "ad_krw": 5807.78,
-   "contribution_krw": 43785.87
-  },
-  {
-   "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
-   "source_sheet": "2026年06月",
-   "source_row_no": 5,
    "date": "2026-06-03",
    "iso_week": "2026-W23",
    "sku": "NR-CM-100",
@@ -11832,7 +11809,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 6,
+   "source_row_no": 5,
    "date": "2026-06-26",
    "iso_week": "2026-W26",
    "sku": "NR-SC-050",
@@ -11855,7 +11832,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 7,
+   "source_row_no": 6,
    "date": "2026-06-05",
    "iso_week": "2026-W23",
    "sku": "NR-CC-075",
@@ -11878,7 +11855,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 8,
+   "source_row_no": 7,
    "date": "2026-06-26",
    "iso_week": "2026-W26",
    "sku": "NR-CO-150",
@@ -11901,7 +11878,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 9,
+   "source_row_no": 8,
    "date": "2026-06-17",
    "iso_week": "2026-W25",
    "sku": "NR-RE-020",
@@ -11924,7 +11901,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 10,
+   "source_row_no": 9,
    "date": "2026-06-04",
    "iso_week": "2026-W23",
    "sku": "NR-RE-020",
@@ -11947,7 +11924,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 11,
+   "source_row_no": 10,
    "date": "2026-06-14",
    "iso_week": "2026-W24",
    "sku": "NR-CO-150",
@@ -11970,7 +11947,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 12,
+   "source_row_no": 11,
    "date": "2026-06-09",
    "iso_week": "2026-W24",
    "sku": "NR-VT-200",
@@ -11993,7 +11970,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 13,
+   "source_row_no": 12,
    "date": "2026-06-16",
    "iso_week": "2026-W25",
    "sku": "NR-RE-020",
@@ -12016,7 +11993,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 14,
+   "source_row_no": 13,
    "date": "2026-06-11",
    "iso_week": "2026-W24",
    "sku": "NR-CM-100",
@@ -12039,7 +12016,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 15,
+   "source_row_no": 14,
    "date": "2026-06-22",
    "iso_week": "2026-W26",
    "sku": "NR-EG-050",
@@ -12062,7 +12039,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 16,
+   "source_row_no": 15,
    "date": "2026-06-06",
    "iso_week": "2026-W23",
    "sku": "NR-CM-100",
@@ -12085,7 +12062,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 17,
+   "source_row_no": 16,
    "date": "2026-06-06",
    "iso_week": "2026-W23",
    "sku": "NR-SC-050",
@@ -12108,7 +12085,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 18,
+   "source_row_no": 17,
    "date": "2026-06-02",
    "iso_week": "2026-W23",
    "sku": "NR-CC-075",
@@ -12131,7 +12108,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 19,
+   "source_row_no": 18,
    "date": "2026-06-09",
    "iso_week": "2026-W24",
    "sku": "NR-VT-200",
@@ -12154,7 +12131,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 20,
+   "source_row_no": 19,
    "date": "2026-06-26",
    "iso_week": "2026-W26",
    "sku": "NR-CM-100",
@@ -12177,7 +12154,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 21,
+   "source_row_no": 20,
    "date": "2026-06-22",
    "iso_week": "2026-W26",
    "sku": "NR-CO-150",
@@ -12200,7 +12177,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 22,
+   "source_row_no": 21,
    "date": "2026-06-15",
    "iso_week": "2026-W25",
    "sku": "NR-RE-020",
@@ -12223,7 +12200,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 23,
+   "source_row_no": 22,
    "date": "2026-06-22",
    "iso_week": "2026-W26",
    "sku": "NR-RE-020",
@@ -12246,7 +12223,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 24,
+   "source_row_no": 23,
    "date": "2026-06-02",
    "iso_week": "2026-W23",
    "sku": "NR-VT-200",
@@ -12269,7 +12246,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 25,
+   "source_row_no": 24,
    "date": "2026-06-24",
    "iso_week": "2026-W26",
    "sku": "NR-RE-020",
@@ -12292,7 +12269,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 26,
+   "source_row_no": 25,
    "date": "2026-06-12",
    "iso_week": "2026-W24",
    "sku": "NR-SC-050",
@@ -12315,7 +12292,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 27,
+   "source_row_no": 26,
    "date": "2026-06-02",
    "iso_week": "2026-W23",
    "sku": "NR-SC-050",
@@ -12338,7 +12315,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 28,
+   "source_row_no": 27,
    "date": "2026-06-16",
    "iso_week": "2026-W25",
    "sku": "NR-RE-020",
@@ -12361,7 +12338,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 29,
+   "source_row_no": 28,
    "date": "2026-06-02",
    "iso_week": "2026-W23",
    "sku": "NR-CO-150",
@@ -12384,7 +12361,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 30,
+   "source_row_no": 29,
    "date": "2026-06-19",
    "iso_week": "2026-W25",
    "sku": "NR-CO-150",
@@ -12407,7 +12384,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 31,
+   "source_row_no": 30,
    "date": "2026-06-01",
    "iso_week": "2026-W23",
    "sku": "NR-CC-075",
@@ -12430,7 +12407,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 32,
+   "source_row_no": 31,
    "date": "2026-06-24",
    "iso_week": "2026-W26",
    "sku": "NR-SC-050",
@@ -12453,7 +12430,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 33,
+   "source_row_no": 32,
    "date": "2026-06-06",
    "iso_week": "2026-W23",
    "sku": "NR-CC-075",
@@ -12476,7 +12453,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 34,
+   "source_row_no": 33,
    "date": "2026-06-14",
    "iso_week": "2026-W24",
    "sku": "NR-EG-050",
@@ -12499,7 +12476,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 35,
+   "source_row_no": 34,
    "date": "2026-06-22",
    "iso_week": "2026-W26",
    "sku": "NR-EG-050",
@@ -12522,7 +12499,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 36,
+   "source_row_no": 35,
    "date": "2026-06-05",
    "iso_week": "2026-W23",
    "sku": "NR-PA-030",
@@ -12545,7 +12522,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 37,
+   "source_row_no": 36,
    "date": "2026-06-14",
    "iso_week": "2026-W24",
    "sku": "NR-RE-020",
@@ -12568,7 +12545,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 38,
+   "source_row_no": 37,
    "date": "2026-06-12",
    "iso_week": "2026-W24",
    "sku": "NR-PA-030",
@@ -12591,7 +12568,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 39,
+   "source_row_no": 38,
    "date": "2026-06-08",
    "iso_week": "2026-W24",
    "sku": "NR-PA-030",
@@ -12614,7 +12591,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 40,
+   "source_row_no": 39,
    "date": "2026-06-19",
    "iso_week": "2026-W25",
    "sku": "NR-SC-050",
@@ -12637,7 +12614,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 41,
+   "source_row_no": 40,
    "date": "2026-06-27",
    "iso_week": "2026-W26",
    "sku": "NR-VT-200",
@@ -12660,7 +12637,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 42,
+   "source_row_no": 41,
    "date": "2026-06-26",
    "iso_week": "2026-W26",
    "sku": "NR-PA-030",
@@ -12683,7 +12660,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 43,
+   "source_row_no": 42,
    "date": "2026-06-18",
    "iso_week": "2026-W25",
    "sku": "NR-RE-020",
@@ -12706,7 +12683,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 44,
+   "source_row_no": 43,
    "date": "2026-06-27",
    "iso_week": "2026-W26",
    "sku": "NR-EG-050",
@@ -12729,7 +12706,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 45,
+   "source_row_no": 44,
    "date": "2026-06-22",
    "iso_week": "2026-W26",
    "sku": "NR-CM-100",
@@ -12752,7 +12729,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 46,
+   "source_row_no": 45,
    "date": "2026-06-10",
    "iso_week": "2026-W24",
    "sku": "NR-VT-200",
@@ -12775,7 +12752,7 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 47,
+   "source_row_no": 46,
    "date": "2026-06-11",
    "iso_week": "2026-W24",
    "sku": "NR-CM-100",
@@ -12798,9 +12775,32 @@
   {
    "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
    "source_sheet": "2026年06月",
-   "source_row_no": 48,
+   "source_row_no": 47,
    "date": "2026-06-09",
    "iso_week": "2026-W24",
+   "sku": "NR-CC-075",
+   "channel": "Qoo10 JP",
+   "country": "JP",
+   "qty": 1,
+   "return_qty": 0,
+   "src_currency": "JPY",
+   "fx_rate": 8.9,
+   "gross_krw": 17897.9,
+   "discount_krw": 0.0,
+   "return_krw": 0.0,
+   "net_revenue_krw": 17897.9,
+   "commission_krw": 2219.34,
+   "cogs_krw": 5600,
+   "logistics_krw": 2500,
+   "ad_krw": 1073.87,
+   "contribution_krw": 6504.69
+  },
+  {
+   "source_file": "05_Qoo10_JP_決済明細_2026Q2.xlsx",
+   "source_sheet": "2026年06月",
+   "source_row_no": 48,
+   "date": "2026-06-27",
+   "iso_week": "2026-W26",
    "sku": "NR-CC-075",
    "channel": "Qoo10 JP",
    "country": "JP",
@@ -13357,11 +13357,11 @@
   },
   {
    "channel": "Qoo10 JP",
-   "qty": 97,
-   "gross_krw": 2071777.6,
-   "net_revenue_krw": 2071777.6,
-   "commission_krw": 256900.46,
-   "contribution_krw": 901170.48
+   "qty": 94,
+   "gross_krw": 1992879.1,
+   "net_revenue_krw": 1992879.1,
+   "commission_krw": 247117.05,
+   "contribution_krw": 863889.3
   },
   {
    "channel": "올리브영",
@@ -13464,11 +13464,11 @@
   {
    "channel": "Qoo10 JP",
    "iso_week": "2026-W26",
-   "qty": 30,
-   "gross_krw": 767669.5,
-   "net_revenue_krw": 767669.5,
-   "commission_krw": 95191.02,
-   "contribution_krw": 356318.31
+   "qty": 27,
+   "gross_krw": 688771.0,
+   "net_revenue_krw": 688771.0,
+   "commission_krw": 85407.61,
+   "contribution_krw": 319037.13
   },
   {
    "channel": "올리브영",
