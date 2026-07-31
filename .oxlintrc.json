@@ -3,6 +3,15 @@
   "plugins": ["react", "oxc"],
   "rules": {
     "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
+    "react-hooks/exhaustive-deps": "warn",
+    "no-unused-vars": "warn",
+    "eqeqeq": ["warn", "smart"],
+    "react/only-export-components": "off"
+  },
+  "//": [
+    "only-export-components를 끈 이유:",
+    "ThemeContext와 ToastContext는 Provider 컴포넌트와 useTheme/useToast 훅을 한 파일에서 함께 내보낸다.",
+    "이 규칙은 그걸 경고하지만, 둘을 갈라 놓으면 쓰는 쪽에서 매번 두 파일을 불러와야 하고",
+    "실제 손해는 개발 중 화면 즉시 반영이 한 번 더 도는 것뿐이다. 나눠서 얻는 것보다 잃는 게 크다."
+  ]
 }

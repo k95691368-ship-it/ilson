@@ -29,7 +29,10 @@ export const DIFFICULTY_SCALE = [
   { score: 5, label: '자료 자체가 없다', detail: '만들기 전에 없는 자료부터 만들어야 한다' },
 ]
 
-const MIN_REASON = 20
+// 예전에는 근거를 스무 자 이상 쓰지 않으면 저장 자체를 막았다. 근거가
+// 중요하다는 뜻이었지만 실제로는 쓰는 사람을 붙잡아 두는 걸림돌이 됐다.
+// 지금은 막지 않는다. 대신 화면에서 비어 있는 칸을 눈에 띄게 표시해 나중에
+// 채우고 싶어지게 한다. 억지로 채운 스무 글자보다 비어 있는 칸이 정직하다.
 
 function text(value) {
   return String(value ?? '').trim()
@@ -60,38 +63,14 @@ export function validateReview(input) {
     reviewer_label: text(input.reviewer_label) || 'AX 담당자',
   }
 
-  if (impact == null) errors.impact_score = '임팩트를 1~5 사이에서 골라주세요.'
-  if (difficulty == null) errors.difficulty_score = '난이도를 1~5 사이에서 골라주세요.'
-
-  if (v.impact_reason.length < MIN_REASON) {
-    errors.impact_reason = `왜 그 점수인지 ${MIN_REASON}자 이상 적어주세요. 점수만 남으면 나중에 근거를 알 수 없습니다.`
-  }
-  if (v.difficulty_reason.length < MIN_REASON) {
-    errors.difficulty_reason = `왜 그 점수인지 ${MIN_REASON}자 이상 적어주세요.`
-  }
-
+  // 막는 것은 이 셋뿐이다. 없으면 기록 자체가 성립하지 않는 값들이다.
+  if (impact == null) errors.impact_score = '임팩트를 골라주세요.'
+  if (difficulty == null) errors.difficulty_score = '난이도를 골라주세요.'
   if (!VERDICTS.includes(v.verdict)) errors.verdict = '판정을 골라주세요.'
-  if (v.verdict_reason.length < MIN_REASON) {
-    errors.verdict_reason = `판정 근거를 ${MIN_REASON}자 이상 적어주세요. 근거 없는 판정은 판정이 아닙니다.`
-  }
-  if (v.alternatives_considered.length < MIN_REASON) {
-    errors.alternatives_considered = `무엇을 고르지 않았는지 ${MIN_REASON}자 이상 적어주세요. 대안을 적어야 판단이 판단이 됩니다.`
-  }
 
-  if (v.verdict === '반려') {
-    if (!REFUSE_CODES.includes(v.refuse_code)) {
-      errors.refuse_code = '무엇이 범위 밖인지 골라주세요.'
-    }
-    if (v.refuse_alternative.length < MIN_REASON) {
-      // "안 됩니다"만 돌려보내면 그 부서는 다시 신청하지 않는다.
-      errors.refuse_alternative =
-        '대신 무엇을 해 드릴 수 있는지 적어주세요. 정말 없으면 "이 요청은 다른 도구로 가야 합니다"라고 적으시면 됩니다.'
-    }
-  }
-
-  if (v.verdict === '보류' && v.hold_until_condition.length < MIN_REASON) {
-    errors.hold_until_condition =
-      '무엇이 풀리면 다시 볼 것인지 적어주세요. 조건 없는 보류는 그냥 방치입니다.'
+  // 반려 사유는 값이 들어왔을 때만 목록에 있는지 본다. 비어 있어도 저장된다.
+  if (v.verdict === '반려' && v.refuse_code && !REFUSE_CODES.includes(v.refuse_code)) {
+    errors.refuse_code = '목록에 있는 사유를 골라주세요.'
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors }

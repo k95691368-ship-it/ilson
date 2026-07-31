@@ -214,25 +214,12 @@ function Detail({ id, onSaved }) {
     setSaving(true)
     setFieldErrors({})
     try {
-      const res = await fetch(`/api/applications/${id}/review`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
-      const json = await res.json().catch(() => null)
-      if (!res.ok) {
-        if (json?.fields) {
-          setFieldErrors(json.fields)
-          toast.error('적어 주신 내용을 확인해주세요.')
-        } else {
-          toast.error(json?.error || '저장하지 못했습니다.')
-        }
-        return
-      }
+      const json = await api.post(`/applications/${id}/review`, form)
       toast.success(`${json.verdict} 판정을 저장했습니다.`)
       await Promise.all([reload(), onSaved()])
     } catch (err) {
-      toast.error(err.message || '저장하지 못했습니다.')
+      if (err.fields) setFieldErrors(err.fields)
+      toast.error(err.message)
     } finally {
       setSaving(false)
     }
@@ -417,7 +404,7 @@ function Detail({ id, onSaved }) {
           onChange={(v) => set('impact_score', v)}
           error={fieldErrors.impact_score}
         />
-        <Field label="왜 그 점수인가" error={fieldErrors.impact_reason} required>
+        <Field label="왜 그 점수인가" hint="비워 둬도 저장됩니다" error={fieldErrors.impact_reason}>
           <textarea
             rows={2}
             value={form.impact_reason}
@@ -433,7 +420,7 @@ function Detail({ id, onSaved }) {
           onChange={(v) => set('difficulty_score', v)}
           error={fieldErrors.difficulty_score}
         />
-        <Field label="왜 그 점수인가" error={fieldErrors.difficulty_reason} required>
+        <Field label="왜 그 점수인가" hint="비워 둬도 저장됩니다" error={fieldErrors.difficulty_reason}>
           <textarea
             rows={2}
             value={form.difficulty_reason}
@@ -462,7 +449,7 @@ function Detail({ id, onSaved }) {
           {fieldErrors.verdict && <div className="field-error">{fieldErrors.verdict}</div>}
         </div>
 
-        <Field label="판정 근거" error={fieldErrors.verdict_reason} required>
+        <Field label="판정 근거" hint="비워 둬도 저장됩니다" error={fieldErrors.verdict_reason}>
           <textarea
             rows={3}
             value={form.verdict_reason}
@@ -473,9 +460,8 @@ function Detail({ id, onSaved }) {
 
         <Field
           label="고려했다 뺀 것"
-          hint="대안을 적어야 판단이 판단이 됩니다"
+          hint="비워 둬도 저장됩니다"
           error={fieldErrors.alternatives_considered}
-          required
         >
           <textarea
             rows={2}
@@ -487,7 +473,7 @@ function Detail({ id, onSaved }) {
 
         {form.verdict === '반려' && (
           <div className="conditional-box">
-            <Field label="무엇이 범위 밖인가" error={fieldErrors.refuse_code} required>
+            <Field label="무엇이 범위 밖인가" error={fieldErrors.refuse_code}>
               <select value={form.refuse_code} onChange={(e) => set('refuse_code', e.target.value)}>
                 <option value="">고르세요</option>
                 {REFUSE_CODES.map((c) => (
@@ -501,7 +487,6 @@ function Detail({ id, onSaved }) {
               label="대신 무엇을 해 드릴 수 있나"
               hint='정말 없으면 "다른 도구로 가야 합니다"라고 적으세요'
               error={fieldErrors.refuse_alternative}
-              required
             >
               <textarea
                 rows={2}
@@ -522,7 +507,6 @@ function Detail({ id, onSaved }) {
             <Field
               label="무엇이 풀리면 다시 볼 것인가"
               error={fieldErrors.hold_until_condition}
-              required
             >
               <textarea
                 rows={2}

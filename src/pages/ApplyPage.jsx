@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
+import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { ago, duration, num } from '../lib/format.js'
 import { peekFile, formatBytes } from '../lib/filePeek.js'
@@ -63,19 +64,7 @@ export default function ApplyPage() {
     files.forEach((f) => body.append('files', f))
 
     try {
-      const res = await fetch('/api/applications', { method: 'POST', body })
-      const json = await res.json().catch(() => null)
-
-      if (!res.ok) {
-        if (json?.fields) {
-          setFieldErrors(json.fields)
-          toast.error('적어 주신 내용을 확인해주세요.')
-        } else {
-          toast.error(json?.error || '접수하지 못했습니다.')
-        }
-        return
-      }
-
+      const json = await api.form('/applications', body)
       setReceipt(json)
       setForm(EMPTY)
       setFiles([])
@@ -87,7 +76,9 @@ export default function ApplyPage() {
       }
       await reload()
     } catch (err) {
-      toast.error(err.message || '접수하지 못했습니다.')
+      // 칸별 오류가 있으면 그 칸 아래에 붙이고, 아니면 알림으로 알린다.
+      if (err.fields) setFieldErrors(err.fields)
+      toast.error(err.message)
     } finally {
       setSubmitting(false)
     }
@@ -165,7 +156,7 @@ export default function ApplyPage() {
               <span className="card-title">무엇이 막혀 있나요</span>
             </div>
 
-            <Field label="한 줄로" required error={fieldErrors.title}>
+            <Field label="한 줄로" required hint="이것만 있으면 낼 수 있습니다" error={fieldErrors.title}>
               <input
                 value={form.title}
                 onChange={(e) => set('title', e.target.value)}
@@ -176,8 +167,7 @@ export default function ApplyPage() {
 
             <Field
               label="무엇이 병목인가요"
-              required
-              hint="어느 대목에서 시간이 가장 많이 드는지"
+              hint="어느 대목에서 시간이 가장 많이 드는지 · 빈칸이어도 냅니다"
               error={fieldErrors.bottleneck}
               count={[form.bottleneck.length, 1000]}
             >
@@ -191,8 +181,7 @@ export default function ApplyPage() {
 
             <Field
               label="그래서 지금 무슨 일이 생기나요"
-              required
-              hint="실제로 있었던 일을 적어 주시면 가장 좋습니다"
+              hint="실제로 있었던 일이 있으면 가장 좋습니다 · 빈칸이어도 냅니다"
               error={fieldErrors.problem}
               count={[form.problem.length, 1500]}
             >

@@ -29,11 +29,12 @@ const LIMITS = {
   contact: 80,
 }
 
-const MIN = {
-  title: 4,
-  bottleneck: 15,
-  problem: 15,
-}
+// 최소 글자 수 제한은 두지 않는다.
+//
+// 처음에는 "병목을 15자 이상 적어야 낼 수 있다"로 막아 뒀다. 짧게 적으면
+// 담당자가 다시 물어야 하니까. 그런데 그 규칙은 짧게 적는 사람을 도운 게
+// 아니라 아예 안 내게 만든다. 신청서는 받는 게 먼저고, 부족하면 담당자가
+// 물어보면 된다. 그게 원래 담당자가 할 일이다.
 
 export const MAX_FILES = 5
 export const MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -63,16 +64,11 @@ export function validateApplication(input) {
     current_frequency: text(input.current_frequency),
   }
 
+  // 꼭 있어야 하는 것만 막는다 — 어느 부서인지, 누가 냈는지, 무엇에 대한 건지.
+  // 이 셋이 없으면 담당자가 되물을 상대조차 알 수 없다.
   if (!DEPTS.includes(v.dept)) errors.dept = '신청 부서를 골라주세요.'
   if (!v.applicant_label) errors.applicant_label = '신청자를 적어주세요. 이름 대신 직책이어도 됩니다.'
-
-  if (v.title.length < MIN.title) errors.title = `제목을 ${MIN.title}자 이상 적어주세요.`
-  if (v.bottleneck.length < MIN.bottleneck) {
-    errors.bottleneck = `무엇이 병목인지 ${MIN.bottleneck}자 이상 적어주세요. 짧으면 담당자가 다시 물어야 합니다.`
-  }
-  if (v.problem.length < MIN.problem) {
-    errors.problem = `그래서 지금 무슨 일이 생기는지 ${MIN.problem}자 이상 적어주세요.`
-  }
+  if (!v.title) errors.title = '무슨 일인지 한 줄만 적어주세요.'
 
   for (const [key, max] of Object.entries(LIMITS)) {
     if (v[key] && v[key].length > max) {

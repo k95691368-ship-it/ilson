@@ -1,47 +1,58 @@
-const API_BASE = '/api'
+// 서버에 말을 거는 통로. 화면 코드가 fetch를 직접 쓰지 않게 한다.
+//
+// 여기 한 곳에서 두 가지를 처리한다.
+//   1) 실패했을 때 사용자에게 보여 줄 한국어 문장을 만든다
+//   2) 폼 검증 실패는 다른 오류와 구분해서 넘긴다 (칸마다 다른 문구를 붙여야 하므로)
 
-// 서버 응답을 사용자에게 보여줄 오류로 변환한다.
-// 권한 거부(403)는 항상 "권한 없음"으로 시작하게 맞춰, 어떤 화면에서 막히든
-// 같은 문구로 인지되도록 한다. 상태 코드 자체는 절대 노출하지 않는다.
-function toUserError(res, data) {
-  let message = data?.error || '요청에 실패했습니다.'
-  if (res.status === 403 && !message.startsWith('권한 없음')) {
-    message = `권한 없음 — ${message}`
+const BASE = '/api'
+
+// 서버는 실패할 때 { error, fields? } 를 준다. fields가 있으면 폼 검증 실패다.
+class ApiError extends Error {
+  constructor(message, { status, fields }) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+    this.fields = fields ?? null
   }
-  const error = new Error(message)
-  error.status = res.status
-  return error
 }
 
-async function request(path, options = {}) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(options.headers || {}) },
-    ...options,
-  })
-  const data = await res.json().catch(() => null)
-  if (!res.ok) throw toUserError(res, data)
-  return data
+export { ApiError }
+
+async function send(path, options = {}) {
+  let res
+  try {
+    res = await fetch(`${BASE}${path}`, options)
+  } catch {
+    // 인터넷이 끊겼거나 서버가 아예 안 뜬 경우. 상태 코드조차 없다.
+    throw new ApiError('서버에 닿지 못했습니다. 인터넷 연결을 확인해주세요.', { status: 0 })
+  }
+
+  // 본문이 비어 있거나 JSON이 아닐 수 있다(예: 배포 중 정적 페이지가 대신 응답).
+  const body = await res.json().catch(() => null)
+
+  if (!res.ok) {
+    throw new ApiError(body?.error ?? '요청에 실패했습니다.', {
+      status: res.status,
+      fields: body?.fields,
+    })
+  }
+  return body
 }
 
-async function upload(path, formData) {
-  const res = await fetch(`${API_BASE}${path}`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
-  })
-  const data = await res.json().catch(() => null)
-  if (!res.ok) throw toUserError(res, data)
-  return data
+function withJson(method, body) {
+  return {
+    method,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body ?? {}),
+  }
 }
 
 export const api = {
-  get: (path) => request(path),
-  post: (path, body) => request(path, { method: 'POST', body: JSON.stringify(body) }),
-  patch: (path, body) => request(path, { method: 'PATCH', body: JSON.stringify(body) }),
-  // DELETE에도 본문을 실을 수 있어야 한다 — 보존 의무처럼 "알고도 지운다"는
-  // 확인을 서버가 받아야 하는 경우가 있다.
-  delete: (path, body) =>
-    request(path, { method: 'DELETE', ...(body ? { body: JSON.stringify(body) } : {}) }),
-  upload,
+  get: (path) => send(path),
+  post: (path, body) => send(path, withJson('POST', body)),
+  patch: (path, body) => send(path, withJson('PATCH', body)),
+  remove: (path, body) => send(path, withJson('DELETE', body)),
+  // 파일이 섞인 폼은 Content-Type을 우리가 정하면 안 된다.
+  // 브라우저가 경계 문자열을 붙여 직접 정해야 서버가 나눠 읽을 수 있다.
+  form: (path, formData) => send(path, { method: 'POST', body: formData }),
 }
