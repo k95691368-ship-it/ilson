@@ -39,3 +39,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# 점검하며 만든 임시 파일
+.tmpcheck/
+*.tmp.mjs
