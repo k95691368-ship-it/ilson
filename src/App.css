@@ -777,6 +777,258 @@
   margin-bottom: 3px;
 }
 
+/* ===== 2단계 검토 — 목록과 상세 ===== */
+.review-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .review-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.review-list {
+  position: sticky;
+  top: 74px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  overflow: hidden;
+  max-height: calc(100svh - 100px);
+  display: flex;
+  flex-direction: column;
+}
+@media (max-width: 1000px) {
+  .review-list {
+    position: static;
+    max-height: 420px;
+  }
+}
+
+.review-list-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.review-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+}
+
+.review-list-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 11px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-weight: 500;
+}
+.review-list-item:hover:not(:disabled) {
+  background: var(--bg);
+}
+.review-list-item.on {
+  background: var(--accent-bg);
+}
+
+.review-list-top {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+.review-list-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  line-height: 1.45;
+  margin-bottom: 3px;
+}
+.review-list-meta {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+}
+
+.review-detail {
+  min-width: 0;
+}
+
+/* 부서가 적어 낸 원문. 담당자가 고칠 수 없는 자리라 배경으로 구분한다. */
+.source-kv {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  grid-template-columns: minmax(120px, auto) minmax(0, 1fr);
+  gap: 10px 16px;
+}
+.source-kv dd {
+  line-height: 1.65;
+}
+
+.cost-strip {
+  margin-top: 12px;
+  padding: 11px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  border: 1px solid var(--warning-border);
+  font-size: 13px;
+  color: var(--text-h);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.cost-note {
+  color: var(--warning-text);
+  font-weight: 600;
+  font-size: 12.5px;
+}
+
+.feasible-box {
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.feasible-box.yes {
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+.feasible-box.no {
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+.feasible-partial,
+.feasible-alt {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+/* ===== 점수 고르기 ===== */
+.score-row {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 6px;
+}
+.score-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 9px 6px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  text-align: center;
+}
+.score-btn:hover:not(:disabled) {
+  background: var(--border);
+}
+.score-btn.on {
+  background: var(--accent-bg);
+  border-color: var(--accent-border);
+}
+.score-num {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text-h);
+}
+.score-btn.on .score-num {
+  color: var(--accent);
+}
+.score-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  line-height: 1.3;
+}
+@media (max-width: 620px) {
+  .score-row {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  .score-label {
+    display: none;
+  }
+}
+
+/* ===== 판정 ===== */
+.verdict-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.verdict-btn {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 700;
+}
+.verdict-btn:hover:not(:disabled) {
+  background: var(--border);
+}
+.verdict-btn.수용.on {
+  background: var(--success-bg);
+  border-color: var(--success);
+  color: var(--success-text);
+}
+.verdict-btn.반려.on {
+  background: var(--danger-bg);
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+.verdict-btn.보류.on {
+  background: var(--warning-bg);
+  border-color: var(--warning);
+  color: var(--warning-text);
+}
+
+/* 판정에 따라 나타나는 추가 입력. 왼쪽 선으로 "이건 조건부"임을 보인다. */
+.conditional-box {
+  margin: 4px 0 16px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--accent);
+  background: var(--bg);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* ===== 결정 기록 ===== */
+.decision-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.decision-why {
+  margin-top: 7px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.decision-why strong {
+  color: var(--text-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+  display: block;
+  margin-bottom: 1px;
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;

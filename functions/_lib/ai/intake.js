@@ -13,7 +13,7 @@
 // feasibility는 사람이 착수/거절을 누르기 전에 보는 근거다.
 
 import { callTool, wrapData, asDraft } from '../claude.js'
-import { scopeBrief, OUT_OF_SCOPE_CODES } from '../blockTypes.js'
+import { scopeBrief, OUT_OF_SCOPE_CODES } from '../../../shared/blockTypes.js'
 
 export const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
 
