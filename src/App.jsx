@@ -15,13 +15,18 @@ const ResultPage = lazy(() => import('./pages/ResultPage.jsx'))
 const ToolPage = lazy(() => import('./pages/ToolPage.jsx'))
 const TrackPage = lazy(() => import('./pages/TrackPage.jsx'))
 const LogPage = lazy(() => import('./pages/LogPage.jsx'))
+const RecordPage = lazy(() => import('./pages/RecordPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
-// 부서 담당자가 여는 화면 둘 — 넘겨받은 도구(/t/:slug)와 내 신청서 조회(/track).
-// 제작 과정도 상단 목차도 보일 이유가 없다. 자기 일만 하면 된다.
+// 목차와 꼬리말 없이 여는 화면들.
+//
+// /t/:slug, /track — 부서 담당자가 여는 자리다. 제작 과정도 상단 목차도
+// 보일 이유가 없다. 자기 일만 하면 된다.
+// /record/:id — 종이에 인쇄하거나 PDF로 저장할 문서다. 목차와 꼬리말이
+// 같이 인쇄되면 서류가 아니라 웹페이지 출력물이 된다.
 function useBareLayout() {
   const path = useLocation().pathname
-  return path.startsWith('/t/') || path === '/track'
+  return path.startsWith('/t/') || path === '/track' || path.startsWith('/record/')
 }
 
 export default function App() {
@@ -86,6 +91,7 @@ export default function App() {
             <Route path="/t/:slug" element={<ToolPage />} />
             <Route path="/track" element={<TrackPage />} />
             <Route path="/log" element={<LogPage />} />
+            <Route path="/record/:id" element={<RecordPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

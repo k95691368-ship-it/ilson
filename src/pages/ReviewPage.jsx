@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import FileList from '../components/FileList.jsx'
 import { useApi } from '../hooks/useApi.js'
@@ -223,6 +224,12 @@ function Detail({ id, onSaved }) {
         <div className="card-head">
           <span className="card-title">{a.title}</span>
           <span className="mono card-note">{a.ticket_no}</span>
+          <span className="spacer" />
+          {/* 이 신청서에 지금까지 일어난 일 전부를 한 문서로. 결재에 붙이거나
+              부서에 보낼 때 필요하다. 여덟 화면을 돌아다니게 하지 않는다. */}
+          <Link to={`/record/${a.id}`} className="btn-ghost btn-sm">
+            기록 전체 보기
+          </Link>
         </div>
         <div className="row" style={{ marginBottom: 12 }}>
           <span className="badge badge-neutral">{a.dept}</span>
