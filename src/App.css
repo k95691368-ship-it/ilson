@@ -3206,3 +3206,103 @@ kbd {
   border-top: 1px dashed var(--warning-border);
   line-height: 1.7;
 }
+
+/* ===== 못 한 것 ===== */
+.unproven-list {
+  display: grid;
+  gap: 13px;
+}
+.unproven {
+  padding: 14px 15px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning-border);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface);
+}
+.unproven h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--text-h);
+  line-height: 1.5;
+}
+.unproven-body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text);
+}
+/* 한계를 적어 놓고 아무 말도 안 하면 회피다. 그래서 어디까지 말할 수
+   있는지를 반드시 붙인다. */
+.unproven-instead {
+  margin: 9px 0 0;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+.unproven-instead strong {
+  color: var(--text-h);
+  margin-right: 5px;
+}
+
+.honest-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.honest-list > li {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.honest-why {
+  margin-top: 4px;
+  line-height: 1.7;
+}
+.honest-old {
+  color: var(--warning-text, var(--warning));
+  font-weight: 600;
+}
+.honest-alt {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.honest-alt strong {
+  color: var(--text-h);
+  margin-right: 5px;
+}
+.honest-alt-missing {
+  border: 1px dashed var(--warning-border);
+  color: var(--text-muted);
+}
+
+.honest-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  font-size: 12.5px;
+}
+.honest-bar {
+  margin-top: 4px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  overflow: hidden;
+}
+.honest-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--warning-border);
+}
