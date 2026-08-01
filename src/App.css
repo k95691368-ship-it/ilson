@@ -4086,3 +4086,53 @@ kbd {
   line-height: 1.7;
   color: var(--text-muted);
 }
+
+/* ===== 여러 건 한 번에 ===== */
+.review-list-item {
+  /* 체크박스와 나란히 놓기 위해 */
+  flex: 1;
+  min-width: 0;
+}
+.review-list ul > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.review-list ul > li.picked {
+  background: var(--accent-bg);
+  border-radius: var(--radius-sm);
+}
+.review-pick {
+  display: flex;
+  align-items: center;
+  padding: 12px 4px 0 8px;
+  cursor: pointer;
+}
+.review-pick input {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+
+.bulk-bar {
+  margin: 8px 8px 0;
+  padding: 11px 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  font-size: 12.5px;
+}
+.bulk-why {
+  line-height: 1.75;
+  margin: 0 0 9px;
+}
+.bulk-why strong {
+  color: var(--text-h);
+}
+/* 판정이 왜 여기 없는지. 없는 기능을 찾다 시간 쓰는 것보다 낫다. */
+.bulk-never {
+  margin: 10px 0 0;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border);
+  line-height: 1.7;
+}

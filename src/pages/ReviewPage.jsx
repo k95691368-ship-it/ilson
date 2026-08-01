@@ -23,6 +23,7 @@ import {
   STALE_HOURS,
 } from '../lib/inbox.js'
 import { findSimilar } from '../../shared/similar.js'
+import { BULK_ACTIONS, MAX_AT_ONCE, validateBulk } from '../../shared/bulk.js'
 import {
   VERDICTS,
   REFUSE_REASONS,
@@ -58,6 +59,12 @@ export default function ReviewPage() {
   const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const [seeding, setSeeding] = useState(false)
+  // 여러 건을 한 번에.
+  //
+  // 신청서가 밀리는 이유는 판정이 어려워서가 아니라, 한 건 열고 읽고 닫고를
+  // 반복하는 것이 지겨워서다. 다만 판정은 여기서 안 한다 — 한 번에
+  // 판정하게 하면 사람은 안 읽고 누른다.
+  const [picked, setPicked] = useState(() => new Set())
 
   // 무엇을 어떤 순서로 볼 것인가.
   //
@@ -481,9 +488,40 @@ export default function ReviewPage() {
                 </div>
               )}
 
+              {picked.size > 0 && (
+                <BulkBar
+                  count={picked.size}
+                  onClear={() => setPicked(new Set())}
+                  onDone={async () => {
+                    setPicked(new Set())
+                    await reload()
+                  }}
+                  ids={[...picked]}
+                />
+              )}
+
               <ul>
                 {visible.map((a) => (
-                  <li key={a.id}>
+                  <li key={a.id} className={picked.has(a.id) ? 'picked' : ''}>
+                    <label
+                      className="review-pick"
+                      onClick={(e) => e.stopPropagation()}
+                      title="한 번에 처리할 것으로 고릅니다"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={picked.has(a.id)}
+                        onChange={(e) => {
+                          setPicked((p) => {
+                            const n = new Set(p)
+                            if (e.target.checked) n.add(a.id)
+                            else n.delete(a.id)
+                            return n
+                          })
+                        }}
+                        aria-label={`${a.title} 고르기`}
+                      />
+                    </label>
                     <button
                       type="button"
                       className={`review-list-item${selectedId === a.id ? ' on' : ''}`}
@@ -530,6 +568,113 @@ export default function ReviewPage() {
               )}
             </div>
           </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// 고른 것을 한 번에.
+//
+// 무엇을 할 수 있는지는 shared/bulk.js가 정한다. 화면에 박아 두면 거기서
+// 하나 빼도 화면에는 남아, 누르면 400이 나는 버튼이 생긴다.
+function BulkBar({ count, ids, onClear, onDone }) {
+  const toast = useToast()
+  const [action, setAction] = useState('')
+  const [reason, setReason] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState({})
+
+  const spec = BULK_ACTIONS.find((a) => a.code === action)
+  const tooMany = count > MAX_AT_ONCE
+
+  async function send() {
+    const errs = validateBulk({ action, ids, reason })
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) return
+
+    setSaving(true)
+    try {
+      const r = await api.post('/applications/bulk', { action, ids, reason })
+      toast.success(r.message)
+      setAction('')
+      setReason('')
+      await onDone()
+    } catch (err) {
+      if (err.fields) setFieldErrors(err.fields)
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bulk-bar">
+      <div className="row" style={{ marginBottom: 8 }}>
+        <strong>{count}건 고르셨습니다</strong>
+        <span className="spacer" />
+        <button type="button" className="btn-ghost btn-sm" onClick={onClear}>
+          고른 것 지우기
+        </button>
+      </div>
+
+      {tooMany ? (
+        <p className="card-note">
+          한 번에 {MAX_AT_ONCE}건까지입니다. 그보다 많으면 안 읽고 누르게 됩니다.
+        </p>
+      ) : (
+        <>
+          <div className="chip-row" style={{ marginBottom: 8 }}>
+            {BULK_ACTIONS.map((a) => (
+              <button
+                key={a.code}
+                type="button"
+                className={`chip${action === a.code ? ' on' : ''}`}
+                onClick={() => setAction(action === a.code ? '' : a.code)}
+                aria-pressed={action === a.code}
+              >
+                {a.label}
+              </button>
+            ))}
+          </div>
+
+          {spec && (
+            <>
+              <p className="card-note bulk-why">
+                {spec.detail} <strong>왜 한 번에 해도 되나</strong> {spec.why}
+              </p>
+              {spec.needsReason && (
+                <div className="field">
+                  <label className="field-label">
+                    {spec.reasonLabel}
+                    <span className="field-required"> *</span>
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    placeholder={spec.reasonPlaceholder}
+                  />
+                  {fieldErrors.reason && <div className="field-error">{fieldErrors.reason}</div>}
+                </div>
+              )}
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                onClick={send}
+                disabled={saving}
+              >
+                {saving ? '처리 중…' : `${count}건 ${spec.label}`}
+              </button>
+            </>
+          )}
+
+          {/* 판정은 여기서 안 된다는 것을 숨기지 않는다. 없는 기능을 찾다가
+              시간 쓰는 것보다 왜 없는지 아는 편이 낫다. */}
+          <p className="card-note bulk-never">
+            수용·반려는 한 건씩 하셔야 합니다. 한 번에 판정하면 안 읽고 누르게 되고, 읽지도 않고
+            반려된 신청서를 부서는 알아챕니다.
+          </p>
         </>
       )}
     </div>
