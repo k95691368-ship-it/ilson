@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
+import FileList from '../components/FileList.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 
 // 접수번호로 내 신청서가 어디까지 왔는지 보는 화면.
@@ -211,9 +212,12 @@ function Result({ data }) {
             )}
           </dl>
           {data.files.length > 0 && (
-            <p className="card-note" style={{ marginTop: 8 }}>
-              첨부: {data.files.map((f) => f.name).join(', ')}
-            </p>
+            <div style={{ marginTop: 10 }}>
+              <div className="card-note" style={{ marginBottom: 6 }}>
+                함께 올리신 파일 {data.files.length}개 — 그대로 보관 중입니다
+              </div>
+              <FileList applicationId={data.ticket} files={data.files} compact />
+            </div>
           )}
         </div>
       </details>

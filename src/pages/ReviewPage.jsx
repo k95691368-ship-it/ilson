@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import StageHeader from '../components/StageHeader.jsx'
+import FileList from '../components/FileList.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
@@ -269,13 +270,11 @@ function Detail({ id, onSaved }) {
         </div>
 
         {data.files.length > 0 && (
-          <div className="row" style={{ marginTop: 12 }}>
-            <span className="card-note">첨부</span>
-            {data.files.map((f) => (
-              <span key={f.id} className="badge badge-neutral">
-                {f.name}
-              </span>
-            ))}
+          <div style={{ marginTop: 14 }}>
+            <div className="card-note" style={{ marginBottom: 6 }}>
+              부서가 함께 올린 파일 {data.files.length}개
+            </div>
+            <FileList applicationId={a.id} files={data.files} compact />
           </div>
         )}
       </section>

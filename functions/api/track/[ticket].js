@@ -53,7 +53,7 @@ export async function onRequestGet({ env, params, request }) {
     const [review, files, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions] =
       await Promise.all([
         env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id).first(),
-        env.DB.prepare('SELECT name, byte_size FROM application_file WHERE application_id = ?')
+        env.DB.prepare('SELECT id, name, byte_size FROM application_file WHERE application_id = ?')
           .bind(app.id)
           .all(),
         env.DB.prepare(

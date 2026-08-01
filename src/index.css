@@ -340,6 +340,24 @@ textarea:focus-visible {
   background: var(--danger);
   color: var(--on-accent);
 }
+/* 버튼처럼 보이지만 실제로는 링크인 것.
+   파일 내려받기는 <a download>여야 브라우저가 저장 대화상자를 띄운다.
+   <button>으로 흉내 내면 자바스크립트로 파일을 통째로 메모리에 올려야 해서,
+   큰 정산서에서 브라우저가 멎는다. 모양만 버튼에서 빌려 온다. */
+a.btn-ghost,
+a.btn-primary,
+a.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  font: inherit;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  padding: 9px 18px;
+  text-decoration: none;
+  color: var(--text-h);
+  transition: background 0.15s ease;
+}
+
 .btn-ghost {
   background: transparent;
 }

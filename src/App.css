@@ -2172,3 +2172,63 @@
   text-align: center;
   padding: 90px 20px;
 }
+
+/* ===== 신청서에 딸려 온 파일 ===== */
+.file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.file-item {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  overflow: hidden;
+}
+.file-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 9px 10px 9px 12px;
+  flex-wrap: wrap;
+}
+.file-icon {
+  font-size: 15px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.file-name {
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text-h);
+  /* 정산서 파일명은 길다. 줄바꿈되더라도 버튼을 밀어내지 않게 한다. */
+  word-break: break-all;
+  min-width: 0;
+}
+.file-preview {
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  padding: 11px 12px 13px;
+}
+.file-sheet + .file-sheet {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--border);
+}
+.file-note {
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border-left: 2px solid var(--warning-border, var(--border));
+  background: var(--warning-bg, var(--surface));
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+.file-preview .data-table {
+  font-size: 12.5px;
+}
+.file-preview .data-table th,
+.file-preview .data-table td {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
