@@ -4,9 +4,10 @@ import { useApi } from '../hooks/useApi.js'
 import ReportForm from '../components/ReportForm.jsx'
 import TeachQuarantine from '../components/TeachQuarantine.jsx'
 import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../shared/quota.js'
+import { annotateRuns, summarizeRuns, usersOf } from '../../shared/history.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
-import { krw, num, ms, ago } from '../lib/format.js'
+import { krw, num, ms, ago, dateTimeLabel } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 
 // 부서에 넘긴 도구.
@@ -276,6 +277,10 @@ export default function ToolPage() {
         )}
       </footer>
 
+      {/* 지난주엔 어떤 파일로 돌렸는지 볼 데가 없었다. 그리고 목록만
+          만들면 반쪽이다 — 스무 줄을 늘어놓아도 사람은 이상한 것을 못 찾는다. */}
+      {data.recent?.length > 0 && <RunHistory runs={data.recent} />}
+
       {/* 밀려난 줄이 뭔지 아는 사람은 매일 그 일을 하는 부서 사람뿐이다.
           보여만 주고 고칠 길이 없으면 그 줄만 따로 손으로 처리하게 된다. */}
       {result?.quarantine?.length > 0 && (
@@ -287,6 +292,80 @@ export default function ToolPage() {
           사람만 찾는다. */}
       <ReportForm slug={slug} />
     </div>
+  )
+}
+
+// 언제 무엇으로 돌렸는가.
+//
+// 부서가 매주 정산을 돌린다. 그러다 "지난주엔 어떤 파일로 돌렸지"를 물을
+// 일이 생긴다 — 숫자가 이상해서, 또는 누가 물어봐서. 답할 데가 없었다.
+//
+// 목록만 만들면 반쪽이다. 가장 흔한 사고는 파일 하나를 빠뜨리고 돌리는
+// 것인데, 도구는 아무 불평 없이 돌고 결과는 그냥 좀 적을 뿐이다. 그래서
+// 이번 실행이 지난번들과 얼마나 다른지를 시스템이 짚어 준다.
+function RunHistory({ runs }) {
+  const annotated = annotateRuns(runs)
+  const s = summarizeRuns(annotated)
+  const users = usersOf(runs)
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <span className="card-title">이 도구를 돌린 기록 {s.total}번</span>
+        <span className="spacer" />
+        {s.flagged > 0 && (
+          <span className="badge badge-warning">살펴볼 것 {s.flagged}번</span>
+        )}
+        {s.failed > 0 && <span className="badge badge-danger">멈춘 것 {s.failed}번</span>}
+      </div>
+
+      <p className="card-note" style={{ marginBottom: 12 }}>
+        합쳐서 {num(s.rows)}줄을 처리했고 {num(s.quarantined)}줄이 밀려났습니다.
+        {users.length === 1
+          ? ` 지금까지 ${users[0].who} 한 분만 쓰고 계십니다 — 자리를 비우시면 멈춥니다.`
+          : ` ${users.length}분이 쓰고 계십니다.`}
+      </p>
+
+      <ol className="run-list">
+        {annotated.map((r) => (
+          <li key={r.id} className={r.flags.length > 0 ? 'flagged' : ''}>
+            <div className="row" style={{ marginBottom: 4 }}>
+              {r.ok ? (
+                <span className="badge badge-success">{num(r.rows_out)}줄</span>
+              ) : (
+                <span className="badge badge-danger">멈춤</span>
+              )}
+              {r.quarantined > 0 && (
+                <span className="badge badge-neutral">밀려남 {num(r.quarantined)}</span>
+              )}
+              <span className="card-note">{r.actor_label}</span>
+              <span className="spacer" />
+              <span className="card-note" title={dateTimeLabel(r.used_at)}>
+                {ago(r.used_at)}
+              </span>
+            </div>
+
+            {r.files.length > 0 && (
+              <div className="run-files">
+                {r.files.map((f, i) => (
+                  <span key={i} className="run-file">
+                    {f.name}
+                  </span>
+                ))}
+              </div>
+            )}
+
+            {/* 이번 실행이 지난번들과 다른 대목. 이게 없으면 목록은
+                그냥 지나간 일의 나열이다. */}
+            {r.flags.map((f, i) => (
+              <div key={i} className={`run-flag ${f.kind}`}>
+                {f.text}
+              </div>
+            ))}
+          </li>
+        ))}
+      </ol>
+    </section>
   )
 }
 

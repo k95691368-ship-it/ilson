@@ -50,7 +50,9 @@ export async function onRequestGet({ env, params, request }) {
         .bind(h.application_id)
         .first(),
       env.DB.prepare(
-        'SELECT used_at, rows_out, quarantined, duration_ms, ok FROM tool_use WHERE application_id = ? ORDER BY used_at DESC LIMIT 5'
+        `SELECT id, used_at, actor_label, files_json, rows_out, quarantined,
+                duration_ms, human_review_seconds, rework_seconds, ok, fail_reason
+         FROM tool_use WHERE application_id = ? ORDER BY used_at DESC LIMIT 40`
       )
         .bind(h.application_id)
         .all(),
