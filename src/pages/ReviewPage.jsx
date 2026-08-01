@@ -1,7 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import FileList from '../components/FileList.jsx'
+import HotkeyHelp from '../components/HotkeyHelp.jsx'
+import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
@@ -22,6 +24,15 @@ import {
   IMPACT_SCALE,
   DIFFICULTY_SCALE,
 } from '../../shared/review.js'
+
+const HOTKEYS = [
+  { keys: 'j ↓', what: '다음 신청서' },
+  { keys: 'k ↑', what: '이전 신청서' },
+  { keys: '/', what: '검색창으로' },
+  { keys: '1 2 3 4', what: '검토 대기 · 수용 · 반려 · 보류만 보기 (다시 누르면 풀림)' },
+  { keys: 'Esc', what: '검색창에서 나가기 · 밖에서는 조건 지우기' },
+  { keys: '?', what: '이 창 열고 닫기' },
+]
 
 const EMPTY_FORM = {
   impact_score: '3',
@@ -111,6 +122,46 @@ export default function ReviewPage() {
     }
   }, [items])
 
+  // 손을 마우스로 옮기지 않고 접수함을 넘긴다.
+  //
+  // 신청서 하나 보고 판정하고 다음 것으로 넘어가는 일을 하루 종일 반복하는
+  // 자리다. 그때마다 왼쪽 목록으로 마우스를 옮겨 클릭하는 것이 전부 손해다.
+  const searchRef = useRef(null)
+  const [helpOpen, setHelpOpen] = useState(false)
+
+  const step = useCallback(
+    (delta) => {
+      if (visible.length === 0) return
+      const at = visible.findIndex((i) => i.id === selectedId)
+      // 지금 고른 것이 목록에 없으면(조건에 걸러졌으면) 맨 위부터 센다.
+      const next = at < 0 ? 0 : Math.min(visible.length - 1, Math.max(0, at + delta))
+      setSelectedId(visible[next].id)
+    },
+    [visible, selectedId]
+  )
+
+  useHotkeys({
+    j: () => step(1),
+    ArrowDown: () => step(1),
+    k: () => step(-1),
+    ArrowUp: () => step(-1),
+    '/': () => searchRef.current?.focus(),
+    '?': () => setHelpOpen((v) => !v),
+    Escape: (e) => {
+      if (helpOpen) {
+        setHelpOpen(false)
+        return
+      }
+      // 검색창 안에서 눌렀으면 거기서 빠져나온다. 밖에서 눌렀으면 조건을 지운다.
+      if (e.target === searchRef.current) searchRef.current?.blur()
+      else if (isFiltered(query)) clearFilters()
+    },
+    1: () => toggle('status', '접수'),
+    2: () => toggle('status', '수용'),
+    3: () => toggle('status', '반려'),
+    4: () => toggle('status', '보류'),
+  })
+
   async function seed() {
     setSeeding(true)
     try {
@@ -131,6 +182,8 @@ export default function ReviewPage() {
   return (
     <div className="stack">
       <StageHeader stageKey="review" />
+
+      <HotkeyHelp open={helpOpen} onClose={() => setHelpOpen(false)} keys={HOTKEYS} />
 
       {error && (
         <div className="notice notice-danger">
@@ -209,6 +262,7 @@ export default function ReviewPage() {
               }}
             >
               <input
+                ref={searchRef}
                 value={draft}
                 onChange={(e) => {
                   setDraft(e.target.value)
@@ -323,9 +377,26 @@ export default function ReviewPage() {
                     <span className="card-note"> {visible.length}/{items.length}</span>
                   )}
                 </span>
-                <button type="button" className="btn-ghost btn-sm" onClick={seed} disabled={seeding}>
-                  시연 데이터
-                </button>
+                <div className="row">
+                  {/* 숨어 있는 단축키는 없는 것과 같다. 만들어 놓고 아무도
+                      모르면 만든 사람만 쓴다. */}
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm"
+                    onClick={() => setHelpOpen(true)}
+                    title="단축키 보기"
+                  >
+                    <kbd>?</kbd>
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost btn-sm"
+                    onClick={seed}
+                    disabled={seeding}
+                  >
+                    시연 데이터
+                  </button>
+                </div>
               </div>
 
               {selectionHidden && (
