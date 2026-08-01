@@ -17,6 +17,7 @@ const TrackPage = lazy(() => import('./pages/TrackPage.jsx'))
 const LogPage = lazy(() => import('./pages/LogPage.jsx'))
 const RecordPage = lazy(() => import('./pages/RecordPage.jsx'))
 const DeptPage = lazy(() => import('./pages/DeptPage.jsx'))
+const ToolsPage = lazy(() => import('./pages/ToolsPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // 목차와 꼬리말 없이 여는 화면들.
@@ -67,6 +68,12 @@ export default function App() {
           <div className="topbar-right">
             {/* 단계가 아니라 여덟 단계를 가로로 훑는 화면이라 목차와 분리해 둔다. */}
             <NavLink
+              to="/tools"
+              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
+            >
+              넘긴 뒤
+            </NavLink>
+            <NavLink
               to="/log"
               className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
             >
@@ -94,6 +101,7 @@ export default function App() {
             <Route path="/log" element={<LogPage />} />
             <Route path="/record/:id" element={<RecordPage />} />
             <Route path="/dept/:dept" element={<DeptPage />} />
+            <Route path="/tools" element={<ToolsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
