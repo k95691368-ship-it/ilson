@@ -97,7 +97,7 @@ export async function onRequestGet({ env }) {
 
         // 합격 기준 중 통과 못 한 것.
         env.DB.prepare(
-          `SELECT br.verdict, br.body, br.evidence, br.is_required_safety, r.round_no, a.ticket_no, a.title
+          `SELECT br.verdict, br.body, br.evidence, br.is_required_safety, r.seq, a.ticket_no, a.title
            FROM beta_result br
            JOIN beta_round r ON r.id = br.round_id
            JOIN application a ON a.id = r.application_id
@@ -125,7 +125,7 @@ export async function onRequestGet({ env }) {
           `SELECT a.ticket_no, a.title, a.dept FROM application a
            JOIN review r ON r.application_id = a.id
            LEFT JOIN baseline b ON b.application_id = a.id
-           WHERE r.verdict = '수용' AND b.id IS NULL LIMIT 20`
+           WHERE r.verdict = '수용' AND b.application_id IS NULL LIMIT 20`
         ).all(),
       ])
 

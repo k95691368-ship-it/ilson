@@ -212,7 +212,7 @@ export default function HonestyPage() {
                       <span className="badge badge-warning">반드시 지켜야 할 것</span>
                     )}
                     <span className="spacer" />
-                    <span className="card-note">{c.round_no}차</span>
+                    <span className="card-note">{c.seq}차</span>
                   </div>
                   <div className="dept-app-title">{c.body}</div>
                   {c.evidence && <div className="card-note honest-why">{c.evidence}</div>}
