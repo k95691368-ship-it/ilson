@@ -46,7 +46,10 @@ describe('얼마나 남았는지', () => {
   it('다 썼으면 그렇게 말한다', () => {
     const s = quotaState({ remaining: 0, limit: 20 })
     expect(s.level).toBe('다 씀')
-    expect(s.headline).toContain('다 쓰셨습니다')
+    // '오늘'이라고 하지 않는다. 자정에 초기화되는 것이 아니라 최근
+    // 24시간 기준이라, '오늘'이라고 하면 자정까지 헛기다리게 된다.
+    expect(s.headline).toContain('더 돌리실 수 없습니다')
+    expect(s.headline).not.toContain('오늘')
   })
 
   it('이상한 값에도 터지지 않는다', () => {
