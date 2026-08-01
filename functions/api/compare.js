@@ -4,9 +4,9 @@
 // 건인가, 말만 비슷하고 다른 일인가 — 은 사람이 한다. 그 판단이 사라지면
 // 다음 사람이 같은 두 건을 놓고 처음부터 다시 견주게 된다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
 import { compare, COMPARE_VERDICTS, VERDICT_MEANING } from '../../shared/compare.js'
-import { recordDecision } from '../_lib/decisions.js'
+import { logDecision } from '../_lib/decisions.js'
 import { annualHours } from '../_lib/applications.js'
 
 const COLUMNS = `id, ticket_no, dept, applicant_label, title, bottleneck, problem, wish,
@@ -94,7 +94,7 @@ export async function onRequestPost({ env, request }) {
     fields.reason = '왜 그렇게 판정했는지 한 줄이라도 적어주세요.'
   }
   if (Object.keys(fields).length > 0) {
-    return jsonError('적어주신 것을 다시 확인해주세요.', 400, fields)
+    return failFields(fields, '적어주신 것을 다시 확인해주세요.')
   }
 
   try {
@@ -108,7 +108,7 @@ export async function onRequestPost({ env, request }) {
     const later = String(a.created_at) >= String(b.created_at) ? a : b
     const earlier = later.id === a.id ? b : a
 
-    const id = await recordDecision(env, {
+    const id = await logDecision(env, {
       applicationId: later.id,
       stage: '검토',
       actor: 'human',
