@@ -14,7 +14,7 @@ import { ago, num } from '../lib/format.js'
 //
 // 막지 않는다. 비슷해 보인다고 신청을 못 하게 하면, 진짜 다른 건을 내려던
 // 사람이 낼 데를 잃는다. 알려 주고 고르게 한다.
-export default function SimilarNotice({ hits, tone = 'apply', onDismiss }) {
+export default function SimilarNotice({ hits, tone = 'apply', onDismiss, selfId }) {
   if (!hits || hits.length === 0) return null
 
   const strongest = hits[0]
@@ -74,6 +74,16 @@ export default function SimilarNotice({ hits, tone = 'apply', onDismiss }) {
             <div className="similar-why">{reasonText(h)}</div>
 
             <div className="similar-item-foot">
+              {/* 담당자 자리에서는 나란히 놓고 볼 수 있게 한다. 번갈아 읽는
+                  것으로는 같은 건인지 판정하기 어렵다. */}
+              {!isApply && selfId && (
+                <Link
+                  to={`/compare?a=${encodeURIComponent(selfId)}&b=${encodeURIComponent(h.id ?? h.ticket_no)}`}
+                  className="btn-ghost btn-sm"
+                >
+                  나란히 놓고 보기
+                </Link>
+              )}
               <Link
                 to={isApply ? `/track?no=${h.ticket_no}` : `/record/${h.id ?? h.ticket_no}`}
                 className="btn-ghost btn-sm"

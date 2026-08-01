@@ -655,7 +655,7 @@ function Detail({ id, onSaved, pool }) {
 
       {/* 판정하기 전에 견준다. 판정한 뒤에 알려 주면 이미 두 번 검토한 것이다.
           목록이 이미 브라우저에 다 있어서 서버를 다시 부르지 않는다. */}
-      <SimilarNotice hits={findSimilar(a, pool ?? [], { limit: 2 })} tone="review" />
+      <SimilarNotice hits={findSimilar(a, pool ?? [], { limit: 2 })} tone="review" selfId={a.id} />
 
       <form className="card decided" onSubmit={save}>
         <div className="card-head">
