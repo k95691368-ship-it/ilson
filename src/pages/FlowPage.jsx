@@ -151,7 +151,10 @@ function Overview({ data }) {
         <div className="stack">
           {data.byDept.length > 0 && (
             <section className="card">
-              <div className="card-title">부서별</div>
+              <div className="card-head">
+                <span className="card-title">부서별</span>
+                <span className="card-note">이름을 누르면 그 부서와 있었던 일 전부</span>
+              </div>
               <div className="table-wrap" style={{ marginTop: 8 }}>
                 <table className="data-table">
                   <thead>
@@ -165,7 +168,9 @@ function Overview({ data }) {
                   <tbody>
                     {data.byDept.map((d) => (
                       <tr key={d.dept}>
-                        <td>{d.dept}</td>
+                        <td>
+                          <Link to={`/dept/${encodeURIComponent(d.dept)}`}>{d.dept}</Link>
+                        </td>
                         <td className="num">{d.total}</td>
                         <td className="num">{d.refused || '—'}</td>
                         <td className="num">{d.done || '—'}</td>

@@ -467,7 +467,11 @@ function Detail({ id, onSaved }) {
           </Link>
         </div>
         <div className="row" style={{ marginBottom: 12 }}>
-          <span className="badge badge-neutral">{a.dept}</span>
+          {/* 이 부서와 그동안 뭘 했는지로 넘어간다. 판정하기 전에 "이 부서에
+              내가 밀린 게 있나"를 보고 가는 것이 순서다. */}
+          <Link to={`/dept/${encodeURIComponent(a.dept)}`} className="badge badge-neutral">
+            {a.dept}
+          </Link>
           <span className="badge badge-neutral">{a.applicant_label}</span>
           <span className={`badge ${statusTone(a.status)}`}>{a.status}</span>
           <span className="card-note">{ago(a.created_at)} 접수</span>

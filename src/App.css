@@ -2707,3 +2707,152 @@ p.record-aside {
   border-top: 1px dashed var(--border);
   line-height: 1.7;
 }
+
+/* ===== 부서 한 곳과 나 사이 ===== */
+
+/* 내가 이 부서에 못 준 것. 화면 맨 위다.
+   보통 대시보드는 남이 나한테 안 해 준 것을 센다. 만들기 쉽고 보기 편하지만
+   부서와 마주 앉을 때 아무 쓸모가 없다. */
+.owed {
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  border-radius: var(--radius);
+  padding: 16px 18px 18px;
+}
+.owed-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.owed-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.owed ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.owed li {
+  padding: 11px 13px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.owed-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.owed-what {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-h);
+  line-height: 1.55;
+}
+.owed-why {
+  margin-top: 3px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+/* 목록 안에서 "아직 못 했다"를 눈에 띄게. */
+.owed-flag {
+  color: var(--warning-text, var(--warning));
+  font-weight: 600;
+}
+
+.dept-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+@media (max-width: 1000px) {
+  .dept-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.dept-apps,
+.dept-reqs,
+.dept-conflicts,
+.dept-people,
+.dept-tools,
+.dept-meetings,
+.dept-feedback,
+.dept-decisions {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  font-size: 13.5px;
+  line-height: 1.7;
+}
+.dept-apps > li,
+.dept-reqs > li,
+.dept-conflicts > li,
+.dept-people > li,
+.dept-tools > li,
+.dept-meetings > li,
+.dept-feedback > li,
+.dept-decisions > li {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.dept-app-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+.dept-app-title {
+  display: block;
+  font-weight: 600;
+  color: var(--text-h);
+  text-decoration: none;
+  line-height: 1.5;
+  margin-bottom: 2px;
+}
+.dept-app-title:hover {
+  text-decoration: underline;
+}
+.dept-app-verdict {
+  margin-top: 7px;
+  padding-left: 9px;
+  border-left: 2px solid var(--border);
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.dept-reqs > li.rejected {
+  opacity: 0.8;
+}
+
+/* 부딪힌 두 요구. 내 부서 쪽을 굵게 해서 어느 쪽이 나였는지 바로 보이게. */
+.conflict-pair {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.conflict-pair .mine {
+  color: var(--text-h);
+}
+.conflict-vs {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 0.06em;
+}

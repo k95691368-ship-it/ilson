@@ -16,6 +16,7 @@ const ToolPage = lazy(() => import('./pages/ToolPage.jsx'))
 const TrackPage = lazy(() => import('./pages/TrackPage.jsx'))
 const LogPage = lazy(() => import('./pages/LogPage.jsx'))
 const RecordPage = lazy(() => import('./pages/RecordPage.jsx'))
+const DeptPage = lazy(() => import('./pages/DeptPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // 목차와 꼬리말 없이 여는 화면들.
@@ -92,6 +93,7 @@ export default function App() {
             <Route path="/track" element={<TrackPage />} />
             <Route path="/log" element={<LogPage />} />
             <Route path="/record/:id" element={<RecordPage />} />
+            <Route path="/dept/:dept" element={<DeptPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
