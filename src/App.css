@@ -2921,3 +2921,26 @@ kbd {
   border-top: 1px dashed var(--border);
   line-height: 1.7;
 }
+
+
+/* 조건에서 빠졌지만 오른쪽에 열려 있는 신청서. 목록 맨 위에 붙여 둔다.
+   경고를 띄우는 대신 이렇게 한다 — 검색어 한 글자마다, 판정을 저장할
+   때마다 노란 경고가 뜨면 정상 동작이 사고처럼 보이고, 경고가 늘 떠 있으면
+   진짜 경고를 아무도 안 읽는다. */
+.review-pinned {
+  list-style: none;
+  margin: 0;
+  padding: 6px 6px 0;
+  border-bottom: 1px dashed var(--border);
+}
+.review-pinned .review-list-item {
+  border: 1px dashed var(--accent);
+}
+.review-list-cap {
+  margin: 0;
+  padding: 8px 12px 10px;
+  border-top: 1px solid var(--border);
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}

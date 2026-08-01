@@ -11,6 +11,8 @@ import { ago, duration, num, krw } from '../lib/format.js'
 import {
   applyQuery,
   facetCounts,
+  presentStatuses,
+  queueStats,
   describeQuery,
   isFiltered,
   sumAnnualHours,
@@ -29,7 +31,7 @@ const HOTKEYS = [
   { keys: 'j ↓', what: '다음 신청서' },
   { keys: 'k ↑', what: '이전 신청서' },
   { keys: '/', what: '검색창으로' },
-  { keys: '1 2 3 4', what: '검토 대기 · 수용 · 반려 · 보류만 보기 (다시 누르면 풀림)' },
+  { keys: '1 … 7', what: '그 자리의 상태 칩만 보기 (다시 누르면 풀림)' },
   { keys: 'Esc', what: '검색창에서 나가기 · 밖에서는 조건 지우기' },
   { keys: '?', what: '이 창 열고 닫기' },
 ]
@@ -70,6 +72,13 @@ export default function ReviewPage() {
   const visible = useMemo(() => applyQuery(items, query), [items, query])
   const facets = useMemo(() => facetCounts(items, query), [items, query])
   const totals = useMemo(() => sumAnnualHours(visible), [visible])
+  const queue = useMemo(() => queueStats(visible), [visible])
+  const statuses = useMemo(() => presentStatuses(items), [items])
+
+  // 서버가 한 번에 주는 것에는 상한이 있다. 그 상한에 걸렸는지를 화면이
+  // 알아야 "없습니다"와 "여기까지만 받아 왔습니다"를 구분해 말할 수 있다.
+  const summary = data?.summary ?? {}
+  const capped = summary.capped === true
 
   // 실제로 신청서가 들어온 부서만 칩으로 낸다. 아무것도 안 들어온 부서까지
   // 늘어놓으면 누를 것과 못 누를 것이 섞여 고르기 나빠진다.
@@ -86,15 +95,22 @@ export default function ReviewPage() {
     setSelectedId(visible[0].id)
   }, [visible, selectedId])
 
-  // 조건을 걸어서 지금 보고 있는 신청서가 목록에서 사라진 경우.
+  // 조건을 걸어서 지금 열어 둔 신청서가 목록에서 빠진 경우.
   //
-  // 이때 자동으로 다른 것을 고르지 않는다. 담당자가 판정 근거를 반쯤 적어
-  // 둔 채로 부서 칩을 눌렀을 수 있고, 그 상태에서 화면이 갈아치워지면
-  // 쓰던 것이 날아간다. 대신 "지금 조건에 없다"고만 알린다.
-  const selectionHidden =
-    selectedId != null &&
-    items.some((i) => i.id === selectedId) &&
-    !visible.some((i) => i.id === selectedId)
+  // 자동으로 다른 것을 고르지 않는다. 담당자가 판정 근거를 반쯤 적어 둔 채로
+  // 부서 칩을 눌렀을 수 있고, 그때 화면이 갈아치워지면 쓰던 것이 날아간다.
+  //
+  // 그렇다고 경고를 띄우지도 않는다. 검색어를 한 글자 칠 때마다, 판정을
+  // 저장할 때마다 노란 경고가 뜨면 — 저장하면 상태가 바뀌어 '접수'로 좁혀
+  // 둔 목록에서 빠지니까 — 그건 정상 동작인데 사고처럼 보인다. 경고가 늘
+  // 떠 있으면 진짜 경고를 아무도 안 읽는다.
+  //
+  // 대신 목록 맨 위에 따로 고정해 둔다. 빠졌다는 것도 보이고, 돌아갈 길도
+  // 남고, 시끄럽지도 않다.
+  const pinned = useMemo(() => {
+    if (selectedId == null || visible.some((i) => i.id === selectedId)) return null
+    return items.find((i) => i.id === selectedId) ?? null
+  }, [items, visible, selectedId])
 
   function setQ(patch) {
     setQuery((q) => ({ ...q, ...patch }))
@@ -112,15 +128,6 @@ export default function ReviewPage() {
     setDraft('')
   }
 
-  const counts = useMemo(() => {
-    const by = (s) => items.filter((i) => i.status === s).length
-    return {
-      waiting: by('접수'),
-      accepted: by('수용'),
-      refused: by('반려'),
-      held: by('보류'),
-    }
-  }, [items])
 
   // 손을 마우스로 옮기지 않고 접수함을 넘긴다.
   //
@@ -156,10 +163,11 @@ export default function ReviewPage() {
       if (e.target === searchRef.current) searchRef.current?.blur()
       else if (isFiltered(query)) clearFilters()
     },
-    1: () => toggle('status', '접수'),
-    2: () => toggle('status', '수용'),
-    3: () => toggle('status', '반려'),
-    4: () => toggle('status', '보류'),
+    // 숫자키는 상태 칩을 왼쪽부터 순서대로 가리킨다. 상태를 코드에 박아 두면
+    // 데이터에 없는 상태를 누르게 되고, 있는 상태를 못 누르게 된다.
+    ...Object.fromEntries(
+      statuses.map((s, i) => [String(i + 1), () => toggle('status', s)])
+    ),
   })
 
   async function seed() {
@@ -208,36 +216,35 @@ export default function ReviewPage() {
 
       {items.length > 0 && (
         <>
-          {/* 숫자를 눌러서 그것만 볼 수 있게 한다. 세어 놓고 못 누르게 하면
-              담당자는 결국 목록을 눈으로 훑어 세게 된다. */}
+          {/* 세는 자리와 고르는 자리를 섞지 않는다.
+              한 줄에 선 숫자 중 어떤 것은 조건을 따라가고 어떤 것은 전체
+              기준이면, 담당자는 잔글씨를 읽어야 어느 쪽인지 안다. 여기 셋은
+              전부 "지금 보고 있는 것"의 요약이고, 고르는 일은 아래 칩이 한다. */}
           <section className="stat-row">
             <Tile
-              label="검토 대기"
-              value={num(counts.waiting)}
-              note="아직 내가 안 본 것"
-              on={query.status === '접수'}
-              onClick={() => toggle('status', '접수')}
+              label="지금 보고 있는 것"
+              value={num(visible.length)}
+              note={`접수된 ${num(items.length)}건 중${isFiltered(query) ? ' · 조건이 걸려 있습니다' : ''}`}
             />
             <Tile
-              label="수용"
-              value={num(counts.accepted)}
-              note="만들기로 한 것"
-              on={query.status === '수용'}
-              onClick={() => toggle('status', '수용')}
+              label="아직 판정 안 한 것"
+              value={num(queue.waiting)}
+              note={
+                queue.stale > 0
+                  ? `그중 ${STALE_HOURS}시간 넘게 안 본 것 ${num(queue.stale)}건`
+                  : '하루 넘게 밀린 것은 없습니다'
+              }
             />
+            {/* 이 화면의 머릿수는 건수가 아니라 이 값이다 — 아무도 손대지
+                않은 채로 흘러가는 시간. */}
             <Tile
-              label="반려"
-              value={num(counts.refused)}
-              note="이유와 대안을 함께 보냈다"
-              on={query.status === '반려'}
-              onClick={() => toggle('status', '반려')}
-            />
-            <Tile
-              label="보류"
-              value={num(counts.held)}
-              note="조건이 풀리면 다시 본다"
-              on={query.status === '보류'}
-              onClick={() => toggle('status', '보류')}
+              label="여기 묶여 있는 시간"
+              value={totals.hours > 0 ? `연 ${num(totals.hours, 0)}시간` : '—'}
+              note={
+                totals.missing > 0
+                  ? `${krw(totals.hours * 25000)} · 소요를 안 적은 ${totals.missing}건은 뺐습니다`
+                  : `시급 25,000원으로 환산하면 ${krw(totals.hours * 25000)}`
+              }
             />
           </section>
 
@@ -288,6 +295,33 @@ export default function ReviewPage() {
                 </button>
               )}
             </form>
+
+            {/* 상태 칩. 네 개만 박아 두면 '진행중'인 신청서가 있어도 그것만
+                골라 볼 방법이 없다 — 화면에 보이는데 좁힐 수가 없는 상태가
+                생긴다. 실제로 그 상태인 것이 있는 것만 낸다. */}
+            {statuses.length > 1 && (
+              <div className="filter-row">
+                <span className="filter-label">상태</span>
+                <div className="chip-row">
+                  {statuses.map((s) => {
+                    const n = facets.byStatus[s] ?? 0
+                    return (
+                      <button
+                        key={s}
+                        type="button"
+                        className={`chip${query.status === s ? ' on' : ''}`}
+                        onClick={() => toggle('status', s)}
+                        disabled={n === 0 && query.status !== s}
+                        aria-pressed={query.status === s}
+                      >
+                        {s}
+                        <span className="chip-count">{n}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
 
             {depts.length > 1 && (
               <div className="filter-row">
@@ -399,14 +433,27 @@ export default function ReviewPage() {
                 </div>
               </div>
 
-              {selectionHidden && (
-                <div className="review-list-warn">
-                  지금 열어 둔 신청서는 이 조건에 들어오지 않습니다. 오른쪽 내용은 그대로 둡니다 —
-                  적던 것이 날아가면 안 되니까요.
-                  <button type="button" className="btn-ghost btn-sm" onClick={clearFilters}>
-                    조건 지우기
-                  </button>
-                </div>
+              {pinned && (
+                <ul className="review-pinned">
+                  <li>
+                    <button
+                      type="button"
+                      className="review-list-item on"
+                      onClick={() => setSelectedId(pinned.id)}
+                      aria-current="true"
+                    >
+                      <span className="review-list-top">
+                        <span className="badge badge-neutral">{pinned.dept}</span>
+                        <span className={`badge ${statusTone(pinned.status)}`}>{pinned.status}</span>
+                        <span className="badge badge-accent">열어 둔 것</span>
+                      </span>
+                      <span className="review-list-title">{pinned.title}</span>
+                      <span className="review-list-meta">
+                        지금 건 조건에는 안 들어오지만 오른쪽에 열려 있어 여기 붙여 둡니다
+                      </span>
+                    </button>
+                  </li>
+                </ul>
               )}
 
               {visible.length === 0 && (
@@ -414,6 +461,7 @@ export default function ReviewPage() {
                   <div className="empty-title">조건에 맞는 신청서가 없습니다</div>
                   <div className="empty-sub">
                     {items.length}건이 접수되어 있지만 지금 건 조건에 맞는 것이 없습니다.
+                    {capped && ' 다만 여기까지만 받아 왔습니다 — 못 받아 온 쪽에는 있을 수 있습니다.'}
                   </div>
                   <button type="button" className="btn-ghost btn-sm" onClick={clearFilters}>
                     조건 지우기
@@ -448,6 +496,13 @@ export default function ReviewPage() {
                   </li>
                 ))}
               </ul>
+
+              {capped && (
+                <p className="review-list-cap">
+                  저장된 {num(summary.stored)}건 중 최근 {num(summary.limit)}건만 받아 왔습니다.
+                  아래 검색과 조건은 받아 온 것 안에서만 찾습니다.
+                </p>
+              )}
             </nav>
 
             <div className="review-detail">
@@ -807,32 +862,14 @@ function Field({ label, required, hint, error, children }) {
   )
 }
 
-// 세어 놓은 숫자를 눌러서 그것만 볼 수 있게 한다.
-//
-// 숫자만 보여 주고 못 누르게 하면, 담당자는 "반려 1건"을 보고 나서 그 1건을
-// 찾으려고 목록을 처음부터 눈으로 훑게 된다. 이미 센 것을 다시 세게 하는 셈이다.
-function Tile({ label, value, note, on, onClick }) {
-  if (!onClick) {
-    return (
-      <div className="stat-tile">
-        <div className="stat-label">{label}</div>
-        <div className="stat-value">{value}</div>
-        <div className="stat-note">{note}</div>
-      </div>
-    )
-  }
+// 세기만 한다. 고르는 일은 아래 칩이 한다.
+function Tile({ label, value, note }) {
   return (
-    <button
-      type="button"
-      className={`stat-tile stat-tile-btn${on ? ' on' : ''}`}
-      onClick={onClick}
-      aria-pressed={on}
-      title={on ? '다시 눌러 조건을 풉니다' : `${label}인 것만 봅니다`}
-    >
+    <div className="stat-tile">
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
       <div className="stat-note">{note}</div>
-    </button>
+    </div>
   )
 }
 

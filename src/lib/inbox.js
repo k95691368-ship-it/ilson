@@ -19,7 +19,31 @@ export const SORTS = [
   { key: 'dept', label: '부서별', note: '같은 부서 것끼리 모아서' },
 ]
 
-export const STATUSES = ['접수', '검토중', '수용', '반려', '보류', '진행중', '완료']
+// migrations/0002_application.sql 의 CHECK 목록과 같은 값이고 같은 순서다.
+// 순서가 곧 진행 순서라, 칩을 이 순서로 늘어놓으면 왼쪽에서 오른쪽으로
+// 일이 흘러가는 모양이 된다.
+export const STATUSES = ['접수', '검토중', '수용', '진행중', '완료', '보류', '반려']
+
+// 실제로 그 상태인 신청서가 있는 것만 고른다.
+//
+// 일곱 개를 다 늘어놓으면 누를 것과 못 누를 것이 섞여 고르기 나빠진다.
+// 반대로 네 개만 박아 두면 '진행중'인 신청서가 있어도 그것만 골라 볼
+// 방법이 없다 — 화면에 보이는데 좁힐 수가 없는 상태가 생긴다.
+export function presentStatuses(items) {
+  const seen = new Set((items ?? []).map((i) => i.status))
+  return STATUSES.filter((s) => seen.has(s))
+}
+
+// 지금 보고 있는 것 안에서 아직 판정 안 한 것과 그중 묵은 것.
+//
+// 이 화면의 머릿수는 전체 건수가 아니라 이 값이다.
+export function queueStats(items) {
+  const list = items ?? []
+  return {
+    waiting: list.filter((i) => i.status === '접수').length,
+    stale: list.filter(isStale).length,
+  }
+}
 
 // 아무 조건도 걸지 않은 상태. 화면과 시험이 같은 것을 쓰게 한다.
 export const EMPTY_QUERY = {

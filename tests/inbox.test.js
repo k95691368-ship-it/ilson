@@ -7,6 +7,8 @@ import {
   describeQuery,
   isFiltered,
   sumAnnualHours,
+  presentStatuses,
+  queueStats,
   EMPTY_QUERY,
   STALE_HOURS,
 } from '../src/lib/inbox.js'
@@ -304,6 +306,43 @@ describe('걸린 조건 안에서의 합계', () => {
   it('빈 목록에서도 터지지 않는다', () => {
     expect(sumAnnualHours([])).toEqual({ hours: 0, missing: 0 })
     expect(sumAnnualHours(undefined)).toEqual({ hours: 0, missing: 0 })
+  })
+})
+
+describe('상태 칩에 낼 것', () => {
+  it('실제로 그 상태인 것이 있는 것만 낸다', () => {
+    expect(presentStatuses(ITEMS)).toEqual(['접수', '수용', '반려'])
+  })
+
+  it('진행 순서대로 늘어놓는다', () => {
+    // 순서가 곧 일이 흘러가는 방향이라, 왼쪽에서 오른쪽으로 읽힌다.
+    const mixed = [{ status: '완료' }, { status: '접수' }, { status: '진행중' }]
+    expect(presentStatuses(mixed)).toEqual(['접수', '진행중', '완료'])
+  })
+
+  it('네 개만 박아 두면 못 고르던 상태를 이제 고를 수 있다', () => {
+    // '진행중'인 신청서가 있는데 칩이 없으면, 화면에 보이는데 좁힐 방법이 없다.
+    expect(presentStatuses([{ status: '진행중' }])).toContain('진행중')
+  })
+
+  it('빈 목록이면 아무것도 안 낸다', () => {
+    expect(presentStatuses([])).toEqual([])
+    expect(presentStatuses(undefined)).toEqual([])
+  })
+})
+
+describe('지금 보고 있는 것 안의 대기', () => {
+  it('아직 판정 안 한 것과 그중 묵은 것을 센다', () => {
+    expect(queueStats(ITEMS)).toEqual({ waiting: 2, stale: 1 })
+  })
+
+  it('조건을 건 결과에 대고 세면 그만큼만 센다', () => {
+    expect(queueStats(applyQuery(ITEMS, { dept: '마케팅' }))).toEqual({ waiting: 1, stale: 0 })
+  })
+
+  it('빈 목록에서도 터지지 않는다', () => {
+    expect(queueStats([])).toEqual({ waiting: 0, stale: 0 })
+    expect(queueStats(undefined)).toEqual({ waiting: 0, stale: 0 })
   })
 })
 

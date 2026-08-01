@@ -12,7 +12,11 @@ import {
   validateFile,
   annualHours,
   MAX_FILES,
+  DEPTS,
+  APP_STATUSES,
 } from '../../_lib/applications.js'
+
+const PAGE_LIMIT = 200
 
 export async function onRequestGet({ env, request }) {
   const url = new URL(request.url)
@@ -22,32 +26,44 @@ export async function onRequestGet({ env, request }) {
   try {
     const where = []
     const binds = []
-    if (dept) {
+    // 아는 값만 조건으로 쓴다. 모르는 값이 오면 조건을 아예 붙이지 않는다.
+    // 오타 하나에 빈 화면을 주는 것보다 전체를 주는 편이 낫다.
+    if (DEPTS.includes(dept)) {
       where.push('a.dept = ?')
       binds.push(dept)
     }
-    if (status) {
+    if (APP_STATUSES.includes(status)) {
       where.push('a.status = ?')
       binds.push(status)
     }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
-    const { results } = await env.DB.prepare(
-      `SELECT a.id, a.ticket_no, a.dept, a.applicant_label, a.title, a.bottleneck,
-              a.problem, a.wish, a.impact_if_wrong,
-              a.current_minutes, a.current_people, a.current_frequency, a.is_measured,
-              a.status, a.created_at,
-              CAST((julianday('now') - julianday(a.created_at)) * 24 AS INTEGER) AS hours_since,
-              (SELECT COUNT(*) FROM application_file f WHERE f.application_id = a.id) AS file_count
-       FROM application a
-       ${clause}
-       ORDER BY a.created_at DESC
-       LIMIT 200`
-    )
-      .bind(...binds)
-      .all()
+    const [listed, counted] = await Promise.all([
+      env.DB.prepare(
+        `SELECT a.id, a.ticket_no, a.dept, a.applicant_label, a.title, a.bottleneck,
+                a.problem, a.wish, a.impact_if_wrong,
+                a.current_minutes, a.current_people, a.current_frequency, a.is_measured,
+                a.status, a.created_at,
+                CAST((julianday('now') - julianday(a.created_at)) * 24 AS INTEGER) AS hours_since,
+                (SELECT COUNT(*) FROM application_file f WHERE f.application_id = a.id) AS file_count
+         FROM application a
+         ${clause}
+         ORDER BY a.created_at DESC
+         LIMIT ${PAGE_LIMIT}`
+      )
+        .bind(...binds)
+        .all(),
 
-    const items = results.map((r) => ({ ...r, annual_hours: annualHours(r) }))
+      // 상한 밖에 무엇이 있는지 알려면 세는 수밖에 없다. 화면이 "없습니다"라고
+      // 말할 때, 그것이 진짜 없는 것인지 여기까지만 받아 온 것인지 구분해야
+      // 한다. 둘을 같게 취급하면 화면이 조용히 거짓말을 한다.
+      env.DB.prepare(`SELECT COUNT(*) AS n FROM application a ${clause}`)
+        .bind(...binds)
+        .first(),
+    ])
+
+    const items = listed.results.map((r) => ({ ...r, annual_hours: annualHours(r) }))
+    const stored = counted?.n ?? items.length
 
     return jsonResponse({
       items,
@@ -57,6 +73,9 @@ export async function onRequestGet({ env, request }) {
         // 접수 후 하루가 지나도록 아무도 안 본 것. 담당자가 밀어 둔 것이지
         // 시스템이 기다리는 것이 아니다.
         overdue: items.filter((i) => i.status === '접수' && i.hours_since >= 24).length,
+        stored,
+        capped: stored > items.length,
+        limit: PAGE_LIMIT,
       },
     })
   } catch (err) {

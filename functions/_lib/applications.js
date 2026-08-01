@@ -6,6 +6,10 @@
 
 export const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
 
+// migrations/0002_application.sql 의 CHECK 목록과 같은 값이다.
+// 목록 API의 ?status= 화이트리스트로 쓴다 — 여기 없는 값이 오면 조건을 안 붙인다.
+export const APP_STATUSES = ['접수', '검토중', '수용', '진행중', '완료', '보류', '반려']
+
 export const FREQUENCIES = [
   '하루 여러 번',
   '매일',
