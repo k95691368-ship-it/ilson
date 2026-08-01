@@ -3728,3 +3728,93 @@ kbd {
   border-top: 1px dashed var(--border);
   line-height: 1.75;
 }
+
+/* ===== 밀려난 줄 알려주기 ===== */
+.teach-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.teach-group {
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+/* 알려주면 풀리는 것을 도드라지게. 밀려나는 게 맞는 것은 가라앉힌다 —
+   부서가 그것부터 읽고 지치면 정작 알려줄 것을 안 알려준다. */
+.teach-group.kind-teach {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.teach-group.kind-expected {
+  opacity: 0.72;
+}
+.teach-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.teach-group-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.teach-group-body {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.teach-codes {
+  list-style: none;
+  margin: 11px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.teach-code {
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.teach-code.done {
+  border-color: var(--success-border, var(--border));
+}
+.teach-code-name {
+  font-weight: 700;
+  color: var(--text-h);
+}
+.teach-form {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+.teach-rows {
+  margin-top: 9px;
+}
+.teach-rows > summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+.teach-rows ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.teach-raw {
+  display: block;
+  font-family: var(--mono, monospace);
+  font-size: 11.5px;
+  color: var(--text);
+  margin-top: 1px;
+}

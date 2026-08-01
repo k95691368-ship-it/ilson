@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import ReportForm from '../components/ReportForm.jsx'
+import TeachQuarantine from '../components/TeachQuarantine.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { krw, num, ms, ago } from '../lib/format.js'
@@ -36,7 +37,9 @@ export default function ToolPage() {
       const files = await Promise.all(
         picked.map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() }))
       )
-      const r = await runPipeline({ files })
+      // 사람이 알려 준 상품코드를 함께 넘긴다. 이게 없으면 알려주고 나서도
+      // 그대로 또 밀려나고, 부서는 그 뒤로 아무것도 안 알려준다.
+      const r = await runPipeline({ files, aliases: data.aliases ?? {} })
       setResult(r)
 
       await api.post(`/tools/${slug}`, {
@@ -276,6 +279,12 @@ export default function ToolPage() {
           </span>
         )}
       </footer>
+
+      {/* 밀려난 줄이 뭔지 아는 사람은 매일 그 일을 하는 부서 사람뿐이다.
+          보여만 주고 고칠 길이 없으면 그 줄만 따로 손으로 처리하게 된다. */}
+      {result?.quarantine?.length > 0 && (
+        <TeachQuarantine slug={slug} quarantine={result.quarantine} onTaught={reload} />
+      )}
 
       {/* 넘긴 뒤 들어온 신고가 이 사이트에서 가장 값진 기록이다.
           만들 때 놓친 것은 만든 사람이 못 찾는다 — 매일 그 일을 하는

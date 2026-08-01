@@ -42,7 +42,7 @@ export async function onRequestGet({ env, params, request }) {
   const bucket = `tool:${h.slug}:${ip}`
 
   try {
-    const [remaining, manual, recent] = await Promise.all([
+    const [remaining, manual, recent, aliases] = await Promise.all([
       remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS),
       env.DB.prepare(
         'SELECT title, intro, when_to_run, what_to_do_after, contact FROM manual WHERE application_id = ?'
@@ -54,6 +54,10 @@ export async function onRequestGet({ env, params, request }) {
       )
         .bind(h.application_id)
         .all(),
+      // 사람이 알려 준 상품코드. 이걸 안 내려보내면 알려줘도 다음 실행에
+      // 반영되지 않는다. 알려주고 나서 그대로 또 밀려나면, 부서는 그
+      // 뒤로 아무것도 안 알려준다.
+      env.DB.prepare('SELECT external_code, canonical_code, product_name, taught_by FROM sku_alias').all(),
     ])
 
     return jsonResponse({
@@ -70,6 +74,9 @@ export async function onRequestGet({ env, params, request }) {
       manual: manual ?? null,
       note: h.note,
       recent: recent.results,
+      // 계산은 브라우저에서 하므로 알려 준 코드도 함께 보낸다.
+      aliases: Object.fromEntries(aliases.results.map((a) => [a.external_code, a.canonical_code])),
+      taught: aliases.results,
     })
   } catch (err) {
     return jsonError(`도구를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
