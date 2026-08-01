@@ -7,6 +7,16 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago, duration, num, krw } from '../lib/format.js'
 import {
+  applyQuery,
+  facetCounts,
+  describeQuery,
+  isFiltered,
+  sumAnnualHours,
+  SORTS,
+  EMPTY_QUERY,
+  STALE_HOURS,
+} from '../lib/inbox.js'
+import {
   VERDICTS,
   REFUSE_REASONS,
   IMPACT_SCALE,
@@ -33,18 +43,63 @@ export default function ReviewPage() {
   const [selectedId, setSelectedId] = useState(null)
   const [seeding, setSeeding] = useState(false)
 
+  // 무엇을 어떤 순서로 볼 것인가.
+  //
+  // 서버에 다시 묻지 않고 브라우저에서 거른다. 목록은 한 번에 200건까지만
+  // 오고, 그 정도는 브라우저가 즉시 처리한다. 한 글자 칠 때마다 서버에
+  // 물으면 느리기도 하지만, 응답이 올 때마다 목록이 새로 그려져 지금 보고
+  // 있던 신청서가 튄다. 그게 더 나쁘다.
+  const [query, setQuery] = useState(EMPTY_QUERY)
+  const [draft, setDraft] = useState('')
+
   // data가 그대로여도 매 렌더에서 새 배열을 만들면, 이 값을 보는 useEffect가
   // 매번 다시 돌아 선택이 튄다.
   const items = useMemo(() => data?.items ?? [], [data])
 
-  // 처음 열었을 때 아직 판정하지 않은 것 중 가장 오래 묵은 것을 고른다.
-  // 담당자가 실제로 다음에 볼 것이 그것이기 때문이다.
+  const visible = useMemo(() => applyQuery(items, query), [items, query])
+  const facets = useMemo(() => facetCounts(items, query), [items, query])
+  const totals = useMemo(() => sumAnnualHours(visible), [visible])
+
+  // 실제로 신청서가 들어온 부서만 칩으로 낸다. 아무것도 안 들어온 부서까지
+  // 늘어놓으면 누를 것과 못 누를 것이 섞여 고르기 나빠진다.
+  const depts = useMemo(
+    () => [...new Set(items.map((i) => i.dept))].sort((a, b) => a.localeCompare(b, 'ko')),
+    [items]
+  )
+
+  // 처음 열었을 때 맨 위를 고른다. 정렬 기본값이 '묵은 순'이라 그것은
+  // 아직 판정 안 한 것 중 가장 오래 앉아 있는 것이다. 담당자가 실제로
+  // 다음에 볼 것이 그것이다.
   useEffect(() => {
-    if (selectedId || items.length === 0) return
-    const waiting = items.filter((i) => i.status === '접수')
-    const target = waiting.length > 0 ? waiting[waiting.length - 1] : items[0]
-    setSelectedId(target.id)
-  }, [items, selectedId])
+    if (selectedId || visible.length === 0) return
+    setSelectedId(visible[0].id)
+  }, [visible, selectedId])
+
+  // 조건을 걸어서 지금 보고 있는 신청서가 목록에서 사라진 경우.
+  //
+  // 이때 자동으로 다른 것을 고르지 않는다. 담당자가 판정 근거를 반쯤 적어
+  // 둔 채로 부서 칩을 눌렀을 수 있고, 그 상태에서 화면이 갈아치워지면
+  // 쓰던 것이 날아간다. 대신 "지금 조건에 없다"고만 알린다.
+  const selectionHidden =
+    selectedId != null &&
+    items.some((i) => i.id === selectedId) &&
+    !visible.some((i) => i.id === selectedId)
+
+  function setQ(patch) {
+    setQuery((q) => ({ ...q, ...patch }))
+  }
+
+  // 같은 칩을 다시 누르면 풀린다. 끄는 방법을 따로 찾게 하지 않는다.
+  function toggle(key, value) {
+    setQuery((q) => ({ ...q, [key]: q[key] === value ? '' : value }))
+  }
+
+  function clearFilters() {
+    // 정렬은 되돌리지 않는다. 정렬은 '무엇을 보느냐'가 아니라 '어떤 순서로
+    // 보느냐'라서, 조건을 지웠다고 순서까지 바뀌면 사용자가 놀란다.
+    setQuery((q) => ({ ...EMPTY_QUERY, sort: q.sort }))
+    setDraft('')
+  }
 
   const counts = useMemo(() => {
     const by = (s) => items.filter((i) => i.status === s).length
@@ -100,23 +155,203 @@ export default function ReviewPage() {
 
       {items.length > 0 && (
         <>
+          {/* 숫자를 눌러서 그것만 볼 수 있게 한다. 세어 놓고 못 누르게 하면
+              담당자는 결국 목록을 눈으로 훑어 세게 된다. */}
           <section className="stat-row">
-            <Tile label="검토 대기" value={num(counts.waiting)} note="아직 내가 안 본 것" />
-            <Tile label="수용" value={num(counts.accepted)} note="만들기로 한 것" />
-            <Tile label="반려" value={num(counts.refused)} note="이유와 대안을 함께 보냈다" />
-            <Tile label="보류" value={num(counts.held)} note="조건이 풀리면 다시 본다" />
+            <Tile
+              label="검토 대기"
+              value={num(counts.waiting)}
+              note="아직 내가 안 본 것"
+              on={query.status === '접수'}
+              onClick={() => toggle('status', '접수')}
+            />
+            <Tile
+              label="수용"
+              value={num(counts.accepted)}
+              note="만들기로 한 것"
+              on={query.status === '수용'}
+              onClick={() => toggle('status', '수용')}
+            />
+            <Tile
+              label="반려"
+              value={num(counts.refused)}
+              note="이유와 대안을 함께 보냈다"
+              on={query.status === '반려'}
+              onClick={() => toggle('status', '반려')}
+            />
+            <Tile
+              label="보류"
+              value={num(counts.held)}
+              note="조건이 풀리면 다시 본다"
+              on={query.status === '보류'}
+              onClick={() => toggle('status', '보류')}
+            />
+          </section>
+
+          <section className="card">
+            <div className="card-head">
+              <span className="card-title">골라 보기</span>
+              <span className="card-note">{describeQuery(query, visible.length, items.length)}</span>
+              <span className="spacer" />
+              {isFiltered(query) && (
+                <button type="button" className="btn-ghost btn-sm" onClick={clearFilters}>
+                  조건 지우기
+                </button>
+              )}
+            </div>
+
+            <form
+              className="row"
+              style={{ marginBottom: 10 }}
+              onSubmit={(e) => {
+                e.preventDefault()
+                setQ({ q: draft.trim() })
+              }}
+            >
+              <input
+                value={draft}
+                onChange={(e) => {
+                  setDraft(e.target.value)
+                  // 브라우저에서 거르니 칠 때마다 바로 좁힌다. 엔터를 눌러야
+                  // 결과가 나오면, 담당자는 엔터를 누르기 전까지 자기가 뭘
+                  // 찾고 있는지 확인할 수 없다.
+                  setQ({ q: e.target.value.trim() })
+                }}
+                placeholder="말로 찾기 — 제목·병목·문제·접수번호 어디에 있든 찾습니다"
+                aria-label="신청서 검색"
+                style={{ flex: 1, minWidth: 220 }}
+              />
+              {draft && (
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    setDraft('')
+                    setQ({ q: '' })
+                  }}
+                >
+                  지우기
+                </button>
+              )}
+            </form>
+
+            {depts.length > 1 && (
+              <div className="filter-row">
+                <span className="filter-label">부서</span>
+                <div className="chip-row">
+                  {depts.map((d) => {
+                    const n = facets.byDept[d] ?? 0
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        className={`chip${query.dept === d ? ' on' : ''}`}
+                        onClick={() => toggle('dept', d)}
+                        // 눌러도 0건인 칩은 누르지 못하게 한다. 눌러 놓고
+                        // 빈 화면을 보게 하는 것보다 낫다.
+                        disabled={n === 0 && query.dept !== d}
+                        aria-pressed={query.dept === d}
+                      >
+                        {d}
+                        <span className="chip-count">{n}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="filter-row">
+              <span className="filter-label">골라내기</span>
+              <div className="chip-row">
+                <button
+                  type="button"
+                  className={`chip${query.onlyStale ? ' on' : ''}`}
+                  onClick={() => setQ({ onlyStale: !query.onlyStale })}
+                  aria-pressed={query.onlyStale}
+                >
+                  {STALE_HOURS}시간 넘게 안 본 것
+                  <span className="chip-count">{facets.stale}</span>
+                </button>
+                <button
+                  type="button"
+                  className={`chip${query.onlyWithFiles ? ' on' : ''}`}
+                  onClick={() => setQ({ onlyWithFiles: !query.onlyWithFiles })}
+                  aria-pressed={query.onlyWithFiles}
+                >
+                  첨부가 있는 것
+                  <span className="chip-count">{facets.withFiles}</span>
+                </button>
+              </div>
+            </div>
+
+            <div className="filter-row">
+              <span className="filter-label">순서</span>
+              <div className="chip-row">
+                {SORTS.map((s) => (
+                  <button
+                    key={s.key}
+                    type="button"
+                    className={`chip${query.sort === s.key ? ' on' : ''}`}
+                    onClick={() => setQ({ sort: s.key })}
+                    title={s.note}
+                    aria-pressed={query.sort === s.key}
+                  >
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* 조건을 걸면 이 합계도 따라 움직인다. 전체 합계를 그대로 두면
+                "재무 것만 봤는데 왜 합계가 그대로지"가 된다. */}
+            {visible.length > 0 && (
+              <p className="card-note filter-sum">
+                지금 보고 있는 {visible.length}건을 합치면 연 <strong>{num(totals.hours, 0)}시간</strong>
+                {totals.missing > 0 && ` (소요를 안 적은 ${totals.missing}건은 뺐습니다)`} · 시급
+                25,000원으로 환산하면 {krw(totals.hours * 25000)}
+              </p>
+            )}
           </section>
 
           <div className="review-layout">
             <nav className="review-list" aria-label="접수된 신청서">
               <div className="review-list-head">
-                <span className="card-title">접수함</span>
+                <span className="card-title">
+                  접수함
+                  {isFiltered(query) && (
+                    <span className="card-note"> {visible.length}/{items.length}</span>
+                  )}
+                </span>
                 <button type="button" className="btn-ghost btn-sm" onClick={seed} disabled={seeding}>
                   시연 데이터
                 </button>
               </div>
+
+              {selectionHidden && (
+                <div className="review-list-warn">
+                  지금 열어 둔 신청서는 이 조건에 들어오지 않습니다. 오른쪽 내용은 그대로 둡니다 —
+                  적던 것이 날아가면 안 되니까요.
+                  <button type="button" className="btn-ghost btn-sm" onClick={clearFilters}>
+                    조건 지우기
+                  </button>
+                </div>
+              )}
+
+              {visible.length === 0 && (
+                <div className="review-list-empty">
+                  <div className="empty-title">조건에 맞는 신청서가 없습니다</div>
+                  <div className="empty-sub">
+                    {items.length}건이 접수되어 있지만 지금 건 조건에 맞는 것이 없습니다.
+                  </div>
+                  <button type="button" className="btn-ghost btn-sm" onClick={clearFilters}>
+                    조건 지우기
+                  </button>
+                </div>
+              )}
+
               <ul>
-                {items.map((a) => (
+                {visible.map((a) => (
                   <li key={a.id}>
                     <button
                       type="button"
@@ -497,13 +732,32 @@ function Field({ label, required, hint, error, children }) {
   )
 }
 
-function Tile({ label, value, note }) {
+// 세어 놓은 숫자를 눌러서 그것만 볼 수 있게 한다.
+//
+// 숫자만 보여 주고 못 누르게 하면, 담당자는 "반려 1건"을 보고 나서 그 1건을
+// 찾으려고 목록을 처음부터 눈으로 훑게 된다. 이미 센 것을 다시 세게 하는 셈이다.
+function Tile({ label, value, note, on, onClick }) {
+  if (!onClick) {
+    return (
+      <div className="stat-tile">
+        <div className="stat-label">{label}</div>
+        <div className="stat-value">{value}</div>
+        <div className="stat-note">{note}</div>
+      </div>
+    )
+  }
   return (
-    <div className="stat-tile">
+    <button
+      type="button"
+      className={`stat-tile stat-tile-btn${on ? ' on' : ''}`}
+      onClick={onClick}
+      aria-pressed={on}
+      title={on ? '다시 눌러 조건을 풉니다' : `${label}인 것만 봅니다`}
+    >
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
       <div className="stat-note">{note}</div>
-    </div>
+    </button>
   )
 }
 

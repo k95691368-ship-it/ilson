@@ -2538,3 +2538,67 @@ p.record-aside {
     margin: 16mm 14mm;
   }
 }
+
+/* ===== 접수함 골라 보기 ===== */
+
+/* 세어 놓은 숫자를 누를 수 있게 만든 타일. 모양은 그대로 두고 눌리는
+   느낌만 더한다 — 모양이 달라지면 옆의 안 눌리는 타일과 다른 것으로 보인다. */
+.stat-tile-btn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+.stat-tile-btn:hover:not(:disabled) {
+  border-color: var(--border);
+}
+.stat-tile-btn.on {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.stat-tile-btn.on .stat-value {
+  color: var(--accent);
+}
+
+.filter-sum {
+  margin: 12px 0 0;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border);
+  line-height: 1.7;
+}
+
+/* 조건을 걸어서 지금 열어 둔 신청서가 목록에서 사라졌을 때.
+   오른쪽 내용을 갈아치우지 않고 이것만 띄운다. */
+.review-list-warn {
+  margin: 8px 8px 0;
+  padding: 10px 11px;
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  line-height: 1.65;
+  color: var(--text);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.review-list-empty {
+  padding: 26px 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.review-list-empty .empty-sub {
+  font-size: 12px;
+}
+
+/* 칩이 0건이면 눌러도 빈 화면만 나온다. 누르기 전에 알 수 있게 죽여 둔다. */
+.chip:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
