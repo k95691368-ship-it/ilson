@@ -1778,6 +1778,42 @@
   white-space: nowrap;
 }
 
+/* ===== 결정 기록 화면 ===== */
+.filter-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 7px 0;
+  border-top: 1px solid var(--border);
+}
+.filter-row:first-of-type {
+  border-top: none;
+}
+.filter-label {
+  flex: none;
+  width: 38px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.chip-count {
+  margin-left: 5px;
+  font-size: 10.5px;
+  font-weight: 800;
+  opacity: 0.7;
+}
+
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 /* ===== 통계 타일 ===== */
 .stat-row {
   display: grid;

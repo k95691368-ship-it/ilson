@@ -14,6 +14,7 @@ const DeployPage = lazy(() => import('./pages/DeployPage.jsx'))
 const ResultPage = lazy(() => import('./pages/ResultPage.jsx'))
 const ToolPage = lazy(() => import('./pages/ToolPage.jsx'))
 const TrackPage = lazy(() => import('./pages/TrackPage.jsx'))
+const LogPage = lazy(() => import('./pages/LogPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // 부서 담당자가 여는 화면 둘 — 넘겨받은 도구(/t/:slug)와 내 신청서 조회(/track).
@@ -58,6 +59,13 @@ export default function App() {
           </nav>
 
           <div className="topbar-right">
+            {/* 단계가 아니라 여덟 단계를 가로로 훑는 화면이라 목차와 분리해 둔다. */}
+            <NavLink
+              to="/log"
+              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
+            >
+              기록
+            </NavLink>
             <ThemeToggle />
           </div>
         </header>
@@ -77,6 +85,7 @@ export default function App() {
             <Route path="/result" element={<ResultPage />} />
             <Route path="/t/:slug" element={<ToolPage />} />
             <Route path="/track" element={<TrackPage />} />
+            <Route path="/log" element={<LogPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
