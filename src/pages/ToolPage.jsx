@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import ReportForm from '../components/ReportForm.jsx'
 import TeachQuarantine from '../components/TeachQuarantine.jsx'
+import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../shared/quota.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { krw, num, ms, ago } from '../lib/format.js'
@@ -26,9 +27,10 @@ export default function ToolPage() {
     const picked = [...fileList]
     if (picked.length === 0) return
 
-    const tooBig = picked.find((f) => f.size > (data.limits.maxFileMb ?? 10) * 1024 * 1024)
-    if (tooBig) {
-      toast.error(`${tooBig.name}이 너무 큽니다. 하나당 ${data.limits.maxFileMb}MB까지입니다.`)
+    // 걸리는 것을 한꺼번에 짚어 준다. 하나만 말하면 고치고 나서 또 걸린다.
+    const problems = checkFiles(picked, { maxFileMb: data.limits.maxFileMb })
+    if (problems.length > 0) {
+      toast.error(problems.join(' '))
       return
     }
 
@@ -156,13 +158,7 @@ export default function ToolPage() {
           <span className="card-note">또는 여기로 끌어다 놓으세요</span>
         </div>
 
-        <div className="tool-limits">
-          <span>
-            오늘 남은 실행 <strong>{data.limits.remainingToday}</strong> / {data.limits.dailyLimit}회
-          </span>
-          <span>파일 하나당 {data.limits.maxFileMb}MB까지</span>
-          <span>계산은 이 브라우저에서 돕니다 — 파일이 서버로 가지 않습니다</span>
-        </div>
+        <Quota limits={data.limits} />
       </section>
 
       {result && (
@@ -290,6 +286,43 @@ export default function ToolPage() {
           만들 때 놓친 것은 만든 사람이 못 찾는다 — 매일 그 일을 하는
           사람만 찾는다. */}
       <ReportForm slug={slug} />
+    </div>
+  )
+}
+
+// 몇 번 더 쓸 수 있는가.
+//
+// 한도는 있었지만 걸리고 나서야 알 수 있었다. 부서 사람이 월요일 아침에
+// 정산을 돌리다가 "더 못 쓴다"를 만나면 그날 할 일이 거기서 멈춘다.
+//
+// 문구도 틀려 있었다. "오늘 남은"이라고 적혀 있었지만 실제로는 최근
+// 24시간 안에 몇 번 썼는지로 센다. 자정에 초기화되는 줄 알고 기다리면
+// 헛기다린다.
+//
+// 넉넉할 때는 조용히 둔다. 늘 경고가 떠 있으면 아무도 안 읽는다.
+function Quota({ limits }) {
+  const state = quotaState({ remaining: limits.remainingToday, limit: limits.dailyLimit })
+  const nextFree = nextFreeText(limits.nextFreeAt)
+  const now = whatNow(state, nextFree)
+
+  return (
+    <div className={`tool-quota${state.loud ? ' loud' : ''}`}>
+      <div className="tool-limits">
+        <span>
+          최근 {limits.windowHours ?? 24}시간 안에 <strong>{state.remaining}</strong> /{' '}
+          {state.limit}회 남았습니다
+        </span>
+        <span>파일 하나당 {limits.maxFileMb}MB까지</span>
+        <span>계산은 이 브라우저에서 돕니다 — 파일이 서버로 가지 않습니다</span>
+      </div>
+
+      {state.loud && (
+        <div className="tool-quota-warn">
+          <strong>{state.headline}</strong>
+          {now ? <p>{now}</p> : nextFree ? <p>{nextFree}</p> : null}
+          <p className="card-note">{WHY_LIMIT}</p>
+        </div>
+      )}
     </div>
   )
 }

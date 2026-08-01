@@ -42,7 +42,7 @@ export async function onRequestGet({ env, params, request }) {
   const bucket = `tool:${h.slug}:${ip}`
 
   try {
-    const [remaining, manual, recent, aliases] = await Promise.all([
+    const [remaining, manual, recent, aliases, nextFree] = await Promise.all([
       remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS),
       env.DB.prepare(
         'SELECT title, intro, when_to_run, what_to_do_after, contact FROM manual WHERE application_id = ?'
@@ -58,6 +58,18 @@ export async function onRequestGet({ env, params, request }) {
       // 반영되지 않는다. 알려주고 나서 그대로 또 밀려나면, 부서는 그
       // 뒤로 아무것도 안 알려준다.
       env.DB.prepare('SELECT external_code, canonical_code, product_name, taught_by FROM sku_alias').all(),
+      // 언제 한 칸이 풀리는가.
+      //
+      // 한도는 자정에 초기화되는 것이 아니라 최근 24시간 안에 몇 번 썼는지로
+      // 센다. 가장 오래된 실행이 24시간을 넘기는 그때 한 칸이 풀린다.
+      // "기다리세요"만 하면 얼마나 기다릴지 몰라 결국 담당자에게 전화한다.
+      env.DB.prepare(
+        `SELECT datetime(MIN(created_at), '+' || ? || ' seconds') AS next_free
+         FROM rate_limit_hits
+         WHERE bucket = ? AND created_at >= datetime('now', '-' || ? || ' seconds')`
+      )
+        .bind(DAY_SECONDS, bucket, DAY_SECONDS)
+        .first(),
     ])
 
     return jsonResponse({
@@ -70,6 +82,9 @@ export async function onRequestGet({ env, params, request }) {
         dailyLimit: h.daily_limit,
         remainingToday: remaining,
         maxFileMb: h.max_file_mb,
+        // 하루 단위가 아니라 최근 24시간 기준이라는 것을 이름에도 남긴다.
+        windowHours: DAY_SECONDS / 3600,
+        nextFreeAt: remaining > 0 ? null : (nextFree?.next_free ?? null),
       },
       manual: manual ?? null,
       note: h.note,

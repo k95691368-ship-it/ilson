@@ -3884,3 +3884,27 @@ kbd {
   font-size: 12.5px;
   line-height: 1.7;
 }
+
+/* ===== 몇 번 더 쓸 수 있는가 ===== */
+.tool-quota {
+  margin-top: 12px;
+}
+/* 넉넉할 때는 조용히. 늘 경고가 떠 있으면 아무도 안 읽는다. */
+.tool-quota-warn {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+.tool-quota-warn strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--text-h);
+  margin-bottom: 3px;
+}
+.tool-quota-warn p {
+  margin: 4px 0 0;
+}
