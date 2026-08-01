@@ -11,6 +11,14 @@ const FREQUENCIES = ['하루 여러 번', '매일', '주 2~3회', '주 1회', '�
 const MAX_FILES = 5
 
 import SimilarNotice from '../components/SimilarNotice.jsx'
+import {
+  loadDraft,
+  saveDraft,
+  clearDraft,
+  draftAge,
+  describeDraft,
+  DRAFT_MAX_DAYS,
+} from '../lib/draft.js'
 
 const EMPTY = {
   dept: '',
@@ -26,11 +34,30 @@ const EMPTY = {
   impact_if_wrong: '',
 }
 
+// 브라우저 저장소. 없거나 막혀 있을 수 있어서 한 곳에서만 꺼낸다.
+function browserStore() {
+  try {
+    return typeof localStorage === 'undefined' ? null : localStorage
+  } catch {
+    // 쿠키를 막아 둔 브라우저에서는 이걸 읽는 것만으로도 터진다.
+    return null
+  }
+}
+
 export default function ApplyPage() {
   const { data, error, reload } = useApi('/applications')
   const toast = useToast()
 
   const [form, setForm] = useState(EMPTY)
+  // 적다 만 것을 잃지 않는다.
+  //
+  // 폼이 길어서 다 적으면 십 분이 간다. 그러다 회의에 불려 가 탭을 닫거나
+  // 실수로 새로고침하면 전부 날아갔다. 한 번 날려 본 사람은 다시 안 적고,
+  // 그러면 그 병목은 영영 접수되지 않는다.
+  //
+  // 되살릴 것이 있어도 먼저 묻는다. 말없이 채워 넣으면, 새 걸 적으러 온
+  // 사람이 남의 옛 글 위에 덧쓰게 된다.
+  const [restorable, setRestorable] = useState(null)
   // 이미 들어와 있는 것을 또 내는 것을 막는다.
   //
   // 다 적고 낸 뒤에 "이미 있습니다"라고 하면 늦다 — 그 사람은 이미 십 분을
@@ -43,6 +70,21 @@ export default function ApplyPage() {
   const [submitting, setSubmitting] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const fileInput = useRef(null)
+
+  useEffect(() => {
+    const found = loadDraft(browserStore())
+    if (found) setRestorable(found)
+  }, [])
+
+  // 손을 멈추면 그때 저장한다. 한 글자마다 저장하면 쓸데없이 시끄럽다.
+  //
+  // 되살릴지 물어보는 중에는 저장하지 않는다. 그 사이에 저장해 버리면
+  // 사람이 "이어서 쓰기"를 누르기도 전에 옛 초안이 지워진다.
+  useEffect(() => {
+    if (restorable) return
+    const timer = setTimeout(() => saveDraft(browserStore(), form), 800)
+    return () => clearTimeout(timer)
+  }, [form, restorable])
 
   // 타이핑이 멈추면 그때 묻는다. 한 글자마다 물으면 서버도 사람도 시끄럽다.
   useEffect(() => {
@@ -96,6 +138,9 @@ export default function ApplyPage() {
 
     try {
       const json = await api.form('/applications', body)
+      // 냈으면 초안은 쓸모가 없다. 남겨 두면 다음에 열었을 때 이미 낸 것을
+      // 또 내라고 권하게 된다.
+      clearDraft(browserStore())
       setReceipt(json)
       setForm(EMPTY)
       setFiles([])
@@ -148,6 +193,43 @@ export default function ApplyPage() {
 
       <div className="grid-side">
         <form className="stack" onSubmit={submit} noValidate>
+          {restorable && (
+            <section className="draft-restore">
+              <div className="draft-restore-head">
+                <span className="draft-restore-title">적으시던 것이 있습니다</span>
+                <span className="card-note">{draftAge(restorable.savedAt)}</span>
+              </div>
+              <p className="draft-restore-body">
+                {describeDraft(restorable.form)} — 이어서 쓰시겠습니까? 이 브라우저에만 두었고
+                서버로 보낸 적은 없습니다. 첨부하셨던 파일은 다시 골라주셔야 합니다.
+              </p>
+              <div className="row">
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={() => {
+                    setForm({ ...EMPTY, ...restorable.form })
+                    setRestorable(null)
+                  }}
+                >
+                  이어서 쓰기
+                </button>
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  onClick={() => {
+                    clearDraft(browserStore())
+                    setRestorable(null)
+                  }}
+                >
+                  버리고 새로 쓰기
+                </button>
+                <span className="spacer" />
+                <span className="card-note">{DRAFT_MAX_DAYS}일이 지나면 저절로 지워집니다</span>
+              </div>
+            </section>
+          )}
+
           <section className="card">
             <div className="card-head">
               <span className="card-title">누가 신청하나요</span>
