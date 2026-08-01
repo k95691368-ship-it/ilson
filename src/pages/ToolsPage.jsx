@@ -20,6 +20,9 @@ export default function ToolsPage() {
   const { data, error, loading } = useApi('/tools')
   // 넘긴 뒤 부서가 겪은 것. 이게 없으면 "돌고 있음"만 보고 잘 되는 줄 안다.
   const { data: reports, reload: reloadReports } = useApi('/reports')
+  // 부서가 알려준 상품코드 중 아직 담당자가 안 본 것. 잘못 이어져 있으면
+  // 그 코드로 팔린 것이 전부 엉뚱한 상품 매출로 잡힌다.
+  const { data: codes } = useApi('/codes')
 
   if (error) return <div className="notice notice-danger">{error}</div>
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
@@ -86,6 +89,21 @@ export default function ToolsPage() {
               tone={s.unconfirmed > 0 ? 'warn' : undefined}
             />
           </section>
+
+          {codes?.summary?.needsCheck > 0 && (
+            <div className="notice notice-warn">
+              <div className="notice-title">
+                부서가 알려준 상품코드 {codes.summary.needsCheck}개를 아직 안 보셨습니다
+              </div>
+              <p>
+                잘못 이어져 있으면 그 코드로 팔린 것이 전부 엉뚱한 상품 매출로 잡힙니다. 밀려난
+                줄은 눈에 띄지만 잘못 이어진 줄은 조용히 섞입니다.
+              </p>
+              <Link to="/codes" className="btn-ghost btn-sm">
+                훑어보기
+              </Link>
+            </div>
+          )}
 
           <div className="tool-cards">
             {data.items.map((t) => (
