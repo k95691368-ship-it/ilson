@@ -4,6 +4,7 @@ import StageHeader from '../components/StageHeader.jsx'
 import FileList from '../components/FileList.jsx'
 import HotkeyHelp from '../components/HotkeyHelp.jsx'
 import SimilarNotice from '../components/SimilarNotice.jsx'
+import Thread from '../components/Thread.jsx'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -365,6 +366,15 @@ export default function ReviewPage() {
                 </button>
                 <button
                   type="button"
+                  className={`chip${query.onlyWaiting ? ' on' : ''}`}
+                  onClick={() => setQ({ onlyWaiting: !query.onlyWaiting })}
+                  aria-pressed={query.onlyWaiting}
+                >
+                  부서 답을 기다리는 것
+                  <span className="chip-count">{facets.waiting}</span>
+                </button>
+                <button
+                  type="button"
                   className={`chip${query.onlyWithFiles ? ' on' : ''}`}
                   onClick={() => setQ({ onlyWithFiles: !query.onlyWithFiles })}
                   aria-pressed={query.onlyWithFiles}
@@ -483,6 +493,9 @@ export default function ReviewPage() {
                       <span className="review-list-top">
                         <span className="badge badge-neutral">{a.dept}</span>
                         <span className={`badge ${statusTone(a.status)}`}>{a.status}</span>
+                        {a.waiting_answers > 0 && (
+                          <span className="badge badge-warning">답 기다리는 중</span>
+                        )}
                         {a.status === '접수' && a.hours_since >= 24 && (
                           <span className="badge badge-warning">{Math.floor(a.hours_since / 24)}일 경과</span>
                         )}
@@ -656,6 +669,15 @@ function Detail({ id, onSaved, pool }) {
       {/* 판정하기 전에 견준다. 판정한 뒤에 알려 주면 이미 두 번 검토한 것이다.
           목록이 이미 브라우저에 다 있어서 서버를 다시 부르지 않는다. */}
       <SimilarNotice hits={findSimilar(a, pool ?? [], { limit: 2 })} tone="review" selfId={a.id} />
+
+      {/* 신청서만 보고 판정하기 어려우면 물어본다. 짐작으로 판정하거나
+          보류로 미루는 것보다 낫다. */}
+      <Thread
+        decisions={data.decisions}
+        applicationId={a.id}
+        mode="staff"
+        onChanged={() => Promise.all([reload(), onSaved()])}
+      />
 
       <form className="card decided" onSubmit={save}>
         <div className="card-head">

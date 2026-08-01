@@ -3451,3 +3451,70 @@ kbd {
   line-height: 1.75;
   color: var(--text);
 }
+
+/* ===== 담당자와 부서가 주고받은 것 ===== */
+.thread {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 15px 16px 14px;
+}
+/* 부서 답을 기다리는 중이면 눈에 띄어야 한다. 이게 안 보이면 담당자는
+   자기 차례인 줄 알고 계속 들여다본다. */
+.thread.waiting {
+  border-color: var(--warning-border);
+}
+.thread-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.thread-msg {
+  padding: 11px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+/* 누가 말한 것인지 색만으로 가르지 않는다. 배지에 글로도 적혀 있다. */
+.thread-staff {
+  border-left: 3px solid var(--accent);
+}
+.thread-dept {
+  border-left: 3px solid var(--border);
+}
+.thread-msg-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.thread-body {
+  font-size: 13.5px;
+  line-height: 1.75;
+  color: var(--text-h);
+  white-space: pre-wrap;
+}
+.thread-note {
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--border);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+.thread-note strong {
+  color: var(--text);
+  margin-right: 5px;
+}
+.thread-form {
+  margin-top: 11px;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border);
+}
+.thread-ask-open {
+  margin-top: 11px;
+}

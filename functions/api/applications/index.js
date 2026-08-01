@@ -45,7 +45,15 @@ export async function onRequestGet({ env, request }) {
                 a.current_minutes, a.current_people, a.current_frequency, a.is_measured,
                 a.status, a.created_at,
                 CAST((julianday('now') - julianday(a.created_at)) * 24 AS INTEGER) AS hours_since,
-                (SELECT COUNT(*) FROM application_file f WHERE f.application_id = a.id) AS file_count
+                (SELECT COUNT(*) FROM application_file f WHERE f.application_id = a.id) AS file_count,
+              -- 아직 답 못 받은 질문. 이게 있으면 지금 멈춰 있는 이유가
+              -- 부서 쪽에 있다는 뜻이라, 담당자 할 일로 세면 안 된다.
+              (SELECT COUNT(*) FROM decision_log q
+                WHERE q.application_id = a.id AND q.link_kind = '질문'
+                  AND NOT EXISTS (
+                    SELECT 1 FROM decision_log ans
+                     WHERE ans.link_kind = '답변' AND ans.link_id = q.id
+                  )) AS waiting_answers
          FROM application a
          ${clause}
          ORDER BY a.created_at DESC

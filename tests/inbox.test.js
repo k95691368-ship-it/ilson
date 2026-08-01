@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  isWaitingAnswer,
   applyQuery,
   facetCounts,
   matchesQuery,
@@ -333,16 +334,16 @@ describe('상태 칩에 낼 것', () => {
 
 describe('지금 보고 있는 것 안의 대기', () => {
   it('아직 판정 안 한 것과 그중 묵은 것을 센다', () => {
-    expect(queueStats(ITEMS)).toEqual({ waiting: 2, stale: 1 })
+    expect(queueStats(ITEMS)).toEqual({ waiting: 2, stale: 1, askedBack: 0 })
   })
 
   it('조건을 건 결과에 대고 세면 그만큼만 센다', () => {
-    expect(queueStats(applyQuery(ITEMS, { dept: '마케팅' }))).toEqual({ waiting: 1, stale: 0 })
+    expect(queueStats(applyQuery(ITEMS, { dept: '마케팅' }))).toEqual({ waiting: 1, stale: 0, askedBack: 0 })
   })
 
   it('빈 목록에서도 터지지 않는다', () => {
-    expect(queueStats([])).toEqual({ waiting: 0, stale: 0 })
-    expect(queueStats(undefined)).toEqual({ waiting: 0, stale: 0 })
+    expect(queueStats([])).toEqual({ waiting: 0, stale: 0, askedBack: 0 })
+    expect(queueStats(undefined)).toEqual({ waiting: 0, stale: 0, askedBack: 0 })
   })
 })
 
@@ -350,5 +351,44 @@ describe('빈 입력', () => {
   it('목록이 없어도 터지지 않는다', () => {
     expect(applyQuery(undefined, EMPTY_QUERY)).toEqual([])
     expect(facetCounts(undefined, EMPTY_QUERY).byDept).toEqual({})
+  })
+})
+
+
+describe('부서 답을 기다리는 건', () => {
+  // 담당자가 되물어 놓고 기다리는 것을 밀린 일로 세면 접수함이 늘 빨갛다.
+  // 그러면 진짜 밀린 것이 안 보인다.
+  const 물어본것 = { ...ITEMS[0], id: 'w', ticket_no: 'AX-WWW-009', waiting_answers: 1 }
+  const 섞인목록 = [...ITEMS, 물어본것]
+
+  it('되물어 놓은 건을 알아본다', () => {
+    expect(isWaitingAnswer(물어본것)).toBe(true)
+    expect(isWaitingAnswer(ITEMS[0])).toBe(false)
+    expect(isWaitingAnswer({})).toBe(false)
+  })
+
+  it('답을 기다리는 것은 묵은 것으로 치지 않는다', () => {
+    // 담당자가 안 본 것이 아니라 물어 놓고 기다리는 것이다.
+    expect(ITEMS[0].hours_since).toBeGreaterThan(STALE_HOURS)
+    expect(isStale(물어본것)).toBe(false)
+  })
+
+  it('내 할 일 수에서 뺀다', () => {
+    const q = queueStats(섞인목록)
+    expect(q.askedBack).toBe(1)
+    expect(q.waiting).toBe(2) // 물어본 것은 안 셌다
+  })
+
+  it('그것만 골라 볼 수 있다', () => {
+    expect(ids(applyQuery(섞인목록, { onlyWaiting: true }))).toEqual(['w'])
+  })
+
+  it('칩에 몇 건인지 적는다', () => {
+    expect(facetCounts(섞인목록, EMPTY_QUERY).waiting).toBe(1)
+  })
+
+  it('조건을 걸었다고 표시한다', () => {
+    expect(isFiltered({ onlyWaiting: true })).toBe(true)
+    expect(describeQuery({ onlyWaiting: true }, 1, 5)).toContain('부서 답을 기다리는 것')
   })
 })

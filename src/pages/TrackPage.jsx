@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import FileList from '../components/FileList.jsx'
+import Thread from '../components/Thread.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
 
@@ -96,7 +97,7 @@ export default function TrackPage() {
         </div>
       )}
 
-      {data && <Result data={data} />}
+      {data && <Result data={data} onChanged={() => look(data.ticket)} />}
 
       {!data && !error && (
         <div className="card">
@@ -113,7 +114,7 @@ export default function TrackPage() {
   )
 }
 
-function Result({ data }) {
+function Result({ data, onChanged }) {
   const a = data.application
   const refused = a.status === '반려'
 
@@ -320,6 +321,13 @@ function Result({ data }) {
           )}
         </div>
       </details>
+
+      <Thread
+        decisions={data.decisions}
+        ticket={data.ticket}
+        mode="dept"
+        onChanged={onChanged}
+      />
 
       {data.decisions.length > 0 && (
         <details className="disclose">

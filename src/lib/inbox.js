@@ -40,7 +40,9 @@ export function presentStatuses(items) {
 export function queueStats(items) {
   const list = items ?? []
   return {
-    waiting: list.filter((i) => i.status === '접수').length,
+    // 부서 답을 기다리는 것은 내 할 일이 아니다. 따로 센다.
+    waiting: list.filter((i) => i.status === '접수' && !isWaitingAnswer(i)).length,
+    askedBack: list.filter(isWaitingAnswer).length,
     stale: list.filter(isStale).length,
   }
 }
@@ -52,6 +54,7 @@ export const EMPTY_QUERY = {
   dept: '',
   onlyStale: false,
   onlyWithFiles: false,
+  onlyWaiting: false,
   sort: 'stale',
 }
 
@@ -63,7 +66,15 @@ export const EMPTY_QUERY = {
 export const STALE_HOURS = 24
 
 export function isStale(item) {
+  // 부서 답을 기다리는 중이면 묵은 것이 아니다. 담당자가 안 본 것이 아니라
+  // 물어 놓고 기다리는 것이라, 이걸 밀린 일로 세면 접수함이 늘 빨갛다.
+  if (isWaitingAnswer(item)) return false
   return item.status === '접수' && (item.hours_since ?? 0) >= STALE_HOURS
+}
+
+// 지금 공이 부서 쪽에 있는 건.
+export function isWaitingAnswer(item) {
+  return (item?.waiting_answers ?? 0) > 0
 }
 
 // 검색이 훑는 자리.
@@ -109,6 +120,7 @@ function passesFacets(item, query, { skip } = {}) {
   if (skip !== 'dept' && query.dept && item.dept !== query.dept) return false
   if (skip !== 'stale' && query.onlyStale && !isStale(item)) return false
   if (skip !== 'files' && query.onlyWithFiles && !(item.file_count > 0)) return false
+  if (skip !== 'waiting' && query.onlyWaiting && !isWaitingAnswer(item)) return false
   return true
 }
 
@@ -185,6 +197,7 @@ export function facetCounts(items, query) {
     byStatus,
     byDept,
     stale: base.filter((i) => passesFacets(i, q, { skip: 'stale' }) && isStale(i)).length,
+    waiting: base.filter((i) => passesFacets(i, q, { skip: 'waiting' }) && isWaitingAnswer(i)).length,
     withFiles: base.filter((i) => passesFacets(i, q, { skip: 'files' }) && i.file_count > 0).length,
   }
 }
@@ -198,6 +211,7 @@ export function describeQuery(query, shown, total) {
   if (q.status) parts.push(`${q.status} 상태`)
   if (q.onlyStale) parts.push(`${STALE_HOURS}시간 넘게 안 본 것`)
   if (q.onlyWithFiles) parts.push('첨부가 있는 것')
+  if (q.onlyWaiting) parts.push('부서 답을 기다리는 것')
   if (q.q) parts.push(`"${q.q}"가 들어간 것`)
 
   if (parts.length === 0) return `전체 ${total}건`
@@ -206,7 +220,7 @@ export function describeQuery(query, shown, total) {
 
 export function isFiltered(query) {
   const q = { ...EMPTY_QUERY, ...query }
-  return Boolean(q.q || q.status || q.dept || q.onlyStale || q.onlyWithFiles)
+  return Boolean(q.q || q.status || q.dept || q.onlyStale || q.onlyWithFiles || q.onlyWaiting)
 }
 
 // 걸린 조건 안에서 합계. 필터를 걸면 이 숫자도 따라 움직여야 한다.
