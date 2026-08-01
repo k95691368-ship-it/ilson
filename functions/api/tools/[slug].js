@@ -112,7 +112,9 @@ export async function onRequestPost({ env, params, request }) {
   const ticket = await checkRateLimit(env, bucket, h.daily_limit, DAY_SECONDS)
   if (!ticket) {
     return jsonError(
-      `오늘 실행 횟수를 다 쓰셨습니다(하루 ${h.daily_limit}회). 내일 다시 하시거나 담당자에게 말씀해주세요.`,
+      // '오늘·내일'이라고 하지 않는다. 자정에 초기화되는 것이 아니라 최근
+      // 24시간 기준이라, 내일 아침에 오면 여전히 막혀 있을 수 있다.
+      `지금은 더 돌리실 수 없습니다(24시간에 ${h.daily_limit}회). 가장 오래된 실행이 24시간을 넘기면 한 번씩 풀립니다. 급하시면 담당자에게 말씀해주세요.`,
       429
     )
   }

@@ -4020,3 +4020,69 @@ kbd {
 .run-flag.failed {
   border-left-color: var(--danger-border);
 }
+
+/* ===== 지금 손볼 것 ===== */
+/* 첫 화면 맨 위. 담당자가 여섯 화면을 돌아다니지 않아도 되게 한다. */
+.todo {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 16px 17px 14px;
+}
+.todo-clear {
+  border-style: dashed;
+}
+.todo-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+.todo-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.todo-item {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+/* 금액이 틀릴 수 있는 것과 정리해야 할 것을 같은 무게로 두면,
+   목록 전체가 "언젠가 할 일"로 읽힌다. */
+.todo-item.kind-금액 {
+  border-left-color: var(--danger-border);
+  background: var(--danger-bg);
+}
+.todo-item.kind-대기 {
+  border-left-color: var(--warning-border);
+}
+.todo-item-top {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+.todo-item-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  line-height: 1.5;
+}
+.todo-why {
+  margin: 5px 0 9px;
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}

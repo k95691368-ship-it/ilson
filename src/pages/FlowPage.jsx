@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { STAGES } from '../lib/stages.js'
 import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
+import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
 
 // 첫 화면. 여덟 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
 // 일어나고 있는지가 숫자로 얹힌다.
@@ -11,6 +12,12 @@ import { ago, num } from '../lib/format.js'
 // 사이트라는 말이 실감난다.
 export default function FlowPage() {
   const { data } = useApi('/overview')
+  // 화면마다 "여기 볼 것이 있습니다"를 자기 안에서만 말한다. 그래서
+  // 담당자가 아침에 앉으면 여섯 화면을 돌아다녀야 오늘 뭘 할지 안다.
+  // 그러면 안 돌아다닌다 — 늘 열던 한 화면만 열고 나머지는 쌓인다.
+  const { data: reports } = useApi('/reports')
+  const { data: codes } = useApi('/codes')
+  const { data: tools } = useApi('/tools')
 
   return (
     <div className="stack">
@@ -24,6 +31,10 @@ export default function FlowPage() {
           비교해 성과를 정리합니다. 그 과정 전체가 신청서 한 건 아래 기록으로 남습니다.
         </p>
       </header>
+
+      {data && data.counts.total > 0 && (
+        <Todo overview={data} reports={reports} codes={codes} tools={tools} />
+      )}
 
       {data && data.counts.total > 0 && <Overview data={data} />}
 
@@ -102,6 +113,60 @@ export default function FlowPage() {
         </div>
       </section>
     </div>
+  )
+}
+
+// 지금 무엇을 해야 하는가.
+//
+// 아무거나 다 올리지 않는다. 스무 개가 올라온 목록은 아무것도 안 올라온
+// 것과 같다. 그리고 순서가 틀리면 더 나쁘다 — 숫자가 틀리는 일보다
+// 사용법서 쓰는 일이 위에 있으면 그 목록은 쓸모가 없다.
+function Todo({ overview, reports, codes, tools }) {
+  const items = buildTodo({ overview, reports, codes, tools })
+  const s = todoSummary(items)
+
+  if (items.length === 0) {
+    return (
+      <section className="todo todo-clear">
+        <div className="todo-head">
+          <span className="todo-title">지금 손볼 것이 없습니다</span>
+        </div>
+        {/* "할 일이 없습니다"로 끝내면 정말 없는 것인지 못 세고 있는
+            것인지 모른다. 무엇을 보고 없다고 하는지 밝힌다. */}
+        <p className="card-note">
+          {NOTHING_CHECKED.join(' · ')} — 이 다섯 가지를 보고 드리는 말씀입니다.
+        </p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="todo">
+      <div className="todo-head">
+        <span className="todo-title">지금 손볼 것 {s.total}가지</span>
+        <span className="spacer" />
+        {s.money > 0 && <span className="badge badge-danger">금액에 걸리는 것 {s.money}</span>}
+        {s.waiting > 0 && <span className="badge badge-warning">사람이 기다리는 것 {s.waiting}</span>}
+      </div>
+
+      <ol className="todo-list">
+        {items.map((i) => (
+          <li key={i.key} className={`todo-item kind-${i.kind}`}>
+            <div className="todo-item-top">
+              <span className={`badge ${i.kind === '금액' ? 'badge-danger' : i.kind === '대기' ? 'badge-warning' : 'badge-neutral'}`}>
+                {i.kind}
+              </span>
+              <span className="todo-item-title">{i.title}</span>
+            </div>
+            {/* 이유 없이 시키면 아무도 안 한다. */}
+            <p className="todo-why">{i.why}</p>
+            <Link to={i.to} className="btn-ghost btn-sm">
+              {i.cta}
+            </Link>
+          </li>
+        ))}
+      </ol>
+    </section>
   )
 }
 
