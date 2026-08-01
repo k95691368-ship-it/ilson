@@ -6,9 +6,9 @@
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
 import { compare, COMPARE_VERDICTS, VERDICT_MEANING } from '../../shared/compare.js'
-import { pickPrimary, holdCondition, MERGE_KIND } from '../../shared/merge.js'
+import { pickPrimary, holdCondition, validateUnmerge, MERGE_KIND, UNMERGE_KIND } from '../../shared/merge.js'
 import { logDecision } from '../_lib/decisions.js'
-import { annualHours } from '../_lib/applications.js'
+import { annualHours, APP_STATUSES } from '../_lib/applications.js'
 
 const COLUMNS = `id, ticket_no, dept, applicant_label, title, bottleneck, problem, wish,
                  impact_if_wrong, current_minutes, current_people, current_frequency,
@@ -80,6 +80,80 @@ function newDecisionId() {
 // 짝이 되어, 좌우를 바꿔 열면 전에 내린 판정이 안 보인다.
 function pairKey(x, y) {
   return [x, y].sort().join('~')
+}
+
+// 잘못 묶었으면 푼다.
+//
+// 묶는 길만 내고 푸는 길을 안 내면, 한 번 잘못 누른 것을 되돌릴 방법이
+// 없다. 그러면 담당자는 무서워서 아예 안 묶는다. 실제로 그랬다 — 진행이
+// 앞선 신청서를 접수만 된 것에 묶어 버렸고, 되돌릴 수가 없었다.
+export async function onRequestDelete({ env, request }) {
+  let body
+  try {
+    body = await request.json()
+  } catch {
+    return jsonError('보내주신 내용을 읽지 못했습니다.', 400)
+  }
+
+  const ticket = String(body.ticket ?? '').trim()
+  const why = String(body.why ?? '').trim().slice(0, 2000)
+  const author = String(body.author ?? '').trim().slice(0, 60) || 'AX 담당자'
+  const restoreTo = String(body.restoreTo ?? '').trim()
+
+  const fields = validateUnmerge({ why, author })
+  if (!ticket) fields.ticket = '어느 신청서를 푸시는지 알려주세요.'
+  if (Object.keys(fields).length > 0) {
+    return failFields(fields, '적어주신 것을 다시 확인해주세요.')
+  }
+
+  try {
+    const app = await findOne(env, ticket)
+    if (!app) return jsonError('그 신청서를 찾지 못했습니다.', 404)
+
+    const merge = await env.DB.prepare(
+      `SELECT id, link_id FROM decision_log
+       WHERE application_id = ? AND link_kind = ?
+       ORDER BY created_at DESC LIMIT 1`
+    )
+      .bind(app.id, MERGE_KIND)
+      .first()
+    if (!merge) return jsonError('그 신청서는 묶여 있지 않습니다.', 409)
+
+    // 이미 푼 것을 또 풀지 않는다.
+    const undone = await env.DB.prepare(
+      `SELECT id FROM decision_log WHERE link_kind = ? AND link_id = ?`
+    )
+      .bind(UNMERGE_KIND, merge.id)
+      .first()
+    if (undone) return jsonError('그 신청서는 이미 푸셨습니다.', 409)
+
+    // 어느 상태로 되돌릴 것인가. 묶기 전 상태를 서버가 알 수 없으므로
+    // 담당자가 정한다. 짐작으로 되돌리면 진행 단계가 조용히 틀어진다.
+    const next = APP_STATUSES.includes(restoreTo) ? restoreTo : '접수'
+
+    await env.DB.batch([
+      env.DB.prepare(
+        `UPDATE application SET status = ?, updated_at = datetime('now') WHERE id = ?`
+      ).bind(next, app.id),
+      env.DB.prepare(
+        `INSERT INTO decision_log
+           (id, application_id, stage, actor, title, what, why, link_kind, link_id)
+         VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?)`
+      ).bind(
+        newDecisionId(),
+        app.id,
+        author,
+        `${app.ticket_no} 를 묶었던 것을 풀고 ${next} 로 되돌립니다.`,
+        why,
+        UNMERGE_KIND,
+        merge.id
+      ),
+    ])
+
+    return jsonResponse({ ok: true, ticket: app.ticket_no, status: next })
+  } catch (err) {
+    return failUnexpected(err, '묶은 것을 풀지 못했습니다.')
+  }
 }
 
 export async function onRequestPost({ env, request }) {

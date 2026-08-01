@@ -265,7 +265,12 @@ export async function onRequestGet({ env, params, request }) {
       // 부서 입장에서 가장 중요한 소식이다 — 모르면 이미 만들고 있는 것을
       // 두고 몇 주를 기다린다.
       mergedInto: await (async () => {
-        const m = decisions.results.find((d) => d.link_kind === '병합')
+        // 푼 것은 빼고 본다. 풀었는데도 "묶였습니다"가 계속 뜨면
+        // 부서는 두 번 헷갈린다.
+        const undone = new Set(
+          decisions.results.filter((d) => d.link_kind === '병합해제').map((d) => d.link_id)
+        )
+        const m = decisions.results.find((d) => d.link_kind === '병합' && !undone.has(d.id))
         if (!m) return null
         const into = await env.DB.prepare(
           'SELECT ticket_no, dept, title, status FROM application WHERE id = ?'

@@ -55,12 +55,26 @@ describe('어느 쪽을 남기는가', () => {
     expect(r.blocked).toContain('반려')
   })
 
-  it('진행 중인 것이 뒤에 낸 것이어도 먼저 낸 살아 있는 것을 남긴다', () => {
-    // 진행 상태는 순서를 뒤집지 않는다. 뒤집으면 어느 쪽이 주인지가
-    // 상태에 따라 매번 달라져서 담당자가 못 믿는다.
+  it('나중에 냈어도 더 나아간 쪽을 남긴다', () => {
+    // 처음에는 반대로 만들었다. 라이브에서 실제로 묶어 보니 여덟 단계를
+    // 다 거쳐 도구까지 배포된 신청서가 접수만 된 신청서에 묶여 보류로
+    // 내려갔다. 해 놓은 일이 통째로 선반에 올라갔다.
     const first = app('a', 'AX-AAA-001', '2026-07-20 09:00:00', '접수')
     const later = app('b', 'AX-BBB-002', '2026-07-28 09:00:00', '진행중')
+    expect(pickPrimary(first, later).primary.id).toBe('b')
+    expect(pickPrimary(first, later).merged.id).toBe('a')
+  })
+
+  it('진행이 같으면 그때 먼저 낸 쪽을 남긴다', () => {
+    const first = app('a', 'AX-AAA-001', '2026-07-20 09:00:00', '수용')
+    const later = app('b', 'AX-BBB-002', '2026-07-28 09:00:00', '수용')
     expect(pickPrimary(first, later).primary.id).toBe('a')
+  })
+
+  it('모르는 상태는 아는 척하고 위로 올리지 않는다', () => {
+    const known = app('a', 'AX-AAA-001', '2026-07-28 09:00:00', '접수')
+    const weird = app('b', 'AX-BBB-002', '2026-07-20 09:00:00', '처음 보는 상태')
+    expect(pickPrimary(known, weird).primary.id).toBe('a')
   })
 
   it('같은 신청서끼리는 묶지 않는다', () => {
