@@ -1,5 +1,8 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
+import { useToast } from '../context/ToastContext.jsx'
+import { api } from '../api/client.js'
 import { ago, dateTimeLabel, duration, ms, num } from '../lib/format.js'
 
 // 넘긴 뒤에 무슨 일이 일어나고 있나.
@@ -15,6 +18,8 @@ import { ago, dateTimeLabel, duration, ms, num } from '../lib/format.js'
 // 넘겨 놓고 아무도 안 쓰는 도구를 숨기지 않는다. 그게 가장 중요한 신호다.
 export default function ToolsPage() {
   const { data, error, loading } = useApi('/tools')
+  // 넘긴 뒤 부서가 겪은 것. 이게 없으면 "돌고 있음"만 보고 잘 되는 줄 안다.
+  const { data: reports, reload: reloadReports } = useApi('/reports')
 
   if (error) return <div className="notice notice-danger">{error}</div>
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
@@ -63,6 +68,16 @@ export default function ToolsPage() {
               value={num(s.idle)}
               note={s.idle > 0 ? '넘긴 것으로 끝난 도구입니다' : '전부 한 번은 쓰였습니다'}
               tone={s.idle > 0 ? 'warn' : undefined}
+            />
+            <Tile
+              label="부서가 이상하다고 한 것"
+              value={num(reports?.summary.open ?? 0)}
+              note={
+                (reports?.summary.urgent ?? 0) > 0
+                  ? `그중 결과를 믿을 수 없는 것 ${reports.summary.urgent}건`
+                  : '아직 못 고친 신고'
+              }
+              tone={(reports?.summary.urgent ?? 0) > 0 ? 'warn' : undefined}
             />
             <Tile
               label="받았다는 확인이 없는 것"
@@ -195,6 +210,22 @@ export default function ToolsPage() {
             ))}
           </div>
 
+          {reports?.tools?.length > 0 && (
+            <section className="stack">
+              <div className="card-head">
+                <span className="card-title">
+                  부서가 겪은 것 {reports.summary.open}건이 아직 안 고쳐졌습니다
+                </span>
+                <span className="card-note">
+                  만들 때 놓친 것은 만든 사람이 못 찾습니다. 매일 그 일을 하는 사람만 찾습니다.
+                </span>
+              </div>
+              {reports.tools.map((t) => (
+                <ReportTool key={t.applicationId} tool={t} onFixed={reloadReports} />
+              ))}
+            </section>
+          )}
+
           {data.failures.length > 0 && (
             <section className="card">
               <div className="card-head">
@@ -224,6 +255,139 @@ export default function ToolsPage() {
         </>
       )}
     </div>
+  )
+}
+
+// 도구 하나에 들어온 신고와, 담당자가 고쳤다고 남기는 자리.
+function ReportTool({ tool, onFixed }) {
+  return (
+    <article className={`report-tool${tool.urgent > 0 ? ' untrusted' : ''}`}>
+      <div className="row" style={{ marginBottom: 8 }}>
+        {tool.urgent > 0 ? (
+          <span className="badge badge-danger">결과를 믿을 수 없음</span>
+        ) : tool.open > 0 ? (
+          <span className="badge badge-warning">불편하다는 신고</span>
+        ) : (
+          <span className="badge badge-success">전부 고쳤습니다</span>
+        )}
+        <span className="badge badge-neutral">{tool.dept}</span>
+        <span className="spacer" />
+        {tool.slug && (
+          <Link to={`/t/${tool.slug}`} className="card-note">
+            도구 열기
+          </Link>
+        )}
+        <Link to={`/record/${tool.ticket_no}`} className="mono card-note">
+          {tool.ticket_no}
+        </Link>
+      </div>
+      <div className="tool-card-title" style={{ marginBottom: 10 }}>
+        {tool.toolTitle}
+      </div>
+
+      <ul className="honest-list">
+        {tool.reports.map((r) => (
+          <ReportItem key={r.id} report={r} onFixed={onFixed} />
+        ))}
+      </ul>
+    </article>
+  )
+}
+
+function ReportItem({ report, onFixed }) {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ how: '', why: '', author: 'AX 담당자' })
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  async function send(e) {
+    e.preventDefault()
+    setSaving(true)
+    setFieldErrors({})
+    try {
+      await api.post('/reports', { ...form, reportId: report.id })
+      toast.success('처리한 것을 남겼습니다.')
+      setOpen(false)
+      await onFixed()
+    } catch (err) {
+      if (err.fields) setFieldErrors(err.fields)
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <li className={`report-item${report.open ? ' open' : ''}${report.urgent ? ' urgent' : ''}`}>
+      <div className="row" style={{ marginBottom: 4 }}>
+        <span className={`badge ${report.urgent ? 'badge-danger' : 'badge-warning'}`}>
+          {report.label}
+        </span>
+        {!report.open && <span className="badge badge-success">고쳤습니다</span>}
+        <span className="spacer" />
+        <span className="card-note">
+          {report.reporter} · {ago(report.at)}
+        </span>
+      </div>
+      <div className="thread-body">{report.body}</div>
+
+      {report.fix ? (
+        <div className="report-fix">
+          <div>
+            <strong>고친 것</strong> {report.fix.how}
+          </div>
+          <div style={{ marginTop: 4 }}>
+            {/* 원인이 남아야 다음에 같은 것을 또 안 겪는다. */}
+            <strong>왜 그랬나</strong> {report.fix.why}
+          </div>
+        </div>
+      ) : open ? (
+        <form className="thread-form" onSubmit={send}>
+          <div className="field">
+            <label className="field-label">
+              무엇을 하셨습니까<span className="field-required"> *</span>
+            </label>
+            <textarea
+              rows={2}
+              value={form.how}
+              onChange={(e) => setForm((f) => ({ ...f, how: e.target.value }))}
+              placeholder="할인액 컬럼 이름이 바뀐 것을 못 잡고 있었습니다. 컬럼이 사라지면 막도록 고쳤습니다."
+            />
+            {fieldErrors.how && <div className="field-error">{fieldErrors.how}</div>}
+          </div>
+          <div className="field">
+            <label className="field-label">
+              왜 그랬던 것입니까<span className="field-required"> *</span>
+            </label>
+            <textarea
+              rows={2}
+              value={form.why}
+              onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
+              placeholder="필수 컬럼이 아니어서 없어도 넘어가게 해 뒀습니다. 금액에 들어가는 컬럼은 없으면 막아야 합니다."
+            />
+            {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
+          </div>
+          <div className="row">
+            <button type="submit" className="btn-primary btn-sm" disabled={saving}>
+              {saving ? '남기는 중…' : '처리했다고 남기기'}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+              그만두기
+            </button>
+          </div>
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="btn-ghost btn-sm"
+          style={{ marginTop: 8 }}
+          onClick={() => setOpen(true)}
+        >
+          처리했다고 남기기
+        </button>
+      )}
+    </li>
   )
 }
 

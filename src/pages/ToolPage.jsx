@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
+import ReportForm from '../components/ReportForm.jsx'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { krw, num, ms, ago } from '../lib/format.js'
@@ -275,6 +276,11 @@ export default function ToolPage() {
           </span>
         )}
       </footer>
+
+      {/* 넘긴 뒤 들어온 신고가 이 사이트에서 가장 값진 기록이다.
+          만들 때 놓친 것은 만든 사람이 못 찾는다 — 매일 그 일을 하는
+          사람만 찾는다. */}
+      <ReportForm slug={slug} />
     </div>
   )
 }
