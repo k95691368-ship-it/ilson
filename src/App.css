@@ -3052,3 +3052,157 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--surface);
 }
+
+/* ===== 이미 들어와 있는 것 ===== */
+.similar {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 14px 16px 15px;
+}
+/* 거의 같은 건이면 더 세게 말한다. */
+.similar.same {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+.similar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.similar-title {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.similar-lead {
+  margin: 0 0 11px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-dim);
+}
+.similar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.similar-list > li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.similar-item-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 4px;
+}
+.similar-item-title {
+  font-weight: 600;
+  font-size: 13.5px;
+  color: var(--text-h);
+  line-height: 1.5;
+}
+/* 왜 비슷한지. 이 줄이 없으면 아무도 이 경고를 안 믿는다. */
+.similar-why {
+  margin-top: 4px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.similar-item-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+.similar-foot {
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  line-height: 1.7;
+}
+
+/* ===== 이미 들어와 있는 것 같습니다 ===== */
+.similar {
+  border: 1px solid var(--warning-border);
+  background: var(--warning-bg);
+  border-radius: var(--radius);
+  padding: 15px 16px 13px;
+}
+/* 거의 같은 건일 때는 더 세게 말한다. */
+.similar.same {
+  border-width: 2px;
+}
+.similar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 7px;
+}
+.similar-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.similar-lead {
+  margin: 0 0 12px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.similar-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+.similar-list > li {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.similar-item-top {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.similar-item-title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  line-height: 1.5;
+}
+/* 왜 비슷하다고 봤는지. 이 줄이 없으면 아무도 이 경고를 안 믿는다. */
+.similar-why {
+  margin-top: 5px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
+.similar-item-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 9px;
+}
+.similar-foot {
+  margin: 11px 0 0;
+  padding-top: 10px;
+  border-top: 1px dashed var(--warning-border);
+  line-height: 1.7;
+}

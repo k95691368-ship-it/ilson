@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import FileList from '../components/FileList.jsx'
 import HotkeyHelp from '../components/HotkeyHelp.jsx'
+import SimilarNotice from '../components/SimilarNotice.jsx'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -20,6 +21,7 @@ import {
   EMPTY_QUERY,
   STALE_HOURS,
 } from '../lib/inbox.js'
+import { findSimilar } from '../../shared/similar.js'
 import {
   VERDICTS,
   REFUSE_REASONS,
@@ -507,7 +509,7 @@ export default function ReviewPage() {
 
             <div className="review-detail">
               {selectedId ? (
-                <Detail id={selectedId} onSaved={reload} />
+                <Detail id={selectedId} onSaved={reload} pool={items} />
               ) : (
                 <div className="empty">
                   <div className="empty-title">왼쪽에서 신청서를 고르세요</div>
@@ -521,7 +523,7 @@ export default function ReviewPage() {
   )
 }
 
-function Detail({ id, onSaved }) {
+function Detail({ id, onSaved, pool }) {
   const { data, error, loading, reload } = useApi(`/applications/${id}`)
   const toast = useToast()
   const [form, setForm] = useState(EMPTY_FORM)
@@ -650,6 +652,10 @@ function Detail({ id, onSaved }) {
           </div>
         )}
       </section>
+
+      {/* 판정하기 전에 견준다. 판정한 뒤에 알려 주면 이미 두 번 검토한 것이다.
+          목록이 이미 브라우저에 다 있어서 서버를 다시 부르지 않는다. */}
+      <SimilarNotice hits={findSimilar(a, pool ?? [], { limit: 2 })} tone="review" />
 
       <form className="card decided" onSubmit={save}>
         <div className="card-head">

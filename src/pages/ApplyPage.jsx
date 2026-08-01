@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../api/client.js'
@@ -9,6 +9,8 @@ import { peekFile, formatBytes } from '../lib/filePeek.js'
 const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
 const FREQUENCIES = ['하루 여러 번', '매일', '주 2~3회', '주 1회', '격주', '매월', '분기', '비정기']
 const MAX_FILES = 5
+
+import SimilarNotice from '../components/SimilarNotice.jsx'
 
 const EMPTY = {
   dept: '',
@@ -29,12 +31,41 @@ export default function ApplyPage() {
   const toast = useToast()
 
   const [form, setForm] = useState(EMPTY)
+  // 이미 들어와 있는 것을 또 내는 것을 막는다.
+  //
+  // 다 적고 낸 뒤에 "이미 있습니다"라고 하면 늦다 — 그 사람은 이미 십 분을
+  // 썼다. 적는 도중에 알려 준다.
+  const [similar, setSimilar] = useState([])
+  const [similarHidden, setSimilarHidden] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [files, setFiles] = useState([])
   const [peeks, setPeeks] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [receipt, setReceipt] = useState(null)
   const fileInput = useRef(null)
+
+  // 타이핑이 멈추면 그때 묻는다. 한 글자마다 물으면 서버도 사람도 시끄럽다.
+  useEffect(() => {
+    const written = `${form.title}${form.bottleneck}${form.problem}`.trim()
+    if (written.length < 8) {
+      setSimilar([])
+      return
+    }
+    const timer = setTimeout(() => {
+      api
+        .post('/applications/similar', {
+          dept: form.dept,
+          title: form.title,
+          bottleneck: form.bottleneck,
+          problem: form.problem,
+        })
+        .then((r) => setSimilar(r.hits ?? []))
+        // 못 찾아도 신청은 계속돼야 한다. 이건 거들어 주는 기능이지
+        // 신청을 막는 기능이 아니다.
+        .catch(() => setSimilar([]))
+    }, 700)
+    return () => clearTimeout(timer)
+  }, [form.dept, form.title, form.bottleneck, form.problem])
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -167,6 +198,10 @@ export default function ApplyPage() {
                 maxLength={80}
               />
             </Field>
+
+            {!similarHidden && (
+              <SimilarNotice hits={similar} tone="apply" onDismiss={() => setSimilarHidden(true)} />
+            )}
 
             <Field
               label="무엇이 병목인가요"
