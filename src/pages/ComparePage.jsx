@@ -69,6 +69,10 @@ export default function ComparePage() {
         />
       </section>
 
+      {/* 지금 묶여 있으면 묶기 대신 풀기를 보여 준다. 잘못 묶은 것을
+          되돌릴 길이 없으면 담당자는 무서워서 아예 안 묶는다. */}
+      {data.merged && <Unmerge merged={data.merged} onDone={reload} />}
+
       {data.pastVerdicts.length > 0 && (
         <div className="notice">
           <div className="notice-title">이 둘은 전에 이미 판정했습니다</div>
@@ -148,8 +152,105 @@ export default function ComparePage() {
           </section>
         ))}
 
-      <Verdict a={a} b={b} verdicts={data.verdicts} onSaved={reload} />
+      {!data.merged && <Verdict a={a} b={b} verdicts={data.verdicts} onSaved={reload} />}
     </div>
+  )
+}
+
+// 묶은 것을 푼다.
+//
+// 어느 상태로 되돌릴지는 담당자가 고른다. 묶기 전 상태를 서버가 알 수
+// 없어서, 짐작으로 되돌리면 진행 단계가 조용히 틀어진다.
+const RESTORE_TO = ['접수', '검토중', '수용', '진행중', '완료']
+
+function Unmerge({ merged, onDone }) {
+  const toast = useToast()
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ restoreTo: '접수', why: '', author: 'AX 담당자' })
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [saving, setSaving] = useState(false)
+
+  async function send(e) {
+    e.preventDefault()
+    setSaving(true)
+    setFieldErrors({})
+    try {
+      const r = await api.remove('/compare', { ...form, ticket: merged.held })
+      toast.success(`${r.ticket} 를 풀고 ${r.status} 로 되돌렸습니다.`)
+      setOpen(false)
+      await onDone()
+    } catch (err) {
+      if (err.fields) setFieldErrors(err.fields)
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <section className="merged-notice">
+      <div className="merged-head">
+        <span className="badge badge-accent">묶여 있습니다</span>
+        <span className="card-note">{ago(merged.at)}</span>
+      </div>
+      <h3>
+        {merged.held} 를 {merged.primary} 에 묶었습니다
+      </h3>
+      <p className="card-note">{merged.why}</p>
+      <p className="card-note">
+        {merged.held} 는 지금 {merged.heldStatus} 상태이고, 부서 조회 화면에 어느 신청서로
+        묶였는지가 뜹니다.
+      </p>
+
+      {!open ? (
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
+          잘못 묶었습니다 — 풀기
+        </button>
+      ) : (
+        <form className="thread-form" onSubmit={send}>
+          <div className="field">
+            <label className="field-label">
+              어느 상태로 되돌립니까<span className="field-required"> *</span>
+            </label>
+            <select
+              value={form.restoreTo}
+              onChange={(e) => setForm((f) => ({ ...f, restoreTo: e.target.value }))}
+            >
+              {RESTORE_TO.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+            <p className="card-note" style={{ marginTop: 5 }}>
+              묶기 전 상태를 시스템이 알 수 없어 직접 고르셔야 합니다. 짐작으로 되돌리면 진행
+              단계가 조용히 틀어집니다.
+            </p>
+          </div>
+          <div className="field">
+            <label className="field-label">
+              왜 푸십니까<span className="field-required"> *</span>
+            </label>
+            <textarea
+              rows={2}
+              value={form.why}
+              onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
+              placeholder="묶는 방향이 반대였습니다. 이쪽이 이미 만들어지고 있는 건입니다."
+            />
+            {/* 부서에게 두 번째로 말이 바뀌는 것이라 이유가 남아야 한다. */}
+            {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
+          </div>
+          <div className="row">
+            <button type="submit" className="btn-primary btn-sm" disabled={saving}>
+              {saving ? '푸는 중…' : '풀고 기록에 남기기'}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+              그만두기
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
   )
 }
 

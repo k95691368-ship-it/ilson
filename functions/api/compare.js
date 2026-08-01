@@ -58,6 +58,34 @@ export async function onRequestGet({ env, request }) {
       b: { ...b, annual_hours: annualHours(b) },
       ...result,
       pastVerdicts: past.results,
+      // 지금 묶여 있는가. 화면이 이걸 알아야 "묶기"를 보여줄지
+      // "풀기"를 보여줄지 정할 수 있다.
+      merged: await (async () => {
+        const rows = await env.DB.prepare(
+          `SELECT id, application_id, link_id, link_kind, why, created_at
+           FROM decision_log
+           WHERE link_kind IN (?, ?) AND application_id IN (?, ?)
+           ORDER BY created_at`
+        )
+          .bind(MERGE_KIND, UNMERGE_KIND, a.id, b.id)
+          .all()
+        const undone = new Set(
+          rows.results.filter((r) => r.link_kind === UNMERGE_KIND).map((r) => r.link_id)
+        )
+        const live = rows.results
+          .filter((r) => r.link_kind === MERGE_KIND && !undone.has(r.id))
+          .pop()
+        if (!live) return null
+        const heldSide = live.application_id === a.id ? a : b
+        const primarySide = live.link_id === a.id ? a : b
+        return {
+          held: heldSide.ticket_no,
+          heldStatus: heldSide.status,
+          primary: primarySide.ticket_no,
+          why: live.why,
+          at: live.created_at,
+        }
+      })(),
       verdicts: COMPARE_VERDICTS.map((v) => ({ verdict: v, meaning: VERDICT_MEANING[v] })),
     })
   } catch (err) {
