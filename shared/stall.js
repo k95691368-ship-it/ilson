@@ -127,6 +127,43 @@ export function daysBetween(fromMs, toMsValue) {
   return Math.max(0, Math.floor((toMsValue - fromMs) / DAY))
 }
 
+const STAGE_NO = Object.fromEntries(STAGE_ORDER.map((s, i) => [s, i]))
+
+// 앞 단계로 내려간 기록을 가른다.
+//
+// 라이브에서 이걸 안 하고 올렸다가 바로 걸렸다. 이미 배포까지 간 신청서
+// 넷이 전부 "검토 단계에 있음"으로 나왔다. 접수함에서 여러 건을 한 번에
+// "봤다고 알리기" 하면 검토 단계 기록이 하나 붙는데, 그것을 **검토로
+// 되돌아갔다**고 읽은 것이다.
+//
+// 내려간 기록에는 두 가지가 섞여 있다.
+//   진짜 되돌아간 것 — 베타에서 떨어져 제작으로 내려가 다시 만든 경우.
+//   지난 단계에 뒤늦게 붙인 메모 — 위 경우.
+//
+// 둘을 가르는 표시는 하나뿐이다. **내려갔던 자리에서 원래 있던 데까지
+// 다시 올라왔는가.** 되돌아가 다시 만들었으면 그 뒤에 베타든 배포든 기록이
+// 또 붙는다. 메모는 거기서 끝나거나, 원래 자리보다 더 앞으로 가 버린다.
+function dropBackfilled(rows) {
+  const out = []
+  let peak = -1
+  for (let i = 0; i < rows.length; i += 1) {
+    const no = STAGE_NO[rows[i].stage]
+    if (no >= peak) {
+      out.push(rows[i])
+      peak = no
+      continue
+    }
+    const climbsBack = rows
+      .slice(i + 1)
+      .some((r) => STAGE_NO[r.stage] > no && STAGE_NO[r.stage] <= peak)
+    if (climbsBack) {
+      out.push(rows[i])
+      peak = no
+    }
+  }
+  return out
+}
+
 // 이 신청서가 어느 단계에 언제부터 언제까지 있었는가.
 //
 // 기록을 시각 순으로 훑으면서 단계가 바뀌는 지점을 자른다. 단계 번호로
@@ -134,11 +171,13 @@ export function daysBetween(fromMs, toMsValue) {
 // 테스트에서 떨어지면 제작으로 내려간다. 그때 제작에 두 번 머문 것을
 // 한 번으로 합치면 두 번째로 만든 기간이 통째로 사라진다.
 export function spansOf(logs, nowMs, startedAt) {
-  const rows = (logs ?? [])
-    .filter((l) => STALL_RULES[l.stage])
-    .map((l) => ({ stage: l.stage, at: toMs(l.created_at) }))
-    .filter((l) => l.at != null)
-    .sort((a, b) => a.at - b.at)
+  const rows = dropBackfilled(
+    (logs ?? [])
+      .filter((l) => STALL_RULES[l.stage])
+      .map((l) => ({ stage: l.stage, at: toMs(l.created_at) }))
+      .filter((l) => l.at != null)
+      .sort((a, b) => a.at - b.at)
+  )
 
   const start = toMs(startedAt)
   // 기록이 하나도 없으면 낸 그대로 신청서 단계에 있는 것이다.

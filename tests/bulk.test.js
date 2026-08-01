@@ -107,6 +107,20 @@ describe('처리할 수 있는 것과 없는 것 가르기', () => {
     expect(partition(items, ['c'], 'ack').ok.map((x) => x.id)).toEqual(['c'])
   })
 
+  it('접수함을 떠난 건은 건드리지 않는다', () => {
+    // 라이브에서 걸린 것이다. 이미 배포까지 간 신청서에 "봤다고 알리기"가
+    // 걸리면 검토 단계 기록이 붙고, 막힌 곳 화면이 그 건을 검토 단계로 읽는다.
+    const moving = [app('m', '진행중'), app('n', '수용')]
+    const r = partition(moving, ['m', 'n'], 'ack')
+    expect(r.ok).toHaveLength(0)
+    expect(r.skipped[0].reason).toContain('접수함을 떠난')
+  })
+
+  it('접수함 안의 것은 그대로 된다', () => {
+    const inbox = [app('p', '접수'), app('q', '검토중'), app('r', '보류')]
+    expect(partition(inbox, ['p', 'q', 'r'], 'ack').ok).toHaveLength(3)
+  })
+
   it('목록에 없는 것을 골랐으면 따로 알려 준다', () => {
     const r = partition(items, ['a', '없는것'], 'ack')
     expect(r.missing).toEqual(['없는것'])

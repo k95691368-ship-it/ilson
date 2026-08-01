@@ -53,6 +53,14 @@ export const MAX_AT_ONCE = 8
 // 남겨 둔다.
 export const NEVER_BULK = ['수용', '반려']
 
+// 여기는 접수함이다. 접수함에 있는 건만 건드린다.
+//
+// 이걸 안 걸고 올렸다가 라이브에서 걸렸다. 이미 배포까지 간 신청서에
+// "봤다고 알리기"가 걸려 검토 단계 기록이 붙었고, 그러면 막힌 곳 화면이
+// 그 건을 "검토 단계에 있음"으로 읽는다. 애초에 뜻도 없는 조작이다 —
+// 이미 도구를 쓰고 있는 부서에 "읽었습니다"를 보내 봐야 할 말이 아니다.
+export const INBOX_STATUSES = ['접수', '검토중', '보류']
+
 export function validateBulk({ action, ids, reason }) {
   const fields = {}
   const list = [...new Set(ids ?? [])].filter(Boolean)
@@ -88,6 +96,8 @@ export function partition(items, ids, action) {
   for (const it of picked) {
     if (it.status === '반려' || it.status === '완료') {
       skipped.push({ ...it, reason: `이미 ${it.status}된 건입니다.` })
+    } else if (!INBOX_STATUSES.includes(it.status)) {
+      skipped.push({ ...it, reason: `이미 ${it.status}이라 접수함을 떠난 건입니다.` })
     } else if (spec?.changesStatus && it.status === spec.changesStatus) {
       skipped.push({ ...it, reason: `이미 ${it.status} 상태입니다.` })
     } else {

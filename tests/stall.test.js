@@ -67,6 +67,37 @@ describe('언제부터 언제까지 어느 단계에 있었나', () => {
     expect(builds[1].days).toBe(8)
   })
 
+  it('지난 단계에 뒤늦게 붙인 메모를 되돌아간 것으로 읽지 않는다', () => {
+    // 라이브에서 바로 걸린 것이다. 이미 배포까지 간 신청서 넷이 전부
+    // "검토 단계에 있음"으로 나왔다 — 접수함 일괄 "봤다고 알리기"가
+    // 검토 단계 기록을 하나 붙였기 때문이다.
+    const s = spansOf(
+      [
+        { stage: '배포', created_at: ago(20) },
+        { stage: '성과', created_at: ago(12) },
+        { stage: '검토', created_at: ago(1) },
+      ],
+      NOW,
+      ago(40)
+    )
+    expect(s[s.length - 1].stage).toBe('성과')
+    expect(s.some((x) => x.stage === '검토')).toBe(false)
+  })
+
+  it('중간에 낀 메모도 구간을 만들지 않는다', () => {
+    // 내려갔다가 원래 자리보다 더 앞으로 가 버리면 되돌아간 것이 아니다.
+    const s = spansOf(
+      [
+        { stage: '배포', created_at: ago(20) },
+        { stage: '검토', created_at: ago(15) },
+        { stage: '성과', created_at: ago(10) },
+      ],
+      NOW,
+      ago(30)
+    )
+    expect(s.map((x) => x.stage)).toEqual(['신청서', '배포', '성과'])
+  })
+
   it('같은 단계 기록이 여러 개여도 한 구간이다', () => {
     const s = spansOf(
       [
