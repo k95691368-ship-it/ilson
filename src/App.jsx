@@ -22,6 +22,7 @@ const HonestyPage = lazy(() => import('./pages/HonestyPage.jsx'))
 const ComparePage = lazy(() => import('./pages/ComparePage.jsx'))
 const WeeklyPage = lazy(() => import('./pages/WeeklyPage.jsx'))
 const CodesPage = lazy(() => import('./pages/CodesPage.jsx'))
+const StallPage = lazy(() => import('./pages/StallPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // 목차와 꼬리말 없이 여는 화면들.
@@ -71,6 +72,12 @@ export default function App() {
 
           <div className="topbar-right">
             {/* 단계가 아니라 여덟 단계를 가로로 훑는 화면이라 목차와 분리해 둔다. */}
+            <NavLink
+              to="/stall"
+              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
+            >
+              막힌 곳
+            </NavLink>
             <NavLink
               to="/weekly"
               className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
@@ -122,6 +129,7 @@ export default function App() {
             <Route path="/compare" element={<ComparePage />} />
             <Route path="/weekly" element={<WeeklyPage />} />
             <Route path="/codes" element={<CodesPage />} />
+            <Route path="/stall" element={<StallPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

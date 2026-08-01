@@ -28,7 +28,7 @@ function item(o) {
 //
 // 각 화면이 이미 세어 둔 숫자를 받아 쓴다. 여기서 다시 세지 않는다 —
 // 두 군데서 세면 두 숫자가 달라지고, 그러면 둘 다 못 믿는다.
-export function buildTodo({ overview, reports, codes, tools } = {}) {
+export function buildTodo({ overview, reports, codes, tools, stalls } = {}) {
   const out = []
 
   // ── 금액이 틀릴 수 있는 것 ──────────────────────────────
@@ -71,6 +71,25 @@ export function buildTodo({ overview, reports, codes, tools } = {}) {
         why: '부서는 낸 뒤로 아무 소식이 없는 상태입니다. 판정이 늦는 것보다 아무 말이 없는 것이 더 나쁩니다.',
         to: '/review',
         cta: '접수함 열기',
+      })
+    )
+  }
+
+  // 접수함에 안 뜨는 중간 단계에서 멈춘 것.
+  //
+  // 이미 판정해서 진행 중으로 넘어간 건은 어느 목록에도 안 뜬다. 그래서
+  // 가장 조용히 늦는다. 앞 두 단계(신청서·검토)는 바로 위에서 이미 세고
+  // 있으므로 여기서는 빼고 받는다.
+  const stalled = stalls?.summary?.mineLater ?? 0
+  if (stalled > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'stalled',
+        title: `중간 단계에서 오래 멈춘 신청서 ${stalled}건`,
+        why: '판정까지 끝나 진행 중으로 넘어간 건들이라 접수함에도, 신고 목록에도 안 뜹니다. 아무 데도 안 뜨는 채로 몇 주가 지나갑니다.',
+        to: '/stall',
+        cta: '어디서 막혔는지 보기',
       })
     )
   }
@@ -143,6 +162,7 @@ export function buildTodo({ overview, reports, codes, tools } = {}) {
 // 무엇을 보고 없다고 하는지 밝힌다.
 export const NOTHING_CHECKED = [
   '하루 넘게 못 본 신청서',
+  '중간 단계에서 오래 멈춘 신청서',
   '결과가 이상하다는 신고',
   '아직 확인 안 한 상품코드',
   '아무도 안 쓰는 도구',

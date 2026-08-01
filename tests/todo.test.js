@@ -95,6 +95,13 @@ describe('숫자를 여기서 다시 세지 않는다', () => {
     expect(t.find((i) => i.key === 'open_reports').title).toContain('2건')
   })
 
+  it('접수함이 이미 세는 앞 단계는 막힌 곳에서 안 받는다', () => {
+    // 같은 건을 "하루 넘게 못 본 신청서"와 "중간에서 멈춘 것" 두 줄에
+    // 올리면 담당자는 두 배로 밀린 줄 안다.
+    const t = buildTodo({ stalls: { summary: { mine: 5, mineLater: 2 } } })
+    expect(t.find((i) => i.key === 'stalled').title).toContain('2건')
+  })
+
   it('급한 신고만 있으면 불편 신고 줄은 안 올린다', () => {
     const t = buildTodo({ reports: { summary: { urgent: 3, open: 3 } } })
     expect(t.find((i) => i.key === 'open_reports')).toBeUndefined()

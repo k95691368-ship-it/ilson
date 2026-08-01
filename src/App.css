@@ -4136,3 +4136,190 @@ kbd {
   border-top: 1px dashed var(--border);
   line-height: 1.7;
 }
+
+/* ===== 막힌 곳 ===== */
+/* 이 화면이 잔소리로 읽히면 두 번째부터 아무도 안 본다. 그래서 색을 아끼고,
+   줄마다 "그래서 무엇을 하면 되는지"에 자리를 넉넉히 준다. */
+.stall-line {
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.stall-line-label {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+}
+.stall-line p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-h);
+}
+
+.stall-list {
+  list-style: none;
+  margin: 0;
+  padding: 6px 8px 10px;
+  display: grid;
+  gap: 8px;
+}
+.stall-row {
+  padding: 12px 13px;
+  border: 1px solid var(--border);
+  border-left-width: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+/* 내가 움직여야 풀리는 것과 기다리는 것을 색으로 가른다. 다만 배지에
+   글로도 적혀 있다 — 색만으로 가르면 못 읽는 사람이 생긴다. */
+.stall-row.mine {
+  border-left-color: var(--warning);
+}
+.stall-row.theirs {
+  border-left-color: var(--text-muted);
+}
+.stall-row.bad.mine {
+  border-left-color: var(--danger);
+}
+
+.stall-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.stall-days {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
+.stall-row.bad .stall-days {
+  color: var(--danger);
+}
+.stall-days-unit {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-left: 1px;
+}
+.stall-who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.stall-stage {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.stall-body {
+  margin-top: 7px;
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.stall-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.stall-stuck {
+  margin: 7px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text);
+}
+/* 늦었다는 말만 있고 할 일이 없으면 이 화면은 잔소리다. */
+.stall-next {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border);
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.stall-next p {
+  margin: 0;
+  flex: 1;
+  min-width: 220px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.stall-clear {
+  padding: 16px;
+}
+.stall-clear p {
+  margin: 5px 0 0;
+}
+
+.stall-typical {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px 12px;
+  display: grid;
+  gap: 7px;
+}
+.stall-typical > li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+}
+/* 표본이 모자란 줄은 흐리게. 숫자와 같은 무게로 보이면 없는 값을 있는
+   값처럼 읽는다. */
+.stall-typical > li.thin {
+  opacity: 0.55;
+}
+.stall-typical-name {
+  width: 72px;
+  flex: none;
+  color: var(--text-h);
+  font-weight: 600;
+}
+.stall-typical-bar {
+  flex: 1;
+  min-width: 60px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--border);
+  overflow: hidden;
+}
+.stall-typical-bar span {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--accent);
+}
+.stall-typical-val {
+  width: 86px;
+  flex: none;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-h);
+  font-weight: 600;
+}
+
+.stall-ok {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px 12px;
+  display: grid;
+  gap: 6px;
+}
+.stall-ok > li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+  font-size: 13px;
+}
