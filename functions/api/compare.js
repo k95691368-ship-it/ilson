@@ -6,6 +6,7 @@
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
 import { compare, COMPARE_VERDICTS, VERDICT_MEANING } from '../../shared/compare.js'
+import { pickPrimary, holdCondition, MERGE_KIND } from '../../shared/merge.js'
 import { logDecision } from '../_lib/decisions.js'
 import { annualHours } from '../_lib/applications.js'
 
@@ -62,6 +63,17 @@ export async function onRequestGet({ env, request }) {
   } catch (err) {
     return failUnexpected(err, '두 신청서를 견주지 못했습니다.')
   }
+}
+
+function verdictAuthor(body) {
+  return String(body?.author ?? '').trim().slice(0, 60) || 'AX 담당자'
+}
+
+// decision_log는 id를 직접 넣어야 한다. logDecision을 두 번 부르면
+// batch 안에서 한 묶음으로 못 돌아서, 상태만 바뀌고 기록이 안 남는 일이
+// 생길 수 있다. 그건 가장 나쁜 결과다 — 왜 보류됐는지 아무도 모른다.
+function newDecisionId() {
+  return `dec_${crypto.randomUUID().replace(/-/g, '').slice(0, 20)}`
 }
 
 // 두 건을 한 짝으로 묶는 이름. 순서를 정해 두지 않으면 A-B와 B-A가 다른
@@ -123,7 +135,43 @@ export async function onRequestPost({ env, request }) {
       linkId: pairKey(a.id, b.id),
     })
 
-    return jsonResponse({ ok: true, id, verdict, applicationId: later.id })
+    // "같은 건"이라고만 하고 아무 일도 안 하면, 담당자는 끝났다고 생각하고
+    // 부서는 아무 소식이 없다고 생각한다. 둘 다 상대가 뭘 하고 있는 줄 안다.
+    //
+    // 묶겠다고 하면 실제로 상태를 바꾼다. 반려가 아니라 보류다 — 안 하는
+    // 것이 아니라 그쪽에서 함께 하는 것이라서.
+    let merged = null
+    if (verdict === '같은 건' && body.merge === true) {
+      const pick = pickPrimary(a, b)
+      if (pick.blocked) {
+        return jsonError(pick.blocked, 409)
+      }
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE application SET status = '보류', updated_at = datetime('now') WHERE id = ?`
+        ).bind(pick.merged.id),
+        env.DB.prepare(
+          `INSERT INTO decision_log
+             (id, application_id, stage, actor, title, what, why, link_kind, link_id)
+           VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?)`
+        ).bind(
+          newDecisionId(),
+          pick.merged.id,
+          verdictAuthor(body),
+          holdCondition(pick.primary),
+          reason,
+          MERGE_KIND,
+          pick.primary.id
+        ),
+      ])
+      merged = {
+        primary: pick.primary.ticket_no,
+        held: pick.merged.ticket_no,
+        condition: holdCondition(pick.primary),
+      }
+    }
+
+    return jsonResponse({ ok: true, id, verdict, applicationId: later.id, merged })
   } catch (err) {
     return failUnexpected(err, '판정을 남기지 못했습니다.')
   }

@@ -173,6 +173,39 @@ function Result({ data, onChanged }) {
         </p>
       </section>
 
+      {/* 다른 신청서와 같은 건으로 묶였으면 그것부터. 모르면 이미 만들고
+          있는 것을 두고 몇 주를 기다린다. "중복입니다"로 끝내지 않는다 —
+          버린 것이 아니라 그쪽에서 함께 처리된다는 것을 말해야 한다. */}
+      {data.mergedInto && (
+        <section className="merged-notice">
+          <div className="merged-head">
+            <span className="badge badge-accent">같은 건으로 묶임</span>
+            <span className="card-note">{ago(data.mergedInto.at)}</span>
+          </div>
+          <h3>{data.mergedInto.ticket_no} 와 같은 건입니다</h3>
+          <p>
+            내주신 것과 같은 병목을 {data.mergedInto.dept}에서 먼저 냈습니다. 두 번 만들지
+            않으려고 <strong>그쪽에서 함께 처리합니다</strong>.
+          </p>
+          <p className="card-note">
+            따로 만들지 않을 뿐이지 안 하는 것이 아닙니다. 그쪽이 다 되면 바로 쓰실 수 있습니다.
+          </p>
+          {data.mergedInto.why && (
+            <p className="merged-why">
+              <strong>왜 같은 건이라고 봤나</strong> {data.mergedInto.why}
+            </p>
+          )}
+          <div className="row">
+            <Link to={`/track?no=${data.mergedInto.ticket_no}`} className="btn-primary btn-sm">
+              그 신청서가 어디까지 왔는지 보기
+            </Link>
+            <span className="card-note">
+              지금 {data.mergedInto.status} 단계입니다 — {data.mergedInto.title}
+            </span>
+          </div>
+        </section>
+      )}
+
       {/* 지금 이 부서가 움직여야 진행되는 것.
           진행 상황보다 위에 둔다. 어디까지 왔는지보다, 지금 멈춰 있는
           이유가 내 쪽에 있다는 것을 먼저 알아야 하기 때문이다. */}

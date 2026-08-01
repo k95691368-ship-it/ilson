@@ -206,6 +206,9 @@ function TokenRow({ label, tokens, kind }) {
 function Verdict({ a, b, verdicts, onSaved }) {
   const toast = useToast()
   const [verdict, setVerdict] = useState('')
+  // 같은 건이라고만 하고 아무 일도 안 하면, 담당자는 끝났다고 생각하고
+  // 부서는 아무 소식이 없다고 생각한다. 실제로 묶을지 그 자리에서 고르게 한다.
+  const [merge, setMerge] = useState(true)
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
@@ -215,8 +218,12 @@ function Verdict({ a, b, verdicts, onSaved }) {
     setSaving(true)
     setFieldErrors({})
     try {
-      const r = await api.post('/compare', { a, b, verdict, reason })
-      toast.success(`"${r.verdict}"으로 판정하고 기록에 남겼습니다.`)
+      const r = await api.post('/compare', { a, b, verdict, reason, merge: verdict === '같은 건' && merge })
+      toast.success(
+        r.merged
+          ? `${r.merged.held} 를 ${r.merged.primary} 에 묶고 보류로 바꿨습니다. 부서 조회 화면에 이유가 뜹니다.`
+          : `"${r.verdict}"으로 판정하고 기록에 남겼습니다.`
+      )
       setReason('')
       setVerdict('')
       await onSaved()
@@ -257,6 +264,20 @@ function Verdict({ a, b, verdicts, onSaved }) {
         {chosen && <p className="card-note" style={{ marginTop: 7 }}>{chosen.meaning}</p>}
         {fieldErrors.verdict && <div className="field-error">{fieldErrors.verdict}</div>}
       </div>
+
+      {verdict === '같은 건' && (
+        <label className="merge-opt">
+          <input type="checkbox" checked={merge} onChange={(e) => setMerge(e.target.checked)} />
+          <span>
+            <strong>나중에 낸 쪽을 보류로 바꾸고 먼저 낸 쪽에 묶습니다</strong>
+            <span className="card-note">
+              반려가 아니라 보류입니다 — 안 하는 것이 아니라 그쪽에서 함께 하는 것이라서요. 부서
+              조회 화면에 어느 신청서로 묶였는지와 그 이유가 그대로 뜹니다. 끄면 판정만 기록에
+              남고 상태는 그대로 둡니다.
+            </span>
+          </span>
+        </label>
+      )}
 
       <div className="field">
         <label className="field-label">

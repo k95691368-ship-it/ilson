@@ -3908,3 +3908,67 @@ kbd {
 .tool-quota-warn p {
   margin: 4px 0 0;
 }
+
+/* ===== 같은 건으로 묶임 ===== */
+/* 부서가 가장 먼저 봐야 하는 소식이다. 모르면 이미 만들고 있는 것을 두고
+   몇 주를 기다린다. */
+.merged-notice {
+  padding: 16px 17px 14px;
+  border: 2px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.merged-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+.merged-notice h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+  color: var(--text-h);
+  line-height: 1.45;
+}
+.merged-notice p {
+  margin: 0 0 7px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.merged-why {
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  font-size: 12.5px;
+}
+.merged-why strong {
+  color: var(--text-h);
+  margin-right: 5px;
+}
+
+.merge-opt {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 11px 12px;
+  margin-bottom: 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  cursor: pointer;
+}
+.merge-opt input {
+  margin-top: 2px;
+  width: auto;
+  flex: none;
+}
+.merge-opt strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-h);
+  margin-bottom: 3px;
+}
+.merge-opt .card-note {
+  line-height: 1.7;
+}

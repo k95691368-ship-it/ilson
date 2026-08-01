@@ -261,6 +261,19 @@ export async function onRequestGet({ env, params, request }) {
       stages: STAGES,
       currentStage: currentIndex >= 0 ? timeline[currentIndex].stage : '신청서',
       decisions: decisions.results,
+      // 다른 신청서와 같은 건으로 묶였으면 그것부터 알려야 한다.
+      // 부서 입장에서 가장 중요한 소식이다 — 모르면 이미 만들고 있는 것을
+      // 두고 몇 주를 기다린다.
+      mergedInto: await (async () => {
+        const m = decisions.results.find((d) => d.link_kind === '병합')
+        if (!m) return null
+        const into = await env.DB.prepare(
+          'SELECT ticket_no, dept, title, status FROM application WHERE id = ?'
+        )
+          .bind(m.link_id)
+          .first()
+        return into ? { ...into, why: m.why, at: m.created_at } : null
+      })(),
       contact: manual?.contact ?? null,
       needs,
     })
