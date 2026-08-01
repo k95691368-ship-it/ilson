@@ -50,7 +50,7 @@ export async function onRequestGet({ env, params, request }) {
       return jsonError('그 접수번호로 낸 신청서를 찾지 못했습니다. 번호를 다시 확인해주세요.', 404)
     }
 
-    const [review, files, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions] =
+    const [review, files, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions, feedbackCount] =
       await Promise.all([
         env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id).first(),
         env.DB.prepare('SELECT id, name, byte_size FROM application_file WHERE application_id = ?')
@@ -107,6 +107,11 @@ export async function onRequestGet({ env, params, request }) {
         )
           .bind(app.id)
           .all(),
+        // 이 부서가 시험판을 써 보고 남긴 말이 있는가. 없으면 기계 채점만
+        // 통과한 상태고, 그것만으로는 쓸 만한지 알 수 없다.
+        env.DB.prepare('SELECT COUNT(*) AS n FROM beta_feedback WHERE application_id = ?')
+          .bind(app.id)
+          .first(),
       ])
 
     const refuseReason = review?.refuse_code
@@ -208,6 +213,31 @@ export async function onRequestGet({ env, params, request }) {
 
     const currentIndex = timeline.findLastIndex((t) => t.status !== '대기')
 
+    // 지금 이 부서가 움직여야 진행되는 것.
+    //
+    // 조회 화면이 "어디까지 왔는지"만 보여 주면, 정작 멈춰 있는 이유가
+    // 부서 쪽에 있을 때 아무도 모른다. 넘겨줬는데 확인이 없어서 멈춘 것과
+    // 아직 안 만들어서 멈춘 것은 다른 일인데 화면에서는 똑같아 보인다.
+    const needs = []
+
+    if (review?.verdict === '보류' && review.hold_until_condition) {
+      needs.push({ code: 'hold_condition', body: review.hold_until_condition })
+    }
+    if (review?.verdict === '반려' && review.refuse_alternative) {
+      needs.push({ code: 'refused_alternative', body: review.refuse_alternative })
+    }
+    // 시험을 돌렸는데 아직 현업 의견이 한 건도 없다. 기계 채점만으로는
+    // 쓸 만한지 알 수 없다.
+    if (beta && (feedbackCount?.n ?? 0) === 0) {
+      needs.push({ code: 'beta_feedback' })
+    }
+    if (handover && !handover.accepted_at && !handover.rolled_back_at) {
+      needs.push({ code: 'handover_unconfirmed', link: `/t/${handover.slug}` })
+    }
+    if (outcome && !outcome.dept_confirmed_at && (uses?.n ?? 0) > 0) {
+      needs.push({ code: 'outcome_unconfirmed' })
+    }
+
     return jsonResponse({
       ticket: app.ticket_no,
       application: {
@@ -229,6 +259,7 @@ export async function onRequestGet({ env, params, request }) {
       currentStage: currentIndex >= 0 ? timeline[currentIndex].stage : '신청서',
       decisions: decisions.results,
       contact: manual?.contact ?? null,
+      needs,
     })
   } catch (err) {
     return jsonError(`조회하지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

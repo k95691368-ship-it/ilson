@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import FileList from '../components/FileList.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
+import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
 
 // 접수번호로 내 신청서가 어디까지 왔는지 보는 화면.
 //
@@ -116,6 +117,40 @@ function Result({ data }) {
   const a = data.application
   const refused = a.status === '반려'
 
+  const notices = useMemo(() => noticesFrom(data), [data])
+  const actions = useMemo(() => actionsFrom(data), [data])
+
+  // 이 브라우저에서 마지막으로 본 시각. 서버에 저장하지 않는다.
+  //
+  // 이 사이트는 부서 담당자에게 계정을 만들게 하지 않기로 했다. 계정이
+  // 없으면 누가 읽었는지 구분할 수 없어서, 접수번호 단위로 서버에 저장하면
+  // AX 담당자가 열어 본 것까지 신청자가 읽은 것으로 처리된다. 그건 틀린
+  // 기록이다. 그래서 브라우저에만 남기고, 화면에도 그렇게 적는다.
+  const [lastSeen, setLastSeen] = useState(null)
+
+  useEffect(() => {
+    let prev = null
+    try {
+      prev = window.localStorage.getItem(seenKey(data.ticket))
+    } catch {
+      // 사생활 보호 모드 등으로 저장소를 못 쓰는 브라우저가 있다.
+      // 그때는 새 표시가 안 붙을 뿐, 화면 나머지는 그대로 돌아야 한다.
+    }
+    setLastSeen(prev)
+
+    // 이번에 본 시각을 남긴다. 다음에 오면 이 뒤에 생긴 것이 새 것이다.
+    // 화면을 그린 뒤에 남겨야 이번 방문의 '새 것'이 살아 있다.
+    try {
+      const now = notices[0]?.at
+      if (now) window.localStorage.setItem(seenKey(data.ticket), now)
+    } catch {
+      // 위와 같다.
+    }
+  }, [data.ticket, notices])
+
+  const fresh = useMemo(() => newSince(notices, lastSeen), [notices, lastSeen])
+  const freshKeys = useMemo(() => new Set(fresh.map((n) => n.key)), [fresh])
+
   return (
     <div className="stack">
       <section className={`track-head${refused ? ' refused' : ''}`}>
@@ -123,6 +158,9 @@ function Result({ data }) {
           <span className="mono badge badge-neutral">{data.ticket}</span>
           <span className="badge badge-neutral">{a.dept}</span>
           <span className={`badge ${statusTone(a.status)}`}>{a.status}</span>
+          {fresh.length > 0 && (
+            <span className="badge badge-accent">지난번 뒤로 새 소식 {fresh.length}건</span>
+          )}
           <span className="spacer" />
           <span className="card-note">{ago(a.created_at)} 접수</span>
         </div>
@@ -133,6 +171,67 @@ function Result({ data }) {
           {a.annual_hours != null && ` · 연 ${num(a.annual_hours, 0)}시간이 드는 일로 접수됐습니다`}
         </p>
       </section>
+
+      {/* 지금 이 부서가 움직여야 진행되는 것.
+          진행 상황보다 위에 둔다. 어디까지 왔는지보다, 지금 멈춰 있는
+          이유가 내 쪽에 있다는 것을 먼저 알아야 하기 때문이다. */}
+      {actions.length > 0 && (
+        <section className="track-actions">
+          <div className="track-actions-head">
+            <span className="track-actions-title">해주셔야 할 일 {actions.length}가지</span>
+            <span className="card-note">이게 있으면 저희 쪽에서는 더 못 나갑니다</span>
+          </div>
+          <ol>
+            {actions.map((x) => (
+              <li key={x.code}>
+                <div className="track-action-headline">{x.headline}</div>
+                {x.body && <div className="track-action-body">{x.body}</div>}
+                <div className="track-action-why">{x.why}</div>
+                {x.link && (
+                  <Link to={x.link} className="btn-primary btn-sm">
+                    열어 보기
+                  </Link>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      )}
+
+      {notices.length > 0 && (
+        <section className="card">
+          <div className="card-head">
+            <span className="card-title">그동안의 소식</span>
+            <span className="spacer" />
+            <span className="card-note">
+              {lastSeen
+                ? `이 브라우저에서 ${dateTimeLabel(lastSeen)}까지 보셨습니다`
+                : '이 브라우저에서는 처음 여셨습니다'}
+            </span>
+          </div>
+          <ol className="notice-list">
+            {notices.map((n) => (
+              <li key={n.key} className={freshKeys.has(n.key) ? 'fresh' : ''}>
+                <div className="notice-top">
+                  {freshKeys.has(n.key) && <span className="badge badge-accent">새 소식</span>}
+                  <span className="badge badge-neutral">{n.stage}</span>
+                  <span className="spacer" />
+                  <span className="card-note" title={dateTimeLabel(n.at)}>
+                    {ago(n.at)}
+                  </span>
+                </div>
+                <div className="notice-headline">{n.headline}</div>
+                <div className="notice-body">{n.body}</div>
+              </li>
+            ))}
+          </ol>
+          <p className="card-note notice-foot">
+            메일이나 문자로 보내드리지는 않습니다. 이 주소를 저장해 두시면 언제든 여기서 확인하실
+            수 있습니다. 새 소식 표시는 이 브라우저 기준이라, 다른 기기에서 여시면 다시 처음부터
+            보입니다.
+          </p>
+        </section>
+      )}
 
       <section className="card">
         <div className="card-head">

@@ -2602,3 +2602,108 @@ p.record-aside {
   opacity: 0.4;
   cursor: not-allowed;
 }
+
+/* ===== 부서에 알리는 것 ===== */
+
+/* 지금 이 부서가 움직여야 진행되는 것.
+   진행 상황보다 위에 둔다. 어디까지 왔는지보다 "지금 멈춰 있는 이유가
+   내 쪽에 있다"를 먼저 알아야 하기 때문이다. */
+.track-actions {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  padding: 16px 18px 18px;
+}
+.track-actions-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.track-actions-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-h);
+}
+.track-actions ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.track-actions li {
+  padding: 13px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.track-action-headline {
+  font-weight: 700;
+  font-size: 14.5px;
+  color: var(--text-h);
+  margin-bottom: 4px;
+}
+.track-action-body {
+  font-size: 13.5px;
+  line-height: 1.7;
+  color: var(--text);
+}
+/* 왜 해야 하는지. 이유 없이 시키면 아무도 안 한다. */
+.track-action-why {
+  margin-top: 6px;
+  padding-left: 9px;
+  border-left: 2px solid var(--border);
+  font-size: 12.5px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+.track-actions li a {
+  margin-top: 10px;
+}
+
+.notice-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.notice-list > li {
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.notice-list > li.fresh {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.notice-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+.notice-headline {
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--text-h);
+  line-height: 1.5;
+}
+.notice-body {
+  margin-top: 3px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-dim);
+}
+.notice-foot {
+  margin: 13px 0 0;
+  padding-top: 11px;
+  border-top: 1px dashed var(--border);
+  line-height: 1.7;
+}
