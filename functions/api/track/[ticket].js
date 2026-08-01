@@ -100,8 +100,11 @@ export async function onRequestGet({ env, params, request }) {
           .bind(app.id)
           .first(),
         // 신청자에게 보여 줄 결정만 고른다. 내부 메모까지 다 보여 주지는 않는다.
+        //
+        // id와 link_kind를 같이 준다. 담당자가 되물은 것을 부서가 보고
+        // 답하려면, 어느 것이 질문이고 그 질문이 무엇인지 가릴 수 있어야 한다.
         env.DB.prepare(
-          `SELECT stage, title, what, why, created_at FROM decision_log
+          `SELECT id, stage, title, what, why, link_kind, link_id, created_at FROM decision_log
            WHERE application_id = ? AND actor = 'human'
            ORDER BY created_at`
         )
