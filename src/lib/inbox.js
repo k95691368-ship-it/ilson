@@ -58,6 +58,13 @@ const SEARCH_FIELDS = [
   'applicant_label',
 ]
 
+// 접수번호는 사람이 대시를 빼고 옮겨 적는다. 부서에서 "AX-EFD-E58 건이요"를
+// 메신저로 받아 붙여 넣을 때는 대시가 붙어 오지만, 전화로 듣고 치면
+// "axefde58"이 된다. 둘 다 같은 것을 찾아야 한다.
+function stripPunct(s) {
+  return s.replace(/[^a-z0-9가-힣]/g, '')
+}
+
 export function matchesQuery(item, q) {
   const needle = String(q ?? '').trim().toLowerCase()
   if (!needle) return true
@@ -67,7 +74,10 @@ export function matchesQuery(item, q) {
   const hay = SEARCH_FIELDS.map((f) => String(item[f] ?? ''))
     .join(' ')
     .toLowerCase()
-  return words.every((w) => hay.includes(w))
+  // 대시·공백을 뗀 것도 같이 뒤진다. 원본만 뒤지면 "axefde58"이 안 걸리고,
+  // 뗀 것만 뒤지면 "재무 정산" 같은 두 낱말 검색이 붙어버려 안 걸린다.
+  const bare = stripPunct(hay)
+  return words.every((w) => hay.includes(w) || bare.includes(stripPunct(w)))
 }
 
 function passesFacets(item, query, { skip } = {}) {

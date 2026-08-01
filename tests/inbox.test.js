@@ -119,6 +119,26 @@ describe('말로 찾기', () => {
     expect(matchesQuery(ITEMS[0], '')).toBe(true)
     expect(matchesQuery(ITEMS[0], '   ')).toBe(true)
   })
+
+  it('접수번호를 대시 없이 쳐도 찾는다', () => {
+    // 메신저로 받아 붙여 넣으면 대시가 있지만, 전화로 듣고 치면 없다.
+    expect(matchesQuery(ITEMS[0], 'axaaa001')).toBe(true)
+    expect(matchesQuery(ITEMS[0], 'AXAAA001')).toBe(true)
+  })
+
+  it('접수번호 뒷자리만 쳐도 찾는다', () => {
+    expect(matchesQuery(ITEMS[1], 'BBB')).toBe(true)
+  })
+
+  it('대시를 떼도 다른 신청서까지 걸리지는 않는다', () => {
+    expect(matchesQuery(ITEMS[1], 'axaaa001')).toBe(false)
+  })
+
+  it('대시를 떼는 것이 두 낱말 검색을 망가뜨리지 않는다', () => {
+    // 뗀 것만 뒤지면 "재무 정산서"가 "재무정산서" 한 덩어리가 되어 안 걸린다.
+    expect(matchesQuery(ITEMS[0], '재무 정산서')).toBe(true)
+    expect(matchesQuery(ITEMS[0], '재무 광고비')).toBe(false)
+  })
 })
 
 describe('기본 정렬 — 묵은 순', () => {
