@@ -71,9 +71,11 @@ function stripTail(word, list) {
   for (const t of list) {
     // 떼고 나서도 두 글자는 남아야 한다. "화면"에서 "면"을 떼면 "화" 하나만
     // 남아 아무 뜻이 없어진다.
-    if (word.length > t.length + 1 && word.endsWith(t)) {
-      return word.slice(0, -t.length)
-    }
+    if (!word.endsWith(t)) continue
+    // 그리고 여기서 멈춘다. 긴 것부터 보고 있으므로 지금 걸린 것이 맞는
+    // 분석이다. 짧은 것으로 계속 내려가면 "손으로"에서 "으로"를 못 떼고
+    // 대신 "로"를 떼서 "손으"라는 없는 말이 된다.
+    return word.length > t.length + 1 ? word.slice(0, -t.length) : word
   }
   return word
 }
@@ -93,32 +95,43 @@ function normalizeWord(word) {
 
 const HANGUL = /[가-힣]/
 
-// 낱말을 뽑는다.
+// 낱말을 뽑되 온전한 낱말과 조각을 나눠서 돌려준다.
 //
 // 한글 낱말은 글자 두 개짜리 조각으로도 쪼개 둔다. "정산서"와 "정산 내역"이
 // 서로 걸리게 하려면 이게 필요하다 — 띄어쓰기와 조사가 제각각이라 낱말을
 // 통째로만 견주면 거의 안 겹친다.
-export function tokenize(text) {
+//
+// 견줄 때는 둘 다 쓴다. 조각이 없으면 "정산서"와 "정산 내역"이 안 걸린다.
+// 그런데 사람에게 왜 비슷한지 말할 때는 온전한 낱말만 쓴다. "손으·산서·니다가
+// 겹칩니다"는 아무 말도 안 한 것이고, "정산서·채널·엑셀이 겹칩니다"는 그
+// 자리에서 맞는지 틀린지 판단하게 해 준다.
+export function tokenParts(text) {
   const raw = String(text ?? '')
     .toLowerCase()
     .replace(/[^0-9a-z가-힣\s]/g, ' ')
     .split(/\s+/)
     .filter(Boolean)
 
-  const out = new Set()
+  const all = new Set()
+  const words = new Set()
   for (const word0 of raw) {
     const word = normalizeWord(word0)
     if (word.length < 2) continue
     if (STOPWORDS.has(word) || STOPWORDS.has(word0)) continue
-    out.add(word)
+    all.add(word)
+    words.add(word)
 
     if (HANGUL.test(word) && word.length >= 3) {
       for (let i = 0; i + 2 <= word.length; i++) {
-        out.add(word.slice(i, i + 2))
+        all.add(word.slice(i, i + 2))
       }
     }
   }
-  return out
+  return { all, words }
+}
+
+export function tokenize(text) {
+  return tokenParts(text).all
 }
 
 // 낱말마다 무게를 다르게 준다.
@@ -136,7 +149,7 @@ export function corpusOf(items) {
   for (const it of list) {
     const seen = new Set()
     for (const field of Object.keys(FIELD_WEIGHT)) {
-      for (const t of tokenize(it?.[field])) seen.add(t)
+      for (const t of tokenParts(it?.[field]).all) seen.add(t)
     }
     for (const t of seen) df.set(t, (df.get(t) ?? 0) + 1)
   }
@@ -155,12 +168,6 @@ function weightOf(token, corpus) {
   return Math.log((corpus.n + 1) / (d + 1)) / Math.log(corpus.n + 1)
 }
 
-// 두 낱말 뭉치가 얼마나 겹치나.
-//
-// 자카드(교집합÷합집합)를 쓰지 않는다. 신청서는 길이가 제각각이라, 긴 글
-// 하나와 짧은 글 하나를 견주면 합집합이 커져서 점수가 부당하게 낮아진다.
-// 짧은 쪽 기준으로 나눈다 — "짧은 쪽이 하는 말이 긴 쪽에 다 들어 있나"를
-// 묻는 것이 우리가 알고 싶은 것이다.
 // 겹친 무게가 이만큼은 돼야 "비슷하다"고 말할 근거가 선다.
 //
 // 이게 없으면 짧은 쪽 낱말이 **전부** 겹칠 때 무게를 아무리 잘 매겨도
@@ -172,19 +179,27 @@ function weightOf(token, corpus) {
 // 하나만큼은 겹쳐야 한다"는 뜻이다.
 const MIN_EVIDENCE = 1
 
+// 두 낱말 뭉치가 얼마나 겹치나.
+//
+// 자카드(교집합÷합집합)를 쓰지 않는다. 신청서는 길이가 제각각이라, 긴 글
+// 하나와 짧은 글 하나를 견주면 합집합이 커져서 점수가 부당하게 낮아진다.
+// 짧은 쪽 기준으로 나눈다 — "짧은 쪽이 하는 말이 긴 쪽에 다 들어 있나"를
+// 묻는 것이 우리가 알고 싶은 것이다.
 function overlap(a, b, corpus) {
-  if (a.size === 0 || b.size === 0) return { score: 0, shared: [] }
-  const [small, big] = a.size <= b.size ? [a, b] : [b, a]
+  if (a.all.size === 0 || b.all.size === 0) return { score: 0, shared: [] }
+  const [small, big] = a.all.size <= b.all.size ? [a, b] : [b, a]
 
   let hit = 0
   let all = 0
   const shared = []
-  for (const t of small) {
+  for (const t of small.all) {
     const w = weightOf(t, corpus)
     all += w
-    if (big.has(t)) {
+    if (big.all.has(t)) {
       hit += w
-      shared.push({ token: t, weight: w })
+      // 양쪽 다 온전한 낱말로 가지고 있는 것만 '낱말'로 친다. 한쪽에서만
+      // 통째로 나온 것은 다른 쪽에선 큰 낱말의 조각일 뿐이다.
+      shared.push({ token: t, weight: w, isWord: small.words.has(t) && big.words.has(t) })
     }
   }
   return { score: hit / Math.max(all, MIN_EVIDENCE), shared }
@@ -219,11 +234,11 @@ export function similarity(draft, other, corpus) {
   const all = []
 
   for (const [field, weight] of Object.entries(FIELD_WEIGHT)) {
-    const a = tokenize(draft?.[field])
-    const b = tokenize(other?.[field])
+    const a = tokenParts(draft?.[field])
+    const b = tokenParts(other?.[field])
     // 한쪽이 비어 있으면 그 칸은 아예 안 센다. 0점으로 치면 아직 다 적지
     // 않은 신청서가 무조건 안 비슷한 것으로 나온다.
-    if (a.size === 0 || b.size === 0) continue
+    if (a.all.size === 0 || b.all.size === 0) continue
     const { score, shared } = overlap(a, b, corpus)
     weighted += score * weight
     totalWeight += weight
@@ -244,12 +259,30 @@ export function similarity(draft, other, corpus) {
   // 먼저다 — "정산서"가 "정산"보다 할 말이 많다.
   const best = new Map()
   for (const s of all) {
-    if (!best.has(s.token) || best.get(s.token) < s.weight) best.set(s.token, s.weight)
+    const prev = best.get(s.token)
+    if (!prev || prev.weight < s.weight) best.set(s.token, s)
   }
-  const shared = [...best.entries()]
-    .sort((x, y) => y[1] - x[1] || y[0].length - x[0].length || x[0].localeCompare(y[0], 'ko'))
-    .slice(0, 8)
-    .map(([token]) => token)
+
+  // 온전한 낱말을 먼저, 그 안에서 드문 것을 먼저.
+  //
+  // 조각("손으"·"산서"·"니다")이 앞에 오면 사람이 이 경고를 안 믿는다.
+  // 조각은 견줄 때만 쓰고 말할 때는 뒤로 미룬다.
+  const ranked = [...best.values()].sort(
+    (x, y) =>
+      Number(y.isWord) - Number(x.isWord) ||
+      y.weight - x.weight ||
+      y.token.length - x.token.length ||
+      x.token.localeCompare(y.token, 'ko')
+  )
+
+  // 이미 고른 낱말 안에 들어 있는 조각은 뺀다. "정산서"를 보여 주면서
+  // "정산"과 "산서"를 또 보여 줄 이유가 없다.
+  const shared = []
+  for (const r of ranked) {
+    if (shared.some((k) => k.includes(r.token))) continue
+    shared.push(r.token)
+    if (shared.length >= 8) break
+  }
 
   return { score, shared }
 }
