@@ -8,6 +8,7 @@ import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice
 import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
+import { RESUBMIT_BACK_KIND } from '../../shared/resubmit.js'
 
 // 접수번호로 내 신청서가 어디까지 왔는지 보는 화면.
 //
@@ -228,7 +229,7 @@ function Result({ data, as, onChanged }) {
       {/* 협의안 화면은 이 기준을 "부서와 합의해 정한 것"이라고 말한다.
           그런데 확정은 담당자 혼자 하고, 부서는 그 문장을 본 적이 없다.
           여기서 실제로 보여드리고 받는다. */}
-      <Signoff ticket={data.ticket} onDone={onChanged} />
+      <Signoff ticket={data.ticket} as={as} onDone={onChanged} />
 
       {/* 지금 이 부서가 움직여야 진행되는 것.
           진행 상황보다 위에 둔다. 어디까지 왔는지보다, 지금 멈춰 있는
@@ -612,10 +613,12 @@ function onChangedSafely(fn) {
 // 안 읽는다. **항목마다** 맞다/아니다를 고르게 하고, 아니라고 하면 왜
 // 아닌지를 받는다. 한 항목이라도 안 고르면 못 넘어간다 — 안 고른 것을
 // 동의로 세면, 안 읽은 것을 읽었다고 기록하는 셈이 된다.
-function Signoff({ ticket, onDone }) {
+function Signoff({ ticket, as, onDone }) {
   const [data, setData] = useState(null)
   const [by, setBy] = useState('')
-  const [dept, setDept] = useState('')
+  // 손든 부서가 ?as=부서로 들어왔으면 그 부서를 골라 둔다. 안 그러면
+  // 자기 부서를 다시 고르게 되고, 안 고르고 넘기면 남의 부서 서명이 된다.
+  const [dept, setDept] = useState(as ?? '')
   const [verdicts, setVerdicts] = useState({})
   const [reasons, setReasons] = useState({})
   const [errors, setErrors] = useState({})
@@ -641,14 +644,23 @@ function Signoff({ ticket, onDone }) {
 
   async function submit(e) {
     e.preventDefault()
-    const bad = validateSignoff({ by, criteria, verdicts, reasons })
+    const bad = validateSignoff({
+      by,
+      dept,
+      requiredDepts: data.requiredDepts,
+      criteria,
+      verdicts,
+      reasons,
+    })
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
     setBusy(true)
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/signoff`, {
         by,
-        dept: dept || data.requiredDepts?.[0],
+        // 안 고른 것을 아무 부서로나 채우지 않는다. 부서가 하나뿐이면
+        // 서버가 채워 주고, 여럿이면 아래 validateSignoff가 먼저 막는다.
+        dept,
         verdicts,
         reasons,
       })
@@ -831,6 +843,7 @@ function stepClass(s) {
 // 담당자는 "물어봤는데 답이 없다 = 동의했다"는 착시를 얻는다.
 // 알려 주기만 하고 묻지 않는다.
 function AsDept({ data, dept }) {
+  const status = data.application?.status
   const mine = (data.decisions ?? []).find((d) => {
     if (d.link_kind !== JOIN_KIND) return false
     try {
@@ -844,6 +857,14 @@ function AsDept({ data, dept }) {
   const released = (data.decisions ?? []).some(
     (d) => d.link_kind === UNJOIN_KIND && d.link_id === mine.id
   )
+
+  // 반려된 뒤 고쳐서 다시 냈으면 그쪽 번호를 알려 준다.
+  //
+  // 재신청은 새 신청서를 만들고 손들기는 안 옮긴다. 그래서 손든 부서는
+  // 한 번의 재신청으로 조용히 증발한다 — 담당자는 새 건을 다시 한 부서
+  // 일로 보고 우선순위를 매긴다. 손들기 기능이 막으려던 바로 그 상황이다.
+  const resubmitted = (data.decisions ?? []).find((d) => d.link_kind === RESUBMIT_BACK_KIND)
+    ?.link_ticket
 
   return (
     <section className={`as-dept${released ? ' released' : ''}`}>
@@ -861,11 +882,42 @@ function AsDept({ data, dept }) {
           담당자가 <strong>이 건은 그쪽 일과 다르다</strong>고 판정했습니다. {dept} 병목은 따로
           신청서를 내 주셔야 합니다.
         </p>
+      ) : status === '반려' ? (
+        // 신청서 상태를 안 보면, 반려된 건에서도 "진행되면 같이 쓰시게
+        // 됩니다"라고 말하게 된다. 화면 위쪽에는 반려 배지가 떠 있는데
+        // 아래에서는 진행된다고 하는 꼴이다.
+        <p className="as-dept-gone">
+          이 신청서는 <strong>반려됐습니다.</strong> 붙여 주신 것도 여기서 함께 멈춥니다.
+          {resubmitted ? (
+            <>
+              {' '}
+              낸 부서가 <strong>{resubmitted}</strong>로 고쳐서 다시 냈습니다. 그쪽에도 손들어
+              주셔야 {dept} 몫이 같이 세어집니다.
+            </>
+          ) : (
+            ' 그쪽 병목이 그대로라면 따로 신청서를 내 주셔야 합니다.'
+          )}
+        </p>
+      ) : status === '보류' ? (
+        <p className="as-dept-gone">
+          이 신청서는 <strong>보류된 상태입니다.</strong> 다시 볼 때까지 붙여 주신 것도 같이
+          기다립니다.
+        </p>
+      ) : status === '완료' ? (
+        <p className="card-note">
+          이 신청서는 <strong>끝났습니다.</strong> 넘어간 도구를 {dept}도 그대로 쓰실 수 있습니다.
+        </p>
       ) : (
         <p className="card-note">
           이 신청서가 진행되면 {dept}도 같이 쓰시게 됩니다. 아래 진행 상황이 그대로 그쪽 일의
           진행 상황입니다. 합격 기준이 정해지면 {dept} 몫으로 한 번 확인해주셔야 합니다.
         </p>
+      )}
+
+      {status === '반려' && resubmitted && (
+        <Link to={`/track?no=${resubmitted}&as=${encodeURIComponent(dept)}`} className="btn-primary btn-sm">
+          다시 낸 신청서 보기
+        </Link>
       )}
     </section>
   )

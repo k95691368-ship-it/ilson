@@ -50,14 +50,27 @@ export function canAsk(criteria) {
 }
 
 // 부서가 적어 낸 것을 확인한다.
-export function validateSignoff({ by, criteria, verdicts, reasons } = {}) {
+export function validateSignoff({ by, dept, requiredDepts, criteria, verdicts, reasons } = {}) {
   const errors = {}
   const list = criteria ?? []
   const v = verdicts ?? {}
   const r = reasons ?? {}
+  const need = [...new Set((requiredDepts ?? []).filter(Boolean))]
 
   if (String(by ?? '').trim().length < MIN_NAME) {
     errors.by = '누가 확인하셨는지 적어주세요. 서명인데 이름이 없으면 서명이 아닙니다.'
+  }
+
+  // 걸린 부서가 여럿이면 어느 부서로 확인하시는지 반드시 골라야 한다.
+  //
+  // 안 고르면 낸 부서로 채워 넣던 때가 있었다. 그러면 손든 부서가 서명한
+  // 것이 낸 부서 서명으로 기록되고, 낸 부서가 앞서 단 이의까지 그 서명에
+  // 덮여 사라졌다. **서버에서 고쳐 놓은 사고를 화면이 다시 만들었다.**
+  //
+  // 안 고른 것을 아무 부서로나 채우는 것은, 안 고른 것을 동의로 세는 것과
+  // 같은 잘못이다.
+  if (need.length > 1 && !need.includes(String(dept ?? ''))) {
+    errors.dept = `${need.join(', ')} 중에서 골라주세요. 이 일에는 ${need.length}개 부서가 걸려 있습니다.`
   }
 
   // 한 항목이라도 안 고르면 막는다. 안 고른 것을 동의로 세면, 안 읽은 것을
@@ -194,6 +207,27 @@ export function signoffState({
   const kept = objs.filter((o) => o.resolution?.code === 'kept')
   const resign = objs.filter((o) => RESOLUTION_BY_CODE[o.resolution?.code]?.resign)
 
+  // 서명한 뒤에 늘어난 기준.
+  //
+  // 서명을 받고 나서 담당자가 기준을 하나 더 확정하면, 예전에는 상태가
+  // 그대로 '확인됨'으로 남았다. 화면은 "6개 항목을 모두 확인하셨습니다"라고
+  // 적는데 부서는 다섯 개만 봤다. 그 여섯 번째로 통과 판정이 나가고,
+  // 부서가 "그건 합의한 적 없다"고 하면 화면이 거짓으로 반박한다.
+  //
+  // 이 파일 위쪽이 "확정 안 된 기준에 서명받으면 알리바이"라고 적어 뒀는데,
+  // 늘어나는 방향만 빠져 있었다.
+  //
+  // 어느 기준에 서명했는지 안 남긴 옛 기록은 전부에 서명한 것으로 본다.
+  // 안 그러면 이미 끝난 신청서가 통째로 되돌아간다.
+  const covered = new Set()
+  let knowsCoverage = false
+  for (const s of signed) {
+    if (!Array.isArray(s.criterionIds)) continue
+    knowsCoverage = true
+    for (const id of s.criterionIds) covered.add(id)
+  }
+  const addedAfter = knowsCoverage ? list.filter((c) => !covered.has(c.id)) : []
+
   const base = {
     by: signoff.by,
     at: signoff.at,
@@ -241,6 +275,20 @@ export function signoffState({
       status: '이의 알고 진행',
       canSign: waiting.length > 0,
       headline: `${who(kept)}의 이의 ${kept.length}건을 담당자가 알고도 그대로 가기로 했습니다`,
+      binding: false,
+    }
+  }
+
+  // 서명 뒤에 기준이 늘었으면 다시 받아야 한다.
+  //
+  // 안 본 기준을 본 것으로 세면, 그 기준으로 낸 통과에 아무 단서도 안 붙는다.
+  if (addedAfter.length > 0) {
+    return {
+      ...base,
+      status: '다시 받아야 함',
+      canSign: true,
+      headline: `확인해주신 뒤에 기준이 ${addedAfter.length}개 늘었습니다. 한 번만 더 봐주세요`,
+      addedAfter,
       binding: false,
     }
   }

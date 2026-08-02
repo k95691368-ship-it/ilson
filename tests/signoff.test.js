@@ -423,3 +423,97 @@ describe('누가 반대했는지 바로 지목한다', () => {
     expect(s.canSign).toBe(true)
   })
 })
+
+// 손든 부서가 자기 시점 주소로 들어와 부서를 안 고르고 서명하면, 낸 부서
+// 이름으로 기록되고 그 부서가 앞서 단 이의까지 그 서명에 덮여 사라졌다.
+// 서버에서 고쳐 놓은 사고를 화면이 그대로 다시 만들고 있었다.
+describe('어느 부서로 확인하는지 반드시 고른다', () => {
+  const criteria = [crit('a')]
+  const good = { by: '이과장', criteria, verdicts: { a: 'ok' } }
+
+  it('부서가 여럿이면 안 고른 것을 막는다', () => {
+    const r = validateSignoff({ ...good, requiredDepts: ['마케팅', '재무'] })
+    expect(r.dept).toBeTruthy()
+    expect(r.dept).toContain('마케팅')
+  })
+
+  it('목록에 없는 부서도 막는다', () => {
+    expect(validateSignoff({ ...good, dept: '인사', requiredDepts: ['마케팅', '재무'] }).dept).toBeTruthy()
+  })
+
+  it('제대로 고르면 통과한다', () => {
+    expect(validateSignoff({ ...good, dept: '재무', requiredDepts: ['마케팅', '재무'] }).dept).toBeUndefined()
+  })
+
+  it('부서가 하나뿐이면 안 물어본다', () => {
+    // 고를 것이 하나뿐인데 고르게 하면 그냥 걸림돌이다.
+    expect(validateSignoff({ ...good, requiredDepts: ['마케팅'] }).dept).toBeUndefined()
+  })
+
+  it('부서 목록을 안 주면 예전대로 본다', () => {
+    expect(validateSignoff(good).dept).toBeUndefined()
+  })
+})
+
+// 서명을 받고 나서 담당자가 기준을 하나 더 확정하면, 상태가 그대로
+// '확인됨'으로 남았다. 화면은 "6개 항목을 모두 확인하셨습니다"라고 적는데
+// 부서는 다섯 개만 봤다. 그 여섯 번째로 통과 판정이 나간다.
+describe('서명 뒤에 기준이 늘면', () => {
+  const sig = (ids) => ({ by: '김대리', dept: '재무', at: '2026-08-02 01:00:00', criterionIds: ids })
+
+  it('다시 받아야 한다', () => {
+    const s = signoffState({
+      criteria: [crit('a'), crit('b'), crit('c')],
+      requiredDepts: ['재무'],
+      signatures: [sig(['a', 'b'])],
+      signoff: sig(['a', 'b']),
+    })
+    expect(s.status).toBe('다시 받아야 함')
+    expect(s.binding).toBe(false)
+    expect(s.canSign).toBe(true)
+    expect(s.addedAfter).toHaveLength(1)
+  })
+
+  it('안 늘었으면 확인됨 그대로다', () => {
+    const s = signoffState({
+      criteria: [crit('a'), crit('b')],
+      requiredDepts: ['재무'],
+      signatures: [sig(['a', 'b'])],
+      signoff: sig(['a', 'b']),
+    })
+    expect(s.status).toBe('확인됨')
+    expect(s.binding).toBe(true)
+  })
+
+  it('여러 부서가 나눠 본 것을 합쳐서 센다', () => {
+    const s = signoffState({
+      criteria: [crit('a'), crit('b')],
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [sig(['a']), { ...sig(['b']), dept: '마케팅' }],
+      signoff: sig(['b']),
+    })
+    expect(s.status).toBe('확인됨')
+  })
+
+  it('무엇에 서명했는지 안 남긴 옛 기록은 전부로 본다', () => {
+    // 안 그러면 이미 끝난 신청서가 통째로 되돌아간다.
+    const s = signoffState({
+      criteria: [crit('a'), crit('b')],
+      requiredDepts: ['재무'],
+      signatures: [{ by: '김대리', dept: '재무', at: 'x' }],
+      signoff: { by: '김대리', dept: '재무', at: 'x' },
+    })
+    expect(s.status).toBe('확인됨')
+    expect(s.binding).toBe(true)
+  })
+
+  it('통과할 때 단서가 붙는다', () => {
+    const s = signoffState({
+      criteria: [crit('a'), crit('b')],
+      requiredDepts: ['재무'],
+      signatures: [sig(['a'])],
+      signoff: sig(['a']),
+    })
+    expect(passCaveat(s)).toBeTruthy()
+  })
+})

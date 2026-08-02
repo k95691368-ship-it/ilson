@@ -193,3 +193,28 @@ describe('손든 부서 사정이 협의안에 안 들어온 것', () => {
     expect(new Set(t.map((i) => i.key)).size).toBe(2)
   })
 })
+
+// 이의는 담당자만 풀 수 있는데, 협의안 화면에서 그 신청서를 골라 아래로
+// 내려가야만 보였다. 그러면 부서는 답을 기다리다 "말해 봐야 소용없다"로
+// 끝나고, 다음부터 서명 자체를 안 한다.
+describe('부서가 단 합격 기준 이의', () => {
+  it('첫 화면에 올라온다', () => {
+    const t = buildTodo({ signoffs: { summary: { applications: 2 } } })
+    expect(t[0].key).toBe('open_objections')
+    expect(t[0].title).toContain('2건')
+    expect(t[0].to).toBe('/agreement')
+  })
+
+  it('사람을 기다리게 하는 일로 센다', () => {
+    // 이의가 있다고 숫자가 틀리지는 않는다. 다만 사람이 답을 기다린다.
+    expect(buildTodo({ signoffs: { summary: { applications: 1 } } })[0].kind).toBe('대기')
+  })
+
+  it('다 풀었으면 안 올린다', () => {
+    expect(buildTodo({ signoffs: { summary: { applications: 0, openObjections: 0 } } })).toEqual([])
+  })
+
+  it('무엇을 보고 없다고 하는지에 들어 있다', () => {
+    expect(NOTHING_CHECKED.join()).toContain('이의')
+  })
+})

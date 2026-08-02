@@ -105,6 +105,8 @@ export async function onRequestPost({ env, request, params }) {
 
   const errors = validateSignoff({
     by: body.by,
+    dept: body.dept,
+    requiredDepts: loaded.requiredDepts,
     criteria: loaded.criteria,
     verdicts: body.verdicts,
     reasons: body.reasons,
@@ -120,7 +122,13 @@ export async function onRequestPost({ env, request, params }) {
   //
   // 목록에 있는 부서만 받는다. 자유 입력으로 두면 "마케팅"과 "마케팅팀"이
   // 다른 부서가 되어, 다 모였는데도 영영 "일부만 확인"으로 남는다.
-  const dept = String(body.dept ?? '').trim() || loaded.requiredDepts[0]
+  // 부서가 하나뿐일 때만 채워 넣는다.
+  //
+  // 여럿일 때 채워 넣으면 손든 부서의 서명이 낸 부서 서명으로 기록되고,
+  // 낸 부서가 앞서 단 이의까지 그 서명에 덮여 사라진다.
+  const dept =
+    String(body.dept ?? '').trim() ||
+    (loaded.requiredDepts.length === 1 ? loaded.requiredDepts[0] : '')
   if (!loaded.requiredDepts.includes(dept)) {
     await releaseRateLimit(env, `signoff:${ip}`, ticket)
     return failFields(
@@ -134,8 +142,8 @@ export async function onRequestPost({ env, request, params }) {
     const stmts = [
       env.DB.prepare(
         `INSERT INTO decision_log
-           (id, application_id, stage, actor, title, what, why, link_kind, link_id)
-         VALUES (?, ?, '협의안', 'human', ?, ?, ?, ?, ?)`
+           (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
+         VALUES (?, ?, '협의안', 'human', ?, ?, ?, ?, ?, ?)`
       ).bind(
         newId('dec'),
         loaded.app.id,
@@ -144,6 +152,14 @@ export async function onRequestPost({ env, request, params }) {
           ? `합격 기준 ${loaded.criteria.length}개를 확인했다. ${objected.length}개에 이의를 달았다.`
           : `합격 기준 ${loaded.criteria.length}개를 모두 확인했고 이의 없다.`,
         '담당자 혼자 정한 기준으로 통과 판정을 내리면, 부서가 아니라고 할 때 통과의 근거가 사라진다.',
+        // **어느 기준에 한 서명인지 남긴다.**
+        //
+        // 이걸 안 남기면, 서명을 받은 뒤에 담당자가 기준을 하나 더
+        // 추가·확정해도 상태가 그대로 '확인됨'으로 남는다. 화면은
+        // "6개 항목을 모두 확인하셨습니다"라고 적는데 부서는 다섯 개만
+        // 봤다. 그 여섯 번째로 통과 판정이 나가고, 부서가 "그건 합의한
+        // 적 없다"고 하면 화면이 거짓으로 반박한다.
+        JSON.stringify(loaded.criteria.map((c) => c.id)),
         SIGNOFF_KIND,
         // 어느 부서의 서명인지. 여러 부서가 걸린 일이면 부서마다 한 장씩 받는다.
         dept

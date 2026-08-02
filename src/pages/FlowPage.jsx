@@ -20,6 +20,7 @@ export default function FlowPage() {
   const { data: tools } = useApi('/tools')
   const { data: stalls } = useApi('/stalls')
   const { data: joins } = useApi('/joins')
+  const { data: signoffs } = useApi('/signoffs')
 
   return (
     <div className="stack">
@@ -35,7 +36,7 @@ export default function FlowPage() {
       </header>
 
       {data && data.counts.total > 0 && (
-        <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} />
+        <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} signoffs={signoffs} />
       )}
 
       {data && data.counts.total > 0 && <Overview data={data} />}
@@ -123,8 +124,8 @@ export default function FlowPage() {
 // 아무거나 다 올리지 않는다. 스무 개가 올라온 목록은 아무것도 안 올라온
 // 것과 같다. 그리고 순서가 틀리면 더 나쁘다 — 숫자가 틀리는 일보다
 // 사용법서 쓰는 일이 위에 있으면 그 목록은 쓸모가 없다.
-function Todo({ overview, reports, codes, tools, stalls, joins }) {
-  const items = buildTodo({ overview, reports, codes, tools, stalls, joins })
+function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
+  const items = buildTodo({ overview, reports, codes, tools, stalls, joins, signoffs })
   const s = todoSummary(items)
 
   if (items.length === 0) {

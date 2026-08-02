@@ -7,6 +7,16 @@
 import { SIGNOFF_KIND, OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 
+function parseIds(json) {
+  if (!json) return null
+  try {
+    const v = JSON.parse(json)
+    return Array.isArray(v) ? v : null
+  } catch {
+    return null
+  }
+}
+
 export async function loadSignoff(env, applicationId, ownDept = null) {
   const [criteria, logs] = await Promise.all([
     env.DB.prepare(
@@ -39,6 +49,9 @@ export async function loadSignoff(env, applicationId, ownDept = null) {
       by: l.title,
       dept: String(l.link_id ?? '').startsWith('app_') ? ownDept : l.link_id,
       at: l.created_at,
+      // 그때 무엇에 서명했는지. 옛 기록에는 없다 — 그때는 전부에
+      // 서명한 것으로 본다. 안 그러면 이미 끝난 신청서가 되돌아간다.
+      criterionIds: parseIds(l.alternatives),
     }))
 
   // 같은 부서가 다시 서명하면 뒤엣것만 남긴다. 기준이 고쳐진 뒤 다시 받는

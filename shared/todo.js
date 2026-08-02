@@ -28,7 +28,7 @@ function item(o) {
 //
 // 각 화면이 이미 세어 둔 숫자를 받아 쓴다. 여기서 다시 세지 않는다 —
 // 두 군데서 세면 두 숫자가 달라지고, 그러면 둘 다 못 믿는다.
-export function buildTodo({ overview, reports, codes, tools, stalls, joins } = {}) {
+export function buildTodo({ overview, reports, codes, tools, stalls, joins, signoffs } = {}) {
   const out = []
 
   // ── 금액이 틀릴 수 있는 것 ──────────────────────────────
@@ -132,6 +132,28 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins } = {
     )
   }
 
+  // 부서가 단 합격 기준 이의.
+  //
+  // 이의는 담당자만 풀 수 있는데, 알리는 길이 없었다 — 협의안 화면에서
+  // 그 신청서를 골라 아래로 내려가야만 보였다. 그러면 부서는 답을 기다리다
+  // "말해 봐야 소용없다"로 끝나고, 다음부터 서명 자체를 안 한다.
+  //
+  // 금액 쪽에 놓지 않은 이유: 이의가 있다고 숫자가 틀리지는 않는다.
+  // 다만 사람이 답을 기다리고 있다.
+  const objections = signoffs?.summary?.applications ?? 0
+  if (objections > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'open_objections',
+        title: `부서가 합격 기준에 이의를 단 신청서 ${objections}건`,
+        why: '이의는 담당자만 푸실 수 있습니다. 안 풀면 그 기준으로 낸 통과에 계속 단서가 붙고, 그 부서는 다음부터 확인을 안 해줍니다.',
+        to: '/agreement',
+        cta: '이의 보기',
+      })
+    )
+  }
+
   const idle = tools?.summary?.idle ?? 0
   if (idle > 0) {
     out.push(
@@ -227,6 +249,7 @@ export const NOTHING_CHECKED = [
   '사용법서에서 모르겠다고 짚힌 곳',
   '다른 부서가 손든 신청서',
   '손든 부서 사정이 협의안에 안 들어온 신청서',
+  '부서가 합격 기준에 단 이의',
 ]
 
 export function todoSummary(items) {
