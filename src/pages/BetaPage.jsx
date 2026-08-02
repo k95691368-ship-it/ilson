@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { num, ms, ago } from '../lib/format.js'
 import { gradeAll } from '../../shared/grade.js'
+import { passCaveat } from '../../shared/signoff.js'
 import { PERIOD } from '../../shared/master.js'
 
 const SAMPLE_NAMES = [
@@ -137,7 +138,7 @@ function Beta({ id }) {
         </div>
       )}
 
-      {latest && <VerdictBanner round={latest} />}
+      {latest && <VerdictBanner round={latest} signoff={data.signoff} />}
 
       {data.canTest && (
         <section className="card">
@@ -193,7 +194,14 @@ function Beta({ id }) {
   )
 }
 
-function VerdictBanner({ round }) {
+function VerdictBanner({ round, signoff }) {
+  // 통과를 말할 때 무엇이 없는 통과인지 같이 적는다.
+  //
+  // 서명 없는 통과를 그냥 "통과"라고 적으면, 나중에 부서가 "그런 기준
+  // 합의한 적 없다"고 할 때 이쪽에 근거가 없다. 통과 자체를 막지는
+  // 않는다 — 막으면 부서가 답을 안 줄 때 아무것도 못 하게 된다.
+  const caveat = passCaveat(signoff)
+
   if (round.overall === '통과') {
     return (
       <div className="verdict verdict-passed">
@@ -203,6 +211,7 @@ function VerdictBanner({ round }) {
           {round.human_needed > 0 &&
             ` 다만 사람이 직접 확인해야 하는 기준이 ${round.human_needed}개 남아 있습니다.`}
         </p>
+        {caveat && <p className="verdict-caveat">{caveat}</p>}
       </div>
     )
   }
@@ -227,6 +236,7 @@ function VerdictBanner({ round }) {
         필수 안전 기준은 지켰지만 {round.failed}개가 통과하지 못했습니다. 넘길지 더 고칠지는
         담당자가 정합니다.
       </p>
+      {caveat && <p className="verdict-caveat">{caveat}</p>}
     </div>
   )
 }

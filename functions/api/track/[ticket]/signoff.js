@@ -19,6 +19,7 @@ import {
   SIGNOFF_KIND,
   OBJECTION_KIND,
 } from '../../../../shared/signoff.js'
+import { loadSignoff } from '../../../_lib/signoff.js'
 
 async function load(env, ticket) {
   const app = await env.DB.prepare(
@@ -27,35 +28,7 @@ async function load(env, ticket) {
     .bind(ticket)
     .first()
   if (!app) return null
-
-  const [criteria, logs] = await Promise.all([
-    env.DB.prepare(
-      `SELECT id, ord, body, check_kind, is_required_safety, confirmed_at
-       FROM acceptance_criterion WHERE application_id = ? ORDER BY ord`
-    )
-      .bind(app.id)
-      .all(),
-    env.DB.prepare(
-      `SELECT id, title, what, why, link_kind, link_id, created_at
-       FROM decision_log WHERE application_id = ? AND link_kind IN (?, ?)
-       ORDER BY created_at`
-    )
-      .bind(app.id, SIGNOFF_KIND, OBJECTION_KIND)
-      .all(),
-  ])
-
-  // 마지막 서명만 살아 있는 것으로 본다. 다시 서명하면 앞의 것을 덮는다 —
-  // 기준이 고쳐진 뒤 다시 받는 일이 실제로 있다.
-  const signs = logs.results.filter((l) => l.link_kind === SIGNOFF_KIND)
-  const last = signs[signs.length - 1] ?? null
-  const signoff = last ? { by: last.title, at: last.created_at, id: last.id } : null
-
-  // 이의는 그 서명 뒤에 달린 것만 본다.
-  const objections = logs.results
-    .filter((l) => l.link_kind === OBJECTION_KIND && (!signoff || l.created_at >= signoff.at))
-    .map((l) => ({ id: l.id, criterion_id: l.link_id, body: l.what, at: l.created_at, resolved_at: null }))
-
-  return { app, criteria: criteria.results, signoff, objections }
+  return { app, ...(await loadSignoff(env, app.id)) }
 }
 
 export async function onRequestGet({ env, params }) {
@@ -66,9 +39,17 @@ export async function onRequestGet({ env, params }) {
   return jsonResponse({
     criteria: loaded.criteria,
     state,
-    // 이의가 달린 항목이 어느 것인지 화면이 붙여 보여줄 수 있게 같이 준다.
+    // 이의가 달린 항목이 어느 것인지, 그리고 담당자가 거기에 뭐라고
+    // 답했는지를 같이 준다. 답을 안 보여주면 부서는 자기가 낸 이의가
+    // 읽히기는 했는지 알 수 없다.
     objectionsByCriterion: Object.fromEntries(
-      loaded.objections.map((o) => [o.criterion_id, o.body])
+      loaded.objections.map((o) => [
+        o.criterion_id,
+        {
+          body: o.body,
+          answer: loaded.resolutions.find((r) => r.objection_id === o.id) ?? null,
+        },
+      ])
     ),
   })
 }

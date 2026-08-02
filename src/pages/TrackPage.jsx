@@ -680,9 +680,19 @@ function Signoff({ ticket, onDone }) {
             </div>
 
             {data.objectionsByCriterion?.[c.id] && (
-              <p className="signoff-objected-note">
-                <strong>아니라고 하신 이유</strong> {data.objectionsByCriterion[c.id]}
-              </p>
+              <>
+                <p className="signoff-objected-note">
+                  <strong>아니라고 하신 이유</strong> {data.objectionsByCriterion[c.id].body}
+                </p>
+                {/* 담당자가 뭐라고 답했는지까지 보여준다. 안 보여주면
+                    부서는 자기가 낸 이의가 읽히기는 했는지 모른다. */}
+                {data.objectionsByCriterion[c.id].answer && (
+                  <p className="signoff-answer">
+                    <strong>{data.objectionsByCriterion[c.id].answer.by}님 답</strong>{' '}
+                    {data.objectionsByCriterion[c.id].answer.body}
+                  </p>
+                )}
+              </>
             )}
 
             {state.canSign && (

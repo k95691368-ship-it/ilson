@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { duration, krw, num, ago } from '../lib/format.js'
+import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
 import {
   CRITERION_CATALOG,
   CONFLICT_VERDICTS,
@@ -93,6 +94,7 @@ function Agreement({ id }) {
       <Requirements data={data} send={send} toast={toast} />
       <Conflicts data={data} send={send} toast={toast} />
       <Criteria data={data} send={send} toast={toast} />
+      <Objections id={id} toast={toast} />
       <Baseline data={data} send={send} toast={toast} />
     </div>
   )
@@ -933,6 +935,128 @@ function Baseline({ data, send, toast }) {
             : `${runs.length}번 잰 값으로 기준선 봉인하기`}
         </button>
       )}
+    </section>
+  )
+}
+
+// ── 부서가 단 이의 ──────────────────────────────────────────
+//
+// 부서에게 합격 기준을 확인받으면 이의가 달려 돌아온다. 그걸 푸는 자리가
+// 없으면 그 신청서는 영영 "이의 있음"으로 남고, 담당자는 다음부터 서명을
+// 아예 안 받는다 — 받아 봐야 되돌릴 수 없는 표시만 붙기 때문이다.
+//
+// **"그대로 갑니다"를 일부러 남겨 뒀다.** 이걸 못 하게 하면 부서가 아무
+// 기준이나 영영 막을 수 있다. 대신 그렇게 하면 그 사실이 기록에 남고,
+// 통과를 말할 때마다 같이 적힌다. 없앨 수 없게 하는 것이 못 하게 하는
+// 것보다 정직하다.
+function Objections({ id, toast }) {
+  const { data, reload } = useApi(`/applications/${id}/signoff`)
+  const [open, setOpen] = useState(null)
+  const [form, setForm] = useState({ code: '', reason: '', by: 'AX 담당자' })
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  if (!data) return null
+  const { state, objections, ways } = data
+  // 아직 부서에 확인을 안 받았으면 이 자리는 아무 말도 하지 않는다.
+  if (!state.by && objections.length === 0) return null
+
+  async function resolve(objectionId) {
+    const bad = validateResolve(form)
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/applications/${id}/signoff`, { ...form, objection_id: objectionId })
+      toast.success(r.message)
+      setOpen(null)
+      setForm({ code: '', reason: '', by: 'AX 담당자' })
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card">
+      <div className="card-head">
+        <span className="card-title">부서가 합격 기준을 본 결과</span>
+        <span className={`badge ${state.binding ? 'badge-success' : 'badge-warning'}`}>
+          {state.status}
+        </span>
+        <span className="spacer" />
+        <span className="card-note">
+          {state.binding
+            ? '이 기준으로 통과를 말해도 근거가 있습니다'
+            : '지금 통과를 말하면 그 통과에 단서가 붙습니다'}
+        </span>
+      </div>
+      <p className="card-note">{state.headline}</p>
+
+      {objections.length === 0 && (
+        <p className="card-note">이의 없이 확인해주셨습니다.</p>
+      )}
+
+      <ul className="objection-list">
+        {objections.map((o) => (
+          <li key={o.id} className={o.resolution ? 'resolved' : ''}>
+            <div className="objection-crit">{o.criterion?.body ?? '(기준을 찾지 못했습니다)'}</div>
+            <p className="objection-body">
+              <strong>{o.by}님</strong> {o.body}
+            </p>
+
+            {o.resolution ? (
+              <p className="objection-answer">
+                <strong>{RESOLUTION_BY_CODE[o.resolution.code]?.label ?? o.resolution.code}</strong>{' '}
+                {o.resolution.body}
+                <span className="card-note"> — {o.resolution.by} · {ago(o.resolution.at)}</span>
+              </p>
+            ) : open === o.id ? (
+              <div className="objection-form">
+                {ways.map((w) => (
+                  <label key={w.code}>
+                    <input
+                      type="radio"
+                      name={`w-${o.id}`}
+                      checked={form.code === w.code}
+                      onChange={() => setForm((f) => ({ ...f, code: w.code }))}
+                    />
+                    {w.label}
+                    {w.resign && <span className="card-note"> — 부서에 다시 확인을 요청합니다</span>}
+                  </label>
+                ))}
+                {errors.code && <em className="field-error">{errors.code}</em>}
+
+                <textarea
+                  rows={2}
+                  value={form.reason}
+                  onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                  placeholder={
+                    RESOLUTION_BY_CODE[form.code]?.reasonLabel ?? '무엇을 하셨습니까'
+                  }
+                />
+                {errors.reason && <em className="field-error">{errors.reason}</em>}
+                <small className="card-note">이 문장이 그대로 부서 조회 화면에 갑니다.</small>
+
+                <div className="row">
+                  <button type="button" className="btn-primary btn-sm" disabled={busy} onClick={() => resolve(o.id)}>
+                    {busy ? '남기는 중…' : '남기기'}
+                  </button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(null)}>
+                    그만두기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(o.id)}>
+                이 이의에 답하기
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }

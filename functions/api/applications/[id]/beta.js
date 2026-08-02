@@ -6,6 +6,8 @@
 import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { loadSignoff } from '../../../_lib/signoff.js'
+import { signoffState } from '../../../../shared/signoff.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -62,6 +64,11 @@ export async function onRequestGet({ env, params }) {
       feedback: feedback.results,
       // 합격 기준을 확정하지 않았으면 채점할 것이 없다.
       canTest: criteria.results.length > 0,
+      // 부서가 이 기준을 확인했는가.
+      //
+      // 통과를 막지는 않는다 — 막으면 부서가 답을 안 줄 때 아무것도 못
+      // 하게 된다. 대신 무엇이 없는 통과인지 화면에 적는다.
+      signoff: signoffState(await loadSignoff(env, app.id)),
     })
   } catch (err) {
     return jsonError(`베타 기록을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

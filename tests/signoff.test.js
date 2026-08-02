@@ -7,6 +7,8 @@ import {
   VERDICTS,
   VERDICT_CODES,
   MIN_NAME,
+  RESOLUTION_CODES,
+  validateResolve,
 } from '../shared/signoff.js'
 
 // 협의안 화면은 합격 기준을 "부서와 합의해 정한 것"이라고 말한다. 그런데
@@ -112,21 +114,11 @@ describe('지금 서명이 어떤 상태인가', () => {
     const s = signoffState({
       criteria,
       signoff: signed,
-      objections: [{ id: 'o1', body: '금액 오차 0원은 과합니다', resolved_at: null }],
+      objections: [{ id: 'o1', body: '금액 오차 0원은 과합니다' }],
     })
     expect(s.status).toBe('이의 있음')
     expect(s.binding).toBe(false)
     expect(s.objections).toHaveLength(1)
-  })
-
-  it('풀린 이의는 안 센다', () => {
-    const s = signoffState({
-      criteria,
-      signoff: signed,
-      objections: [{ id: 'o1', resolved_at: '2026-08-02 01:00:00' }],
-    })
-    expect(s.status).toBe('확인됨')
-    expect(s.binding).toBe(true)
   })
 
   it('빈 입력에도 터지지 않는다', () => {
@@ -160,5 +152,98 @@ describe('답의 종류', () => {
   it('맞다와 아니다 둘뿐이다', () => {
     // "잘 모르겠다"를 넣으면 전부 거기로 몰린다.
     expect(VERDICT_CODES).toEqual(['ok', 'no'])
+  })
+})
+
+// 이의를 푸는 자리가 없으면, 이의가 달린 순간 그 신청서는 영영 "이의 있음"
+// 으로 남는다. 그러면 담당자는 다음부터 서명을 아예 안 받는다 — 받아 봐야
+// 되돌릴 수 없는 표시만 붙기 때문이다.
+describe('담당자가 이의를 푼다', () => {
+  const criteria = [crit('a'), crit('b')]
+  const signed = { by: '김대리', at: '2026-08-02 00:00:00' }
+  const objection = { id: 'o1', criterion_id: 'a', body: '오차 0원은 과합니다' }
+  const state = (code) =>
+    signoffState({
+      criteria,
+      signoff: signed,
+      objections: [objection],
+      resolutions: [{ objection_id: 'o1', code, body: '무엇을 했다' }],
+    })
+
+  it('세 가지 길이 있다', () => {
+    expect(RESOLUTION_CODES).toEqual(['changed', 'explained', 'kept'])
+  })
+
+  it('기준을 고쳤으면 다시 확인을 받아야 한다', () => {
+    // 바뀐 기준에 옛 서명을 붙여 두면 서명이 거짓이 된다.
+    const s = state('changed')
+    expect(s.status).toBe('다시 받아야 함')
+    expect(s.canSign).toBe(true)
+    expect(s.binding).toBe(false)
+  })
+
+  it('설명드린 것도 다시 확인을 받아야 한다', () => {
+    // 담당자 혼자 "설명했으니 됐다"고 하면 그건 해소가 아니다.
+    expect(state('explained').canSign).toBe(true)
+  })
+
+  it('그대로 가기로 했으면 그렇게 적고 판정 근거로는 안 쓴다', () => {
+    const s = state('kept')
+    expect(s.status).toBe('이의 알고 진행')
+    expect(s.binding).toBe(false)
+    expect(s.kept).toHaveLength(1)
+  })
+
+  it('그대로 가기는 이의를 지우는 버튼이 아니다', () => {
+    // 한 번 넘겼다고 없던 일이 되면, 그대로 가기가 이의 삭제 버튼이 된다.
+    const t = passCaveat(state('kept'))
+    expect(t).toContain('알고도')
+  })
+
+  it('푼 것과 안 푼 것이 섞여 있으면 안 푼 것을 먼저 본다', () => {
+    const s = signoffState({
+      criteria,
+      signoff: signed,
+      objections: [objection, { id: 'o2', criterion_id: 'b', body: '이것도' }],
+      resolutions: [{ objection_id: 'o1', code: 'kept', body: 'x' }],
+    })
+    expect(s.status).toBe('이의 있음')
+  })
+
+  it('바뀐 것이 있으면 그것이 가장 먼저다', () => {
+    // 안 푼 이의보다 "기준이 바뀌었다"가 급하다. 바뀐 기준에 옛 서명이
+    // 붙어 있는 상태이기 때문이다.
+    const s = signoffState({
+      criteria,
+      signoff: signed,
+      objections: [objection, { id: 'o2', criterion_id: 'b' }],
+      resolutions: [{ objection_id: 'o1', code: 'changed', body: 'x' }],
+    })
+    expect(s.status).toBe('다시 받아야 함')
+  })
+})
+
+describe('이의 푼 것 확인', () => {
+  const good = { code: 'kept', reason: '정산 마감 규정상 오차를 둘 수 없습니다', by: 'AX 담당자' }
+
+  it('제대로 적었으면 통과한다', () => {
+    expect(validateResolve(good)).toEqual({})
+  })
+
+  it('없는 방법은 막는다', () => {
+    expect(validateResolve({ ...good, code: '무시' }).code).toBeTruthy()
+  })
+
+  it('무엇을 했는지 안 적으면 막는다', () => {
+    // 이 문장이 그대로 부서에 간다.
+    expect(validateResolve({ ...good, reason: '' }).reason).toBeTruthy()
+  })
+
+  it('누가 풀었는지 안 적으면 막는다', () => {
+    expect(validateResolve({ ...good, by: '' }).by).toBeTruthy()
+  })
+
+  it('빈 입력에도 터지지 않는다', () => {
+    expect(() => validateResolve()).not.toThrow()
   })
 })
