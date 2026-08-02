@@ -7,6 +7,10 @@ import {
   joinReceipt,
   FREQUENCIES,
   MIN_STORY,
+  pendingJoinDepts,
+  joinAsRequirement,
+  joinTrackPath,
+  joinCounts,
 } from '../shared/join.js'
 
 // 신청서를 내려는데 비슷한 것이 이미 있으면 화면이 알려 준다. 그런데
@@ -162,5 +166,157 @@ describe('손든 부서에게 뭐라고 답하나', () => {
 
   it('혼자면 부서 수를 안 적는다', () => {
     expect(joinReceipt({ ticket: 'AX-A-1', dept: '마케팅', deptCount: 1 })).not.toContain('개 부서가 이 일에')
+  })
+})
+
+// 손든 부서의 사정은 다 적혀 있는데, 그 한 줄이 협의 자리로 건너오지
+// 않았다. 담당자는 낸 부서하고만 합의하고, 손든 부서는 다 만들어진 뒤에
+// 처음 기준을 본다. 그때는 늦다.
+describe('손든 한 줄을 협의 자리로', () => {
+  const j = (id, dept, extra = {}) => ({
+    id,
+    dept,
+    by: '이과장',
+    story: `${dept}도 매주 같은 일을 손으로 합니다`,
+    minutes: 60,
+    people: 1,
+    frequency: '주 1회',
+    at: '2026-08-02 01:00:00',
+    ...extra,
+  })
+
+  it('요구가 없는 부서만 올린다', () => {
+    const p = pendingJoinDepts({ joins: [j('j1', '마케팅'), j('j2', '영업')], requirements: [{ dept: '영업' }] })
+    expect(p.map((x) => x.dept)).toEqual(['마케팅'])
+  })
+
+  it('푼 손들기는 안 올린다', () => {
+    // 손들기를 풀면 이해관계자 줄에서도 한꺼번에 빠져야 한다.
+    const p = pendingJoinDepts({ joins: [j('j1', '마케팅', { released: true })], requirements: [] })
+    expect(p).toEqual([])
+  })
+
+  it('기각된 요구도 들어온 것으로 센다', () => {
+    // 판단이 끝난 것을 다시 조르면 담당자는 이 목록을 통째로 무시한다.
+    const p = pendingJoinDepts({ joins: [j('j1', '마케팅')], requirements: [{ dept: '마케팅', status: '기각' }] })
+    expect(p).toEqual([])
+  })
+
+  it('부서 이름 표기가 조금 달라도 같게 본다', () => {
+    // "운영"과 "운영팀"은 같은 부서다.
+    const p = pendingJoinDepts({ joins: [j('j1', '운영팀')], requirements: [{ dept: '운영' }] })
+    expect(p).toEqual([])
+  })
+
+  it('다른 부서를 같은 부서로 뭉개지 않는다', () => {
+    // 접미사를 여러 개 떼기 시작하면 서로 다른 부서가 하나가 된다.
+    const p = pendingJoinDepts({ joins: [j('j1', '영업지원')], requirements: [{ dept: '영업' }] })
+    expect(p.map((x) => x.dept)).toEqual(['영업지원'])
+  })
+
+  it('그 부서가 얼마나 겪는지를 같이 준다', () => {
+    // 담당자가 요구 문장을 다듬을 때 크기를 알아야 한다.
+    expect(pendingJoinDepts({ joins: [j('j1', '마케팅')], requirements: [] })[0].annualHours).toBe(52)
+  })
+
+  it('빈 입력에도 터지지 않는다', () => {
+    expect(pendingJoinDepts({})).toEqual([])
+    expect(() => pendingJoinDepts()).not.toThrow()
+  })
+})
+
+describe('요구로 올릴 모양', () => {
+  const join = { dept: '마케팅', story: '광고비까지 같이 봅니다' }
+
+  it('손든 사정이 본문에 들어간다', () => {
+    expect(joinAsRequirement(join).body).toBe('광고비까지 같이 봅니다')
+    expect(joinAsRequirement(join).dept).toBe('마케팅')
+  })
+
+  it('회의록 인용은 비운다', () => {
+    // 회의에서 나온 말이 아니라, 채우면 "회의록에서 못 찾음"이 잘못 붙는다.
+    expect(joinAsRequirement(join).quote).toBe('')
+  })
+
+  it('가정으로 올린다', () => {
+    // 아직 그 부서와 마주 앉기 전이라 확정이 아니다.
+    expect(joinAsRequirement(join).req_kind).toBe('가정')
+  })
+
+  it('빈 입력에도 터지지 않는다', () => {
+    expect(() => joinAsRequirement()).not.toThrow()
+  })
+})
+
+describe('손든 부서 전용 조회 주소', () => {
+  it('부서를 주소에 실어 준다', () => {
+    // 손든 부서는 접수번호가 없다. 낸 부서 시점 화면만 보면 자기가 적어
+    // 낸 한 줄이 어떻게 됐는지 못 찾는다.
+    expect(joinTrackPath({ ticket: 'AX-A-1', dept: '재무' })).toContain('as=')
+    expect(joinTrackPath({ ticket: 'AX-A-1', dept: '재무' })).toContain('no=AX-A-1')
+  })
+
+  it('부서가 없으면 접수번호만 준다', () => {
+    expect(joinTrackPath({ ticket: 'AX-A-1' })).toBe('/track?no=AX-A-1')
+  })
+
+  it('접수번호가 없으면 조회 화면만 준다', () => {
+    expect(joinTrackPath({})).toBe('/track')
+    expect(() => joinTrackPath()).not.toThrow()
+  })
+})
+
+describe('첫 화면에 몇 건으로 세나', () => {
+  const live = [{ id: 'j1', dept: '마케팅', story: 'x' }]
+
+  it('판정 전이면 우선순위 다시 보기로 센다', () => {
+    const c = joinCounts({ joinsByApp: { a: live }, apps: [{ id: 'a', status: '접수' }] })
+    expect(c.needsRepriority).toBe(1)
+    expect(c.notInAgreement).toBe(0)
+  })
+
+  it('협의 중이면 협의안에 넣기로 센다', () => {
+    const c = joinCounts({
+      joinsByApp: { a: live },
+      apps: [{ id: 'a', status: '진행중' }],
+      requirementsByApp: { a: [] },
+    })
+    expect(c.needsRepriority).toBe(0)
+    expect(c.notInAgreement).toBe(1)
+  })
+
+  it('한 신청서가 두 줄에 동시에 안 뜬다', () => {
+    const c = joinCounts({ joinsByApp: { a: live }, apps: [{ id: 'a', status: '진행중' }], requirementsByApp: { a: [] } })
+    expect(c.needsRepriority + c.notInAgreement).toBe(1)
+  })
+
+  it('요구가 들어왔으면 안 센다', () => {
+    const c = joinCounts({
+      joinsByApp: { a: live },
+      apps: [{ id: 'a', status: '진행중' }],
+      requirementsByApp: { a: [{ dept: '마케팅' }] },
+    })
+    expect(c.notInAgreement).toBe(0)
+  })
+
+  it('끝나거나 접힌 건은 어느 쪽에도 안 센다', () => {
+    for (const status of ['완료', '반려', '보류']) {
+      const c = joinCounts({ joinsByApp: { a: live }, apps: [{ id: 'a', status }], requirementsByApp: { a: [] } })
+      expect(c.needsRepriority + c.notInAgreement).toBe(0)
+    }
+  })
+
+  it('푼 것은 안 센다', () => {
+    const c = joinCounts({
+      joinsByApp: { a: [{ id: 'j1', dept: '마케팅', released: true }] },
+      apps: [{ id: 'a', status: '진행중' }],
+    })
+    expect(c.joinCount).toBe(0)
+    expect(c.releasedCount).toBe(1)
+  })
+
+  it('빈 입력에도 터지지 않는다', () => {
+    expect(joinCounts({}).joinCount).toBe(0)
+    expect(() => joinCounts()).not.toThrow()
   })
 })

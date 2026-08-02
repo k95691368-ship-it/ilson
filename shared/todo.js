@@ -113,6 +113,25 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins } = {
     )
   }
 
+  // 손든 부서 사정이 아직 협의안에 안 들어온 것.
+  //
+  // 위의 '손든 신청서'와 겹치지 않는다. 저건 아직 판정 전인 건이고,
+  // 이건 판정이 끝나 협의 중인 건이다. 한 신청서가 두 줄에 동시에 뜨면
+  // 목록이 두 배로 길어 보이고, 그러면 아무도 안 읽는다.
+  const notFiled = joins?.summary?.notInAgreement ?? 0
+  if (notFiled > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'join_not_in_agreement',
+        title: `손든 부서 사정이 협의안에 안 들어온 신청서 ${notFiled}건`,
+        why: '지금 합의하시는 그 기준을, 손든 부서는 다 만들어진 뒤에 처음 봅니다. 그때 아니라고 해도 되돌리기엔 늦습니다.',
+        to: '/agreement',
+        cta: '협의안 열기',
+      })
+    )
+  }
+
   const idle = tools?.summary?.idle ?? 0
   if (idle > 0) {
     out.push(
@@ -207,6 +226,7 @@ export const NOTHING_CHECKED = [
   '받았다는 확인이 없는 도구',
   '사용법서에서 모르겠다고 짚힌 곳',
   '다른 부서가 손든 신청서',
+  '손든 부서 사정이 협의안에 안 들어온 신청서',
 ]
 
 export function todoSummary(items) {

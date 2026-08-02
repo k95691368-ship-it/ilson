@@ -8,6 +8,8 @@ import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
+import { pendingJoinDepts } from '../../../../shared/join.js'
+import { loadJoins } from './join.js'
 import {
   agreementGate,
   quoteFound,
@@ -78,6 +80,11 @@ export async function onRequestGet({ env, params }) {
 
     const reqById = new Map(reqs.map((r) => [r.id, r]))
 
+    const pendingJoins = pendingJoinDepts({
+      joins: await loadJoins(env, app.id),
+      requirements: reqs,
+    })
+
     return jsonResponse({
       application: app,
       stakeholders: stakeholders.results,
@@ -86,6 +93,12 @@ export async function onRequestGet({ env, params }) {
         depts: safeParse(m.depts_json, []),
       })),
       requirements: reqs,
+      // 손든 부서 중 아직 협의안에 사정이 안 들어온 곳.
+      //
+      // 표에 새로 담지 않는다. "그 부서 이름으로 된 요구가 있느냐 없느냐"만
+      // 본다. 그래서 요구를 지우면 저절로 다시 뜨고, 손들기를 풀면 한꺼번에
+      // 빠진다 — 되돌리는 코드를 한 줄도 안 쓰고 되돌리기가 된다.
+      pendingJoins,
       conflicts: conflicts.results.map((c) => ({
         ...c,
         a: reqById.get(c.req_a_id) ?? null,
@@ -102,6 +115,7 @@ export async function onRequestGet({ env, params }) {
         conflicts: conflicts.results,
         criteria: criteria.results,
         baseline,
+        pendingJoins,
       }),
     })
   } catch (err) {

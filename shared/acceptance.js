@@ -127,8 +127,21 @@ export function quoteFound(minutes, quote) {
 //
 // 서버가 판단한다. 화면에서만 막으면 요청을 직접 보내 우회할 수 있고,
 // 무엇보다 "왜 다음으로 못 가는지"를 한 곳에서 설명할 수 있어야 한다.
-export function agreementGate({ requirements, conflicts, criteria, baseline }) {
+export function agreementGate({ requirements, conflicts, criteria, baseline, pendingJoins = [] }) {
   const blockers = []
+
+  // 손든 부서의 사정이 아직 협의안에 안 들어왔으면 만들기 시작하면 안 된다.
+  //
+  // 이걸 안 막으면 담당자는 낸 부서하고만 합의하고 넘어간다. 손든 부서는
+  // 다 만들어진 뒤에 처음 기준을 보고, 그때 아니라고 해도 되돌리기엔 늦다.
+  // 가장 먼저 막는다 — 뒤의 것들이 이 부서 요구 위에서 정해져야 한다.
+  if (pendingJoins.length > 0) {
+    const names = pendingJoins.map((p) => p.dept)
+    const label = names.slice(0, 3).join('·') + (names.length > 3 ? ` 외 ${names.length - 3}곳` : '')
+    blockers.push(
+      `${label}의 사정이 아직 협의안에 없습니다. 그 부서 문장을 요구로 올리시거나, "이건 다른 건입니다"로 손들기를 푸셔야 합니다.`
+    )
+  }
 
   const drafts = requirements.filter((r) => r.status === '초안')
   if (drafts.length > 0) {

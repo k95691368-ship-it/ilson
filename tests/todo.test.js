@@ -177,3 +177,19 @@ describe('다른 부서가 손든 신청서', () => {
     expect(buildTodo({ joins: { summary: { needsRepriority: 0 } } })).toEqual([])
   })
 })
+
+describe('손든 부서 사정이 협의안에 안 들어온 것', () => {
+  it('첫 화면에 올라온다', () => {
+    const t = buildTodo({ joins: { summary: { notInAgreement: 2 } } })
+    expect(t[0].key).toBe('join_not_in_agreement')
+    expect(t[0].to).toBe('/agreement')
+  })
+
+  it('손든 신청서 줄과 겹치지 않는다', () => {
+    // 저건 판정 전, 이건 협의 중. 한 신청서가 두 줄에 동시에 뜨면
+    // 목록이 두 배로 길어 보인다.
+    const t = buildTodo({ joins: { summary: { needsRepriority: 1, notInAgreement: 1 } } })
+    expect(t).toHaveLength(2)
+    expect(new Set(t.map((i) => i.key)).size).toBe(2)
+  })
+})

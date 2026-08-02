@@ -121,3 +121,132 @@ export function joinReceipt({ ticket, dept, deptCount }) {
     ' 새로 신청서를 내지 않으셔도 됩니다 — 이 건이 진행되면 그쪽도 같이 쓰시게 됩니다.',
   ].join('')
 }
+
+// ── 손든 부서의 한 줄을 협의 자리로 건네기 ──────────────────
+//
+// 손든 부서의 사정은 이미 다 적혀 있다. 없는 것은 그 한 줄이 협의 자리로
+// 건너오는 다리 하나뿐이다. 지금은 담당자가 낸 부서하고만 합의하고,
+// 손든 부서는 다 만들어진 뒤에 처음 기준을 본다.
+//
+// **충돌을 자동으로 찾아 주지 않는다.** 규칙의 몫은 "여러 부서 요구를 한
+// 목록에 나란히 세우는 것"까지다. 낱말 사전으로 '정확 ↔ 마감'을 짚어 주는
+// 규칙은 안 만든다 — 다섯 낱말짜리 사전은 "정확해야 한다"조차 못 짚고,
+// 틀린 후보가 늘 켜져 있으면 담당자가 충돌 카드 자체를 안 읽는다.
+
+// 부서 이름 표기 흔들림을 흡수한다.
+//
+// "운영"과 "운영팀"은 같게 보고, "영업"과 "영업지원"은 다르게 본다.
+// 접미사를 하나만 떼는 이유는, 여러 개를 떼기 시작하면 서로 다른 부서가
+// 같은 부서로 뭉개지기 때문이다.
+const DEPT_SUFFIX = ['팀', '파트', '실', '본부', '그룹']
+
+function normDept(v) {
+  let s = String(v ?? '').replace(/\s+/g, '')
+  for (const suffix of DEPT_SUFFIX) {
+    if (s.length > suffix.length && s.endsWith(suffix)) {
+      s = s.slice(0, -suffix.length)
+      break
+    }
+  }
+  return s
+}
+
+// 아직 협의안에 안 들어온 손든 부서.
+//
+// 판정 기준은 하나다 — "풀리지 않은 손들기의 부서 중, 이 신청서에 그 이름으로
+// 된 요구가 0건인 부서". **상태를 새로 안 만든다.** 그래서 요구를 지우면
+// 저절로 다시 뜨고, 손들기를 풀면 한꺼번에 빠진다. 되돌리는 코드를 한 줄도
+// 안 쓰고 되돌리기가 된다.
+//
+// 요구의 status는 안 본다. 기각된 요구도 "들어온 것"으로 센다 — 판단이 끝난
+// 것을 다시 조르면 담당자는 이 목록을 통째로 무시한다.
+export function pendingJoinDepts({ joins, requirements } = {}) {
+  const have = new Set((requirements ?? []).map((r) => normDept(r.dept)).filter(Boolean))
+  return (joins ?? [])
+    .filter((j) => !j.released && j.dept)
+    .filter((j) => !have.has(normDept(j.dept)))
+    .map((j) => ({
+      join_id: j.id,
+      dept: j.dept,
+      by: j.by,
+      story: j.story,
+      minutes: j.minutes,
+      people: j.people,
+      frequency: j.frequency,
+      annualHours: annualHoursOf(j),
+      at: j.at,
+    }))
+}
+
+// 손든 한 줄을 요구 등록에 넣을 모양으로.
+//
+// **회의록 인용은 비운다.** 회의에서 나온 말이 아니라 손들면서 적어 주신
+// 것이라, 채우면 "회의록에서 못 찾음" 표시가 잘못 붙는다.
+//
+// 그리고 '가정'으로 올린다. 아직 그 부서와 마주 앉기 전이라 확정이 아니다.
+export function joinAsRequirement(join) {
+  const j = join ?? {}
+  return {
+    kind: 'requirement',
+    req_kind: '가정',
+    dept: j.dept ?? '',
+    body: j.story ?? '',
+    quote: '',
+    priority: '보통',
+    measurable: '',
+  }
+}
+
+// 손든 부서가 자기 것만 볼 수 있는 조회 주소.
+//
+// 손든 부서는 접수번호가 없다. 낸 부서의 접수번호로 열면 화면 전체가
+// 낸 부서 시점이라, 자기가 적어 낸 한 줄이 어떻게 됐는지 못 찾는다.
+export function joinTrackPath({ ticket, dept } = {}) {
+  const t = String(ticket ?? '').trim()
+  if (!t) return '/track'
+  const d = String(dept ?? '').trim()
+  return d ? `/track?no=${encodeURIComponent(t)}&as=${encodeURIComponent(d)}` : `/track?no=${encodeURIComponent(t)}`
+}
+
+// 첫 화면 할 일 목록이 쓸 집계.
+//
+// 한 신청서가 두 줄에 동시에 뜨지 않게 상태로 가른다. 아직 판정 전인 건은
+// "우선순위 다시 보기", 판정이 끝나 협의 중인 건은 "협의안에 넣기".
+// 끝나거나 접힌 건은 어느 쪽에도 안 센다.
+const BEFORE_VERDICT = ['접수', '검토중']
+const IN_PROGRESS = ['수용', '진행중']
+
+export function joinCounts({ joinsByApp, apps, requirementsByApp } = {}) {
+  const status = new Map((apps ?? []).map((a) => [a.id, a.status]))
+  const repriorityIds = []
+  const notInAgreementIds = []
+  let joinCount = 0
+  let releasedCount = 0
+
+  for (const [appId, joins] of Object.entries(joinsByApp ?? {})) {
+    const live = (joins ?? []).filter((j) => !j.released)
+    releasedCount += (joins ?? []).length - live.length
+    if (live.length === 0) continue
+    joinCount += live.length
+
+    const s = status.get(appId)
+    if (BEFORE_VERDICT.includes(s)) {
+      repriorityIds.push(appId)
+    } else if (IN_PROGRESS.includes(s)) {
+      const pending = pendingJoinDepts({
+        joins: live,
+        requirements: (requirementsByApp ?? {})[appId] ?? [],
+      })
+      if (pending.length > 0) notInAgreementIds.push(appId)
+    }
+  }
+
+  return {
+    joinCount,
+    releasedCount,
+    needsRepriority: repriorityIds.length,
+    notInAgreement: notInAgreementIds.length,
+    repriorityIds,
+    notInAgreementIds,
+  }
+}

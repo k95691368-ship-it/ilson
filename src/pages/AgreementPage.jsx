@@ -7,6 +7,7 @@ import { api } from '../api/client.js'
 import { duration, krw, num, ago } from '../lib/format.js'
 import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
 import { HOURLY_WAGE_KRW, RUNS_PER_YEAR } from '../../shared/outcome.js'
+import { joinAsRequirement } from '../../shared/join.js'
 import {
   CRITERION_CATALOG,
   CONFLICT_VERDICTS,
@@ -135,6 +136,11 @@ function Stakeholders({ data, send, toast }) {
         <span className="card-title">누가 이 일에 얽혀 있나</span>
         <span className="card-note">각자 원하는 것이 다르고, 그 차이가 충돌이 된다</span>
       </div>
+
+      {/* 손들었는데 아직 협의안에 사정이 안 들어온 부서.
+          이걸 안 하면 담당자는 낸 부서하고만 합의하고 넘어가고, 손든
+          부서는 다 만들어진 뒤에 처음 기준을 본다. */}
+      <PendingJoins pending={data.pendingJoins ?? []} send={send} toast={toast} />
 
       {data.stakeholders.length > 0 && (
         <div className="stack-sm" style={{ marginBottom: 14 }}>
@@ -1127,6 +1133,98 @@ function SealInputs({ seal, setSeal, app }) {
           <small className="card-note">비워 두면 {HOURLY_WAGE_KRW.toLocaleString()}원</small>
         </label>
       </div>
+    </div>
+  )
+}
+
+// 손들었는데 아직 협의안에 사정이 안 들어온 부서.
+//
+// 손든 부서의 사정은 이미 다 적혀 있다. 없는 것은 그 한 줄이 협의 자리로
+// 건너오는 다리 하나뿐이다.
+//
+// **버튼을 누르면 바로 안 올린다. 편집 칸을 연다.** 손들며 적어 주신 것은
+// "그쪽에서 이 일이 어떻게 벌어지는가"(사정)이지 "무엇을 원하는가"(요구)가
+// 아니다. 그대로 올리면 요구 목록에 요구가 아닌 신세 한탄이 박히고,
+// 요구는 올린 뒤에 본문을 못 고친다.
+function PendingJoins({ pending, send, toast }) {
+  const [draft, setDraft] = useState({})
+  const [busy, setBusy] = useState(null)
+
+  if (pending.length === 0) return null
+
+  async function lift(p) {
+    const body = (draft[p.join_id] ?? p.story ?? '').trim()
+    if (!body) {
+      toast.error('무엇을 요구하시는지 한 줄로 적어주세요.')
+      return
+    }
+    setBusy(p.join_id)
+    try {
+      await send('post', { ...joinAsRequirement(p), body })
+      toast.success(`${p.dept}의 요구로 올렸습니다. 회의 뒤에 채택/기각을 정하세요.`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  return (
+    <div className="pending-joins">
+      <div className="pending-joins-head">
+        <strong>손들었는데 아직 협의안에 없는 부서 {pending.length}곳</strong>
+        <span className="card-note">
+          이 부서들 사정이 요구 목록에 들어와야 만들기 시작할 수 있습니다. 지금 합의하시는 기준을,
+          이 부서들은 다 만들어진 뒤에 처음 봅니다.
+        </span>
+      </div>
+
+      {pending.map((p) => {
+        const value = draft[p.join_id] ?? p.story ?? ''
+        const untouched = value.trim() === (p.story ?? '').trim()
+        return (
+          <div key={p.join_id} className="pending-join">
+            <div className="pending-join-top">
+              <span className="badge badge-warning">{p.dept}</span>
+              <span className="card-note">
+                {p.by}
+                {p.annualHours != null && ` · 연 ${p.annualHours}시간`}
+                {p.minutes && ` · 한 번에 ${p.minutes}분`}
+                {p.frequency && ` · ${p.frequency}`}
+              </span>
+            </div>
+
+            <p className="pending-join-said">&ldquo;{p.story}&rdquo;</p>
+
+            <textarea
+              rows={2}
+              value={value}
+              onChange={(e) => setDraft((d) => ({ ...d, [p.join_id]: e.target.value }))}
+            />
+            <small className="card-note">
+              적어 주신 것은 <strong>사정</strong>입니다. 무엇을 요구하시는지로 바꿔 올리세요.
+              올린 뒤에는 본문을 못 고칩니다 — 수정채택으로 덮거나 지우고 다시 올려야 합니다.
+            </small>
+
+            <div className="row">
+              <button
+                type="button"
+                className="btn-primary btn-sm"
+                disabled={busy === p.join_id}
+                onClick={() => lift(p)}
+              >
+                {busy === p.join_id ? '올리는 중…' : '협의안에 올리기'}
+              </button>
+              {untouched && (
+                <span className="card-note">사정 문장 그대로입니다 — 요구로 읽히십니까?</span>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      <p className="card-note pending-joins-foot">
+        마주 앉기 전이라 <strong>가정</strong>으로 올라갑니다. 회의 뒤에 채택·수정채택·기각을
+        정하시면 됩니다. 이 부서가 이 건과 상관없다면 접수함에서 손들기를 푸세요.
+      </p>
     </div>
   )
 }

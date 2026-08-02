@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { reasonText } from '../../shared/similar.js'
 import { api } from '../api/client.js'
 import { ago, num } from '../lib/format.js'
-import { validateJoin, FREQUENCIES } from '../../shared/join.js'
+import { validateJoin, FREQUENCIES, joinTrackPath } from '../../shared/join.js'
 
 // "이거 이미 들어와 있는데요"
 //
@@ -147,7 +147,11 @@ function JoinIn({ hit, draft }) {
     return (
       <p className="join-done">
         {done}{' '}
-        <Link to={`/track?no=${hit.ticket_no}`}>어디까지 왔는지 보기</Link>
+        {/* 부서 시점 주소를 준다. 그냥 접수번호만 주면 낸 부서 시점으로
+            열려서, 자기가 적어 낸 한 줄을 못 찾는다. */}
+        <Link to={joinTrackPath({ ticket: hit.ticket_no, dept: form.dept })}>
+          그쪽 부서 것이 어떻게 됐는지 보기
+        </Link>
       </p>
     )
   }

@@ -7,6 +7,7 @@ import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
 import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
+import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 
 // 접수번호로 내 신청서가 어디까지 왔는지 보는 화면.
 //
@@ -31,7 +32,11 @@ export default function TrackPage() {
     try {
       const r = await api.get(`/track/${encodeURIComponent(clean)}`)
       setData(r)
-      setParams({ no: clean }, { replace: true })
+      // 손든 부서가 자기 시점으로 여는 주소(?as=부서)를 지우지 않는다.
+      // 지우면 새로고침 한 번에 낸 부서 시점으로 돌아가고, 그 부서는
+      // 자기가 적어 낸 한 줄을 다시 못 찾는다.
+      const as = params.get('as')
+      setParams(as ? { no: clean, as } : { no: clean }, { replace: true })
     } catch (err) {
       setError(err.message)
       setData(null)
@@ -99,7 +104,7 @@ export default function TrackPage() {
         </div>
       )}
 
-      {data && <Result data={data} onChanged={() => look(data.ticket)} />}
+      {data && <Result data={data} as={params.get('as')} onChanged={() => look(data.ticket)} />}
 
       {!data && !error && (
         <div className="card">
@@ -116,7 +121,7 @@ export default function TrackPage() {
   )
 }
 
-function Result({ data, onChanged }) {
+function Result({ data, as, onChanged }) {
   const a = data.application
   const refused = a.status === '반려'
 
@@ -207,6 +212,12 @@ function Result({ data, onChanged }) {
           </div>
         </section>
       )}
+
+      {/* 손든 부서가 자기 시점으로 열었을 때.
+          손든 부서는 접수번호가 없어서 낸 부서의 번호로 열게 되는데,
+          그러면 화면 전체가 낸 부서 시점이라 자기가 적어 낸 한 줄이
+          어떻게 됐는지 못 찾는다. */}
+      {as && <AsDept data={data} dept={as} />}
 
       {/* 반려는 지금까지 막다른 길이었다. 부서는 "그건 원래 안 됩니다"와
           대안 한 줄을 읽고 끝났다. 대안을 읽는 것과 그 대안대로 신청서를
@@ -808,4 +819,54 @@ function stepClass(s) {
   if (s === '진행중') return 'now'
   if (s === '되돌림') return 'back'
   return 'wait'
+}
+
+// 손든 부서가 자기 시점으로 열었을 때 맨 위에 뜨는 것.
+//
+// 이 화면은 원래 낸 부서 것이다. 손든 부서가 그대로 열면 남의 신청서를
+// 구경하는 꼴이 되고, 자기가 적어 낸 한 줄이 어디로 갔는지 못 찾는다.
+//
+// **이의 칸은 안 연다.** 부서가 말할 자리는 합격 기준 서명이고, 그 앞에
+// 말할 칸을 하나 더 만들면 부서는 같은 것을 두 번 확인하게 된다. 그리고
+// 담당자는 "물어봤는데 답이 없다 = 동의했다"는 착시를 얻는다.
+// 알려 주기만 하고 묻지 않는다.
+function AsDept({ data, dept }) {
+  const mine = (data.decisions ?? []).find((d) => {
+    if (d.link_kind !== JOIN_KIND) return false
+    try {
+      return JSON.parse(d.why).dept === dept
+    } catch {
+      return String(d.title ?? '').startsWith(dept)
+    }
+  })
+  if (!mine) return null
+
+  const released = (data.decisions ?? []).some(
+    (d) => d.link_kind === UNJOIN_KIND && d.link_id === mine.id
+  )
+
+  return (
+    <section className={`as-dept${released ? ' released' : ''}`}>
+      <div className="as-dept-head">
+        <span className="badge badge-accent">{dept} 시점으로 보고 계십니다</span>
+        <span className="card-note">{ago(mine.created_at)}에 붙이셨습니다</span>
+      </div>
+
+      <p className="as-dept-said">
+        <strong>적어 주신 것</strong> {mine.what}
+      </p>
+
+      {released ? (
+        <p className="as-dept-gone">
+          담당자가 <strong>이 건은 그쪽 일과 다르다</strong>고 판정했습니다. {dept} 병목은 따로
+          신청서를 내 주셔야 합니다.
+        </p>
+      ) : (
+        <p className="card-note">
+          이 신청서가 진행되면 {dept}도 같이 쓰시게 됩니다. 아래 진행 상황이 그대로 그쪽 일의
+          진행 상황입니다. 합격 기준이 정해지면 {dept} 몫으로 한 번 확인해주셔야 합니다.
+        </p>
+      )}
+    </section>
+  )
 }
