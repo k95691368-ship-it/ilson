@@ -389,3 +389,37 @@ describe('다른 부서가 서명해도 이의는 안 사라진다', () => {
     expect(s.binding).toBe(false)
   })
 })
+
+describe('누가 반대했는지 바로 지목한다', () => {
+  const criteria = [crit('a'), crit('b')]
+
+  it('마지막에 서명한 사람이 아니라 이의를 단 부서를 적는다', () => {
+    // 부서가 여럿이면 그 둘이 다르고, 그러면 반대한 적 없는 사람이
+    // 반대한 것처럼 적힌다.
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [
+        { by: '김대리', dept: '재무', at: '2026-08-02 01:00:00' },
+        { by: '이과장', dept: '마케팅', at: '2026-08-02 02:00:00' },
+      ],
+      signoff: { by: '이과장', dept: '마케팅', at: '2026-08-02 02:00:00' },
+      objections: [{ id: 'o1', dept: '재무', by: '김대리', criterion_id: 'a', body: '과합니다' }],
+    })
+    expect(s.headline).toContain('재무')
+    expect(s.headline).not.toContain('이과장')
+  })
+
+  it('아직 안 본 부서가 있으면 이의가 있어도 서명은 계속 받는다', () => {
+    // 한 부서가 반대했다고 나머지 부서 확인을 못 받게 하면, 그 신청서는
+    // 이의를 푸는 동안 나머지 부서 확인이 통째로 멈춘다.
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅', '영업'],
+      signatures: [{ by: '김대리', dept: '재무', at: '2026-08-02 01:00:00' }],
+      signoff: { by: '김대리', dept: '재무', at: '2026-08-02 01:00:00' },
+      objections: [{ id: 'o1', dept: '재무', criterion_id: 'a', body: '과합니다' }],
+    })
+    expect(s.canSign).toBe(true)
+  })
+})

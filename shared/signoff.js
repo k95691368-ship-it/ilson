@@ -215,12 +215,20 @@ export function signoffState({
     }
   }
 
+  // 누가 단 이의인지는 그 이의에 적힌 사람이다. 마지막에 서명한 사람이
+  // 아니다 — 부서가 여럿이면 그 둘이 다르고, 그러면 반대한 적 없는 사람이
+  // 반대한 것처럼 적힌다.
+  const who = (list2) => {
+    const names = [...new Set(list2.map((o) => o.dept || o.by).filter(Boolean))]
+    return names.length > 0 ? names.join('·') : '부서'
+  }
+
   if (open.length > 0) {
     return {
       ...base,
       status: '이의 있음',
-      canSign: false,
-      headline: `${signoff.by}님이 확인하셨고, ${open.length}개 항목에 이의를 다셨습니다`,
+      canSign: waiting.length > 0,
+      headline: `${who(open)}가 ${open.length}개 항목에 이의를 다셨습니다`,
       binding: false,
     }
   }
@@ -229,8 +237,8 @@ export function signoffState({
     return {
       ...base,
       status: '이의 알고 진행',
-      canSign: false,
-      headline: `${signoff.by}님의 이의 ${kept.length}건을 담당자가 알고도 그대로 가기로 했습니다`,
+      canSign: waiting.length > 0,
+      headline: `${who(kept)}의 이의 ${kept.length}건을 담당자가 알고도 그대로 가기로 했습니다`,
       binding: false,
     }
   }
