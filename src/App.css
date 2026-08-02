@@ -4374,3 +4374,70 @@ kbd {
   gap: 8px;
   flex-wrap: wrap;
 }
+
+/* ===== 반려된 뒤에 하실 수 있는 것 ===== */
+/* 반려는 지금까지 막다른 길이었다. 대안을 읽는 것과 그 대안대로 신청서를
+   고치는 것은 다른 일이고, 그 사이를 메우지 않으면 대안은 읽히기만 한다.
+   다만 안 되는 사유는 안 된다고 먼저 말한다 — 헛수고를 시키지 않는 것이
+   이 자리의 핵심이다. */
+.retry {
+  padding: 15px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+/* 다시 내도 안 되는 것은 눈에 덜 띄게. 여기서 기대를 주면 안 된다. */
+.retry-no {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.retry-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.retry h3 {
+  margin: 0 0 7px;
+  font-size: 15px;
+}
+.retry p {
+  margin: 0 0 9px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.retry-from-reviewer {
+  padding: 9px 11px;
+  border-left: 3px solid var(--accent);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+.retry-from-reviewer strong {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-muted);
+  margin-bottom: 3px;
+}
+.retry-change {
+  color: var(--text);
+}
+.retry-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  display: grid;
+  gap: 11px;
+}
+.retry-form label {
+  display: grid;
+  gap: 4px;
+}
+.retry-form label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.retry-done {
+  border-color: var(--success);
+}

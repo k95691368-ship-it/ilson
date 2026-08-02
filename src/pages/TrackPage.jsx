@@ -5,6 +5,7 @@ import FileList from '../components/FileList.jsx'
 import Thread from '../components/Thread.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
+import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 
 // 접수번호로 내 신청서가 어디까지 왔는지 보는 화면.
 //
@@ -206,6 +207,12 @@ function Result({ data, onChanged }) {
         </section>
       )}
 
+      {/* 반려는 지금까지 막다른 길이었다. 부서는 "그건 원래 안 됩니다"와
+          대안 한 줄을 읽고 끝났다. 대안을 읽는 것과 그 대안대로 신청서를
+          고치는 것은 다른 일이고, 그 사이를 메우지 않으면 대안은 읽히기만
+          하고 아무 일도 안 일어난다. */}
+      {refused && <Retry ticket={data.ticket} onDone={onChanged} />}
+
       {/* 지금 이 부서가 움직여야 진행되는 것.
           진행 상황보다 위에 둔다. 어디까지 왔는지보다, 지금 멈춰 있는
           이유가 내 쪽에 있다는 것을 먼저 알아야 하기 때문이다. */}
@@ -395,6 +402,183 @@ function Result({ data, onChanged }) {
       </p>
     </div>
   )
+}
+
+// 반려당한 뒤에 부서가 할 수 있는 일.
+//
+// 지금까지 반려는 막다른 길이었다. 이유와 대안을 읽고 끝났다. 그런데
+// **다시 내기를 그냥 열어 두면 반려가 뜻이 없어진다** — 같은 것이 그대로
+// 다시 오고, 담당자는 같은 판정을 두 번 한다.
+//
+// 그래서 되는 것만 열어 둔다. 안 되는 사유는 안 된다고 먼저 말한다.
+// 헛수고를 시키지 않는 것이 이 자리의 핵심이다.
+function Retry({ ticket, onDone }) {
+  const [info, setInfo] = useState(null)
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState(null)
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(null)
+
+  useEffect(() => {
+    let alive = true
+    api
+      .get(`/track/${encodeURIComponent(ticket)}/resubmit`)
+      .then((r) => {
+        if (alive) setInfo(r)
+      })
+      .catch(() => {})
+    return () => {
+      alive = false
+    }
+  }, [ticket])
+
+  if (!info?.eligible) return null
+  const plan = info.plan
+
+  if (done) {
+    return (
+      <section className="retry retry-done">
+        <div className="retry-head">
+          <span className="badge badge-accent">다시 내셨습니다</span>
+        </div>
+        <h3>새 접수번호는 {done.ticket_no}입니다</h3>
+        <p>
+          앞 신청서({done.previous_ticket})와 이어서 기록됩니다. 담당자는 이것이 고쳐 낸 것이라는
+          것과, 무엇을 바꾸셨는지를 열자마자 봅니다.
+        </p>
+        <Link to={`/track?no=${done.ticket_no}`} className="btn-primary btn-sm">
+          새 신청서 조회하기
+        </Link>
+      </section>
+    )
+  }
+
+  function start() {
+    setForm({ ...info.draft, changed: '' })
+    setOpen(true)
+  }
+
+  async function submit(e) {
+    e.preventDefault()
+    const bad = validateResubmit(form)
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/resubmit`, form)
+      setDone(r)
+      setOpen(false)
+      onChangedSafely(onDone)
+    } catch (err) {
+      setErrors({ changed: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  return (
+    <section className={`retry${plan.canRetry ? '' : ' retry-no'}`}>
+      <div className="retry-head">
+        <span className={`badge ${plan.canRetry ? 'badge-accent' : 'badge-neutral'}`}>
+          반려된 뒤에 하실 수 있는 것
+        </span>
+        {plan.canRetry && (
+          <span className="card-note">
+            {plan.left}번 더 고쳐 내실 수 있습니다 (최대 {MAX_RESUBMIT}번)
+          </span>
+        )}
+      </div>
+
+      <h3>{plan.headline}</h3>
+
+      {/* 담당자가 이 건을 보고 직접 쓴 대안이 있으면 그것부터. 규칙이 만든
+          일반론보다 언제나 낫다. */}
+      {plan.fromReviewer && (
+        <p className="retry-from-reviewer">
+          <strong>담당자가 적어 둔 대안</strong> {plan.fromReviewer}
+        </p>
+      )}
+
+      <p className="retry-change">{plan.change}</p>
+
+      {plan.canRetry && !open && (
+        <button type="button" className="btn-primary btn-sm" onClick={start}>
+          {plan.cta}
+        </button>
+      )}
+
+      {open && (
+        <form className="retry-form" onSubmit={submit}>
+          {/* 바꾼 것을 맨 위에 둔다. 담당자가 열자마자 보는 것도 이것이고,
+              부서가 적으면서 스스로 확인하게 되는 것도 이것이다. */}
+          <label>
+            <span>무엇을 바꾸셨습니까</span>
+            <textarea
+              rows={3}
+              value={form.changed}
+              onChange={set('changed')}
+              placeholder="등록까지가 아니라 올릴 파일까지만 만들어 주시면 됩니다. 등록 버튼은 저희가 누르겠습니다."
+            />
+            {errors.changed && <em className="field-error">{errors.changed}</em>}
+            <small className="card-note">
+              이걸 안 적으면 담당자가 앞 판정을 찾아 대조해야 무엇이 달라졌는지 압니다. 그 일을
+              시키지 않으려고 여쭙습니다.
+            </small>
+          </label>
+
+          <label>
+            <span>제목</span>
+            <input value={form.title} onChange={set('title')} />
+            {errors.title && <em className="field-error">{errors.title}</em>}
+          </label>
+
+          <label>
+            <span>무엇이 병목입니까</span>
+            <textarea rows={3} value={form.bottleneck} onChange={set('bottleneck')} />
+            {errors.bottleneck && <em className="field-error">{errors.bottleneck}</em>}
+          </label>
+
+          <label>
+            <span>그래서 지금 무슨 일이 벌어집니까</span>
+            <textarea rows={3} value={form.problem} onChange={set('problem')} />
+            {errors.problem && <em className="field-error">{errors.problem}</em>}
+          </label>
+
+          <label>
+            <span>바라시는 해결 방안 (선택)</span>
+            <textarea rows={2} value={form.wish ?? ''} onChange={set('wish')} />
+          </label>
+
+          <p className="card-note">
+            부서·신청자·연락처는 앞 신청서 그대로 갑니다. 같은 분이 같은 일로 다시 내시는 것이라
+            다시 여쭙지 않습니다.
+          </p>
+
+          <div className="row">
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? '내는 중…' : '다시 내기'}
+            </button>
+            <button
+              type="button"
+              className="btn-ghost"
+              onClick={() => setOpen(false)}
+              disabled={busy}
+            >
+              그만두기
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  )
+}
+
+// 부모가 새로고침 함수를 안 넘겨도 터지지 않게.
+function onChangedSafely(fn) {
+  if (typeof fn === 'function') fn()
 }
 
 function statusTone(s) {
