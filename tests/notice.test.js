@@ -213,3 +213,60 @@ describe('고쳐서 다시 낸 것', () => {
     expect(() => noticesFrom({ timeline: [] })).not.toThrow()
   })
 })
+
+// 부서가 손들면 그 자리에서 고맙다는 말은 나가는데, 그 뒤로 아무것도
+// 안 보였다. 손든 부서는 자기가 붙였다는 사실이 남아 있는지도 모르고,
+// 담당자가 "이건 다른 건입니다"로 풀어 버려도 알 길이 없다.
+describe('손든 것과 풀린 것', () => {
+  const join = (extra = {}) => ({
+    id: 'dec_j1',
+    title: '마케팅 — 우리도 같은 일을 겪는다',
+    what: '저희도 매주 채널별로 숫자를 옮겨 적습니다',
+    why: JSON.stringify({ dept: '마케팅', by: '이과장', minutes: 60 }),
+    link_kind: '같은건손듦',
+    link_id: 'app_1',
+    created_at: '2026-08-02 01:00:00',
+    ...extra,
+  })
+  const unjoin = {
+    id: 'dec_u1',
+    title: 'AX 담당자',
+    what: '영업은 월말 마감 자료라 원본이 다릅니다',
+    why: '',
+    link_kind: '같은건아님',
+    link_id: 'dec_j1',
+    created_at: '2026-08-02 02:00:00',
+  }
+
+  it('손든 것이 소식에 뜬다', () => {
+    const n = noticesFrom({ timeline: [], decisions: [join()] })[0]
+    expect(n.headline).toContain('마케팅')
+    expect(n.body).toContain('옮겨 적습니다')
+  })
+
+  it('풀렸으면 따로 내시라고 알린다', () => {
+    // 안 알리면 그 부서는 이 건이 자기 것도 해결해 줄 줄 알고 계속 기다린다.
+    const list = noticesFrom({ timeline: [], decisions: [join(), unjoin] })
+    const said = list.find((x) => x.headline.includes('다른 것으로 판정'))
+    expect(said).toBeTruthy()
+    expect(said.body).toContain('따로 신청서를 내')
+    expect(said.link).toBe('/apply')
+  })
+
+  it('풀린 손듦은 붙은 채로 안 보인다', () => {
+    const list = noticesFrom({ timeline: [], decisions: [join(), unjoin] })
+    const first = list.find((x) => x.key.startsWith('join:'))
+    expect(first.headline).toContain('다른 건으로 판정')
+  })
+
+  it('부서를 못 읽어도 터지지 않는다', () => {
+    const broken = join({ why: '깨진 값', title: '' })
+    expect(() => noticesFrom({ timeline: [], decisions: [broken] })).not.toThrow()
+  })
+
+  it('열쇠가 다른 소식과 안 부딪힌다', () => {
+    const t = { timeline: [{ stage: '신청서', status: '완료', at: '2026-08-01 00:00:00', summary: '냈습니다' }], decisions: [join(), unjoin] }
+    const keys = noticesFrom(t).map((x) => x.key)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+})

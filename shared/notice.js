@@ -14,6 +14,7 @@
 // 적용된다.
 
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from './resubmit.js'
+import { JOIN_KIND, UNJOIN_KIND } from './join.js'
 
 // 소식으로 삼을 만한 단계인가.
 //
@@ -77,6 +78,65 @@ function resubmitNotices(track) {
     })
 }
 
+// 다른 부서가 "우리도 같은 일을 겪는다"고 손든 것.
+//
+// 손들면 그 자리에서 고맙다는 말은 나가는데, **그 뒤로 아무것도 안 보인다.**
+// 손든 부서는 자기가 붙였다는 사실이 남아 있는지도 모르고, 담당자가
+// "이건 다른 건입니다"로 풀어 버려도 알 길이 없다. 그러면 그 부서는
+// 이 건이 자기 것도 해결해 줄 줄 알고 몇 주를 기다리다가, 다 만들어진
+// 뒤에야 자기 것은 아니었다는 것을 안다.
+//
+// 푼 것을 특히 크게 알려야 한다. 그때는 **따로 내셔야 한다**는 말이
+// 그 부서에 가야 한다.
+function joinNotices(track) {
+  const rows = track?.decisions ?? []
+  const released = new Set(
+    rows.filter((d) => d.link_kind === UNJOIN_KIND).map((d) => d.link_id)
+  )
+
+  const out = []
+  for (const d of rows) {
+    if (d.link_kind === JOIN_KIND) {
+      const gone = released.has(d.id)
+      out.push({
+        key: `join:${d.id}`,
+        stage: '신청서',
+        at: d.created_at,
+        headline: gone
+          ? `${deptOf(d)}가 붙였던 것은 다른 건으로 판정됐습니다`
+          : `${deptOf(d)}도 같은 일을 겪는다고 붙였습니다`,
+        body: d.what,
+        detail: null,
+        link: gone ? '/apply' : null,
+        linkLabel: gone ? '따로 신청서 내기' : null,
+      })
+    }
+    if (d.link_kind === UNJOIN_KIND) {
+      out.push({
+        key: `unjoin:${d.id}`,
+        stage: '신청서',
+        at: d.created_at,
+        // 이게 가장 중요한 소식이다. 안 알리면 그 부서는 이 건이 자기
+        // 것도 해결해 줄 줄 알고 계속 기다린다.
+        headline: '이 건은 그쪽 일과 다른 것으로 판정됐습니다',
+        body: `${d.what} — 그쪽 병목은 따로 신청서를 내 주셔야 합니다.`,
+        detail: null,
+        link: '/apply',
+        linkLabel: '따로 신청서 내기',
+      })
+    }
+  }
+  return out
+}
+
+function deptOf(d) {
+  try {
+    return JSON.parse(d.why).dept || '다른 부서'
+  } catch {
+    return String(d.title ?? '').split(' — ')[0] || '다른 부서'
+  }
+}
+
 export function noticesFrom(track) {
   const timeline = track?.timeline ?? []
   const notices = timeline.filter(happened).map((t) => ({
@@ -92,6 +152,7 @@ export function noticesFrom(track) {
   }))
 
   notices.push(...resubmitNotices(track))
+  notices.push(...joinNotices(track))
 
   // 최근 것이 위로. 알림은 옛날 것부터 읽는 물건이 아니다.
   notices.sort((a, b) => String(b.at ?? '').localeCompare(String(a.at ?? '')))
