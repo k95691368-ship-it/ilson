@@ -114,7 +114,10 @@ export function resultText({ action, ok, skipped }) {
   const spec = BULK_BY_CODE[action]
   const parts = [`${ok}건을 ${spec?.label ?? '처리'}했습니다.`]
   if (skipped > 0) {
-    parts.push(`${skipped}건은 이미 처리된 것이라 건너뛰었습니다.`)
+    // 왜 건너뛰었는지는 건마다 다르다 — 이미 판정이 끝났거나, 이미 그
+    // 상태거나, 접수함을 떠났거나. 여기서 한 가지로 뭉뚱그리면 화면에 적힌
+    // 줄별 이유와 이 한 줄이 서로 다른 말을 하게 된다.
+    parts.push(`${skipped}건은 그대로 두었습니다. 왜인지는 건마다 적어 뒀습니다.`)
   }
   return parts.join(' ')
 }

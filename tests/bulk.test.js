@@ -140,7 +140,14 @@ describe('처리하고 나서 뭐라고 말하는가', () => {
   it('건너뛴 것이 있으면 그것도 말한다', () => {
     const t = resultText({ action: 'ack', ok: 3, skipped: 2 })
     expect(t).toContain('3건')
-    expect(t).toContain('2건은 이미')
+    expect(t).toContain('2건은')
+  })
+
+  it('건너뛴 이유를 한 가지로 뭉뚱그리지 않는다', () => {
+    // 이미 판정이 끝났거나, 이미 그 상태거나, 접수함을 떠났거나 — 이유가
+    // 다르다. 한 줄에서 "이미 처리된 것"이라고 못 박으면 줄별로 적힌
+    // 이유와 서로 다른 말을 하게 된다.
+    expect(resultText({ action: 'ack', ok: 1, skipped: 1 })).not.toContain('이미 처리된')
   })
 
   it('건너뛴 것이 없으면 그 말은 안 한다', () => {
