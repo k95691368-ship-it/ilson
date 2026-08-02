@@ -7,7 +7,7 @@
 import { SIGNOFF_KIND, OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 
-export async function loadSignoff(env, applicationId) {
+export async function loadSignoff(env, applicationId, ownDept = null) {
   const [criteria, logs] = await Promise.all([
     env.DB.prepare(
       `SELECT id, ord, body, check_kind, is_required_safety, confirmed_at
@@ -27,13 +27,17 @@ export async function loadSignoff(env, applicationId) {
   // 부서마다 한 장씩 받는다.
   //
   // link_id에 부서 이름을 넣는다. 옛 기록에는 거기에 신청서 id가 들어 있어서
-  // 'app_'으로 시작한다 — 그때는 어느 부서인지 모르는 서명으로 본다.
+  // 'app_'으로 시작한다. 그때는 **낸 부서의 서명으로 본다** — 이 기능을
+  // 만들기 전에는 걸린 부서가 하나뿐이었으니 그게 맞는 읽기다.
+  //
+  // null로 두면 안 된다. 그러면 "재무 김대리님이 확인하셨습니다"라고 적어
+  // 놓고 바로 아래에 "재무 아직"이라고 적는 화면이 된다.
   const signs = logs.results
     .filter((l) => l.link_kind === SIGNOFF_KIND)
     .map((l) => ({
       id: l.id,
       by: l.title,
-      dept: String(l.link_id ?? '').startsWith('app_') ? null : l.link_id,
+      dept: String(l.link_id ?? '').startsWith('app_') ? ownDept : l.link_id,
       at: l.created_at,
     }))
 

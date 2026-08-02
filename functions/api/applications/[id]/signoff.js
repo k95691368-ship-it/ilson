@@ -30,7 +30,7 @@ export async function onRequestGet({ env, params }) {
 
   try {
     const loaded = {
-      ...(await loadSignoff(env, app.id)),
+      ...(await loadSignoff(env, app.id, app.dept)),
       requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
     }
     const byId = new Map(loaded.criteria.map((c) => [c.id, c]))
@@ -72,7 +72,7 @@ export async function onRequestPost({ env, request, params }) {
 
   try {
     const loaded = {
-      ...(await loadSignoff(env, app.id)),
+      ...(await loadSignoff(env, app.id, app.dept)),
       requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
     }
     const objection = loaded.objections.find((o) => o.id === body.objection_id)
@@ -102,7 +102,7 @@ export async function onRequestPost({ env, request, params }) {
       .run()
 
     const after = {
-      ...(await loadSignoff(env, app.id)),
+      ...(await loadSignoff(env, app.id, app.dept)),
       requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
     }
     return jsonResponse({

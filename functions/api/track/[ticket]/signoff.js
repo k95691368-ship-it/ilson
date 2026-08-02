@@ -44,7 +44,7 @@ async function load(env, ticket) {
   if (!app) return null
   return {
     app,
-    ...(await loadSignoff(env, app.id)),
+    ...(await loadSignoff(env, app.id, app.dept)),
     requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
   }
 }

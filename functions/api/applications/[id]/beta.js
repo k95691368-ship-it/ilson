@@ -69,7 +69,7 @@ export async function onRequestGet({ env, params }) {
       // 통과를 막지는 않는다 — 막으면 부서가 답을 안 줄 때 아무것도 못
       // 하게 된다. 대신 무엇이 없는 통과인지 화면에 적는다.
       signoff: signoffState({
-        ...(await loadSignoff(env, app.id)),
+        ...(await loadSignoff(env, app.id, app.dept)),
         requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
       }),
     })
