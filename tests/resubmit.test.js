@@ -8,6 +8,7 @@ import {
   RETRY_KINDS,
   MAX_RESUBMIT,
   MIN_CHANGED,
+  refuseHelp,
 } from '../shared/resubmit.js'
 import { REFUSE_CODES } from '../shared/review.js'
 
@@ -190,5 +191,42 @@ describe('접수함에 보이는 한 줄', () => {
   it('두 번째부터는 몇 번째인지 적는다', () => {
     expect(resubmitNote({ previousTicket: 'AX-A', changed: 'x', times: 2 })).toContain('2번째')
     expect(resubmitNote({ previousTicket: 'AX-A', changed: 'x', times: 1 })).not.toContain('1번째')
+  })
+})
+
+// 반려 사유마다 "왜 범위 밖인가"와 "대신 무엇을"이 이미 적혀 있는데
+// 반려 화면이 그걸 안 보여줬다. 담당자는 매번 빈칸에서 시작했고, 실제로
+// 기록에 "대안: 적지 않음"이 남았다.
+describe('반려할 때 담당자가 보는 것', () => {
+  it('모든 사유에 답이 있다', () => {
+    for (const code of REFUSE_CODES) {
+      const h = refuseHelp(code)
+      expect(h).toBeTruthy()
+      expect(h.detail.length).toBeGreaterThan(10)
+      expect(h.deptWillHear.headline).toBeTruthy()
+      expect(h.deptWillHear.change.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('미리 적어 둔 대안을 준다', () => {
+    expect(refuseHelp('external_write').suggested).toContain('파일까지')
+  })
+
+  it('대안이 없는 사유는 없다고 말한다', () => {
+    // 없는데 있는 척하면 담당자가 빈 문장을 저장한다.
+    expect(refuseHelp('other').suggested).toBeNull()
+  })
+
+  it('부서가 무슨 안내를 받을지 같이 준다', () => {
+    // 담당자가 적는 대안과 부서가 받는 안내가 다른 말을 하면, 부서는
+    // 어느 쪽을 따라야 할지 모른다.
+    const h = refuseHelp('media_gen')
+    expect(h.deptWillHear.canRetry).toBe(false)
+    expect(h.deptWillHear.headline).toContain('같은 답')
+  })
+
+  it('없는 사유는 null이다', () => {
+    expect(refuseHelp('없는것')).toBeNull()
+    expect(refuseHelp()).toBeNull()
   })
 })

@@ -14,6 +14,8 @@
 //      한다 — 헛수고를 시키지 않는 것이 이 화면의 핵심이다.
 //   ② 다시 낼 때 무엇을 바꿨는지 반드시 적게 한다.
 
+import { REFUSE_REASONS } from './review.js'
+
 // 반려 사유별로 다시 내면 어떻게 되는가.
 //
 //   reshape — 범위를 대안에 맞춰 줄이면 받는다. 대부분이 여기다.
@@ -190,4 +192,41 @@ export function resubmitNote({ previousTicket, changed, times }) {
     '. 부서가 밝힌 바뀐 점: ',
     String(changed ?? '').trim(),
   ].join('')
+}
+
+// 반려할 때 담당자가 봐야 하는 것.
+//
+// 반려 사유마다 "왜 이게 범위 밖인가"와 "대신 무엇을 해 드릴 수 있나"가
+// shared/review.js에 이미 적혀 있다. 그런데 반려 화면은 사유 이름만
+// 드롭다운에 늘어놓고 그 둘을 안 보여준다. 담당자는 매번 빈칸에서 시작하고,
+// 실제로 라이브 기록에 "대안: 적지 않음"이 남아 있다.
+//
+// 더 중요한 것은 **부서가 무슨 안내를 받게 되는지**다. 담당자가 적는 대안과
+// 부서가 받는 안내가 서로 다른 말을 하면, 부서는 어느 쪽을 따라야 할지
+// 모른다. 반려를 저장하기 전에 그 안내를 같이 보여 준다.
+export function refuseHelp(code) {
+  const reason = REFUSE_REASONS.find((r) => r.code === code)
+  if (!reason) return null
+
+  const advice = RETRY_ADVICE[code] ?? RETRY_ADVICE.other
+  const kind = RETRY_KINDS[advice.kind]
+
+  return {
+    code,
+    label: reason.label,
+    // 왜 이게 범위 밖인가. 담당자가 사유를 잘못 고르는 것을 줄인다.
+    detail: reason.detail,
+    // 미리 적어 둔 대안. **자동으로 안 채운다.**
+    //
+    // 자동으로 채우면 담당자는 안 읽고 저장하고, 부서는 이 건에 대해
+    // 한 마디도 없는 일반론을 받는다. 그건 대안이 아니라 상투어다.
+    // 가져다 쓰겠다고 누를 때만 들어간다.
+    suggested: reason.alternative,
+    // 이 사유로 반려하면 부서 조회 화면에 뜰 안내.
+    deptWillHear: {
+      canRetry: kind.canRetry,
+      headline: kind.headline,
+      change: advice.change,
+    },
+  }
 }

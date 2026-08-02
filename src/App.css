@@ -5074,3 +5074,56 @@ kbd {
   min-width: 200px;
   line-height: 1.7;
 }
+
+/* ===== 반려 사유를 고르면 딸려 나오는 것 ===== */
+/* 자동으로 안 채운다. 자동으로 채우면 담당자는 안 읽고 저장하고,
+   부서는 이 건에 대해 한 마디도 없는 일반론을 받는다. */
+.refuse-help {
+  display: grid;
+  gap: 9px;
+  margin-bottom: 11px;
+}
+.refuse-why {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+.refuse-why > strong,
+.refuse-suggest > .card-note,
+.refuse-dept > .card-note {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--text-muted);
+  font-weight: 600;
+  font-size: 11.5px;
+}
+.refuse-suggest {
+  padding: 10px 11px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+}
+.refuse-suggest p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--text-h);
+}
+.refuse-dept {
+  padding: 10px 11px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+}
+/* 다시 낼 수 없는 사유는 다르게 칠한다. 그 부서에게는 길이 없다. */
+.refuse-dept.closed {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+.refuse-dept p {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  line-height: 1.75;
+}

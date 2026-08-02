@@ -23,6 +23,7 @@ import {
   STALE_HOURS,
 } from '../lib/inbox.js'
 import { findSimilar } from '../../shared/similar.js'
+import { refuseHelp } from '../../shared/resubmit.js'
 import { BULK_ACTIONS, MAX_AT_ONCE, validateBulk } from '../../shared/bulk.js'
 import {
   VERDICTS,
@@ -986,6 +987,12 @@ function Detail({ id, onSaved, pool }) {
                 ))}
               </select>
             </Field>
+            <RefuseHelp
+              code={form.refuse_code}
+              onUse={(text) => set('refuse_alternative', text)}
+              filled={Boolean(form.refuse_alternative.trim())}
+            />
+
             <Field
               label="대신 무엇을 해 드릴 수 있나"
               hint='정말 없으면 "다른 도구로 가야 합니다"라고 적으세요'
@@ -1223,5 +1230,52 @@ function Joined({ id }) {
         </p>
       )}
     </section>
+  )
+}
+
+// 반려 사유를 고르면 딸려 나오는 것.
+//
+// 사유마다 "왜 이게 범위 밖인가"와 "대신 무엇을 해 드릴 수 있나"가
+// shared/review.js에 이미 적혀 있는데, 반려 화면은 사유 이름만 보여줬다.
+// 담당자는 매번 빈칸에서 시작했고, 실제로 기록에 "대안: 적지 않음"이 남았다.
+//
+// **자동으로 안 채운다.** 자동으로 채우면 담당자는 안 읽고 저장하고, 부서는
+// 이 건에 대해 한 마디도 없는 일반론을 받는다. 그건 대안이 아니라 상투어다.
+function RefuseHelp({ code, onUse, filled }) {
+  const help = refuseHelp(code)
+  if (!help) return null
+
+  return (
+    <div className="refuse-help">
+      <p className="refuse-why">
+        <strong>왜 범위 밖인가</strong> {help.detail}
+      </p>
+
+      {help.suggested && (
+        <div className="refuse-suggest">
+          <span className="card-note">이 사유에는 보통 이렇게 답합니다</span>
+          <p>{help.suggested}</p>
+          {/* 눌러야 들어간다. 이 건에 맞게 고쳐 쓰라는 뜻이다. */}
+          <button type="button" className="btn-ghost btn-sm" onClick={() => onUse(help.suggested)}>
+            {filled ? '이 문장으로 바꾸기' : '가져다 쓰고 고치기'}
+          </button>
+        </div>
+      )}
+
+      {/* 담당자가 적는 대안과 부서가 받는 안내가 서로 다른 말을 하면,
+          부서는 어느 쪽을 따라야 할지 모른다. 저장하기 전에 보여준다. */}
+      <div className={`refuse-dept ${help.deptWillHear.canRetry ? '' : 'closed'}`}>
+        <span className="card-note">이 사유로 반려하시면 부서 조회 화면에 이렇게 뜹니다</span>
+        <p>
+          <strong>{help.deptWillHear.headline}</strong> {help.deptWillHear.change}
+        </p>
+        {!help.deptWillHear.canRetry && (
+          <p className="card-note">
+            이 사유는 <strong>부서가 고쳐서 다시 낼 수 없습니다.</strong> 정말 이 사유가 맞는지
+            한 번만 더 보세요 — 다른 사유라면 부서에게 길이 생깁니다.
+          </p>
+        )}
+      </div>
+    </div>
   )
 }
