@@ -26,6 +26,20 @@ import { RUNS_PER_YEAR } from './outcome.js'
 
 export const FREQUENCIES = Object.keys(RUNS_PER_YEAR)
 
+const DEPT_SUFFIX = ['팀', '파트', '실', '본부', '그룹']
+
+export function normDept(v) {
+  let s = String(v ?? '').replace(/\s+/g, '')
+  for (const suffix of DEPT_SUFFIX) {
+    if (s.length > suffix.length && s.endsWith(suffix)) {
+      s = s.slice(0, -suffix.length)
+      break
+    }
+  }
+  return s
+}
+
+
 export function validateJoin({ dept, by, minutes, people, frequency, story } = {}) {
   const errors = {}
   const t = (v) => String(v ?? '').trim()
@@ -42,8 +56,15 @@ export function validateJoin({ dept, by, minutes, people, frequency, story } = {
   if (!Number.isFinite(m) || m <= 0) {
     errors.minutes = '한 번에 몇 분쯤 걸리는지 적어주세요.'
   }
-  if (frequency && !FREQUENCIES.includes(String(frequency))) {
-    errors.frequency = '목록에 있는 주기를 골라주세요.'
+  // 주기도 반드시 받는다.
+  //
+  // minutes만 필수로 막고 frequency는 비워 둘 수 있게 했더니, 시간을
+  // 다 적어 주신 부서에게 "시간을 안 적어 주셔서 합계를 못 냅니다"라고
+  // 말하게 됐다. annualHoursOf는 둘이 다 있어야 셀 수 있는데 하나만
+  // 막고 있었던 것이다. 손들기를 고치는 길도 없어서 그 신청서의 합계는
+  // 그대로 안 나온다.
+  if (!FREQUENCIES.includes(String(frequency ?? ''))) {
+    errors.frequency = '얼마나 자주 있는 일인지 골라주세요. 이걸 골라야 시간을 셀 수 있습니다.'
   }
 
   const p = Number(people)
@@ -69,14 +90,35 @@ export function annualHoursOf({ minutes, people, frequency } = {}) {
 // 같은 병목이라도 걸리는 시간이 다르고, 여기 적힌 것은 전부 스스로 말한
 // 체감값이다. 3단계에서 재 봉인한 값과는 다른 종류의 숫자다.
 export function joinSummary({ application, joins } = {}) {
-  const list = (joins ?? []).filter((j) => !j.released)
   const ownHours = annualHoursOf({
     minutes: application?.current_minutes,
     people: application?.current_people,
     frequency: application?.current_frequency,
   })
 
-  const depts = [...new Set([application?.dept, ...list.map((j) => j.dept)].filter(Boolean))]
+  // 한 부서는 한 번만 센다.
+  //
+  // 두 가지가 새고 있었다.
+  //   ① 낸 부서가 자기 신청서에 다시 손들 수 있었다. 손들기 폼의 부서
+  //      칸이 쓰던 초안의 부서로 미리 채워져 있어서 실제로 일어난다.
+  //      그러면 재무 78시간짜리 일이 156시간으로 보고됐다.
+  //   ② "마케팅"과 "마케팅팀"을 다른 부서로 셌다. 같은 파일 안에서
+  //      pendingJoinDepts는 둘을 같다고 보는데 여기서는 다르다고 봤다.
+  //
+  // 부서 수가 안 늘었는데 시간만 두 배인 값은, 한 번 들키면 그 뒤로
+  // 아무도 이 합계를 안 믿는다.
+  const ownKey = normDept(application?.dept)
+  const seen = new Set(ownKey ? [ownKey] : [])
+  const list = []
+  for (const j of joins ?? []) {
+    if (j.released) continue
+    const key = normDept(j.dept)
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    list.push(j)
+  }
+
+  const depts = [application?.dept, ...list.map((j) => j.dept)].filter(Boolean)
   const joinedHours = list.reduce((sum, j) => sum + (annualHoursOf(j) ?? 0), 0)
 
   // 시간을 못 센 부서가 하나라도 있으면 합계를 내놓지 않는다. 일부만
@@ -138,18 +180,6 @@ export function joinReceipt({ ticket, dept, deptCount }) {
 // "운영"과 "운영팀"은 같게 보고, "영업"과 "영업지원"은 다르게 본다.
 // 접미사를 하나만 떼는 이유는, 여러 개를 떼기 시작하면 서로 다른 부서가
 // 같은 부서로 뭉개지기 때문이다.
-const DEPT_SUFFIX = ['팀', '파트', '실', '본부', '그룹']
-
-function normDept(v) {
-  let s = String(v ?? '').replace(/\s+/g, '')
-  for (const suffix of DEPT_SUFFIX) {
-    if (s.length > suffix.length && s.endsWith(suffix)) {
-      s = s.slice(0, -suffix.length)
-      break
-    }
-  }
-  return s
-}
 
 // 아직 협의안에 안 들어온 손든 부서.
 //

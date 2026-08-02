@@ -76,3 +76,43 @@ describe('손든 부서 사정이 안 들어왔으면', () => {
     expect(agreementGate(ok).ready).toBe(true)
   })
 })
+
+// 확정된 기준이 하나만 있어도 통과시켰다. 그러면 화면이 "합격 기준을
+// 확정했고"라고 단정하는데 바로 아래에 '미확정' 기준이 그대로 떠 있다.
+//
+// 더 나쁜 것은 부서 서명이 전부 확정돼야 받을 수 있다는 것이다
+// (shared/signoff.js의 canAsk). 만들기는 시작할 수 있는데 부서 확인은
+// 영영 못 받는 상태가 된다 — 두 문이 서로 다른 말을 했다.
+describe('확정 안 된 합격 기준이 남아 있으면', () => {
+  const base = {
+    requirements: [{ status: '채택' }],
+    conflicts: [],
+    baseline: { median_seconds: 100 },
+  }
+
+  it('만들기 시작 못 하게 막는다', () => {
+    const g = agreementGate({
+      ...base,
+      criteria: [{ confirmed_at: 'x' }, { confirmed_at: null }],
+    })
+    expect(g.ready).toBe(false)
+    expect(g.blockers.join()).toContain('1개가 아직 미확정')
+  })
+
+  it('전부 확정했으면 연다', () => {
+    expect(agreementGate({ ...base, criteria: [{ confirmed_at: 'x' }, { confirmed_at: 'y' }] }).ready).toBe(true)
+  })
+
+  it('하나도 없으면 예전 문구 그대로 막는다', () => {
+    const g = agreementGate({ ...base, criteria: [] })
+    expect(g.blockers.join()).toContain('아직 확정하지 않았습니다')
+  })
+
+  it('부서 서명 조건과 같은 기준으로 막는다', async () => {
+    // canAsk는 전부 확정돼야 서명을 받는다. 게이트도 같아야 한다.
+    const { canAsk } = await import('../shared/signoff.js')
+    const criteria = [{ confirmed_at: 'x' }, { confirmed_at: null }]
+    expect(canAsk(criteria).ok).toBe(false)
+    expect(agreementGate({ ...base, criteria }).ready).toBe(false)
+  })
+})

@@ -320,3 +320,71 @@ describe('첫 화면에 몇 건으로 세나', () => {
     expect(() => joinCounts()).not.toThrow()
   })
 })
+
+// 손들기 집계가 부풀려지던 세 자리.
+describe('한 부서는 한 번만 센다', () => {
+  const application = { dept: '재무', current_minutes: 90, current_people: 1, current_frequency: '주 1회' }
+
+  it('낸 부서가 자기 신청서에 다시 손들어도 두 번 안 센다', () => {
+    // 손들기 폼의 부서 칸이 쓰던 초안의 부서로 미리 채워져 있어서
+    // 실제로 일어난다. 78시간짜리 일이 156시간으로 보고됐다.
+    const s = joinSummary({
+      application,
+      joins: [{ dept: '재무', minutes: 90, people: 1, frequency: '주 1회' }],
+    })
+    expect(s.totalHours).toBe(78)
+    expect(s.deptCount).toBe(1)
+    expect(s.joinCount).toBe(0)
+  })
+
+  it('표기가 흔들려도 같은 부서로 센다', () => {
+    // 같은 파일 안에서 pendingJoinDepts는 둘을 같다고 보는데
+    // joinSummary는 다르다고 봤다.
+    const s = joinSummary({
+      application,
+      joins: [
+        { dept: '마케팅', minutes: 60, people: 1, frequency: '주 1회' },
+        { dept: '마케팅팀', minutes: 60, people: 1, frequency: '주 1회' },
+      ],
+    })
+    expect(s.deptCount).toBe(2)
+    expect(s.joinedHours).toBe(52)
+  })
+
+  it('서로 다른 부서는 그대로 다 센다', () => {
+    const s = joinSummary({
+      application,
+      joins: [
+        { dept: '마케팅', minutes: 60, people: 1, frequency: '주 1회' },
+        { dept: '영업', minutes: 60, people: 1, frequency: '주 1회' },
+      ],
+    })
+    expect(s.deptCount).toBe(3)
+    expect(s.joinCount).toBe(2)
+  })
+})
+
+describe('주기도 반드시 받는다', () => {
+  const good = {
+    dept: '마케팅',
+    by: '이과장',
+    minutes: 60,
+    frequency: '주 1회',
+    story: '저희도 매주 같은 일을 손으로 합니다',
+  }
+
+  it('안 고르면 막는다', () => {
+    // minutes만 막고 frequency를 비워 두게 했더니, 시간을 다 적어 주신
+    // 부서에게 "시간을 안 적어 주셔서 합계를 못 냅니다"라고 말하게 됐다.
+    expect(validateJoin({ ...good, frequency: '' }).frequency).toBeTruthy()
+    expect(validateJoin({ ...good, frequency: null }).frequency).toBeTruthy()
+  })
+
+  it('고르면 통과한다', () => {
+    expect(validateJoin(good)).toEqual({})
+  })
+
+  it('막는 이유를 같이 말한다', () => {
+    expect(validateJoin({ ...good, frequency: '' }).frequency).toContain('시간을 셀 수')
+  })
+})

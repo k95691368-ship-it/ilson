@@ -158,6 +158,20 @@ export function agreementGate({ requirements, conflicts, criteria, baseline, pen
   const confirmed = criteria.filter((c) => c.confirmed_at)
   if (confirmed.length === 0) {
     blockers.push('합격 기준을 아직 확정하지 않았습니다.')
+  } else {
+    // 확정 안 된 기준이 하나라도 남아 있으면 막는다.
+    //
+    // 예전에는 하나만 확정돼도 통과시켰다. 그러면 화면이 "합격 기준을
+    // 확정했고"라고 단정하는데 바로 아래에 '미확정' 기준이 그대로 떠
+    // 있었다. 게다가 부서 서명은 **전부 확정돼야** 받을 수 있어서
+    // (shared/signoff.js의 canAsk), 만들기는 시작할 수 있는데 부서
+    // 확인은 영영 못 받는 상태가 된다. 두 문이 서로 다른 말을 했다.
+    const pending = criteria.length - confirmed.length
+    if (pending > 0) {
+      blockers.push(
+        `합격 기준 ${pending}개가 아직 미확정입니다. 확정하시거나 지우셔야 부서에 확인을 요청할 수 있습니다.`
+      )
+    }
   }
 
   if (!baseline) {

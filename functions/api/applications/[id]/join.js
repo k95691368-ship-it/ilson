@@ -9,7 +9,15 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
-import { validateJoin, joinSummary, joinLine, joinReceipt, JOIN_KIND, UNJOIN_KIND } from '../../../../shared/join.js'
+import {
+  validateJoin,
+  joinSummary,
+  joinLine,
+  joinReceipt,
+  normDept,
+  JOIN_KIND,
+  UNJOIN_KIND,
+} from '../../../../shared/join.js'
 import { withJosa } from '../../../../shared/korean.js'
 
 async function findApplication(env, id) {
@@ -159,8 +167,22 @@ export async function onRequestPost({ env, request, params }) {
   try {
     // 같은 부서가 이미 손들었으면 또 안 받는다. 한 부서가 두 번 세어지면
     // 이 병목이 실제보다 커 보인다.
+    //
+    // 완전일치로만 보다가 "마케팅"과 "마케팅팀"이 둘 다 접수됐다.
+    // 표기 흔들림을 흡수해서 본다.
     const joins = await loadJoins(env, app.id)
-    if (joins.some((j) => !j.released && j.dept === detail.dept)) {
+    const key = normDept(detail.dept)
+
+    // 낸 부서가 자기 신청서에 다시 손드는 것도 막는다. 손들기 폼의 부서
+    // 칸이 쓰던 초안의 부서로 미리 채워져 있어서 실제로 일어난다.
+    if (key && key === normDept(app.dept)) {
+      await releaseRateLimit(env, `join:${ip}`, ticket)
+      return jsonError(
+        `${withJosa(app.dept, '가')} 낸 신청서입니다. 손드실 필요 없이 이미 그쪽 일로 세고 있습니다.`,
+        409
+      )
+    }
+    if (joins.some((j) => !j.released && normDept(j.dept) === key)) {
       await releaseRateLimit(env, `join:${ip}`, ticket)
       return jsonError(`${withJosa(detail.dept, '는')} 이미 손드셨습니다. 두 번 세지 않습니다.`, 409)
     }

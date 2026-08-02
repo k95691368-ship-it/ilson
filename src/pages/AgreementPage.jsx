@@ -8,6 +8,7 @@ import { duration, krw, num, ago } from '../lib/format.js'
 import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
 import { HOURLY_WAGE_KRW, RUNS_PER_YEAR } from '../../shared/outcome.js'
 import { joinAsRequirement } from '../../shared/join.js'
+import { withJosa } from '../../shared/korean.js'
 import {
   CRITERION_CATALOG,
   CONFLICT_VERDICTS,
@@ -108,8 +109,8 @@ function GateBanner({ gate }) {
       <div className="notice notice-success">
         <div className="notice-title">협의가 끝났습니다</div>
         <p>
-          요구를 전부 판단했고, 충돌을 판정했고, 합격 기준을 확정했고, 기준선을 봉인했습니다.
-          이제 만들기 시작할 수 있습니다.
+          요구를 전부 판단했고, 충돌을 판정했고, 합격 기준을 <strong>모두</strong> 확정했고,
+          기준선을 봉인했습니다. 이제 만들기 시작할 수 있습니다.
         </p>
       </div>
     )
@@ -455,7 +456,7 @@ function RequirementCard({ r, send, toast, editable }) {
           그 문장으로 판정받는다. 무엇을 고쳤는지 보이는 것이 협의다. */}
       {r.decided_body && r.decided_body !== r.body && (
         <div className="item-original">
-          <strong>{r.dept}가 말한 것</strong> {r.body}
+          <strong>{withJosa(r.dept, '가')} 말한 것</strong> {r.body}
         </div>
       )}
 

@@ -303,6 +303,11 @@ function Overview({ data }) {
   )
 }
 
+// 반려·보류는 단계가 아니다. 여덟 단계를 지나가다 빠진 자리다.
+// 막대에는 같이 그리되(어디로 빠졌는지 보여야 한다), 세는 문장에서는
+// 갈라 적는다.
+const OFF_STAGE = ['반려', '보류']
+
 const STAGE_ORDER = [
   '신청서',
   '검토',
@@ -318,6 +323,10 @@ const STAGE_ORDER = [
 
 function StageBars({ byStage, total }) {
   const rows = STAGE_ORDER.filter((s) => (byStage[s] ?? 0) > 0)
+  const inStages = STAGE_ORDER.filter((s) => !OFF_STAGE.includes(s)).reduce(
+    (n, s) => n + (byStage[s] ?? 0),
+    0
+  )
   const max = Math.max(...rows.map((s) => byStage[s]), 1)
 
   return (
@@ -335,8 +344,12 @@ function StageBars({ byStage, total }) {
           </div>
         )
       })}
+      {/* 여덟 단계에 있는 것만 센다.
+          전체 건수를 그대로 적으면 반려·보류처럼 단계에 없는 것까지
+          여덟 단계에 있는 것처럼 읽힌다. 막대 합과 이 숫자가 안 맞는다. */}
       <p className="card-note" style={{ marginTop: 8 }}>
-        전체 {total}건이 여덟 단계에 흩어져 있습니다.
+        {inStages}건이 여덟 단계 위에 있습니다
+        {total > inStages && ` · 나머지 ${total - inStages}건은 반려·보류처럼 단계 밖입니다`}.
       </p>
     </div>
   )
