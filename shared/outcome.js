@@ -72,12 +72,40 @@ export function computeOutcome({
   const savedSeconds = manualSeconds - afterSeconds
   const savedKrw = (savedSeconds / 3600) * wage
 
-  // 만든 공수를 한 번에 다 빼면 첫 달은 무조건 적자로 보인다.
-  // 24개월에 나눠 보되, 나눴다는 사실을 화면에 적는다.
   const devKrw = devHours * wage
-  const devAmortized = devKrw / amortizeMonths
 
-  const netKrw = savedKrw - devAmortized - opsCostKrw
+  // 만든 공수는 **전부** 뺀다.
+  //
+  // 처음에는 24개월로 나눠서 한 달치만 뺐다. 틀렸다. 위의 아낀 금액은
+  // 지금까지 돌린 것을 전부 더한 누적값인데, 거기서 한 달치 상각만 빼면
+  // 단위가 안 맞는다. 석 달을 돌렸으면 석 달치 절감에서 한 달치 공수만
+  // 빠지고, 일주일 돌렸으면 일주일치 절감에서 한 달치가 빠진다. 앞의
+  // 경우는 성과가 부풀고 뒤의 경우는 깎인다.
+  //
+  // 게다가 이 함수는 그 결과에 '아직본전'이라는 이름을 붙이고 있었다.
+  // 본전이라는 말은 만든 공수를 다 뽑았다는 뜻인데, 다 빼지도 않고
+  // 그렇게 부르고 있었던 것이다.
+  //
+  // 달로 나눈 값은 참고로만 남긴다 — 계산에는 안 쓴다.
+  const devPerMonth = devKrw / Math.max(1, amortizeMonths)
+
+  const netKrw = savedKrw - devKrw - opsCostKrw
+
+  // 아직 못 뽑았으면 얼마가 남았고 몇 번 더 돌리면 되는가.
+  //
+  // "아직 본전"이라고만 하면 담당자는 그게 곧 넘어설 것인지 영영 아닌지를
+  // 알 수 없다. 지금 속도로 몇 번인지까지 말해야 판단이 된다.
+  const perRunKrw = savedKrw / runCount
+  const shortfall = Math.max(0, devKrw + opsCostKrw - savedKrw)
+  const breakEven = {
+    done: netKrw > 0,
+    shortfallKrw: round(shortfall),
+    perRunKrw: round(perRunKrw),
+    // 한 번 돌려서 아끼는 것이 0 이하면 영영 못 뽑는다. 그때는 횟수를
+    // 내놓지 않는다 — 큰 수를 적어 두면 언젠가 된다는 뜻으로 읽힌다.
+    runsNeeded: perRunKrw > 0 && shortfall > 0 ? Math.ceil(shortfall / perRunKrw) : null,
+    neverAtThisRate: perRunKrw <= 0,
+  }
 
   return {
     status: netKrw > 0 ? '인정' : '아직본전',
@@ -98,11 +126,14 @@ export function computeOutcome({
 
     devHours,
     devKrw: round(devKrw),
-    devAmortized: round(devAmortized),
+    // 계산에는 안 쓰는 참고값이다. "달로 나눠 보면 얼마"를 알고 싶어 하는
+    // 사람이 있어서 남겨 두되, 이 값으로 순절감을 내지 않는다.
+    devPerMonth: round(devPerMonth),
     amortizeMonths,
     opsCostKrw: round(opsCostKrw),
 
     netKrw: round(netKrw),
+    breakEven,
 
     // 계산식을 그대로 돌려준다. 화면에 항상 펼쳐 두기 위해서다.
     formula: [
@@ -113,8 +144,18 @@ export function computeOutcome({
       { label: '= 아낀 시간', value: savedSeconds, strong: true },
     ],
     moneyFormula: [
-      { label: '아낀 시간을 돈으로', value: savedKrw, note: `시급 ${wage.toLocaleString()}원` },
-      { label: `− 만든 공수 (${devHours}시간을 ${amortizeMonths}개월로 나눔)`, value: -devAmortized },
+      {
+        label: '아낀 시간을 돈으로',
+        value: savedKrw,
+        note: `시급 ${wage.toLocaleString()}원 · 지금까지 ${runCount}회를 다 더한 값`,
+      },
+      {
+        label: `− 만든 공수 (${devHours}시간)`,
+        value: -devKrw,
+        // 왜 나눠서 안 빼는지 화면에 적어 둔다. 나눠 빼는 것이 더 흔한
+        // 방식이라, 안 그런 이유를 안 적으면 틀린 줄 안다.
+        note: '위가 누적이라 여기도 누적으로 뺍니다. 달로 나눠 빼면 단위가 안 맞습니다.',
+      },
       { label: '− 운영비', value: -opsCostKrw },
       { label: '= 남는 것', value: netKrw, strong: true },
     ],
@@ -164,6 +205,15 @@ export const CHALLENGE_RULES = [
     applies: ({ outcome }) => (outcome.devHours ?? 0) < 8,
     body: ({ outcome }) =>
       `만드는 데 ${outcome.devHours}시간이 들었다고 적혀 있습니다. 회의, 시험, 고치는 시간까지 넣으면 대개 이보다 큽니다. 적게 잡으면 성과가 커 보입니다.`,
+  },
+  {
+    code: 'slower_than_before',
+    title: '자동화한 뒤가 더 오래 걸렸습니다',
+    // 이걸 '아직 본전'으로만 부르면 곧 넘어설 것처럼 읽힌다. 실제로는
+    // 돌릴수록 손해가 커지는 상태다. 반드시 따로 말해야 한다.
+    applies: ({ outcome }) => (outcome.savedSeconds ?? 0) <= 0 && (outcome.runCount ?? 0) > 0,
+    body: ({ outcome }) =>
+      `사람이 하던 시간보다 자동 실행·검토·재작업을 더한 시간이 더 깁니다(${Math.abs(outcome.savedSeconds)}초 더 듦). 돌릴수록 손해입니다. 검토 시간이 왜 이렇게 드는지부터 보셔야 합니다.`,
   },
   {
     code: 'seasonality',
@@ -216,17 +266,41 @@ export function labelForOutcome(outcome, unresolvedCount) {
 }
 
 // 연 단위로 환산하면 얼마인가. 지금 실행 횟수가 아니라 주기로 계산한다.
-export function annualize(outcome, frequency) {
+//
+// 여기가 두 번째로 틀렸던 자리다. 위의 순절감은 만든 공수와 운영비를 빼는데,
+// 이 연 환산값은 아무것도 안 뺐다. 그런데 화면에서는 두 숫자가 위아래로
+// 나란히 놓인다. 읽는 사람은 같은 기준으로 잰 값인 줄 알고, 큰 쪽을 기억한다.
+//
+// 그래서 뺀 것과 안 뺀 것을 따로 준다. 하나로 합치지 않는 이유는, 첫 해와
+// 그다음 해가 실제로 다르기 때문이다 — 만든 공수는 첫 해에 한 번만 든다.
+export function annualize(outcome, frequency, { devKrw = 0, opsCostKrw = 0 } = {}) {
   if (outcome.status === '산정불가' || !frequency) return null
   const perYear = RUNS_PER_YEAR[frequency]
   if (!perYear) return null
+
   const perRunSaved = outcome.savedSeconds / outcome.runCount
   const seconds = perRunSaved * perYear
+  const grossKrw = (seconds / 3600) * outcome.wage
+
+  // 지금까지 쓴 운영비를 회당으로 나눠 연 횟수만큼 다시 곱한다. 운영비는
+  // 돌릴 때마다 드는 것이라 해마다 든다.
+  const opsPerYear = (opsCostKrw / outcome.runCount) * perYear
+  const dev = devKrw || outcome.devKrw || 0
+
   return {
     perYear,
     seconds: round(seconds),
     hours: round(seconds / 3600, 1),
-    krw: round((seconds / 3600) * outcome.wage),
+    // 아무것도 안 뺀 값. 이름에 그렇게 적어 둔다.
+    grossKrw: round(grossKrw),
+    // 첫 해 — 만든 공수가 여기 들어간다.
+    firstYearKrw: round(grossKrw - dev - opsPerYear),
+    // 그다음 해부터 — 만든 공수는 다시 안 든다.
+    laterYearKrw: round(grossKrw - opsPerYear),
     note: `지금까지 ${outcome.runCount}번 돌린 평균으로 연 ${perYear}회를 곱한 값입니다. 실제로 그만큼 돌지 않으면 이 숫자는 틀립니다.`,
+    caveat:
+      dev > 0
+        ? '첫 해에는 만든 공수가 들어갑니다. 그다음 해부터는 안 듭니다 — 그래서 두 해를 따로 적었습니다.'
+        : null,
   }
 }

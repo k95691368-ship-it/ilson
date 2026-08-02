@@ -107,7 +107,12 @@ export async function onRequestGet({ env, params }) {
         : null,
       uses,
       outcome,
-      annual: annualize(outcome, baseline?.frequency ?? app.current_frequency),
+      // 만든 공수와 운영비를 같이 넘긴다. 안 넘기면 연 환산값만 아무것도
+      // 안 뺀 큰 숫자가 되어, 바로 위의 순절감과 기준이 달라진다.
+      annual: annualize(outcome, baseline?.frequency ?? app.current_frequency, {
+        devKrw: outcome.devKrw ?? 0,
+        opsCostKrw: saved?.ops_cost_krw ?? 0,
+      }),
       challenges: merged,
       unresolvedCount: unresolved,
       label: labelForOutcome(outcome, unresolved),

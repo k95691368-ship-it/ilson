@@ -151,13 +151,48 @@ function Result({ id }) {
           ))}
         </div>
 
+        {/* 연 환산은 뺀 것과 안 뺀 것을 갈라서 적는다.
+            위의 순절감은 만든 공수와 운영비를 빼는데 여기만 안 빼면, 나란히
+            놓인 두 숫자가 다른 기준으로 잰 값이 된다. 읽는 사람은 큰 쪽을
+            기억하고, 그 숫자가 보고에 올라간다. */}
         {data.annual && (
           <div className="notice notice-info" style={{ marginTop: 14 }}>
             <div className="notice-title">
-              연 단위로는 {num(data.annual.hours, 1)}시간 · {krw(data.annual.krw)}
+              연 단위로는 {num(data.annual.hours, 1)}시간 · {krw(data.annual.grossKrw)}
+              <span className="card-note"> (아무것도 빼기 전)</span>
+            </div>
+            <div className="annual-split">
+              <div>
+                <span className="card-note">첫 해 — 만든 공수를 뺀 것</span>
+                <strong>{krw(data.annual.firstYearKrw)}</strong>
+              </div>
+              <div>
+                <span className="card-note">그다음 해부터</span>
+                <strong>{krw(data.annual.laterYearKrw)}</strong>
+              </div>
             </div>
             <p>{data.annual.note}</p>
+            {data.annual.caveat && <p className="card-note">{data.annual.caveat}</p>}
           </div>
+        )}
+
+        {/* 아직 본전을 못 넘었으면 얼마가 남았는지 말한다. "아직 본전"만
+            적어 두면 곧 넘어설 것인지 영영 아닌지를 알 수 없다. */}
+        {o.breakEven && !o.breakEven.done && (
+          <p className="outcome-warn" style={{ marginTop: 12 }}>
+            {o.breakEven.neverAtThisRate ? (
+              <>
+                지금은 <strong>돌릴수록 손해</strong>입니다. 사람이 하던 시간보다 자동 실행·검토·
+                재작업을 더한 시간이 더 깁니다. 몇 번 더 돌린다고 넘어서지 않습니다.
+              </>
+            ) : (
+              <>
+                만든 공수를 뽑기까지 <strong>{krw(o.breakEven.shortfallKrw)}</strong> 남았습니다.
+                지금 속도(1회당 {krw(o.breakEven.perRunKrw)})로 <strong>{o.breakEven.runsNeeded}번</strong>{' '}
+                더 돌리면 넘어섭니다.
+              </>
+            )}
+          </p>
         )}
       </section>
 

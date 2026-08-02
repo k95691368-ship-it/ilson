@@ -4846,3 +4846,25 @@ kbd {
   font-weight: 600;
   color: var(--text-h);
 }
+
+/* ===== 연 환산 — 뺀 것과 안 뺀 것 ===== */
+/* 나란히 놓인 두 숫자가 다른 기준으로 잰 값이면, 읽는 사람은 큰 쪽을
+   기억하고 그 숫자가 보고에 올라간다. 그래서 갈라 적는다. */
+.annual-split {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin: 9px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.annual-split > div {
+  display: grid;
+  gap: 2px;
+}
+.annual-split strong {
+  font-size: 15px;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+}
