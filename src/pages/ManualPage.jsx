@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago } from '../lib/format.js'
+import { validateFix, SECTION_BY_KEY } from '../../shared/unclear.js'
 
 export default function ManualPage() {
   const { data: list } = useApi('/applications')
@@ -109,6 +110,10 @@ function Manual({ id }) {
           </p>
         </div>
       )}
+
+      {/* 부서가 짚은 곳을 맨 위에 둔다. 아래 편집칸보다 먼저 봐야
+          무엇을 고쳐 쓸지 알고 손을 댄다. */}
+      <Unclear id={id} toast={toast} />
 
       <section className="card no-print">
         <div className="card-head">
@@ -444,5 +449,109 @@ function Field({ label, hint, children }) {
       </label>
       {children}
     </div>
+  )
+}
+
+// ── 부서가 모르겠다고 짚은 곳 ────────────────────────────────
+//
+// 짚는 자리만 만들고 고치는 자리를 안 만들면, 짚기는 신고함이 되고 아무도
+// 안 읽는다. 그러면 부서는 "말해 봐야 소용없다"를 배우고 그 뒤로는 짚지
+// 않는다. 문서는 영영 그대로다.
+//
+// 여기 적는 문장은 도구 화면의 그 대목에 그대로 붙는다. 그래서 "고쳤음"
+// 같은 말을 적으면 부서가 그걸 읽게 된다.
+function Unclear({ id, toast }) {
+  const { data, reload } = useApi(`/applications/${id}/unclear`)
+  const [open, setOpen] = useState(null)
+  const [form, setForm] = useState({ body: '', by: 'AX 담당자' })
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  if (!data) return null
+  // 짚힌 것이 하나도 없으면 이 자리는 아무 말도 하지 않는다. 빈 목록을
+  // 띄워 두면 화면만 길어진다.
+  if (data.sections.length === 0) return null
+
+  async function fix(flagId) {
+    const bad = validateFix(form)
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/applications/${id}/unclear`, { ...form, flag_id: flagId })
+      toast.success(r.message)
+      setOpen(null)
+      setForm({ body: '', by: 'AX 담당자' })
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="card no-print">
+      <div className="card-head">
+        <span className="card-title">부서가 모르겠다고 짚은 곳</span>
+        {data.summary.mustFix > 0 && (
+          <span className="badge badge-warning">{data.summary.mustFix}곳은 문서 문제</span>
+        )}
+        <span className="spacer" />
+        <span className="card-note">여기 적는 문장이 도구 화면 그 대목에 그대로 붙습니다</span>
+      </div>
+      <p className="card-note">{data.line}</p>
+
+      <ul className="unclear-list">
+        {data.sections.map((sec) => (
+          <li key={sec.key} className={sec.mustFix ? 'must' : ''}>
+            <div className="unclear-sec">
+              <strong>{SECTION_BY_KEY[sec.key]?.label ?? sec.key}</strong>
+              <span className="card-note">
+                {sec.open > 0 ? `${sec.open}분이 막히셨습니다` : '다시 썼습니다'}
+                {sec.mustFix && ' — 두 분 이상이 같은 데서 막히셨으면 문서가 잘못 쓰인 것입니다'}
+              </span>
+            </div>
+
+            <ul className="unclear-flags">
+              {sec.flags.map((f) => (
+                <li key={f.id} className={f.fix ? 'fixed' : ''}>
+                  <p className="unclear-said">{f.body}</p>
+                  <span className="card-note">{ago(f.at)}</span>
+
+                  {f.fix ? (
+                    <p className="unclear-fixed">
+                      <strong>{f.fix.by}님이 다시 씀</strong> {f.fix.body}
+                    </p>
+                  ) : open === f.id ? (
+                    <div className="unclear-fix-form">
+                      <textarea
+                        rows={2}
+                        value={form.body}
+                        onChange={(e) => setForm((v) => ({ ...v, body: e.target.value }))}
+                        placeholder="어떻게 고치셨는지 — 이 문장이 부서 화면에 그대로 붙습니다"
+                      />
+                      {errors.body && <em className="field-error">{errors.body}</em>}
+                      <div className="row">
+                        <button type="button" className="btn-primary btn-sm" disabled={busy} onClick={() => fix(f.id)}>
+                          {busy ? '남기는 중…' : '다시 썼다고 남기기'}
+                        </button>
+                        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(null)}>
+                          그만두기
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(f.id)}>
+                      이 대목 다시 썼습니다
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }

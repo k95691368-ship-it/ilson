@@ -4650,3 +4650,130 @@ kbd {
   font-weight: 600;
   margin-bottom: 3px;
 }
+
+/* ===== 여기 모르겠습니다 ===== */
+/* 짚는 버튼이 크면 문서보다 버튼이 먼저 보인다. 작게 두되, 짚은 뒤에
+   붙는 표시는 눈에 띄게 한다 — 아무 표시가 없으면 "말해 봐야 소용없다"가
+   되고 그 뒤로는 아무도 안 짚는다. */
+.unclear {
+  margin-top: 8px;
+}
+.unclear-ask {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  width: auto;
+}
+.unclear-ask:hover {
+  color: var(--accent);
+}
+.unclear-note {
+  margin: 0 0 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.unclear-open {
+  background: var(--warning-bg);
+  color: var(--warning-text);
+}
+.unclear-fixed,
+.unclear-thanks {
+  background: var(--success-bg);
+  color: var(--success-text);
+}
+.unclear-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.unclear-form label {
+  display: grid;
+  gap: 4px;
+}
+.unclear-form label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.unclear-rest {
+  display: grid;
+  gap: 2px;
+}
+
+.unclear-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.unclear-list > li {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.unclear-list > li.must {
+  border-color: var(--warning);
+}
+.unclear-sec {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.unclear-sec strong {
+  font-size: 13px;
+  color: var(--text-h);
+}
+.unclear-flags {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.unclear-flags > li {
+  padding: 9px 10px;
+  border-left: 2px solid var(--warning);
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+}
+.unclear-flags > li.fixed {
+  border-left-color: var(--success);
+}
+.unclear-said {
+  margin: 0 0 3px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-h);
+}
+.unclear-fixed {
+  margin: 7px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.unclear-fixed > strong {
+  display: block;
+  margin-bottom: 3px;
+}
+.unclear-fix-form {
+  display: grid;
+  gap: 6px;
+  margin-top: 7px;
+}

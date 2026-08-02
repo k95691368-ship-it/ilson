@@ -1,6 +1,7 @@
-import { useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
+import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
 import ReportForm from '../components/ReportForm.jsx'
 import TeachQuarantine from '../components/TeachQuarantine.jsx'
 import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../shared/quota.js'
@@ -18,6 +19,18 @@ import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 // 계산은 이 브라우저에서 돈다. 파일이 서버로 올라가지 않는다.
 export default function ToolPage() {
   const { slug } = useParams()
+  // 대목마다 무슨 표시를 붙일지. 짚고 나서 아무 표시가 없으면
+  // "말해 봐야 소용없다"가 되고, 그 뒤로는 아무도 안 짚는다.
+  const [notes, setNotes] = useState({})
+  const loadNotes = useCallback(() => {
+    api
+      .get(`/tools/${encodeURIComponent(slug)}/unclear`)
+      .then((r) => setNotes(r.notes ?? {}))
+      .catch(() => {})
+  }, [slug])
+  useEffect(() => {
+    loadNotes()
+  }, [loadNotes])
   const { data, error, loading, reload } = useApi(`/tools/${slug}`)
   const toast = useToast()
   const [result, setResult] = useState(null)
@@ -119,12 +132,14 @@ export default function ToolPage() {
       <header className="page-head">
         <h1>{data.title}</h1>
         {data.manual?.intro && <p className="page-sub">{data.manual.intro}</p>}
+        <Unclear slug={slug} section="intro" notes={notes} reload={loadNotes} />
       </header>
 
       {data.manual?.when_to_run && (
         <div className="notice notice-info">
           <div className="notice-title">언제 돌리나요</div>
           <p>{data.manual.when_to_run}</p>
+          <Unclear slug={slug} section="when_to_run" notes={notes} reload={loadNotes} />
         </div>
       )}
 
@@ -253,6 +268,7 @@ export default function ToolPage() {
                 무엇을 해야 하는지는 사용법서를 보세요. 모르겠으면{' '}
                 {data.manual?.contact ?? '담당자'}에게 문의하세요.
               </p>
+              <Unclear slug={slug} section="quarantine" notes={notes} reload={loadNotes} />
             </section>
           )}
         </>
@@ -262,8 +278,21 @@ export default function ToolPage() {
         <section className="card">
           <div className="card-title">결과를 어떻게 쓰나요</div>
           <p className="card-note">{data.manual.what_to_do_after}</p>
+          <Unclear slug={slug} section="what_to_do_after" notes={notes} reload={loadNotes} />
         </section>
       )}
+
+      {/* 어떤 파일을 올리는지, 막혔을 때 누구에게 연락하는지도 짚을 수
+          있어야 한다. 여기가 실제로 막히는 자리다. */}
+      <section className="card unclear-rest">
+        <div className="card-title">사용법서에서 모르겠는 데가 있으신가요</div>
+        <p className="card-note">
+          쓴 사람은 다 압니다. 모르는 데가 어디인지는 실제로 읽는 분만 아십니다. 짚어 주시면 그
+          대목을 다시 씁니다 — 다음 분이 같은 데서 막히지 않게요.
+        </p>
+        <Unclear slug={slug} section="upload" notes={notes} reload={loadNotes} />
+        <Unclear slug={slug} section="contact" notes={notes} reload={loadNotes} />
+      </section>
 
       <footer className="tool-foot">
         <span>
@@ -416,6 +445,86 @@ function Tile({ label, value, tone }) {
       >
         {value}
       </div>
+    </div>
+  )
+}
+
+// 이 대목이 모르겠다고 짚는 자리.
+//
+// 막힌 자리에서 바로 짚을 수 있어야 한다. 사용법서 화면을 따로 열어야
+// 짚을 수 있으면, 막힌 순간에 짚지 못하고 그냥 전화를 건다.
+//
+// 이름은 안 받는다. 모르겠다고 말하는 일에 이름을 붙이라고 하면, 모르는
+// 것을 밝히는 것 자체가 부담이 되어 아무도 안 짚는다.
+function Unclear({ slug, section, notes, reload }) {
+  const [open, setOpen] = useState(false)
+  const [body, setBody] = useState('')
+  const [error, setError] = useState(null)
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(null)
+
+  const spec = SECTION_BY_KEY[section]
+  const note = notes?.[section] ?? null
+
+  async function send(e) {
+    e.preventDefault()
+    const bad = validateUnclear({ section, body })
+    if (bad.body) {
+      setError(bad.body)
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await api.post(`/tools/${encodeURIComponent(slug)}/unclear`, { section, body })
+      setDone(r.message)
+      setOpen(false)
+      setBody('')
+      reload()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="unclear">
+      {/* 담당자가 이미 다시 쓴 대목이면 그 말이 여기 붙는다. */}
+      {note && <p className={`unclear-note unclear-${note.tone}`}>{note.text}</p>}
+      {done && <p className="unclear-note unclear-thanks">{done}</p>}
+
+      {open ? (
+        <form className="unclear-form" onSubmit={send}>
+          <label>
+            <span>{spec?.label} — 무엇이 모르겠으신가요</span>
+            <textarea
+              rows={2}
+              value={body}
+              onChange={(e) => {
+                setBody(e.target.value)
+                setError(null)
+              }}
+              placeholder={spec?.hint}
+            />
+          </label>
+          {error && <em className="field-error">{error}</em>}
+          <small className="card-note">성함은 안 여쭙습니다. 적어주신 내용만 담당자에게 갑니다.</small>
+          <div className="row">
+            <button type="submit" className="btn-primary btn-sm" disabled={busy}>
+              {busy ? '보내는 중…' : '보내기'}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+              그만두기
+            </button>
+          </div>
+        </form>
+      ) : (
+        !done && (
+          <button type="button" className="unclear-ask" onClick={() => setOpen(true)}>
+            {spec?.label} — 여기 모르겠습니다
+          </button>
+        )
+      )}
     </div>
   )
 }
