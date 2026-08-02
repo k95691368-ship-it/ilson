@@ -10,6 +10,7 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_l
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { validateJoin, joinSummary, joinLine, joinReceipt, JOIN_KIND, UNJOIN_KIND } from '../../../../shared/join.js'
+import { withJosa } from '../../../../shared/korean.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -161,7 +162,7 @@ export async function onRequestPost({ env, request, params }) {
     const joins = await loadJoins(env, app.id)
     if (joins.some((j) => !j.released && j.dept === detail.dept)) {
       await releaseRateLimit(env, `join:${ip}`, ticket)
-      return jsonError(`${detail.dept}는 이미 손드셨습니다. 두 번 세지 않습니다.`, 409)
+      return jsonError(`${withJosa(detail.dept, '는')} 이미 손드셨습니다. 두 번 세지 않습니다.`, 409)
     }
 
     await env.DB.prepare(

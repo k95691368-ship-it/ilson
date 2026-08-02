@@ -12,6 +12,8 @@
 //
 // 여기서 그 서명을 받는다. 다만 서명 버튼 하나를 놓고 "동의합니다"를
 // 누르게 하지 않는다. 그건 아무도 안 읽는다.
+import { withJosa, listWithJosa } from './korean.js'
+
 
 export const SIGNOFF_KIND = '기준서명'
 export const OBJECTION_KIND = '기준이의'
@@ -228,7 +230,7 @@ export function signoffState({
       ...base,
       status: '이의 있음',
       canSign: waiting.length > 0,
-      headline: `${who(open)}가 ${open.length}개 항목에 이의를 다셨습니다`,
+      headline: `${withJosa(who(open), '가')} ${open.length}개 항목에 이의를 다셨습니다`,
       binding: false,
     }
   }
@@ -252,7 +254,7 @@ export function signoffState({
       ...base,
       status: '일부만 확인',
       canSign: true,
-      headline: `${[...signedDepts].join('·')}는 확인하셨습니다. ${waiting.join('·')}가 아직입니다`,
+      headline: `${listWithJosa([...signedDepts], '는')} 확인하셨습니다. ${listWithJosa(waiting, '가')} 아직입니다`,
       binding: false,
     }
   }
@@ -292,7 +294,7 @@ export function passCaveat(state) {
     // 이 일에 걸린 부서가 여럿인데 일부만 봤다는 것을 통과할 때마다 말한다.
     // 안 본 부서를 이의 없음으로 세면, 그 부서는 다 만들어진 뒤에 처음
     // 기준을 보게 되고 그때는 늦다.
-    return `${(s.waitingDepts ?? []).join('·')}가 아직 합격 기준을 확인하지 않았습니다. 이 통과는 ${(s.signedDepts ?? []).join('·')}의 확인만으로 낸 것입니다.`
+    return `${listWithJosa(s.waitingDepts ?? [], '가')} 아직 합격 기준을 확인하지 않았습니다. 이 통과는 ${(s.signedDepts ?? []).join('·')}의 확인만으로 낸 것입니다.`
   }
   return '부서가 아직 합격 기준을 확인하지 않았습니다. 이 통과는 담당자 혼자 정한 기준으로 낸 것입니다.'
 }

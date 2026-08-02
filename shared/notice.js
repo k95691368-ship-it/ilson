@@ -15,6 +15,7 @@
 
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from './resubmit.js'
 import { JOIN_KIND, UNJOIN_KIND } from './join.js'
+import { withJosa } from './korean.js'
 
 // 소식으로 삼을 만한 단계인가.
 //
@@ -103,7 +104,7 @@ function joinNotices(track) {
         stage: '신청서',
         at: d.created_at,
         headline: gone
-          ? `${deptOf(d)}가 붙였던 것은 다른 건으로 판정됐습니다`
+          ? `${withJosa(deptOf(d), '가')} 붙였던 것은 다른 건으로 판정됐습니다`
           : `${deptOf(d)}도 같은 일을 겪는다고 붙였습니다`,
         body: d.what,
         detail: null,
