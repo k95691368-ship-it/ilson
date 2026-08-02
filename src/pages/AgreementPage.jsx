@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { duration, krw, num, ago } from '../lib/format.js'
 import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
+import { HOURLY_WAGE_KRW, RUNS_PER_YEAR } from '../../shared/outcome.js'
 import {
   CRITERION_CATALOG,
   CONFLICT_VERDICTS,
@@ -836,6 +837,9 @@ function Criteria({ data, send, toast }) {
 
 // ── 기준선 ──────────────────────────────────────────────────
 function Baseline({ data, send, toast }) {
+  // 봉인할 때 같이 굳히는 값. 신청서에 적힌 체감값으로 채워 두고
+  // 담당자가 고칠 수 있게 한다 — 실측해 보면 신청서와 다를 때가 많다.
+  const [seal, setSeal] = useState({ people: '', frequency: '', hourly_wage_krw: '' })
   const runs = data.shadowRuns
   const b = data.baseline
 
@@ -919,6 +923,12 @@ function Baseline({ data, send, toast }) {
         </div>
       )}
 
+      {/* 몇 명이 몇 번 하는 일인지 여기서 확정한다.
+          이 두 값이 8단계 절감 계산의 곱하기 자리에 그대로 들어간다.
+          안 보내면 서버가 1명으로 봉인하고, 세 명이 하던 일의 절감이
+          3분의 1로 나온다. 그 숫자가 이 사이트의 결론이다. */}
+      {!b && <SealInputs seal={seal} setSeal={setSeal} app={data.application} />}
+
       {!b && (
         <button
           type="button"
@@ -926,7 +936,7 @@ function Baseline({ data, send, toast }) {
           style={{ marginTop: 12 }}
           disabled={runs.length < 3}
           onClick={async () => {
-            await send('post', { kind: 'baseline' })
+            await send('post', { kind: 'baseline', ...seal })
             toast.success('기준선을 봉인했습니다.')
           }}
         >
@@ -1058,5 +1068,65 @@ function Objections({ id, toast }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+// 봉인할 때 같이 굳히는 값.
+//
+// 인원과 주기는 8단계 절감 계산의 곱하기 자리에 그대로 들어간다. 이 칸이
+// 없던 동안 화면이 아무것도 안 보내서 서버가 전부 1명으로 봉인했고,
+// 세 명이 하던 일의 절감이 3분의 1로 나왔다. 오류는 어디에도 안 떴다.
+//
+// 신청서에 적힌 값으로 채워 둔다. 다만 그 값은 신청자의 체감이라,
+// 세 번 재 보고 다르면 담당자가 여기서 고친다.
+const FREQUENCIES = Object.keys(RUNS_PER_YEAR)
+
+function SealInputs({ seal, setSeal, app }) {
+  const set = (k) => (e) => setSeal((v) => ({ ...v, [k]: e.target.value }))
+  const ph = (v) => (v == null || v === '' ? '적혀 있지 않음' : String(v))
+
+  return (
+    <div className="seal-inputs">
+      <p className="card-note">
+        아래 두 값이 <strong>8단계 절감 계산에 그대로 곱해집니다</strong>. 신청서에 적힌 체감값을
+        채워 뒀습니다 — 재 보시고 다르면 여기서 고쳐 주세요.
+      </p>
+      <div className="seal-row">
+        <label>
+          <span>몇 분이 하십니까</span>
+          <input
+            type="number"
+            min="1"
+            value={seal.people}
+            onChange={set('people')}
+            placeholder={ph(app?.current_people)}
+          />
+          <small className="card-note">비워 두면 신청서 값({ph(app?.current_people)})으로 굳습니다</small>
+        </label>
+        <label>
+          <span>얼마나 자주</span>
+          <select value={seal.frequency} onChange={set('frequency')}>
+            <option value="">신청서 값 그대로 ({ph(app?.current_frequency)})</option>
+            {FREQUENCIES.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          <span>시급 (원)</span>
+          <input
+            type="number"
+            min="0"
+            step="1000"
+            value={seal.hourly_wage_krw}
+            onChange={set('hourly_wage_krw')}
+            placeholder={String(HOURLY_WAGE_KRW)}
+          />
+          <small className="card-note">비워 두면 {HOURLY_WAGE_KRW.toLocaleString()}원</small>
+        </label>
+      </div>
+    </div>
   )
 }

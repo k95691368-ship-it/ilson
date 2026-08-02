@@ -7,6 +7,7 @@
 import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
 import {
   agreementGate,
   quoteFound,
@@ -19,7 +20,9 @@ import {
 
 async function findApplication(env, id) {
   return env.DB.prepare(
-    'SELECT id, ticket_no, dept, title, status FROM application WHERE id = ? OR ticket_no = ?'
+    `SELECT id, ticket_no, dept, title, status,
+            current_minutes, current_people, current_frequency
+     FROM application WHERE id = ? OR ticket_no = ?`
   )
     .bind(id, id)
     .first()
@@ -331,9 +334,20 @@ export async function onRequestPost({ env, params, request }) {
             times[times.length - 1],
             times.length,
             runs.filter((r) => r.error_count > 0).length / runs.length,
-            Number(body.people) || 1,
-            t(body.frequency) || null,
-            Number(body.hourly_wage_krw) || 25000
+            // 신청서에 적힌 값을 기본으로 봉인한다.
+            //
+            // 처음에는 `Number(body.people) || 1`이었다. 그런데 봉인 화면에
+            // 인원 칸이 없어서 화면이 people을 한 번도 안 보냈고, 결국
+            // **몇 명이 하던 일이든 전부 1명으로 봉인됐다.** 신청서에 세
+            // 명이라고 적혀 있어도 8단계 계산식이 "90분 × 1명 × 12회"로
+            // 뜨고, 아낀 시간과 금액이 3분의 1로 나왔다. 아무 오류도 안 떴다.
+            //
+            // 주기도 같았다. 늘 null이라 성과 화면의
+            // `baseline?.frequency ?? app.current_frequency` 앞가지가
+            // 죽은 코드였다.
+            Number(body.people) || app.current_people || 1,
+            t(body.frequency) || app.current_frequency || null,
+            Number(body.hourly_wage_krw) || HOURLY_WAGE_KRW
           )
           .run()
 

@@ -74,7 +74,8 @@ export const RETRY_ADVICE = {
     change:
       '이미지나 영상은 여기서 만들지 않습니다. 다만 거기 들어갈 정보를 표로 정리하는 일이라면 그것만 따로 내 주세요 — 그건 받습니다.',
   },
-  no_input: {
+  // shared/review.js의 코드와 같아야 한다. DB CHECK 목록에 있는 값이다.
+  unstructured_only: {
     kind: 'later',
     change:
       '자동화할 자료가 아직 없어서 반려된 것입니다. 그 자료가 실제로 쌓이기 시작하면, 파일 한두 건을 붙여서 다시 내 주세요.',

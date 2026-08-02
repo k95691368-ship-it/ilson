@@ -21,6 +21,15 @@ export default function ToolPage() {
   const { slug } = useParams()
   // 대목마다 무슨 표시를 붙일지. 짚고 나서 아무 표시가 없으면
   // "말해 봐야 소용없다"가 되고, 그 뒤로는 아무도 안 짚는다.
+  // 누가 돌렸는가.
+  //
+  // 이걸 안 보내면 서버가 인수인계 받은 사람 이름으로 기록한다. 그래서 세
+  // 사람이 써도 실행 기록이 전부 한 이름이 되고, "지금까지 한 분만 쓰고
+  // 계십니다"라는 경보가 **늘 켜져 있었다.** 늘 켜진 경보는 경보가 아니다.
+  //
+  // 계정을 만들라고 하지는 않는다. 이 브라우저에 기억해 두고 다음부터는
+  // 안 묻는다.
+  const [whoRan, setWhoRan] = useState('')
   const [notes, setNotes] = useState({})
   const loadNotes = useCallback(() => {
     api
@@ -31,6 +40,18 @@ export default function ToolPage() {
   useEffect(() => {
     loadNotes()
   }, [loadNotes])
+
+  // 이 브라우저에서 이 도구를 돌린 사람. 한 번 적으면 다음부터 안 묻는다.
+  useEffect(() => {
+    if (whoRan) return
+    let saved = null
+    try {
+      saved = window.localStorage.getItem(`ilson:who:${slug}`)
+    } catch {
+      // 사생활 보호 모드면 저장소를 못 쓴다. 그때는 매번 적으시게 된다.
+    }
+    setWhoRan(saved || data?.handedTo?.person || '')
+  }, [slug, data, whoRan])
   const { data, error, loading, reload } = useApi(`/tools/${slug}`)
   const toast = useToast()
   const [result, setResult] = useState(null)
@@ -63,6 +84,7 @@ export default function ToolPage() {
         rows_out: r.rows.length,
         quarantined: r.quarantine.length,
         duration_ms: r.stats.durationMs,
+        actor_label: whoRan,
       })
 
       toast.success(`${num(r.rows.length)}줄을 합쳤습니다.`)
@@ -70,7 +92,7 @@ export default function ToolPage() {
     } catch (err) {
       toast.error(err.message)
       await api
-        .post(`/tools/${slug}`, { ok: false, fail_reason: err.message })
+        .post(`/tools/${slug}`, { ok: false, fail_reason: err.message, actor_label: whoRan })
         .catch(() => {})
     } finally {
       setRunning(false)
@@ -142,6 +164,30 @@ export default function ToolPage() {
           <Unclear slug={slug} section="when_to_run" notes={notes} reload={loadNotes} />
         </div>
       )}
+
+      {/* 누가 돌렸는지 남긴다. 이게 없으면 실행 기록이 전부 한 이름이 되고,
+          "한 분만 쓰고 계십니다" 경보가 늘 켜져 있게 된다. */}
+      <div className="who-ran">
+        <label>
+          <span>돌리시는 분</span>
+          <input
+            value={whoRan}
+            onChange={(e) => {
+              setWhoRan(e.target.value)
+              try {
+                window.localStorage.setItem(`ilson:who:${slug}`, e.target.value)
+              } catch {
+                // 저장소를 못 써도 이번 실행에는 실려 간다.
+              }
+            }}
+            placeholder={data.handedTo?.person ?? '성함'}
+          />
+        </label>
+        <span className="card-note">
+          실행 기록에 남습니다. 여러 분이 나눠 쓰시는지를 이걸로 압니다 — 한 분만 쓰고 계시면
+          그분이 자리를 비울 때 멈추기 때문입니다.
+        </span>
+      </div>
 
       <section className="card">
         <div

@@ -5010,3 +5010,67 @@ kbd {
   color: var(--text-h);
   font-weight: 600;
 }
+
+/* ===== 봉인할 때 같이 굳히는 값 ===== */
+/* 인원과 주기는 8단계 절감 계산의 곱하기 자리에 그대로 들어간다.
+   이 칸이 없던 동안 전부 1명으로 봉인됐고 절감이 인원수만큼 줄었다. */
+.seal-inputs {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+}
+.seal-inputs > p {
+  margin: 0 0 9px;
+  line-height: 1.75;
+}
+.seal-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.seal-row > label {
+  flex: 1;
+  min-width: 130px;
+  display: grid;
+  gap: 4px;
+}
+.seal-row > label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+/* ===== 돌리시는 분 ===== */
+/* 이름을 안 받으면 실행 기록이 전부 한 이름이 되고, "한 분만 쓰고 계십니다"
+   경보가 늘 켜져 있게 된다. 늘 켜진 경보는 경보가 아니다. */
+.who-ran {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.who-ran label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.who-ran label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  white-space: nowrap;
+}
+.who-ran input {
+  width: 160px;
+}
+.who-ran > .card-note {
+  flex: 1;
+  min-width: 200px;
+  line-height: 1.7;
+}

@@ -634,6 +634,10 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
         ok: true,
         channel,
         encoding: table.encoding ?? null,
+        // 판별에 확신이 있었는지. 이걸 안 실어 보내면 화면이 인코딩 이름만
+        // 보고 색을 추측하게 되고, 제대로 읽어 낸 CP949에 경고를 붙이는
+        // 거꾸로 된 표시가 나온다. xlsx에는 없는 값이라 없으면 확신으로 본다.
+        encodingConfident: table.encodingConfident ?? true,
         headerRowNo: table.headerRowNo,
         rowsIn: table.rows.length,
         rowsOut: okCount,

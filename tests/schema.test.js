@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { REFUSE_CODES } from '../shared/review.js'
 
 // 없는 컬럼을 쓰는 SQL을 배포 전에 잡는다.
 //
@@ -112,5 +113,23 @@ describe('SQL이 없는 컬럼을 쓰고 있지 않은지', () => {
     }
 
     expect(problems).toEqual([])
+  })
+})
+
+// 반려 사유 코드가 DB CHECK 목록과 갈라져 있었다.
+//
+// shared/review.js에는 no_input이 있는데 migrations의 CHECK에는 그 자리에
+// unstructured_only가 있었다. 그 사유로 반려하면 판정 저장이 통째로 500이
+// 났고, 같은 배치에 묶인 점수·근거·대안이 전부 롤백됐다. 담당자는 적어 둔
+// 것을 다 잃고 신청서는 '접수' 그대로 남았다.
+//
+// 위의 스키마 검사기는 CHECK로 시작하는 줄을 건너뛰기 때문에 이걸 못 잡았다.
+describe('CHECK 목록과 코드 목록', () => {
+  it('반려 사유가 DB가 받는 값과 같다', () => {
+    const sql = readFileSync(join(ROOT, 'migrations', '0003_review.sql'), 'utf8')
+    const m = sql.match(/refuse_code TEXT CHECK \(refuse_code IN \(([\s\S]*?)\)\)/)
+    expect(m).toBeTruthy()
+    const allowed = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]).sort()
+    expect([...REFUSE_CODES].sort()).toEqual(allowed)
   })
 })

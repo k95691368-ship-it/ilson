@@ -68,9 +68,13 @@ export default function FileList({ applicationId, files, compact = false }) {
                 <div key={i} className="file-sheet">
                   <div className="row" style={{ marginBottom: 6 }}>
                     {s.sheetName && <span className="badge badge-neutral">{s.sheetName}</span>}
+                    {/* 인코딩 이름으로 색을 정하면 안 된다.
+                        CP949를 노랗게 칠하고 있었는데, CP949는 제대로 읽어
+                        낸 것이고 오히려 판별을 못 한 쪽이 위험하다. 색 약속이
+                        신청 화면과 정반대였다. 판별에 확신이 있었는지로 칠한다. */}
                     {s.encoding && (
                       <span
-                        className={`badge ${s.encoding === 'CP949' ? 'badge-warning' : 'badge-neutral'}`}
+                        className={`badge ${s.encodingConfident === false ? 'badge-warning' : 'badge-neutral'}`}
                       >
                         {s.encoding}
                       </span>
@@ -81,11 +85,18 @@ export default function FileList({ applicationId, files, compact = false }) {
                     </span>
                   </div>
 
-                  {s.encoding === 'CP949' && (
+                  {s.encodingConfident === false ? (
                     <p className="card-note file-note">
-                      UTF-8이 아니라 CP949로 저장된 파일입니다. 엑셀에서 그냥 열면 한글이 깨질 수
-                      있는데, 여기서는 제대로 읽었습니다.
+                      글자 코드를 확실히 알아내지 못했습니다. 아래 미리보기에서 한글이 깨져 보이면
+                      그 파일은 저희가 제대로 못 읽은 것입니다 — 담당자에게 알려주세요.
                     </p>
+                  ) : (
+                    s.encoding === 'CP949' && (
+                      <p className="card-note file-note">
+                        UTF-8이 아니라 CP949로 저장된 파일입니다. 엑셀에서 그냥 열면 한글이 깨질 수
+                        있는데, 여기서는 제대로 읽었습니다.
+                      </p>
+                    )
                   )}
 
                   <div className="table-wrap" style={{ maxHeight: compact ? 200 : 280 }}>

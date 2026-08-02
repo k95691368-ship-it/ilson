@@ -117,11 +117,23 @@ export async function onRequestPost({ env, params, request }) {
 function buildWhat(application, v) {
   const head = `${application.ticket_no} · ${application.dept} · ${application.title}`
   const score = `임팩트 ${v.impact_score} / 난이도 ${v.difficulty_score}`
+  // 빈 값을 그대로 문장에 끼우면 안 된다.
+  //
+  // shared/review.js는 사유와 대안을 비워 둬도 저장한다 — 억지로 채운
+  // 스무 글자보다 빈 칸이 정직하기 때문이다. 그런데 여기서 그 null을
+  // 그대로 템플릿에 넣어서, 지워지지 않는 결정 기록에
+  // "반려(null). 대안: null"이 박혀 있었다.
+  const said = (value, whenEmpty) => {
+    const t = String(value ?? '').trim()
+    return t || whenEmpty
+  }
+
   if (v.verdict === '반려') {
-    return `${head} — 반려(${REFUSE_LABELS[v.refuse_code] ?? v.refuse_code}). 대안: ${v.refuse_alternative} [${score}]`
+    const why = REFUSE_LABELS[v.refuse_code] ?? said(v.refuse_code, '사유를 안 고름')
+    return `${head} — 반려(${why}). 대안: ${said(v.refuse_alternative, '적지 않음')} [${score}]`
   }
   if (v.verdict === '보류') {
-    return `${head} — 보류. 다시 볼 조건: ${v.hold_until_condition} [${score}]`
+    return `${head} — 보류. 다시 볼 조건: ${said(v.hold_until_condition, '적지 않음')} [${score}]`
   }
   return `${head} — 수용 [${score}]`
 }

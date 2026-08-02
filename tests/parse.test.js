@@ -180,3 +180,49 @@ describe('엑셀 읽기', () => {
     expect(findHeaderRow(rows, [])).toBe(1)
   })
 })
+
+// 값 안에 줄바꿈이 든 CSV에서 원본 줄 번호가 밀렸다.
+//
+// 따옴표 안의 줄바꿈을 소비만 하고 세지 않아서, 상품명에 줄바꿈이 든
+// 정산서를 올리면 그 지점 이후 '줄' 칸이 통째로 당겨졌다. 되짚기가 가리키는
+// 원본 줄이 실제와 어긋난다 — 이 사이트가 내세우는 것이 바로 그 되짚기다.
+describe('원본 줄 번호는 파일의 물리적 줄이다', () => {
+  const enc = (s) => new TextEncoder().encode(s)
+
+  it('값 안에 줄바꿈이 있어도 그다음 줄 번호가 안 밀린다', () => {
+    const t = readCsv(enc('a,b\n"x\ny",2\n"p",3\n'))
+    expect(t.rows.map((r) => r.rowNo)).toEqual([2, 4])
+  })
+
+  it('값 안의 줄바꿈은 값에 그대로 남는다', () => {
+    const t = readCsv(enc('a,b\n"x\ny",2\n'))
+    expect(t.rows[0].cells[0]).toBe('x\ny')
+  })
+
+  it('빈 줄을 건너뛰어도 번호는 물리적 줄 그대로다', () => {
+    const t = readCsv(enc('a,b\n1,2\n\n3,4\n'))
+    expect(t.rows.map((r) => r.rowNo)).toEqual([2, 4])
+  })
+
+  it('CRLF는 한 줄로 센다', () => {
+    const t = readCsv(enc('a,b\r\n1,2\r\n3,4\r\n'))
+    expect(t.rows.map((r) => r.rowNo)).toEqual([2, 3])
+  })
+
+  it('값 안에 CRLF가 있어도 한 줄로 센다', () => {
+    const t = readCsv(enc('a,b\r\n"x\r\ny",2\r\n"p",3\r\n'))
+    expect(t.rows.map((r) => r.rowNo)).toEqual([2, 4])
+  })
+})
+
+// 인코딩 판별에 확신이 있었는지를 표에 실어 보낸다.
+//
+// 이걸 안 실어 보내서 화면이 인코딩 이름만 보고 색을 추측했고, 제대로
+// 읽어 낸 CP949에 노란 경고를 붙이고 판별 못 한 것에 회색 중립을 붙이고
+// 있었다. 정확히 반대다.
+describe('인코딩 판별 확신', () => {
+  it('표에 같이 실려 나온다', () => {
+    const t = readCsv(new TextEncoder().encode('a,b\n1,2\n'))
+    expect(t).toHaveProperty('encodingConfident')
+  })
+})

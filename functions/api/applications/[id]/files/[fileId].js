@@ -64,6 +64,11 @@ export async function onRequestGet({ env, params, request }) {
         sheets: tables.map((t) => ({
           sheetName: t.sheetName,
           encoding: t.encoding ?? null,
+          // 판별에 확신이 있었는지. 이걸 안 실어 보내서 화면이 인코딩
+          // 이름만 보고 색을 추측했고, 제대로 읽어 낸 CP949에 노란 경고를
+          // 붙이고 판별 못 한 것에 회색 중립을 붙이고 있었다. 정확히 반대다.
+          // xlsx에는 없는 값이라 없으면 확신한 것으로 본다.
+          encodingConfident: t.encodingConfident ?? true,
           headerRowNo: t.headerRowNo,
           header: t.header,
           rows: t.rows.slice(0, PREVIEW_ROWS).map((r) => ({ rowNo: r.rowNo, cells: r.cells })),

@@ -237,3 +237,32 @@ describe('두 곳에 있는 같은 표', () => {
     expect(master.HOURLY_WAGE_KRW).toBe(HOURLY_WAGE_KRW)
   })
 })
+
+// 기준선을 인원수 없이 봉인해서 절감액이 인원수만큼 줄고 있었다.
+//
+// 봉인 화면에 인원 칸이 없어서 화면이 people을 한 번도 안 보냈고, 서버는
+// `Number(body.people) || 1`이라 몇 명이 하던 일이든 전부 1명으로 굳었다.
+// 신청서에 세 명이라고 적혀 있어도 계산식이 "× 1명"으로 뜨고 절감이
+// 3분의 1로 나왔다. 아무 오류도 안 떴다.
+describe('인원수가 절감액에 그대로 곱해진다', () => {
+  const one = { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 }
+  const three = { ...one, people: 3 }
+  const runs = [{ duration_ms: 60000, human_review_seconds: 300 }]
+
+  it('세 명이면 아낀 시간이 세 배다', () => {
+    const a = computeOutcome({ baseline: one, runs })
+    const b = computeOutcome({ baseline: three, runs })
+    expect(b.manualSeconds).toBe(a.manualSeconds * 3)
+    expect(b.savedSeconds).toBeGreaterThan(a.savedSeconds * 2.9)
+  })
+
+  it('인원이 비어 있으면 한 명으로 본다', () => {
+    // 0으로 세면 절감이 통째로 사라지고, 큰 수로 세면 부풀려진다.
+    expect(computeOutcome({ baseline: { ...one, people: null }, runs }).people).toBe(1)
+  })
+
+  it('계산식 줄에도 인원이 적힌다', () => {
+    const o = computeOutcome({ baseline: three, runs })
+    expect(o.formula[0].note).toContain('3명')
+  })
+})

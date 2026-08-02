@@ -82,25 +82,44 @@ export function splitLine(line, delimiter) {
 }
 
 // 줄 나누기. 값 안에 줄바꿈이 들어 있는 경우(따옴표 안)를 감안한다.
+//
+// **레코드가 파일 몇 번째 줄에서 시작했는지도 같이 돌려준다.**
+//
+// 처음에는 문자열 배열만 돌려주고 부르는 쪽에서 순번으로 줄 번호를 매겼다.
+// 따옴표 안의 줄바꿈을 소비만 하고 세지 않아서, 상품명에 줄바꿈이 든
+// 정산서를 올리면 그 지점 이후 '줄' 칸이 통째로 당겨졌다. 되짚기가 가리키는
+// 원본 줄이 실제와 어긋난다 — 이 사이트가 내세우는 것이 바로 그 되짚기다.
 function splitLines(text) {
   const lines = []
   let cur = ''
   let inQuote = false
+  let physical = 1 // 지금 읽는 문자가 파일 몇 번째 줄에 있나
+  let startedAt = 1 // 지금 모으는 레코드가 시작한 줄
 
   for (let i = 0; i < text.length; i++) {
     const ch = text[i]
     if (ch === '"') inQuote = !inQuote
 
-    if (!inQuote && (ch === '\n' || ch === '\r')) {
+    if (ch === '\n' || ch === '\r') {
       // \r\n 은 한 번만 센다
-      if (ch === '\r' && text[i + 1] === '\n') i += 1
-      lines.push(cur)
+      const crlf = ch === '\r' && text[i + 1] === '\n'
+      if (inQuote) {
+        // 값 안의 줄바꿈. 레코드는 안 끝나지만 파일 줄 수는 늘어난다.
+        cur += crlf ? '\n' : ch
+        if (crlf) i += 1
+        physical += 1
+        continue
+      }
+      if (crlf) i += 1
+      lines.push({ rowNo: startedAt, line: cur })
       cur = ''
+      physical += 1
+      startedAt = physical
     } else {
       cur += ch
     }
   }
-  if (cur !== '') lines.push(cur)
+  if (cur !== '') lines.push({ rowNo: startedAt, line: cur })
   return lines
 }
 
@@ -111,11 +130,9 @@ export function readCsv(buffer) {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
   const { text, encoding, confident } = detectEncoding(bytes)
 
-  const lines = splitLines(stripBom(text))
   // 완전히 빈 줄은 세지 않되, 원본 몇 번째 줄이었는지는 기억한다.
-  const numbered = lines
-    .map((line, i) => ({ rowNo: i + 1, line }))
-    .filter((r) => r.line.trim() !== '')
+  // 줄 번호는 splitLines가 물리적으로 세어 준 값을 그대로 쓴다.
+  const numbered = splitLines(stripBom(text)).filter((r) => r.line.trim() !== '')
 
   if (numbered.length === 0) {
     return { sheetName: '', headerRowNo: 0, header: [], rows: [], encoding, encodingConfident: confident }
