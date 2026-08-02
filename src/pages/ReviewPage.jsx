@@ -59,6 +59,9 @@ export default function ReviewPage() {
   const toast = useToast()
   const [selectedId, setSelectedId] = useState(null)
   const [seeding, setSeeding] = useState(false)
+  // 되돌릴 수 없는 일이라 한 번 더 묻는다. 확인 창을 띄우지 않고 버튼
+  // 자리에서 묻는 이유는, 확인 창은 사람이 안 읽고 닫기 때문이다.
+  const [confirmWipe, setConfirmWipe] = useState(false)
   // 여러 건을 한 번에.
   //
   // 신청서가 밀리는 이유는 판정이 어려워서가 아니라, 한 건 열고 읽고 닫고를
@@ -84,6 +87,12 @@ export default function ReviewPage() {
   const totals = useMemo(() => sumAnnualHours(visible), [visible])
   const queue = useMemo(() => queueStats(visible), [visible])
   const statuses = useMemo(() => presentStatuses(items), [items])
+  // 시연용으로 심은 것이 몇 건 남아 있는가. 접수번호로만 가른다 —
+  // 다른 기준을 쓰면 실제 신청서가 걸릴 여지가 생긴다.
+  const demoCount = useMemo(
+    () => items.filter((i) => String(i.ticket_no ?? '').startsWith('AX-DEM-')).length,
+    [items]
+  )
 
   // 서버가 한 번에 주는 것에는 상한이 있다. 그 상한에 걸렸는지를 화면이
   // 알아야 "없습니다"와 "여기까지만 받아 왔습니다"를 구분해 말할 수 있다.
@@ -197,6 +206,25 @@ export default function ReviewPage() {
     }
   }
 
+  // 심는 것만 있고 지우는 것이 없었다.
+  //
+  // 심기 버튼은 접수함이 비었을 때만 나온다. 그래서 한 번 심고 나면 그
+  // 버튼이 사라지고, 시연을 다시 처음부터 하려면 손댈 데가 없다. 두 번째
+  // 시연에 첫 번째 흔적이 그대로 남는다.
+  async function unseed() {
+    setSeeding(true)
+    try {
+      const r = await api.remove('/demo/seed')
+      toast.success(r.message ?? `시연 신청서 ${r.removed}건을 지웠습니다.`)
+      setConfirmWipe(false)
+      await reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSeeding(false)
+    }
+  }
+
   return (
     <div className="stack">
       <StageHeader stageKey="review" />
@@ -221,6 +249,42 @@ export default function ReviewPage() {
           <button type="button" className="btn-primary" onClick={seed} disabled={seeding}>
             {seeding ? '심는 중…' : '시연 신청서 심기'}
           </button>
+        </section>
+      )}
+
+      {/* 심는 자리만 있고 지우는 자리가 없었다. 심기 버튼은 접수함이 비었을
+          때만 나오므로, 한 번 심으면 되돌릴 데가 사라진다. 두 번째 시연에
+          첫 번째 흔적이 그대로 남는다. */}
+      {demoCount > 0 && (
+        <section className="demo-wipe">
+          <div className="demo-wipe-text">
+            <strong>지금 접수함에 시연용 신청서 {demoCount}건이 섞여 있습니다.</strong>
+            <p className="card-note">
+              접수번호가 AX-DEM- 으로 시작하는 것만 지웁니다. 실제로 들어온 신청서는 건드리지
+              않습니다. 딸린 결정 기록도 같이 지웁니다 — 신청서만 지우면 없는 신청서를 가리키는
+              기록이 남습니다.
+            </p>
+          </div>
+          {confirmWipe ? (
+            <div className="demo-wipe-ask">
+              <span className="card-note">되돌릴 수 없습니다.</span>
+              <button type="button" className="btn-danger btn-sm" onClick={unseed} disabled={seeding}>
+                {seeding ? '지우는 중…' : `${demoCount}건 지웁니다`}
+              </button>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                onClick={() => setConfirmWipe(false)}
+                disabled={seeding}
+              >
+                그만두기
+              </button>
+            </div>
+          ) : (
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setConfirmWipe(true)}>
+              시연 신청서 지우기
+            </button>
+          )}
         </section>
       )}
 

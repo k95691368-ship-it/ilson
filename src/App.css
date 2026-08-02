@@ -4323,3 +4323,54 @@ kbd {
   flex-wrap: wrap;
   font-size: 13px;
 }
+
+/* ===== 이 배포가 살아 있는가 ===== */
+/* 다 준비됐으면 한 줄로 조용히 지나간다. 늘 상태창이 떠 있으면 아무도 안 읽는다. */
+.honest-ready {
+  margin: 0;
+  padding: 10px 2px 0;
+  border-top: 1px dashed var(--border);
+  line-height: 1.7;
+}
+.honest-ready-list {
+  list-style: none;
+  margin: 8px 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+/* ===== 시연 신청서 지우기 ===== */
+/* 되돌릴 수 없는 일이라 한 번 더 묻는다. 확인 창을 안 띄우는 이유는
+   확인 창은 사람이 안 읽고 닫기 때문이다. */
+.demo-wipe {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.demo-wipe-text {
+  flex: 1;
+  min-width: 240px;
+}
+.demo-wipe-text strong {
+  display: block;
+  font-size: 13px;
+  color: var(--text-h);
+  margin-bottom: 4px;
+}
+.demo-wipe-text p {
+  margin: 0;
+  line-height: 1.7;
+}
+.demo-wipe-ask {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}

@@ -78,16 +78,47 @@ export async function onRequestPost({ env, request }) {
 }
 
 // 심은 것만 지운다. 사람이 실제로 낸 신청서는 건드리지 않는다.
+//
+// 접수번호가 AX-DEM- 으로 시작하는 것만 고른다. 이 조건을 넓히면 시연 중
+// 실수 한 번으로 실제 신청서가 날아간다.
+//
+// 딸린 기록은 대부분 표가 알아서 같이 지운다(ON DELETE CASCADE). 그런데
+// **결정 기록은 아니다** — 여덟 단계를 관통하려고 일부러 신청서에 매달지
+// 않고 만든 표라, 신청서를 지워도 그대로 남는다. 그러면 결정 기록 화면에
+// 없는 신청서를 가리키는 줄이 남는다. 손으로 같이 지운다.
 export async function onRequestDelete({ env, request }) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `demo-seed:${ip}`, 8, 3600)
   if (!ticket) return jsonError('시간당 8회까지 가능합니다.', 429)
 
   try {
-    const res = await env.DB.prepare('DELETE FROM application WHERE ticket_no LIKE ?')
+    const { results: targets } = await env.DB.prepare(
+      'SELECT id, ticket_no FROM application WHERE ticket_no LIKE ?'
+    )
       .bind('AX-DEM-%')
-      .run()
-    return jsonResponse({ ok: true, removed: res.meta?.changes ?? 0 })
+      .all()
+
+    if (targets.length === 0) {
+      return jsonResponse({ ok: true, removed: 0, decisionsRemoved: 0, message: '지울 시연 신청서가 없습니다.' })
+    }
+
+    const ids = targets.map((t) => t.id)
+    const holes = ids.map(() => '?').join(',')
+
+    // 한 묶음으로 돌린다. 따로 돌리다 중간에 끊기면 신청서는 사라졌는데
+    // 결정 기록만 남은 상태가 되고, 그건 지금 고치려는 그 상태다.
+    const [decisions] = await env.DB.batch([
+      env.DB.prepare(`DELETE FROM decision_log WHERE application_id IN (${holes})`).bind(...ids),
+      env.DB.prepare(`DELETE FROM application WHERE id IN (${holes})`).bind(...ids),
+    ])
+
+    return jsonResponse({
+      ok: true,
+      removed: targets.length,
+      decisionsRemoved: decisions?.meta?.changes ?? 0,
+      tickets: targets.map((t) => t.ticket_no),
+      message: `시연 신청서 ${targets.length}건과 거기 딸린 결정 기록을 지웠습니다.`,
+    })
   } catch (err) {
     return jsonError(`지우지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
   }

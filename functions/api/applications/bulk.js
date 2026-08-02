@@ -5,14 +5,7 @@
 // 반려된 신청서가 생기면 부서는 그걸 알아챈다.
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../_lib/http.js'
-import {
-  validateBulk,
-  partition,
-  resultText,
-  BULK_ACTIONS,
-  BULK_BY_CODE,
-  MAX_AT_ONCE,
-} from '../../../shared/bulk.js'
+import { validateBulk, partition, resultText, BULK_BY_CODE } from '../../../shared/bulk.js'
 
 export async function onRequestPost({ env, request }) {
   let body
@@ -97,10 +90,11 @@ export async function onRequestPost({ env, request }) {
   }
 }
 
-// 무엇을 한 번에 할 수 있는지 화면이 물어본다.
+// 무엇을 한 번에 할 수 있는지는 화면이 서버에 묻지 않는다.
 //
-// 목록을 화면에 박아 두지 않는다. 박아 두면 서버에서 하나 빼도 화면에는
-// 그대로 남아, 누르면 400이 나는 버튼이 생긴다.
-export function onRequestGet() {
-  return jsonResponse({ actions: BULK_ACTIONS, maxAtOnce: MAX_AT_ONCE })
-}
+// 처음에는 목록을 내려주는 GET을 뒀었다. "화면에 박아 두면 서버에서 하나
+// 빼도 버튼이 남는다"는 이유였는데, 이 프로젝트에서는 그 걱정이 성립하지
+// 않는다. 목록이 shared/bulk.js 한 곳에 있고 화면과 서버가 그 파일을 같이
+// 쓰기 때문이다. 어긋날 수가 없는 것을 왕복 한 번 더 들여 물어보는 꼴이라
+// 지웠다. 아무도 안 부르는 창구를 남겨 두면, 뒤에 읽는 사람이 화면이
+// 그걸 쓰는 줄 안다.

@@ -253,7 +253,51 @@ export default function HonestyPage() {
       )}
 
       <RefuseCatalog />
+      <Ready />
     </div>
+  )
+}
+
+// 이 배포가 실제로 살아 있는가.
+//
+// 서버에는 검사 창구가 있는데 화면에서 아무도 안 불렀다. 그래서 D1 바인딩이나
+// 스키마가 빠진 채 올라가면, 첫 화면은 멀쩡히 뜨고 각 API만 503을 낸다.
+// 올린 사람은 원인이 아니라 증상만 본다.
+//
+// 이 화면에 두는 이유는, 여기가 "무엇이 안 됐는가"를 말하는 자리이기 때문이다.
+// 다 준비됐으면 한 줄로 조용히 지나간다 — 늘 상태창이 떠 있으면 아무도 안 읽는다.
+function Ready() {
+  const { data, error } = useApi('/health')
+  if (error || !data) return null
+
+  const labels = { db: '데이터베이스(D1) 연결', schema: '표 구조 적용', r2: '파일 보관소(R2) 연결' }
+
+  if (data.ready) {
+    return (
+      <p className="card-note honest-ready">
+        이 배포는 준비된 상태입니다 — {Object.values(labels).join(' · ')} 모두 확인됨. 표{' '}
+        {num(data.tables.length)}개.
+      </p>
+    )
+  }
+
+  return (
+    <section className="notice notice-danger">
+      <div className="notice-title">이 배포는 아직 덜 준비됐습니다</div>
+      <ul className="honest-ready-list">
+        {Object.entries(labels).map(([key, label]) => (
+          <li key={key}>
+            <span aria-hidden="true">{data.checks[key] ? '○' : '✕'}</span> {label}
+            {data.checks[key] ? ' — 됨' : ' — 안 됨'}
+          </li>
+        ))}
+      </ul>
+      {data.notes.map((n) => (
+        <p key={n} className="card-note">
+          {n}
+        </p>
+      ))}
+    </section>
   )
 }
 
