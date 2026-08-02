@@ -13,6 +13,8 @@
 // 남는 식으로. 뽑아 쓰면 어긋날 수가 없고, 이미 진행된 신청서에도 그대로
 // 적용된다.
 
+import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from './resubmit.js'
+
 // 소식으로 삼을 만한 단계인가.
 //
 // '대기'는 소식이 아니다. 아무 일도 안 일어났다는 것을 알리는 것은
@@ -47,6 +49,34 @@ const HEADLINE = {
   성과: (t) => (t.status === '완료' ? '성과를 확인해 주셨습니다' : '넘긴 뒤 실제로 쓰이고 있습니다'),
 }
 
+// 반려된 신청서를 고쳐서 다시 낸 것.
+//
+// 이건 여덟 단계 타임라인에 안 나온다. 한 신청서 안에서 일어난 일이 아니라
+// 두 신청서 사이에서 일어난 일이기 때문이다. 그래서 기록에서 따로 뽑는다.
+//
+// 안 뽑으면 어떻게 되냐면, 부서가 앞 접수번호를 다시 열었을 때 "반려했습니다"
+// 에서 이야기가 끊긴다. 자기가 고쳐 낸 것이 어디 갔는지 알 수가 없다.
+function resubmitNotices(track) {
+  return (track?.decisions ?? [])
+    .filter((d) => d.link_kind === RESUBMIT_KIND || d.link_kind === RESUBMIT_BACK_KIND)
+    .map((d) => {
+      const forward = d.link_kind === RESUBMIT_BACK_KIND
+      return {
+        // 단계 이름을 열쇠로 쓰면 접수 소식과 부딪친다.
+        key: `resubmit:${d.id}`,
+        stage: '신청서',
+        at: d.created_at,
+        headline: forward
+          ? '고쳐서 다시 내셨습니다'
+          : '앞에 반려된 신청서를 고쳐서 내신 것입니다',
+        body: forward ? `바꾸신 점 — ${d.what}` : d.what,
+        detail: null,
+        link: d.link_ticket ? `/track?no=${d.link_ticket}` : null,
+        linkLabel: forward ? '새 신청서 보기' : '앞 신청서 보기',
+      }
+    })
+}
+
 export function noticesFrom(track) {
   const timeline = track?.timeline ?? []
   const notices = timeline.filter(happened).map((t) => ({
@@ -60,6 +90,8 @@ export function noticesFrom(track) {
     detail: t.detail ?? null,
     link: t.link ?? null,
   }))
+
+  notices.push(...resubmitNotices(track))
 
   // 최근 것이 위로. 알림은 옛날 것부터 읽는 물건이 아니다.
   notices.sort((a, b) => String(b.at ?? '').localeCompare(String(a.at ?? '')))

@@ -263,6 +263,14 @@ function Result({ data, onChanged }) {
                 </div>
                 <div className="notice-headline">{n.headline}</div>
                 <div className="notice-body">{n.body}</div>
+                {/* 소식이 다른 신청서를 가리키면 그리로 갈 수 있어야 한다.
+                    "고쳐서 다시 내셨습니다"만 적어 두고 그 신청서로 가는
+                    길이 없으면, 부서는 접수번호를 손으로 옮겨 적는다. */}
+                {n.link && (
+                  <Link to={n.link} className="btn-ghost btn-sm notice-link">
+                    {n.linkLabel ?? '열어 보기'}
+                  </Link>
+                )}
               </li>
             ))}
           </ol>

@@ -14,6 +14,31 @@ import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { annualHours } from '../../_lib/applications.js'
 import { REFUSE_REASONS } from '../../../shared/review.js'
+import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
+
+// 기록이 다른 신청서를 가리키고 있으면 그 접수번호를 붙여 준다.
+//
+// link_id는 내부 id라 부서에게는 아무 뜻이 없다. 이걸 안 붙이면 화면은
+// 기록 본문에서 접수번호를 글자로 뽑아 쓰게 되는데, 문구를 한 번 고치는
+// 날 조용히 끊긴다.
+async function withLinkedTickets(env, rows) {
+  const linked = [RESUBMIT_KIND, RESUBMIT_BACK_KIND]
+  const ids = [...new Set(rows.filter((d) => linked.includes(d.link_kind)).map((d) => d.link_id))]
+  if (ids.length === 0) return rows
+
+  const { results } = await env.DB.prepare(
+    `SELECT id, ticket_no FROM application WHERE id IN (${ids.map(() => '?').join(',')})`
+  )
+    .bind(...ids)
+    .all()
+  const byId = new Map(results.map((r) => [r.id, r.ticket_no]))
+
+  // 상대 신청서가 지워졌으면 null이 그대로 간다. 화면은 그때 링크를 안
+  // 건다 — 없는 데로 보내는 버튼보다 버튼이 없는 편이 낫다.
+  return rows.map((d) =>
+    linked.includes(d.link_kind) ? { ...d, link_ticket: byId.get(d.link_id) ?? null } : d
+  )
+}
 
 const STAGES = [
   '신청서',
@@ -260,7 +285,12 @@ export async function onRequestGet({ env, params, request }) {
       timeline,
       stages: STAGES,
       currentStage: currentIndex >= 0 ? timeline[currentIndex].stage : '신청서',
-      decisions: decisions.results,
+      // 재신청으로 이어진 기록에는 상대 접수번호를 붙여 준다.
+      //
+      // link_id는 내부 id라 부서에게는 아무 뜻이 없다. 화면에서 "그 신청서
+      // 보기"를 누르려면 접수번호가 있어야 하는데, 그것을 기록 본문에서
+      // 글자로 뽑아 쓰면 문구를 한 번 고치는 날 조용히 끊긴다.
+      decisions: await withLinkedTickets(env, decisions.results),
       // 다른 신청서와 같은 건으로 묶였으면 그것부터 알려야 한다.
       // 부서 입장에서 가장 중요한 소식이다 — 모르면 이미 만들고 있는 것을
       // 두고 몇 주를 기다린다.

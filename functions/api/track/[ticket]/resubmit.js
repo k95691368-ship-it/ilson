@@ -16,6 +16,7 @@ import {
   carryOver,
   resubmitNote,
   RESUBMIT_KIND,
+  RESUBMIT_BACK_KIND,
 } from '../../../../shared/resubmit.js'
 
 async function loadPrevious(env, ticket) {
@@ -39,7 +40,7 @@ async function loadPrevious(env, ticket) {
     env.DB.prepare(
       'SELECT COUNT(*) AS n FROM decision_log WHERE application_id = ? AND link_kind = ?'
     )
-      .bind(app.id, RESUBMIT_KIND)
+      .bind(app.id, RESUBMIT_BACK_KIND)
       .first(),
   ])
 
@@ -176,7 +177,7 @@ export async function onRequestPost({ env, request, params }) {
         title: `고쳐서 다시 내셨습니다 — ${ticketNo}`,
         what: `${t(draft.changed)}`,
         why: '반려에서 이야기가 끊기면, 부서는 그 뒤에 무슨 일이 있었는지 알 수 없다.',
-        linkKind: RESUBMIT_KIND,
+        linkKind: RESUBMIT_BACK_KIND,
         linkId: id,
       }),
     ]).catch(() => {})

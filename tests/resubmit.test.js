@@ -168,6 +168,16 @@ describe('앞 신청서에서 가져올 것', () => {
   })
 })
 
+describe('양쪽 기록에 서로 다른 이름을 쓴다', () => {
+  it('새 신청서 쪽과 앞 신청서 쪽이 구분된다', async () => {
+    // 둘 다 같은 이름이면, 기록 한 줄만 보고는 이것이 "고쳐서 낸 새
+    // 신청서"인지 "고쳐서 다시 내신 앞 신청서"인지 가릴 수 없다. 제목
+    // 글자를 뒤져 가리는 방법은 문구를 고치는 날 조용히 틀린다.
+    const { RESUBMIT_KIND, RESUBMIT_BACK_KIND } = await import('../shared/resubmit.js')
+    expect(RESUBMIT_KIND).not.toBe(RESUBMIT_BACK_KIND)
+  })
+})
+
 describe('접수함에 보이는 한 줄', () => {
   it('앞 접수번호와 바뀐 점을 같이 적는다', () => {
     // 새 신청서처럼 섞여 들어오면 담당자는 자기가 반려한 것인 줄 모르고

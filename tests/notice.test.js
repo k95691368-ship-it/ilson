@@ -163,3 +163,53 @@ describe('브라우저에 남기는 열쇠', () => {
     expect(seenKey('ax-abc-123')).toBe(seenKey('AX-ABC-123'))
   })
 })
+
+// 반려된 신청서를 고쳐서 다시 낸 것은 여덟 단계 타임라인에 안 나온다.
+// 한 신청서 안에서 일어난 일이 아니라 두 신청서 사이에서 일어난 일이라서다.
+// 안 뽑으면 부서가 앞 접수번호를 다시 열었을 때 "반려했습니다"에서
+// 이야기가 끊기고, 자기가 고쳐 낸 것이 어디 갔는지 알 수가 없다.
+describe('고쳐서 다시 낸 것', () => {
+  const track = (kind, extra = {}) => ({
+    timeline: [],
+    decisions: [
+      {
+        id: 'dec_1',
+        stage: '신청서',
+        title: '무엇',
+        what: '즉시가 아니라 하루 한 번으로 바꿨습니다',
+        link_kind: kind,
+        link_id: 'app_other',
+        created_at: '2026-08-02 01:00:00',
+        ...extra,
+      },
+    ],
+  })
+
+  it('앞 신청서에서는 어디로 갔는지 알려준다', () => {
+    const n = noticesFrom(track('재신청됨', { link_ticket: 'AX-NEW-001' }))[0]
+    expect(n.headline).toContain('다시 내셨습니다')
+    expect(n.link).toBe('/track?no=AX-NEW-001')
+  })
+
+  it('새 신청서에서는 어디서 왔는지 알려준다', () => {
+    const n = noticesFrom(track('재신청', { link_ticket: 'AX-OLD-001' }))[0]
+    expect(n.headline).toContain('고쳐서 내신 것')
+    expect(n.link).toBe('/track?no=AX-OLD-001')
+  })
+
+  it('상대 신청서가 없으면 링크를 안 건다', () => {
+    // 없는 데로 보내는 버튼보다 버튼이 없는 편이 낫다.
+    expect(noticesFrom(track('재신청', { link_ticket: null }))[0].link).toBeNull()
+  })
+
+  it('접수 소식과 열쇠가 부딪치지 않는다', () => {
+    const t = track('재신청됨', { link_ticket: 'AX-N' })
+    t.timeline = [{ stage: '신청서', status: '완료', at: '2026-08-01 00:00:00', summary: '냈습니다' }]
+    const keys = noticesFrom(t).map((x) => x.key)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('기록이 없어도 터지지 않는다', () => {
+    expect(() => noticesFrom({ timeline: [] })).not.toThrow()
+  })
+})

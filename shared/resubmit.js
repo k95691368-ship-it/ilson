@@ -93,7 +93,13 @@ export const RETRY_ADVICE = {
 export const MAX_RESUBMIT = 2
 
 // 다시 낸 것을 앞 신청서와 잇는 표시. decision_log의 link_kind로 쓴다.
-export const RESUBMIT_KIND = '재신청'
+//
+// 양쪽에 서로 다른 이름을 쓴다. 처음에는 둘 다 '재신청'으로 뒀는데, 그러면
+// 기록 한 줄만 보고는 이것이 "고쳐서 낸 새 신청서"인지 "고쳐서 다시 내신
+// 앞 신청서"인지 가릴 수가 없다. 제목 글자를 뒤져서 가리는 방법도 있지만,
+// 문구를 한 번 고치면 그날로 조용히 틀린다.
+export const RESUBMIT_KIND = '재신청' // 새 신청서 쪽 — link_id는 앞 신청서
+export const RESUBMIT_BACK_KIND = '재신청됨' // 앞 신청서 쪽 — link_id는 새 신청서
 
 // 이 반려 건을 부서가 어떻게 할 수 있는가.
 export function retryPlan({ refuseCode, refuseAlternative, timesResubmitted } = {}) {
