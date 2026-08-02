@@ -430,6 +430,10 @@ function Requirements({ data, send, toast }) {
 function RequirementCard({ r, send, toast, editable }) {
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
+  // 고쳐서 채택하기. 서버는 decided_body를 받는데 화면에 버튼이 없어서
+  // 이 길이 죽어 있었다. 요구는 올린 뒤 본문을 못 고치므로, 문장을 다듬는
+  // 유일한 길이 이것이다.
+  const [amend, setAmend] = useState(null)
 
   const tone =
     r.status === '기각' ? 'rejected' : r.status === '초안' ? 'draft' : 'decided'
@@ -445,6 +449,15 @@ function RequirementCard({ r, send, toast, editable }) {
       </div>
 
       <div className="item-body">{r.decided_body || r.body}</div>
+
+      {/* 고쳐서 채택했으면 부서가 말한 원문을 같이 남긴다.
+          고친 문장만 보이면, 부서는 자기가 한 말이 어떻게 바뀌었는지 모른 채
+          그 문장으로 판정받는다. 무엇을 고쳤는지 보이는 것이 협의다. */}
+      {r.decided_body && r.decided_body !== r.body && (
+        <div className="item-original">
+          <strong>{r.dept}가 말한 것</strong> {r.body}
+        </div>
+      )}
 
       {r.quote && (
         <div className="item-quote">
@@ -481,6 +494,13 @@ function RequirementCard({ r, send, toast, editable }) {
           <button
             type="button"
             className="btn-ghost btn-sm"
+            onClick={() => setAmend(amend === null ? r.body : null)}
+          >
+            고쳐서 채택
+          </button>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
             onClick={() => setOpen(!open)}
           >
             기각
@@ -492,6 +512,44 @@ function RequirementCard({ r, send, toast, editable }) {
           >
             지우기
           </button>
+        </div>
+      )}
+
+      {amend !== null && (
+        <div className="conditional-box" style={{ marginTop: 8 }}>
+          <textarea
+            rows={2}
+            value={amend}
+            onChange={(e) => setAmend(e.target.value)}
+            placeholder="이 건에 맞게 다듬은 문장"
+          />
+          <p className="card-note">
+            원문은 지우지 않고 같이 남습니다. 부서는 자기 말이 어떻게 바뀌었는지 봐야 합니다.
+          </p>
+          <div className="row">
+            <button
+              type="button"
+              className="btn-primary btn-sm"
+              onClick={async () => {
+                if (!amend.trim()) {
+                  toast.error('고친 문장을 적어주세요.')
+                  return
+                }
+                await send('patch', {
+                  kind: 'requirement',
+                  id: r.id,
+                  status: '수정채택',
+                  decided_body: amend.trim(),
+                })
+                setAmend(null)
+              }}
+            >
+              이 문장으로 채택
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setAmend(null)}>
+              그만두기
+            </button>
+          </div>
         </div>
       )}
 

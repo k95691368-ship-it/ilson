@@ -5215,3 +5215,19 @@ kbd {
   line-height: 1.75;
   color: var(--warning-text);
 }
+
+/* ===== 고쳐서 채택한 요구의 원문 ===== */
+/* 고친 문장만 보이면, 부서는 자기가 한 말이 어떻게 바뀌었는지 모른 채
+   그 문장으로 판정받는다. 무엇을 고쳤는지 보이는 것이 협의다. */
+.item-original {
+  margin-top: 6px;
+  padding: 7px 10px;
+  border-left: 2px solid var(--border);
+  font-size: 12.5px;
+  line-height: 1.7;
+  color: var(--text-muted);
+}
+.item-original > strong {
+  color: var(--text);
+  margin-right: 5px;
+}
