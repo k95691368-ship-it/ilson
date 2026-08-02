@@ -502,6 +502,22 @@ function Unclear({ id, toast }) {
       </div>
       <p className="card-note">{data.line}</p>
 
+      {/* 짚힌 것에서 자주 묻는 것 초안을 뽑아 제안한다.
+          자주 묻는 것은 지금 사용법서를 쓴 사람이 손으로 적는데, 쓴 사람은
+          자기가 무엇을 자주 묻히는지 모른다. 실제로 오는 질문은 이미
+          여기 다 있다. */}
+      {data.drafts?.length > 0 && (
+        <div className="faq-drafts">
+          <div className="faq-drafts-head">
+            <strong>자주 묻는 것에 올리실 만한 것</strong>
+            <span className="card-note">{data.draftLine}</span>
+          </div>
+          {data.drafts.map((d) => (
+            <FaqDraft key={d.key} draft={d} id={id} toast={toast} reload={reload} />
+          ))}
+        </div>
+      )}
+
       <ul className="unclear-list">
         {data.sections.map((sec) => (
           <li key={sec.key} className={sec.mustFix ? 'must' : ''}>
@@ -553,5 +569,111 @@ function Unclear({ id, toast }) {
         ))}
       </ul>
     </section>
+  )
+}
+
+// 짚힌 것에서 뽑은 자주 묻는 것 초안.
+//
+// 문장을 자동으로 고쳐 쓰지 않는다. 짚은 원문과 담당자가 다시 쓴 문장을
+// 그대로 칸에 채워 주고, 다듬는 것은 사람이 한다. 규칙으로 "어떻게 말할지"
+// 까지 만들면 어색한 한국어가 나오고, 그걸 부서가 읽는다.
+function FaqDraft({ draft, id, toast, reload }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState({ question: draft.question, answer: draft.answer })
+  const [busy, setBusy] = useState(false)
+
+  async function add() {
+    setBusy(true)
+    try {
+      await api.post(`/applications/${id}/manual`, { kind: 'faq', ...form })
+      toast.success('자주 묻는 것에 올렸습니다.')
+      await dismiss(false)
+    } catch (err) {
+      toast.error(err.message)
+      setBusy(false)
+    }
+  }
+
+  // 올린 것도 물린 것도 다시 안 띄운다. 올린 뒤에 제안이 그대로 남아
+  // 있으면 담당자가 두 번 올린다.
+  async function dismiss(notify = true) {
+    setBusy(true)
+    try {
+      await api.post(`/applications/${id}/unclear`, {
+        kind: 'dismiss_faq',
+        key: draft.key,
+        by: 'AX 담당자',
+        reason: notify ? '올리지 않기로 했다.' : '자주 묻는 것에 올렸다.',
+      })
+      if (notify) toast.info('이 제안은 다시 안 띄웁니다.')
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="faq-draft">
+      <div className="faq-draft-head">
+        <span className="badge badge-neutral">{draft.label}</span>
+        <span className="card-note">{draft.askedBy}분이 막히셨습니다</span>
+        {/* 겹치는 것이 있으면 감추지 않고 같이 보여준다. 담당자가 보고
+            판단할 일이지, 규칙이 대신 지울 일이 아니다. */}
+        {draft.duplicateOf && (
+          <span className="badge badge-warning">이미 적어 두신 것과 비슷합니다</span>
+        )}
+      </div>
+
+      {draft.duplicateOf && (
+        <p className="faq-dup">이미 있는 것 — {draft.duplicateOf.question}</p>
+      )}
+
+      {open ? (
+        <div className="faq-draft-form">
+          <label>
+            <span>질문</span>
+            <input
+              value={form.question}
+              onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
+            />
+          </label>
+          <label>
+            <span>답</span>
+            <textarea
+              rows={3}
+              value={form.answer}
+              onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
+            />
+          </label>
+          <small className="card-note">
+            부서가 적어 주신 말과 다시 쓰신 문장을 그대로 넣어 뒀습니다. 문장은 다듬어 주세요 —
+            여기서 자동으로 고쳐 쓰지 않습니다.
+          </small>
+          <div className="row">
+            <button type="button" className="btn-primary btn-sm" disabled={busy} onClick={add}>
+              {busy ? '올리는 중…' : '자주 묻는 것에 올리기'}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+              그만두기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <>
+          <p className="faq-draft-q">{draft.question}</p>
+          <p className="faq-draft-a">{draft.answer}</p>
+          <div className="row">
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
+              다듬어서 올리기
+            </button>
+            <button type="button" className="btn-ghost btn-sm" disabled={busy} onClick={() => dismiss()}>
+              안 올립니다
+            </button>
+          </div>
+        </>
+      )}
+    </div>
   )
 }

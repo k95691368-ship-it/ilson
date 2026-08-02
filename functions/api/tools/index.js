@@ -14,6 +14,7 @@
 //   - 부서가 받았다고 확인 안 한 것
 
 import { jsonResponse, failUnexpected } from '../../_lib/http.js'
+import { UNCLEAR_KIND, UNCLEAR_FIXED_KIND } from '../../../shared/unclear.js'
 
 // 최근 며칠을 "요즘"으로 볼 것인가. 주 1회 도는 도구가 많아서 이레로 잡는다.
 // 사흘로 잡으면 정상인 도구가 전부 "안 쓰임"으로 찍힌다.
@@ -100,8 +101,26 @@ export async function onRequestGet({ env }) {
       }
     })
 
+    // 부서가 사용법서에서 모르겠다고 짚었는데 아직 안 고친 곳.
+    //
+    // 첫 화면 할 일 목록에 올리려고 여기서 센다. 사용법서 화면을 열어야만
+    // 보이면 담당자는 못 본다 — 다 쓴 뒤로 그 화면을 안 열기 때문이다.
+    const { results: unclearRows } = await env.DB.prepare(
+      `SELECT id, link_kind, link_id FROM decision_log
+       WHERE link_kind IN (?, ?)`
+    )
+      .bind(UNCLEAR_KIND, UNCLEAR_FIXED_KIND)
+      .all()
+    const fixedFlagIds = new Set(
+      unclearRows.filter((r) => r.link_kind === UNCLEAR_FIXED_KIND).map((r) => r.link_id)
+    )
+    const openUnclear = unclearRows.filter(
+      (r) => r.link_kind === UNCLEAR_KIND && !fixedFlagIds.has(r.id)
+    ).length
+
     const summary = {
       total: items.length,
+      unclear: openUnclear,
       running: items.filter((i) => i.health === '돌고 있음').length,
       idle: items.filter((i) => i.health === '안 쓰임').length,
       quiet: items.filter((i) => i.health === '뜸해짐').length,

@@ -140,3 +140,24 @@ describe('요약', () => {
     expect(todoSummary(undefined).money).toBe(0)
   })
 })
+
+// 짚힌 곳은 사용법서 화면을 열어야만 보였다. 그런데 담당자는 다 쓴 뒤로
+// 그 화면을 안 연다 — 쓸 일이 끝났다고 생각하기 때문이다.
+describe('사용법서에서 짚힌 곳', () => {
+  it('첫 화면 할 일 목록에 올라온다', () => {
+    const t = buildTodo({ tools: { summary: { unclear: 3 } } })
+    expect(t).toHaveLength(1)
+    expect(t[0].key).toBe('unclear_manual')
+    expect(t[0].title).toContain('3곳')
+    expect(t[0].to).toBe('/manual')
+  })
+
+  it('없으면 안 올린다', () => {
+    expect(buildTodo({ tools: { summary: { unclear: 0 } } })).toEqual([])
+  })
+
+  it('사람을 기다리게 하는 일로 센다', () => {
+    // 읽는 분이 막힌 자리다. 정리할 일이 아니라 지금 막고 있는 일이다.
+    expect(buildTodo({ tools: { summary: { unclear: 1 } } })[0].kind).toBe('대기')
+  })
+})

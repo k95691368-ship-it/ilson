@@ -4777,3 +4777,72 @@ kbd {
   gap: 6px;
   margin-top: 7px;
 }
+
+/* ===== 자주 묻는 것 초안 ===== */
+/* 짚힌 것에서 뽑아 제안한다. 문장은 자동으로 안 고친다 — 규칙으로
+   "어떻게 말할지"까지 만들면 어색한 한국어가 나오고 부서가 그걸 읽는다. */
+.faq-drafts {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  display: grid;
+  gap: 9px;
+}
+.faq-drafts-head {
+  display: grid;
+  gap: 3px;
+}
+.faq-drafts-head strong {
+  font-size: 13px;
+  color: var(--text-h);
+}
+.faq-draft {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.faq-draft-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.faq-draft-q {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.7;
+  color: var(--text-h);
+}
+.faq-draft-a {
+  margin: 0 0 9px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.faq-dup {
+  margin: 0 0 8px;
+  padding: 7px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.faq-draft-form {
+  display: grid;
+  gap: 8px;
+}
+.faq-draft-form label {
+  display: grid;
+  gap: 4px;
+}
+.faq-draft-form label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}

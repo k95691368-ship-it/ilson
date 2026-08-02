@@ -137,6 +137,25 @@ export function buildTodo({ overview, reports, codes, tools, stalls } = {}) {
     )
   }
 
+  // 부서가 사용법서에서 모르겠다고 짚은 곳.
+  //
+  // 지금은 사용법서 화면을 열어야만 보인다. 그런데 담당자는 다 쓴 뒤로
+  // 그 화면을 안 연다 — 쓸 일이 끝났다고 생각하기 때문이다. 짚어 주신
+  // 것이 거기서 조용히 쌓인다.
+  const unclear = tools?.summary?.unclear ?? 0
+  if (unclear > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'unclear_manual',
+        title: `사용법서에서 모르겠다고 짚힌 곳 ${unclear}곳`,
+        why: '읽는 분이 막힌 자리입니다. 안 고치면 그 자리에서 다음 분도 막히고, 그때마다 전화가 옵니다.',
+        to: '/manual',
+        cta: '어디가 막히는지 보기',
+      })
+    )
+  }
+
   const noManual = tools?.summary?.noManual ?? 0
   if (noManual > 0) {
     out.push(
@@ -167,6 +186,7 @@ export const NOTHING_CHECKED = [
   '아직 확인 안 한 상품코드',
   '아무도 안 쓰는 도구',
   '받았다는 확인이 없는 도구',
+  '사용법서에서 모르겠다고 짚힌 곳',
 ]
 
 export function todoSummary(items) {
