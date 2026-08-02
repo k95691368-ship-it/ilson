@@ -137,11 +137,34 @@ export function validateResolve({ code, reason, by } = {}) {
 // 알고도 그대로 가기로 한 것, 그리고 아무 이의 없이 확인된 것. 이걸
 // 뭉뚱그리면 화면이 "확인됨"이라고 말하는데 실제로는 부서가 반대한
 // 기준으로 통과 판정이 나가는 일이 생긴다.
-export function signoffState({ criteria, signoff, objections, resolutions } = {}) {
+export function signoffState({
+  criteria,
+  signoff,
+  objections,
+  resolutions,
+  // 이 일에 걸린 부서 전부. 다른 부서가 "우리도 같은 일을 겪는다"고
+  // 손들었으면 그 부서도 여기 들어온다.
+  requiredDepts,
+  // 부서별 서명. 옛 기록에는 부서가 안 붙어 있어서 signoff 하나만 온다.
+  signatures,
+} = {}) {
   const list = criteria ?? []
   const ask = canAsk(list)
   const byObjection = new Map((resolutions ?? []).map((r) => [r.objection_id, r]))
   const objs = (objections ?? []).map((o) => ({ ...o, resolution: byObjection.get(o.id) ?? null }))
+
+  // 걸린 부서가 여럿이면 한 부서 서명으로는 부족하다.
+  //
+  // 이건 앞 회차에 만든 구멍이다. 다른 부서가 손들 수 있게 해 놓고,
+  // 합격 기준 서명은 여전히 한 명한테만 받고 있었다. 그러면 마케팅과
+  // 영업이 걸린 일인데 재무 한 사람이 확인했다고 "확인됨"이 되고,
+  // 5단계에서 "합격 기준을 통과했습니다"가 나간다. 나머지 두 부서는
+  // 그 기준을 본 적도 없다.
+  const need = [...new Set((requiredDepts ?? []).filter(Boolean))]
+  const signed = signatures ?? (signoff ? [{ ...signoff, dept: signoff.dept ?? null }] : [])
+  const signedDepts = new Set(signed.map((s) => s.dept).filter(Boolean))
+  const waiting = need.filter((d) => !signedDepts.has(d))
+  const multi = need.length > 1
 
   if (!signoff) {
     return {
@@ -149,12 +172,17 @@ export function signoffState({ criteria, signoff, objections, resolutions } = {}
       canSign: ask.ok,
       why: ask.why,
       headline: ask.ok
-        ? '합격 기준을 확인해주세요'
+        ? multi
+          ? `이 일에 걸린 ${need.length}개 부서가 각각 확인해주셔야 합니다`
+          : '합격 기준을 확인해주세요'
         : '합격 기준이 정해지면 확인을 요청드립니다',
       by: null,
       at: null,
       objections: [],
       kept: [],
+      requiredDepts: need,
+      signedDepts: [],
+      waitingDepts: waiting,
       // 통과 판정에 쓸 수 있는 기준인가. 서명 전에는 아니다.
       binding: false,
     }
@@ -164,7 +192,16 @@ export function signoffState({ criteria, signoff, objections, resolutions } = {}
   const kept = objs.filter((o) => o.resolution?.code === 'kept')
   const resign = objs.filter((o) => RESOLUTION_BY_CODE[o.resolution?.code]?.resign)
 
-  const base = { by: signoff.by, at: signoff.at, why: null, objections: open, kept }
+  const base = {
+    by: signoff.by,
+    at: signoff.at,
+    why: null,
+    objections: open,
+    kept,
+    requiredDepts: need,
+    signedDepts: [...signedDepts],
+    waitingDepts: waiting,
+  }
 
   // 기준이 바뀌었거나 설명을 드렸으면 다시 받아야 한다. 이게 가장
   // 먼저다 — 바뀐 기준에 옛 서명을 붙여 두면 서명이 거짓이 된다.
@@ -198,11 +235,27 @@ export function signoffState({ criteria, signoff, objections, resolutions } = {}
     }
   }
 
+  // 아직 확인 안 한 부서가 있으면 확인됨이 아니다.
+  //
+  // 이의가 없는 것과 안 본 것은 다르다. 안 본 부서를 이의 없음으로 세면,
+  // 그 부서는 다 만들어진 뒤에 처음 기준을 보게 되고 그때는 늦다.
+  if (waiting.length > 0) {
+    return {
+      ...base,
+      status: '일부만 확인',
+      canSign: true,
+      headline: `${[...signedDepts].join('·')}는 확인하셨습니다. ${waiting.join('·')}가 아직입니다`,
+      binding: false,
+    }
+  }
+
   return {
     ...base,
     status: '확인됨',
     canSign: false,
-    headline: `${signoff.by}님이 ${list.length}개 항목을 모두 확인하셨습니다`,
+    headline: multi
+      ? `${need.length}개 부서가 모두 ${list.length}개 항목을 확인하셨습니다`
+      : `${signoff.by}님이 ${list.length}개 항목을 모두 확인하셨습니다`,
     binding: true,
   }
 }
@@ -226,6 +279,12 @@ export function passCaveat(state) {
   }
   if (s.status === '다시 받아야 함') {
     return '기준이 바뀐 뒤로 부서가 아직 다시 확인하지 않았습니다. 이 통과는 바뀌기 전 확인 위에 있습니다.'
+  }
+  if (s.status === '일부만 확인') {
+    // 이 일에 걸린 부서가 여럿인데 일부만 봤다는 것을 통과할 때마다 말한다.
+    // 안 본 부서를 이의 없음으로 세면, 그 부서는 다 만들어진 뒤에 처음
+    // 기준을 보게 되고 그때는 늦다.
+    return `${(s.waitingDepts ?? []).join('·')}가 아직 합격 기준을 확인하지 않았습니다. 이 통과는 ${(s.signedDepts ?? []).join('·')}의 확인만으로 낸 것입니다.`
   }
   return '부서가 아직 합격 기준을 확인하지 않았습니다. 이 통과는 담당자 혼자 정한 기준으로 낸 것입니다.'
 }

@@ -5,6 +5,7 @@
 // 식으로. 읽는 자리를 하나만 둔다.
 
 import { SIGNOFF_KIND, OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
+import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 
 export async function loadSignoff(env, applicationId) {
   const [criteria, logs] = await Promise.all([
@@ -23,11 +24,27 @@ export async function loadSignoff(env, applicationId) {
       .all(),
   ])
 
-  // 마지막 서명만 살아 있는 것으로 본다. 기준이 고쳐진 뒤 다시 받는 일이
-  // 실제로 있고, 그때 앞의 서명은 고치기 전 문장에 한 것이다.
-  const signs = logs.results.filter((l) => l.link_kind === SIGNOFF_KIND)
+  // 부서마다 한 장씩 받는다.
+  //
+  // link_id에 부서 이름을 넣는다. 옛 기록에는 거기에 신청서 id가 들어 있어서
+  // 'app_'으로 시작한다 — 그때는 어느 부서인지 모르는 서명으로 본다.
+  const signs = logs.results
+    .filter((l) => l.link_kind === SIGNOFF_KIND)
+    .map((l) => ({
+      id: l.id,
+      by: l.title,
+      dept: String(l.link_id ?? '').startsWith('app_') ? null : l.link_id,
+      at: l.created_at,
+    }))
+
+  // 같은 부서가 다시 서명하면 뒤엣것만 남긴다. 기준이 고쳐진 뒤 다시 받는
+  // 일이 실제로 있고, 그때 앞의 서명은 고치기 전 문장에 한 것이다.
+  const latestByDept = new Map()
+  for (const s of signs) latestByDept.set(s.dept ?? '(부서 없음)', s)
+  const signatures = [...latestByDept.values()]
+
   const last = signs[signs.length - 1] ?? null
-  const signoff = last ? { by: last.title, at: last.created_at, id: last.id } : null
+  const signoff = last ? { by: last.by, at: last.at, id: last.id, dept: last.dept } : null
 
   // 이의는 그 서명 뒤에 달린 것만 본다. 앞 서명에 달렸던 이의는 이미
   // 지나간 이야기다.
@@ -55,5 +72,39 @@ export async function loadSignoff(env, applicationId) {
       at: l.created_at,
     }))
 
-  return { criteria: criteria.results, signoff, objections, resolutions }
+  return { criteria: criteria.results, signoff, signatures, objections, resolutions }
+}
+
+// 이 일에 걸린 부서 전부.
+//
+// 낸 부서 하나만 세면 안 된다. 다른 부서가 "우리도 같은 일을 겪는다"고
+// 손들었으면 그 부서도 합격 기준을 봐야 한다. 안 그러면 마케팅과 영업이
+// 걸린 일인데 재무 한 사람이 확인했다고 "확인됨"이 되고, 나머지 두 부서는
+// 다 만들어진 뒤에 처음 기준을 본다. 그때는 늦다.
+export async function requiredDeptsOf(env, applicationId, ownDept) {
+  const { results } = await env.DB.prepare(
+    `SELECT id, title, why, link_kind, link_id FROM decision_log
+     WHERE application_id = ? AND link_kind IN (?, ?)`
+  )
+    .bind(applicationId, JOIN_KIND, UNJOIN_KIND)
+    .all()
+
+  // 담당자가 "이건 다른 건입니다"로 푼 부서는 빼야 한다. 풀었는데도
+  // 그 부서 서명을 기다리면 이 신청서는 영영 확인됨이 못 된다.
+  const released = new Set(
+    results.filter((r) => r.link_kind === UNJOIN_KIND).map((r) => r.link_id)
+  )
+  const joined = results
+    .filter((r) => r.link_kind === JOIN_KIND && !released.has(r.id))
+    .map((r) => {
+      try {
+        return JSON.parse(r.why).dept
+      } catch {
+        // 옛 기록은 제목에만 부서가 들어 있다.
+        return String(r.title ?? '').split(' — ')[0]
+      }
+    })
+    .filter(Boolean)
+
+  return [...new Set([ownDept, ...joined].filter(Boolean))]
 }

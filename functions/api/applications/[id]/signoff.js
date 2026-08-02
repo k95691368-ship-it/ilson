@@ -7,7 +7,7 @@
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
-import { loadSignoff } from '../../../_lib/signoff.js'
+import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import {
   signoffState,
   validateResolve,
@@ -29,7 +29,10 @@ export async function onRequestGet({ env, params }) {
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
   try {
-    const loaded = await loadSignoff(env, app.id)
+    const loaded = {
+      ...(await loadSignoff(env, app.id)),
+      requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
+    }
     const byId = new Map(loaded.criteria.map((c) => [c.id, c]))
     const resolved = new Map(loaded.resolutions.map((r) => [r.objection_id, r]))
 
@@ -68,7 +71,10 @@ export async function onRequestPost({ env, request, params }) {
   }
 
   try {
-    const loaded = await loadSignoff(env, app.id)
+    const loaded = {
+      ...(await loadSignoff(env, app.id)),
+      requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
+    }
     const objection = loaded.objections.find((o) => o.id === body.objection_id)
     if (!objection) return jsonError('그 이의를 찾지 못했습니다.', 404)
     if (loaded.resolutions.some((r) => r.objection_id === objection.id)) {
@@ -95,7 +101,10 @@ export async function onRequestPost({ env, request, params }) {
       )
       .run()
 
-    const after = await loadSignoff(env, app.id)
+    const after = {
+      ...(await loadSignoff(env, app.id)),
+      requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
+    }
     return jsonResponse({
       ok: true,
       state: signoffState(after),

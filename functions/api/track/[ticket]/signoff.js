@@ -19,7 +19,21 @@ import {
   SIGNOFF_KIND,
   OBJECTION_KIND,
 } from '../../../../shared/signoff.js'
-import { loadSignoff } from '../../../_lib/signoff.js'
+import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
+
+// 확인해주신 뒤에 뭐라고 답할 것인가.
+//
+// 걸린 부서가 여럿이면 "이 기준으로 시험합니다"라고 하면 안 된다. 아직
+// 다른 부서가 안 봤는데 다 끝난 것처럼 읽힌다.
+function signoffMessage(state, objectedCount) {
+  if (objectedCount > 0) {
+    return `확인해주셔서 고맙습니다. 아니라고 하신 ${objectedCount}개는 담당자가 다시 봅니다.`
+  }
+  if ((state.waitingDepts ?? []).length > 0) {
+    return `확인해주셔서 고맙습니다. ${state.waitingDepts.join('·')}도 확인해주셔야 이 기준으로 판정할 수 있습니다.`
+  }
+  return '확인해주셔서 고맙습니다. 이 기준으로 시험하고 판정합니다.'
+}
 
 async function load(env, ticket) {
   const app = await env.DB.prepare(
@@ -28,7 +42,11 @@ async function load(env, ticket) {
     .bind(ticket)
     .first()
   if (!app) return null
-  return { app, ...(await loadSignoff(env, app.id)) }
+  return {
+    app,
+    ...(await loadSignoff(env, app.id)),
+    requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
+  }
 }
 
 export async function onRequestGet({ env, params }) {
@@ -39,6 +57,10 @@ export async function onRequestGet({ env, params }) {
   return jsonResponse({
     criteria: loaded.criteria,
     state,
+    // 어느 부서로 서명할지 고르게 하려면 목록이 필요하다. 자유 입력으로
+    // 두면 "마케팅"과 "마케팅팀"이 다른 부서가 되어 영영 다 안 모인다.
+    requiredDepts: loaded.requiredDepts,
+    signatures: loaded.signatures,
     // 이의가 달린 항목이 어느 것인지, 그리고 담당자가 거기에 뭐라고
     // 답했는지를 같이 준다. 답을 안 보여주면 부서는 자기가 낸 이의가
     // 읽히기는 했는지 알 수 없다.
@@ -93,6 +115,19 @@ export async function onRequestPost({ env, request, params }) {
   }
 
   const by = String(body.by).trim().slice(0, 60)
+
+  // 어느 부서로 확인하시는지 받는다.
+  //
+  // 목록에 있는 부서만 받는다. 자유 입력으로 두면 "마케팅"과 "마케팅팀"이
+  // 다른 부서가 되어, 다 모였는데도 영영 "일부만 확인"으로 남는다.
+  const dept = String(body.dept ?? '').trim() || loaded.requiredDepts[0]
+  if (!loaded.requiredDepts.includes(dept)) {
+    await releaseRateLimit(env, `signoff:${ip}`, ticket)
+    return failFields(
+      { dept: `${loaded.requiredDepts.join(', ')} 중에서 골라주세요.` },
+      '어느 부서로 확인하시는지 알 수 없습니다.'
+    )
+  }
   const objected = loaded.criteria.filter((c) => VERDICTS[body.verdicts[c.id]]?.needsReason)
 
   try {
@@ -110,7 +145,8 @@ export async function onRequestPost({ env, request, params }) {
           : `합격 기준 ${loaded.criteria.length}개를 모두 확인했고 이의 없다.`,
         '담당자 혼자 정한 기준으로 통과 판정을 내리면, 부서가 아니라고 할 때 통과의 근거가 사라진다.',
         SIGNOFF_KIND,
-        loaded.app.id
+        // 어느 부서의 서명인지. 여러 부서가 걸린 일이면 부서마다 한 장씩 받는다.
+        dept
       ),
     ]
 
@@ -123,7 +159,7 @@ export async function onRequestPost({ env, request, params }) {
         ).bind(
           newId('dec'),
           loaded.app.id,
-          `${by} — 이 기준은 아니라고 하셨다`,
+          `${dept} ${by} — 이 기준은 아니라고 하셨다`,
           String(body.reasons?.[c.id] ?? '').trim().slice(0, 1000),
           `원래 기준: ${c.body}`,
           OBJECTION_KIND,
@@ -138,10 +174,7 @@ export async function onRequestPost({ env, request, params }) {
     return jsonResponse({
       ok: true,
       state: signoffState(after),
-      message:
-        objected.length > 0
-          ? `확인해주셔서 고맙습니다. 아니라고 하신 ${objected.length}개는 담당자가 다시 봅니다.`
-          : '확인해주셔서 고맙습니다. 이 기준으로 시험하고 판정합니다.',
+      message: signoffMessage(signoffState(after), objected.length),
     })
   } catch (err) {
     await releaseRateLimit(env, `signoff:${ip}`, ticket)

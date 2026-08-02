@@ -247,3 +247,103 @@ describe('이의 푼 것 확인', () => {
     expect(() => validateResolve()).not.toThrow()
   })
 })
+
+// 앞 회차에 만든 구멍. 다른 부서가 "우리도 같은 일을 겪는다"고 손들 수
+// 있게 해 놓고, 합격 기준 서명은 여전히 한 명한테만 받고 있었다.
+//
+// 그러면 마케팅과 영업이 걸린 일인데 재무 한 사람이 확인했다고 "확인됨"이
+// 되고, 5단계에서 "합격 기준을 통과했습니다"가 나간다. 나머지 두 부서는
+// 그 기준을 본 적도 없다.
+describe('여러 부서가 걸린 일', () => {
+  const criteria = [crit('a'), crit('b')]
+  const sig = (dept, by = '김대리') => ({ by, dept, at: '2026-08-02 00:00:00' })
+
+  it('한 부서만 확인했으면 확인됨이 아니다', () => {
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅', '영업'],
+      signatures: [sig('재무')],
+      signoff: sig('재무'),
+    })
+    expect(s.status).toBe('일부만 확인')
+    expect(s.binding).toBe(false)
+    expect(s.waitingDepts).toEqual(['마케팅', '영업'])
+  })
+
+  it('아직 안 한 부서가 또 확인할 수 있어야 한다', () => {
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [sig('재무')],
+      signoff: sig('재무'),
+    })
+    expect(s.canSign).toBe(true)
+  })
+
+  it('다 확인하면 확인됨이다', () => {
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [sig('재무'), sig('마케팅', '이과장')],
+      signoff: sig('마케팅', '이과장'),
+    })
+    expect(s.status).toBe('확인됨')
+    expect(s.binding).toBe(true)
+    expect(s.waitingDepts).toEqual([])
+  })
+
+  it('안 본 부서를 이의 없음으로 세지 않는다', () => {
+    // 이의가 없는 것과 안 본 것은 다르다. 안 본 부서를 이의 없음으로 세면
+    // 그 부서는 다 만들어진 뒤에 처음 기준을 보게 되고 그때는 늦다.
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [sig('재무')],
+      signoff: sig('재무'),
+      objections: [],
+    })
+    expect(s.binding).toBe(false)
+  })
+
+  it('통과할 때 어느 부서가 안 봤는지 적는다', () => {
+    const t = passCaveat({
+      binding: false,
+      status: '일부만 확인',
+      signedDepts: ['재무'],
+      waitingDepts: ['마케팅', '영업'],
+    })
+    expect(t).toContain('마케팅·영업')
+    expect(t).toContain('재무')
+  })
+
+  it('이의가 있으면 그것이 먼저다', () => {
+    // 안 본 부서보다 반대한 부서가 급하다.
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [sig('재무')],
+      signoff: sig('재무'),
+      objections: [{ id: 'o1', body: '이건 아닙니다' }],
+    })
+    expect(s.status).toBe('이의 있음')
+  })
+
+  it('한 부서짜리 일은 예전과 똑같이 돈다', () => {
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무'],
+      signatures: [sig('재무')],
+      signoff: sig('재무'),
+    })
+    expect(s.status).toBe('확인됨')
+    expect(s.binding).toBe(true)
+  })
+
+  it('부서 목록을 안 주면 예전대로 본다', () => {
+    // 옛 기록에는 부서가 안 붙어 있다. 그때까지 확인됨을 못 만들면
+    // 이미 끝난 신청서가 전부 되돌아간다.
+    const s = signoffState({ criteria, signoff: { by: '김대리', at: 'x' } })
+    expect(s.status).toBe('확인됨')
+    expect(s.binding).toBe(true)
+  })
+})

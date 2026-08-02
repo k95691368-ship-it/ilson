@@ -604,6 +604,7 @@ function onChangedSafely(fn) {
 function Signoff({ ticket, onDone }) {
   const [data, setData] = useState(null)
   const [by, setBy] = useState('')
+  const [dept, setDept] = useState('')
   const [verdicts, setVerdicts] = useState({})
   const [reasons, setReasons] = useState({})
   const [errors, setErrors] = useState({})
@@ -636,6 +637,7 @@ function Signoff({ ticket, onDone }) {
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/signoff`, {
         by,
+        dept: dept || data.requiredDepts?.[0],
         verdicts,
         reasons,
       })
@@ -664,6 +666,21 @@ function Signoff({ ticket, onDone }) {
         건 이게 아닌데"라고 하셔도 저희는 <strong>"기준을 통과했습니다"라고밖에 답할 수 없습니다.</strong>
       </p>
       {state.why && <p className="card-note">{state.why}</p>}
+
+      {/* 여러 부서가 걸린 일이면 누가 확인했고 누가 아직인지 보여준다.
+          안 보여주면 각 부서는 자기가 확인하면 끝난 줄 안다. */}
+      {(state.requiredDepts?.length ?? 0) > 1 && (
+        <ul className="signoff-depts">
+          {state.requiredDepts.map((d) => (
+            <li key={d} className={state.signedDepts?.includes(d) ? 'done' : ''}>
+              <span aria-hidden="true">{state.signedDepts?.includes(d) ? '○' : '·'}</span> {d}
+              <span className="card-note">
+                {state.signedDepts?.includes(d) ? ' 확인하셨습니다' : ' 아직입니다'}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
       {msg && <p className="signoff-msg">{msg}</p>}
 
       <ul className="signoff-list">
@@ -726,6 +743,29 @@ function Signoff({ ticket, onDone }) {
         <form className="signoff-form" onSubmit={submit}>
           {errors.verdicts && <em className="field-error">{errors.verdicts}</em>}
           {errors.reasons && <em className="field-error">{errors.reasons}</em>}
+          {/* 걸린 부서가 여럿이면 어느 부서로 확인하시는지 골라야 한다.
+              자유 입력으로 두면 "마케팅"과 "마케팅팀"이 다른 부서가 되어,
+              다 모였는데도 영영 "일부만 확인"으로 남는다. */}
+          {(data.requiredDepts?.length ?? 0) > 1 && (
+            <label>
+              <span>어느 부서로 확인하십니까</span>
+              <select value={dept} onChange={(e) => setDept(e.target.value)}>
+                <option value="">고르세요</option>
+                {data.requiredDepts.map((d) => (
+                  <option key={d} value={d} disabled={state.signedDepts?.includes(d)}>
+                    {d}
+                    {state.signedDepts?.includes(d) ? ' (이미 확인하셨습니다)' : ''}
+                  </option>
+                ))}
+              </select>
+              {errors.dept && <em className="field-error">{errors.dept}</em>}
+              <small className="card-note">
+                이 일은 {data.requiredDepts.length}개 부서가 걸려 있습니다. 부서마다 한 번씩
+                확인해주셔야 이 기준으로 판정할 수 있습니다.
+              </small>
+            </label>
+          )}
+
           <label>
             <span>확인하신 분</span>
             <input
