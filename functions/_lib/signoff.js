@@ -16,7 +16,7 @@ export async function loadSignoff(env, applicationId, ownDept = null) {
       .bind(applicationId)
       .all(),
     env.DB.prepare(
-      `SELECT id, title, what, why, link_kind, link_id, created_at
+      `SELECT id, title, what, why, alternatives, link_kind, link_id, created_at
        FROM decision_log WHERE application_id = ? AND link_kind IN (?, ?, ?)
        ORDER BY created_at`
     )
@@ -50,18 +50,34 @@ export async function loadSignoff(env, applicationId, ownDept = null) {
   const last = signs[signs.length - 1] ?? null
   const signoff = last ? { by: last.by, at: last.at, id: last.id, dept: last.dept } : null
 
-  // 이의는 그 서명 뒤에 달린 것만 본다. 앞 서명에 달렸던 이의는 이미
-  // 지나간 이야기다.
+  // 이의는 **그 부서의 서명**을 기준으로 본다.
+  //
+  // 처음에는 "가장 마지막 서명 뒤에 달린 것만"으로 했다. 틀렸다. 부서가
+  // 여럿이 되자마자 사고가 났다 — 재무가 이의를 달아 둔 신청서에 마케팅이
+  // 서명하니, 마케팅 서명이 가장 마지막이 되면서 재무의 이의가 통째로
+  // 사라지고 상태가 '확인됨'이 됐다. 부서가 반대한 기준으로 통과 판정이
+  // 나갈 뻔했다.
+  //
+  // 이의는 그것을 단 부서의 것이다. 그 부서가 다시 봐야 지워진다.
+  const signByDept = new Map(signatures.map((s) => [s.dept ?? ownDept, s]))
   const objections = logs.results
-    .filter((l) => l.link_kind === OBJECTION_KIND && (!signoff || l.created_at >= signoff.at))
+    .filter((l) => l.link_kind === OBJECTION_KIND)
     .map((l) => ({
       id: l.id,
       criterion_id: l.link_id,
       by: l.title,
+      // 어느 부서가 단 이의인지. alternatives 칸을 쓴다 — 이 표에서 비어
+      // 있는 칸이고, 제목 글자를 뒤져 가리면 문구를 고치는 날 틀린다.
+      dept: l.alternatives || ownDept,
       body: l.what,
       of: l.why,
       at: l.created_at,
     }))
+    .filter((o) => {
+      const sig = signByDept.get(o.dept)
+      // 그 부서가 그 뒤에 다시 서명했으면 이미 다시 본 것이다.
+      return !sig || o.at >= sig.at
+    })
 
   const resolutions = logs.results
     .filter((l) => l.link_kind === RESOLVE_KIND)

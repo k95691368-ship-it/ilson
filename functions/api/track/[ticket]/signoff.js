@@ -154,14 +154,17 @@ export async function onRequestPost({ env, request, params }) {
       stmts.push(
         env.DB.prepare(
           `INSERT INTO decision_log
-             (id, application_id, stage, actor, title, what, why, link_kind, link_id)
-           VALUES (?, ?, '협의안', 'human', ?, ?, ?, ?, ?)`
+             (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
+           VALUES (?, ?, '협의안', 'human', ?, ?, ?, ?, ?, ?)`
         ).bind(
           newId('dec'),
           loaded.app.id,
           `${dept} ${by} — 이 기준은 아니라고 하셨다`,
           String(body.reasons?.[c.id] ?? '').trim().slice(0, 1000),
           `원래 기준: ${c.body}`,
+          // 어느 부서가 단 이의인지. 다른 부서가 서명해도 이 이의는
+          // 안 사라져야 한다.
+          dept,
           OBJECTION_KIND,
           c.id
         )

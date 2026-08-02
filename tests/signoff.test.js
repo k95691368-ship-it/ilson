@@ -347,3 +347,45 @@ describe('여러 부서가 걸린 일', () => {
     expect(s.binding).toBe(true)
   })
 })
+
+// 라이브에서 잡은 사고. 부서가 여럿이 되자마자 터졌다.
+//
+// 재무가 이의를 달아 둔 신청서에 마케팅이 서명하니, 마케팅 서명이 가장
+// 마지막이 되면서 재무의 이의가 통째로 사라지고 상태가 '확인됨'이 됐다.
+// 부서가 반대한 기준으로 통과 판정이 나갈 뻔했다.
+describe('다른 부서가 서명해도 이의는 안 사라진다', () => {
+  const criteria = [crit('a'), crit('b')]
+
+  it('한 부서의 이의는 그 부서가 다시 봐야 지워진다', () => {
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [
+        { by: '김대리', dept: '재무', at: '2026-08-02 01:00:00' },
+        { by: '이과장', dept: '마케팅', at: '2026-08-02 02:00:00' },
+      ],
+      signoff: { by: '이과장', dept: '마케팅', at: '2026-08-02 02:00:00' },
+      // 재무가 단 이의는 마케팅이 서명해도 살아 있어야 한다.
+      objections: [{ id: 'o1', dept: '재무', criterion_id: 'a', body: '오차 0원은 과합니다' }],
+    })
+    expect(s.status).toBe('이의 있음')
+    expect(s.binding).toBe(false)
+  })
+
+  it('이의가 풀린 상태도 다른 부서 서명에 안 지워진다', () => {
+    const s = signoffState({
+      criteria,
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [
+        { by: '김대리', dept: '재무', at: '2026-08-02 01:00:00' },
+        { by: '이과장', dept: '마케팅', at: '2026-08-02 02:00:00' },
+      ],
+      signoff: { by: '이과장', dept: '마케팅', at: '2026-08-02 02:00:00' },
+      objections: [{ id: 'o1', dept: '재무', criterion_id: 'a', body: '과합니다' }],
+      resolutions: [{ objection_id: 'o1', code: 'kept', body: '규정상 못 둡니다' }],
+    })
+    // 담당자가 알고도 그대로 가기로 한 사실은 계속 붙어 있어야 한다.
+    expect(s.status).toBe('이의 알고 진행')
+    expect(s.binding).toBe(false)
+  })
+})
