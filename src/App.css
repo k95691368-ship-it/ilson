@@ -4441,3 +4441,129 @@ kbd {
 .retry-done {
   border-color: var(--success);
 }
+
+/* ===== 합격 기준 확인 ===== */
+/* 서명 버튼 하나로 "동의합니다"를 누르게 하지 않는다. 그건 아무도 안 읽는다.
+   항목마다 맞다/아니다를 고르게 하고, 아니라고 하면 왜 아닌지를 받는다. */
+.signoff {
+  padding: 15px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.signoff-open {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.signoff-objected {
+  border-color: var(--warning);
+}
+.signoff-done {
+  border-color: var(--success);
+}
+.signoff-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.signoff h3 {
+  margin: 0 0 7px;
+  font-size: 15px;
+}
+.signoff-why {
+  margin: 0 0 10px;
+  font-size: 13px;
+  line-height: 1.8;
+  color: var(--text);
+}
+.signoff-msg {
+  margin: 0 0 10px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-size: 13px;
+}
+.signoff-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.signoff-list > li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.signoff-list > li.objected {
+  border-color: var(--warning);
+}
+.signoff-body {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--text-h);
+}
+.signoff-objected-note {
+  margin: 7px 0 0;
+  padding-top: 7px;
+  border-top: 1px dashed var(--border);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.signoff-objected-note strong {
+  color: var(--text-muted);
+  font-weight: 600;
+  margin-right: 5px;
+}
+.signoff-pick {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+.signoff-pick label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.signoff-pick input[type='radio'] {
+  width: auto;
+  flex: none;
+  margin: 0;
+}
+.signoff-reason {
+  flex: 1;
+  min-width: 200px;
+}
+.signoff-form {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--border);
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+.signoff-form label {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  max-width: 320px;
+}
+.signoff-form label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}

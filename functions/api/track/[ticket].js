@@ -15,6 +15,7 @@ import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { annualHours } from '../../_lib/applications.js'
 import { REFUSE_REASONS } from '../../../shared/review.js'
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
+import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 
 // 기록이 다른 신청서를 가리키고 있으면 그 접수번호를 붙여 준다.
 //
@@ -95,7 +96,9 @@ export async function onRequestGet({ env, params, request }) {
           .bind(app.id)
           .first(),
         env.DB.prepare(
-          'SELECT COUNT(*) AS n FROM acceptance_criterion WHERE application_id = ? AND confirmed_at IS NOT NULL'
+          `SELECT COUNT(*) AS n,
+                  SUM(CASE WHEN confirmed_at IS NULL THEN 0 ELSE 1 END) AS confirmed
+           FROM acceptance_criterion WHERE application_id = ?`
         )
           .bind(app.id)
           .first(),
@@ -182,7 +185,7 @@ export async function onRequestGet({ env, params, request }) {
           (meetings?.n ?? 0) > 0
             ? `회의 ${meetings.n}번 · 요구 ${reqs?.total ?? 0}건 중 ${reqs?.taken ?? 0}건 채택${
                 (reqs?.rejected ?? 0) > 0 ? `, ${reqs.rejected}건 기각` : ''
-              } · 합격 기준 ${criteria?.n ?? 0}개 확정${
+              } · 합격 기준 ${criteria?.confirmed ?? 0}개 확정${
                 baseline
                   ? ` · 실제로 재 보니 ${Math.round(baseline.median_seconds / 60)}분 걸렸습니다(${baseline.sample_n}회 측정)`
                   : ''
@@ -264,6 +267,17 @@ export async function onRequestGet({ env, params, request }) {
     }
     if (outcome && !outcome.dept_confirmed_at && (uses?.n ?? 0) > 0) {
       needs.push({ code: 'outcome_unconfirmed' })
+    }
+
+    // 합격 기준이 전부 확정됐는데 부서가 아직 안 본 상태.
+    //
+    // 이걸 안 물으면 5단계에서 "합격 기준을 통과했습니다"라고 말하게 되는데,
+    // 그 기준을 부서는 한 번도 본 적이 없다.
+    const criteriaTotal = criteria?.n ?? 0
+    const criteriaConfirmed = criteria?.confirmed ?? 0
+    const signed = decisions.results.some((d) => d.link_kind === SIGNOFF_KIND)
+    if (criteriaTotal > 0 && criteriaConfirmed === criteriaTotal && !signed) {
+      needs.push({ code: 'criteria_signoff', body: `${criteriaTotal}개 항목입니다.` })
     }
 
     return jsonResponse({

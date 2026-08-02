@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
 import FileList from '../components/FileList.jsx'
@@ -6,6 +6,7 @@ import Thread from '../components/Thread.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
 import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
+import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
 
 // 접수번호로 내 신청서가 어디까지 왔는지 보는 화면.
 //
@@ -212,6 +213,11 @@ function Result({ data, onChanged }) {
           고치는 것은 다른 일이고, 그 사이를 메우지 않으면 대안은 읽히기만
           하고 아무 일도 안 일어난다. */}
       {refused && <Retry ticket={data.ticket} onDone={onChanged} />}
+
+      {/* 협의안 화면은 이 기준을 "부서와 합의해 정한 것"이라고 말한다.
+          그런데 확정은 담당자 혼자 하고, 부서는 그 문장을 본 적이 없다.
+          여기서 실제로 보여드리고 받는다. */}
+      <Signoff ticket={data.ticket} onDone={onChanged} />
 
       {/* 지금 이 부서가 움직여야 진행되는 것.
           진행 상황보다 위에 둔다. 어디까지 왔는지보다, 지금 멈춰 있는
@@ -587,6 +593,149 @@ function Retry({ ticket, onDone }) {
 // 부모가 새로고침 함수를 안 넘겨도 터지지 않게.
 function onChangedSafely(fn) {
   if (typeof fn === 'function') fn()
+}
+
+// 합격 기준을 부서가 직접 보고 확인한다.
+//
+// 서명 버튼 하나를 놓고 "동의합니다"를 누르게 하지 않는다. 그건 아무도
+// 안 읽는다. **항목마다** 맞다/아니다를 고르게 하고, 아니라고 하면 왜
+// 아닌지를 받는다. 한 항목이라도 안 고르면 못 넘어간다 — 안 고른 것을
+// 동의로 세면, 안 읽은 것을 읽었다고 기록하는 셈이 된다.
+function Signoff({ ticket, onDone }) {
+  const [data, setData] = useState(null)
+  const [by, setBy] = useState('')
+  const [verdicts, setVerdicts] = useState({})
+  const [reasons, setReasons] = useState({})
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const reload = useCallback(() => {
+    api
+      .get(`/track/${encodeURIComponent(ticket)}/signoff`)
+      .then(setData)
+      .catch(() => {})
+  }, [ticket])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  if (!data) return null
+  const { criteria, state } = data
+  // 기준 자체가 아직 없으면 이 자리는 아무 말도 하지 않는다. 없는 것을
+  // "준비중"이라고 띄우면 화면만 늘어난다.
+  if (criteria.length === 0) return null
+
+  async function submit(e) {
+    e.preventDefault()
+    const bad = validateSignoff({ by, criteria, verdicts, reasons })
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/signoff`, {
+        by,
+        verdicts,
+        reasons,
+      })
+      setMsg(r.message)
+      reload()
+      onChangedSafely(onDone)
+    } catch (err) {
+      setErrors({ by: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className={`signoff signoff-${state.status === '확인됨' ? 'done' : state.status === '이의 있음' ? 'objected' : 'open'}`}>
+      <div className="signoff-head">
+        <span className="badge badge-neutral">합격 기준 {criteria.length}개</span>
+        <span className={`badge ${state.binding ? 'badge-success' : 'badge-warning'}`}>
+          {state.status}
+        </span>
+      </div>
+
+      <h3>{state.headline}</h3>
+      <p className="signoff-why">
+        이 기준으로 시험하고 통과·불통과를 판정합니다. 안 보신 채로 넘어가면, 나중에 "내가 원한
+        건 이게 아닌데"라고 하셔도 저희는 <strong>"기준을 통과했습니다"라고밖에 답할 수 없습니다.</strong>
+      </p>
+      {state.why && <p className="card-note">{state.why}</p>}
+      {msg && <p className="signoff-msg">{msg}</p>}
+
+      <ul className="signoff-list">
+        {criteria.map((c) => (
+          <li key={c.id} className={verdicts[c.id] === 'no' ? 'objected' : ''}>
+            <div className="signoff-body">
+              {c.body}
+              {c.is_required_safety === 1 && (
+                <span className="badge badge-danger">이건 빼면 안 되는 것</span>
+              )}
+              <span className="card-note">
+                {c.check_kind === 'rule' ? '기계가 자동으로 판정' : '사람이 직접 확인'}
+              </span>
+            </div>
+
+            {data.objectionsByCriterion?.[c.id] && (
+              <p className="signoff-objected-note">
+                <strong>아니라고 하신 이유</strong> {data.objectionsByCriterion[c.id]}
+              </p>
+            )}
+
+            {state.canSign && (
+              <div className="signoff-pick">
+                {Object.entries(VERDICTS).map(([code, v]) => (
+                  <label key={code}>
+                    <input
+                      type="radio"
+                      name={`v-${c.id}`}
+                      checked={verdicts[c.id] === code}
+                      onChange={() => setVerdicts((s) => ({ ...s, [c.id]: code }))}
+                    />
+                    {v.label}
+                  </label>
+                ))}
+                {verdicts[c.id] === 'no' && (
+                  <input
+                    className="signoff-reason"
+                    placeholder="무엇이 다릅니까 — 이걸 모르면 고칠 수가 없습니다"
+                    value={reasons[c.id] ?? ''}
+                    onChange={(e) => setReasons((s) => ({ ...s, [c.id]: e.target.value }))}
+                  />
+                )}
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {state.canSign && (
+        <form className="signoff-form" onSubmit={submit}>
+          {errors.verdicts && <em className="field-error">{errors.verdicts}</em>}
+          {errors.reasons && <em className="field-error">{errors.reasons}</em>}
+          <label>
+            <span>확인하신 분</span>
+            <input
+              value={by}
+              onChange={(e) => setBy(e.target.value)}
+              placeholder="김대리"
+            />
+            {errors.by && <em className="field-error">{errors.by}</em>}
+            <small className="card-note">
+              계정을 만드시라고 하지 않습니다. 다만 서명인데 누가 하셨는지 모르면 서명이 아니라서
+              성함만 여쭙습니다.
+            </small>
+          </label>
+          <button type="submit" className="btn-primary" disabled={busy}>
+            {busy ? '남기는 중…' : '확인했습니다'}
+          </button>
+        </form>
+      )}
+    </section>
+  )
 }
 
 function statusTone(s) {
