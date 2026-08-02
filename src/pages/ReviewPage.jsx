@@ -877,6 +877,10 @@ function Detail({ id, onSaved, pool }) {
 
       {/* 판정하기 전에 견준다. 판정한 뒤에 알려 주면 이미 두 번 검토한 것이다.
           목록이 이미 브라우저에 다 있어서 서버를 다시 부르지 않는다. */}
+      {/* 다른 부서가 손든 것. 판정 화면 위쪽에 둔다 — 우선순위를 매기기
+          전에 이 병목이 몇 부서 것인지 알아야 한다. */}
+      <Joined id={a.id} />
+
       <SimilarNotice hits={findSimilar(a, pool ?? [], { limit: 2 })} tone="review" selfId={a.id} />
 
       {/* 신청서만 보고 판정하기 어려우면 물어본다. 짐작으로 판정하거나
@@ -1116,4 +1120,108 @@ function statusTone(status) {
   if (status === '보류') return 'badge-warning'
   if (status === '진행중' || status === '검토중') return 'badge-accent'
   return 'badge-neutral'
+}
+
+// 다른 부서가 "우리도 같은 일을 겪는다"고 손든 것.
+//
+// 처음 판정할 때는 한 부서 일인 줄 알고 점수를 매긴다. 그 뒤에 두 부서가
+// 손들면 같은 신청서인데 크기가 세 배가 된다. 그러면 우선순위를 다시
+// 매겨야 하는데, 손든 사실이 어디에도 안 뜨면 그럴 일이 없다.
+function Joined({ id }) {
+  const { data, reload } = useApi(`/applications/${id}/join`)
+  const toast = useToast()
+  const [open, setOpen] = useState(null)
+  const [reason, setReason] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  if (!data || data.joins.length === 0) return null
+  const live = data.joins.filter((j) => !j.released)
+
+  async function release(joinId) {
+    if (reason.trim().length < 5) {
+      toast.error('왜 다른 건인지 적어주세요. 이 문장이 그 부서에 갑니다.')
+      return
+    }
+    setBusy(true)
+    try {
+      const r = await api.post(`/applications/${id}/join`, {
+        kind: 'release',
+        join_id: joinId,
+        reason,
+        by: 'AX 담당자',
+      })
+      toast.success(r.message)
+      setOpen(null)
+      setReason('')
+      reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="joined">
+      <div className="joined-head">
+        <span className="badge badge-accent">{data.summary.deptCount}개 부서가 걸린 일</span>
+        <span className="card-note">{data.line}</span>
+      </div>
+
+      {data.summary.needsRepriority && (
+        <p className="joined-warn">
+          처음 판정하실 때는 한 부서 일이었습니다. <strong>우선순위를 다시 보셔야 합니다.</strong>
+        </p>
+      )}
+
+      <ul className="joined-list">
+        {live.map((j) => (
+          <li key={j.id}>
+            <div className="joined-top">
+              <strong>{j.dept}</strong>
+              <span className="card-note">
+                {j.by} · {ago(j.at)}
+                {j.minutes ? ` · 한 번에 ${j.minutes}분` : ''}
+                {j.people > 1 ? ` · ${j.people}명` : ''}
+                {j.frequency ? ` · ${j.frequency}` : ''}
+              </span>
+            </div>
+            <p className="joined-story">{j.story}</p>
+
+            {open === j.id ? (
+              <div className="joined-release">
+                <input
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="왜 다른 건입니까 — 이 문장이 그 부서에 갑니다"
+                />
+                <div className="row">
+                  <button type="button" className="btn-danger btn-sm" disabled={busy} onClick={() => release(j.id)}>
+                    {busy ? '푸는 중…' : '이건 다른 건입니다'}
+                  </button>
+                  <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(null)}>
+                    그만두기
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(j.id)}>
+                이건 다른 건입니다
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+
+      {/* 더한 값을 실측인 척하지 않는다. */}
+      <p className="card-note joined-foot">{data.summary.caveat}</p>
+
+      {/* 푼 것도 지우지 않는다. 그 판정이 맞았는지는 나중에 봐야 안다. */}
+      {data.joins.some((j) => j.released) && (
+        <p className="card-note">
+          다른 건으로 판정해 푼 것 {data.joins.filter((j) => j.released).length}건은 기록에 남아 있습니다.
+        </p>
+      )}
+    </section>
+  )
 }

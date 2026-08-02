@@ -282,7 +282,14 @@ export default function ApplyPage() {
             </Field>
 
             {!similarHidden && (
-              <SimilarNotice hits={similar} tone="apply" onDismiss={() => setSimilarHidden(true)} />
+              <SimilarNotice
+                hits={similar}
+                tone="apply"
+                onDismiss={() => setSimilarHidden(true)}
+                /* 이미 적으신 것을 손들기 칸에 그대로 채워 드린다. 다시
+                   적으라고 하면 그 자리에서 그만두신다. */
+                draft={form}
+              />
             )}
 
             <Field

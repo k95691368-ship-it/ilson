@@ -28,7 +28,7 @@ function item(o) {
 //
 // 각 화면이 이미 세어 둔 숫자를 받아 쓴다. 여기서 다시 세지 않는다 —
 // 두 군데서 세면 두 숫자가 달라지고, 그러면 둘 다 못 믿는다.
-export function buildTodo({ overview, reports, codes, tools, stalls } = {}) {
+export function buildTodo({ overview, reports, codes, tools, stalls, joins } = {}) {
   const out = []
 
   // ── 금액이 틀릴 수 있는 것 ──────────────────────────────
@@ -90,6 +90,25 @@ export function buildTodo({ overview, reports, codes, tools, stalls } = {}) {
         why: '판정까지 끝나 진행 중으로 넘어간 건들이라 접수함에도, 신고 목록에도 안 뜹니다. 아무 데도 안 뜨는 채로 몇 주가 지나갑니다.',
         to: '/stall',
         cta: '어디서 막혔는지 보기',
+      })
+    )
+  }
+
+  // 다른 부서가 손든 신청서.
+  //
+  // 처음 판정할 때는 한 부서 일인 줄 알고 점수를 매겼다. 두 부서가 손들면
+  // 같은 신청서인데 크기가 몇 배가 된다. 그런데 손든 사실은 그 신청서를
+  // 열어야만 보이고, 담당자는 이미 판정한 건을 다시 열지 않는다.
+  const rejoined = joins?.summary?.needsRepriority ?? 0
+  if (rejoined > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'rejoined',
+        title: `다른 부서가 손든 신청서 ${rejoined}건`,
+        why: '판정하실 때는 한 부서 일이었습니다. 여러 부서가 걸린 일이면 순서가 달라집니다.',
+        to: '/review',
+        cta: '우선순위 다시 보기',
       })
     )
   }
@@ -187,6 +206,7 @@ export const NOTHING_CHECKED = [
   '아무도 안 쓰는 도구',
   '받았다는 확인이 없는 도구',
   '사용법서에서 모르겠다고 짚힌 곳',
+  '다른 부서가 손든 신청서',
 ]
 
 export function todoSummary(items) {

@@ -19,6 +19,7 @@ export default function FlowPage() {
   const { data: codes } = useApi('/codes')
   const { data: tools } = useApi('/tools')
   const { data: stalls } = useApi('/stalls')
+  const { data: joins } = useApi('/joins')
 
   return (
     <div className="stack">
@@ -34,7 +35,7 @@ export default function FlowPage() {
       </header>
 
       {data && data.counts.total > 0 && (
-        <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} />
+        <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} />
       )}
 
       {data && data.counts.total > 0 && <Overview data={data} />}
@@ -122,8 +123,8 @@ export default function FlowPage() {
 // 아무거나 다 올리지 않는다. 스무 개가 올라온 목록은 아무것도 안 올라온
 // 것과 같다. 그리고 순서가 틀리면 더 나쁘다 — 숫자가 틀리는 일보다
 // 사용법서 쓰는 일이 위에 있으면 그 목록은 쓸모가 없다.
-function Todo({ overview, reports, codes, tools, stalls }) {
-  const items = buildTodo({ overview, reports, codes, tools, stalls })
+function Todo({ overview, reports, codes, tools, stalls, joins }) {
+  const items = buildTodo({ overview, reports, codes, tools, stalls, joins })
   const s = todoSummary(items)
 
   if (items.length === 0) {
@@ -135,7 +136,7 @@ function Todo({ overview, reports, codes, tools, stalls }) {
         {/* "할 일이 없습니다"로 끝내면 정말 없는 것인지 못 세고 있는
             것인지 모른다. 무엇을 보고 없다고 하는지 밝힌다. */}
         <p className="card-note">
-          {NOTHING_CHECKED.join(' · ')} — 이 다섯 가지를 보고 드리는 말씀입니다.
+          {NOTHING_CHECKED.join(' · ')} — 이 {NOTHING_CHECKED.length}가지를 보고 드리는 말씀입니다.
         </p>
       </section>
     )

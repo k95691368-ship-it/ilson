@@ -161,3 +161,19 @@ describe('사용법서에서 짚힌 곳', () => {
     expect(buildTodo({ tools: { summary: { unclear: 1 } } })[0].kind).toBe('대기')
   })
 })
+
+// 손든 사실은 그 신청서를 열어야만 보인다. 그런데 담당자는 이미 판정한
+// 건을 다시 열지 않는다.
+describe('다른 부서가 손든 신청서', () => {
+  it('첫 화면 할 일 목록에 올라온다', () => {
+    const t = buildTodo({ joins: { summary: { needsRepriority: 2 } } })
+    expect(t).toHaveLength(1)
+    expect(t[0].key).toBe('rejoined')
+    expect(t[0].title).toContain('2건')
+    expect(t[0].cta).toContain('우선순위')
+  })
+
+  it('없으면 안 올린다', () => {
+    expect(buildTodo({ joins: { summary: { needsRepriority: 0 } } })).toEqual([])
+  })
+})

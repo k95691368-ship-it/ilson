@@ -138,7 +138,10 @@ export function validateFile(file) {
 
 // 지금 이 일에 드는 연간 시간. 우선순위를 매길 때 쓴다.
 // 신청자의 체감값이므로 어디까지나 참고치이고, 3단계에서 실측으로 대체된다.
-const PER_YEAR = {
+// 이 표는 shared/outcome.js의 RUNS_PER_YEAR와 같은 값이어야 한다.
+// 한쪽만 고치면 접수함에 적힌 연간 시간과 성과 화면의 연 환산이 서로
+// 다른 횟수로 계산된다. 어긋나면 시험이 잡는다(tests/outcome.test.js).
+export const PER_YEAR = {
   '하루 여러 번': 250 * 3,
   매일: 250,
   '주 2~3회': 52 * 2.5,

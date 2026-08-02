@@ -222,3 +222,18 @@ describe('스스로 반박하기', () => {
 function round1(n) {
   return Math.round(n)
 }
+
+// 같은 표가 두 파일에 따로 박혀 있다. 지금은 값이 같지만, 한쪽만 고치면
+// 접수함에 적힌 연간 시간과 성과 화면의 연 환산이 서로 다른 횟수로
+// 계산된다. 그러면 두 숫자가 다른데 아무도 그 이유를 모른다.
+describe('두 곳에 있는 같은 표', () => {
+  it('연간 횟수 표가 어긋나지 않았다', async () => {
+    const { PER_YEAR } = await import('../functions/_lib/applications.js')
+    expect(PER_YEAR).toEqual(RUNS_PER_YEAR)
+  })
+
+  it('시급도 어긋나지 않았다', async () => {
+    const master = await import('../shared/master.js')
+    expect(master.HOURLY_WAGE_KRW).toBe(HOURLY_WAGE_KRW)
+  })
+})

@@ -4868,3 +4868,125 @@ kbd {
   color: var(--text-h);
   font-variant-numeric: tabular-nums;
 }
+
+/* ===== 저것도 우리 얘기입니다 ===== */
+/* 알려 주기만 하면 부서는 할 수 있는 일이 없다. 버튼은 작게 두되,
+   누르면 이미 적으신 것이 채워진 채로 열린다. */
+.join-ask {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+  padding: 9px 11px;
+  border: 1px dashed var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  color: var(--text-h);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+.join-ask:hover {
+  border-style: solid;
+}
+.join-form {
+  margin-top: 9px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--accent-bg);
+  display: grid;
+  gap: 10px;
+}
+.join-form label {
+  display: grid;
+  gap: 4px;
+}
+.join-form label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.join-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.join-row > label {
+  flex: 1;
+  min-width: 110px;
+}
+.join-done {
+  margin: 9px 0 0;
+  padding: 10px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
+/* ===== 여러 부서가 걸린 일 ===== */
+.joined {
+  padding: 13px 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.joined-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+  margin-bottom: 7px;
+}
+.joined-warn {
+  margin: 0 0 9px;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--warning-bg);
+  color: var(--warning-text);
+  font-size: 12.5px;
+  line-height: 1.7;
+}
+.joined-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.joined-list > li {
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.joined-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.joined-top strong {
+  font-size: 13px;
+  color: var(--text-h);
+}
+.joined-story {
+  margin: 5px 0 8px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.joined-release {
+  display: grid;
+  gap: 7px;
+  margin-top: 7px;
+  padding-top: 7px;
+  border-top: 1px dashed var(--border);
+}
+.joined-foot {
+  margin: 9px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}

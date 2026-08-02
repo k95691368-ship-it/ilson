@@ -1,6 +1,9 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { reasonText } from '../../shared/similar.js'
+import { api } from '../api/client.js'
 import { ago, num } from '../lib/format.js'
+import { validateJoin, FREQUENCIES } from '../../shared/join.js'
 
 // "이거 이미 들어와 있는데요"
 //
@@ -14,7 +17,7 @@ import { ago, num } from '../lib/format.js'
 //
 // 막지 않는다. 비슷해 보인다고 신청을 못 하게 하면, 진짜 다른 건을 내려던
 // 사람이 낼 데를 잃는다. 알려 주고 고르게 한다.
-export default function SimilarNotice({ hits, tone = 'apply', onDismiss, selfId }) {
+export default function SimilarNotice({ hits, tone = 'apply', onDismiss, selfId, draft }) {
   if (!hits || hits.length === 0) return null
 
   const strongest = hits[0]
@@ -97,6 +100,11 @@ export default function SimilarNotice({ hits, tone = 'apply', onDismiss, selfId 
                 </span>
               )}
             </div>
+
+            {/* 알려 주기만 하면 부서는 할 수 있는 일이 없다. 그냥 똑같이
+                내거나(담당자가 두 번 판정한다) 그만두거나인데, 그만두면
+                그 부서도 같은 일로 시간을 쓴다는 사실이 어디에도 안 남는다. */}
+            {isApply && <JoinIn hit={h} draft={draft} />}
           </li>
         ))}
       </ol>
@@ -114,4 +122,127 @@ function statusTone(status) {
   if (status === '반려') return 'badge-danger'
   if (status === '보류') return 'badge-warning'
   return 'badge-neutral'
+}
+
+// "저것도 우리 얘기입니다" — 새로 안 내고 있는 신청서에 손든다.
+//
+// 부서 이름만 받지 않는다. 그 부서에서 이 일이 얼마나 걸리는지를 같이
+// 받아야 담당자가 우선순위를 다시 매길 수 있다. 부서 이름만 있으면
+// "세 부서가 겪습니다"까지밖에 못 말한다.
+function JoinIn({ hit, draft }) {
+  const [open, setOpen] = useState(false)
+  const [form, setForm] = useState(() => ({
+    dept: draft?.dept ?? '',
+    by: draft?.applicant_label ?? '',
+    minutes: draft?.current_minutes ?? '',
+    people: draft?.current_people ?? '',
+    frequency: draft?.current_frequency ?? '',
+    story: draft?.problem ?? '',
+  }))
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [done, setDone] = useState(null)
+
+  if (done) {
+    return (
+      <p className="join-done">
+        {done}{' '}
+        <Link to={`/track?no=${hit.ticket_no}`}>어디까지 왔는지 보기</Link>
+      </p>
+    )
+  }
+
+  async function send(e) {
+    e.preventDefault()
+    const bad = validateJoin(form)
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/applications/${encodeURIComponent(hit.ticket_no)}/join`, form)
+      setDone(r.message)
+    } catch (err) {
+      setErrors({ story: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+
+  if (!open) {
+    return (
+      <button type="button" className="join-ask" onClick={() => setOpen(true)}>
+        저것도 우리 얘기입니다 — 새로 내지 말고 저기 붙이기
+      </button>
+    )
+  }
+
+  return (
+    <form className="join-form" onSubmit={send}>
+      <p className="card-note">
+        새 신청서를 만들지 않습니다. 저 신청서에 <strong>그쪽 부서 몫을 같이 세어</strong> 둡니다.
+        저것이 만들어지면 그쪽도 바로 쓰시게 됩니다.
+      </p>
+
+      <div className="join-row">
+        <label>
+          <span>부서</span>
+          <input value={form.dept} onChange={set('dept')} placeholder="마케팅" />
+          {errors.dept && <em className="field-error">{errors.dept}</em>}
+        </label>
+        <label>
+          <span>성함</span>
+          <input value={form.by} onChange={set('by')} placeholder="이과장" />
+          {errors.by && <em className="field-error">{errors.by}</em>}
+        </label>
+      </div>
+
+      <label>
+        <span>그쪽 부서에서는 이 일이 어떻게 벌어집니까</span>
+        <textarea
+          rows={2}
+          value={form.story}
+          onChange={set('story')}
+          placeholder="저희도 매주 채널별로 숫자를 옮겨 적습니다. 다만 저희는 광고비까지 같이 봅니다."
+        />
+        {errors.story && <em className="field-error">{errors.story}</em>}
+        <small className="card-note">같은 병목이라도 부서마다 다릅니다. 다른 데가 있으면 그것부터 적어 주세요.</small>
+      </label>
+
+      <div className="join-row">
+        <label>
+          <span>한 번에 몇 분</span>
+          <input type="number" min="1" value={form.minutes} onChange={set('minutes')} />
+          {errors.minutes && <em className="field-error">{errors.minutes}</em>}
+        </label>
+        <label>
+          <span>몇 분이</span>
+          <input type="number" min="1" value={form.people} onChange={set('people')} placeholder="1" />
+          {errors.people && <em className="field-error">{errors.people}</em>}
+        </label>
+        <label>
+          <span>얼마나 자주</span>
+          <select value={form.frequency} onChange={set('frequency')}>
+            <option value="">고르세요</option>
+            {FREQUENCIES.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          {errors.frequency && <em className="field-error">{errors.frequency}</em>}
+        </label>
+      </div>
+
+      <div className="row">
+        <button type="submit" className="btn-primary btn-sm" disabled={busy}>
+          {busy ? '붙이는 중…' : '이 신청서에 붙이기'}
+        </button>
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+          그만두기
+        </button>
+      </div>
+    </form>
+  )
 }
