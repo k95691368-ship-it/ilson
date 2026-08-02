@@ -181,6 +181,18 @@ export function signoffState({
   const waiting = need.filter((d) => !signedDepts.has(d))
   const multi = need.length > 1
 
+  // 서명 전과 "기준이 없어진 뒤"가 같은 모양을 써야 화면이 안 깨진다.
+  const base0 = () => ({
+    by: signoff?.by ?? null,
+    at: signoff?.at ?? null,
+    why: null,
+    objections: [],
+    kept: [],
+    requiredDepts: need,
+    signedDepts: [...signedDepts],
+    waitingDepts: waiting,
+  })
+
   if (!signoff) {
     return {
       status: ask.ok ? '아직' : '준비중',
@@ -199,6 +211,26 @@ export function signoffState({
       signedDepts: [],
       waitingDepts: waiting,
       // 통과 판정에 쓸 수 있는 기준인가. 서명 전에는 아니다.
+      binding: false,
+    }
+  }
+
+  // 기준이 하나도 없으면 서명이 있어도 확인됨이 아니다.
+  //
+  // 서명을 받은 뒤 담당자가 기준을 전부 지우면, 예전에는 상태가 그대로
+  // '확인됨'에 binding=true로 남았다. 화면은 "0개 항목을 모두 확인하셨습니다"
+  // 라고 적었고, passCaveat가 null을 돌려줘서 5단계 통과에 아무 단서도
+  // 안 붙었다. **아무 기준도 없는 통과가 근거 있는 통과로 나갔다.**
+  //
+  // 위쪽 canAsk가 이미 "기준이 없으면 서명 못 받는다"고 정해 뒀는데,
+  // 서명이 이미 있는 경우에만 그 분기를 건너뛰고 있었다.
+  if (list.length === 0) {
+    return {
+      ...base0(),
+      status: '준비중',
+      canSign: false,
+      why: ask.why,
+      headline: '합격 기준이 없습니다. 확인해드릴 것이 없습니다',
       binding: false,
     }
   }
@@ -302,7 +334,12 @@ export function signoffState({
       ...base,
       status: '일부만 확인',
       canSign: true,
-      headline: `${listWithJosa([...signedDepts], '는')} 확인하셨습니다. ${listWithJosa(waiting, '가')} 아직입니다`,
+      headline:
+        signedDepts.size > 0
+          ? `${listWithJosa([...signedDepts], '는')} 확인하셨습니다. ${listWithJosa(waiting, '가')} 아직입니다`
+          : // 어느 부서 서명인지 모르는 옛 기록만 있을 때. 앞을 비워 두면
+            // "  확인하셨습니다"로 시작하는 깨진 문장이 나온다.
+            `${listWithJosa(waiting, '가')} 아직 확인하지 않으셨습니다`,
       binding: false,
     }
   }

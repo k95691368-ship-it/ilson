@@ -517,3 +517,53 @@ describe('서명 뒤에 기준이 늘면', () => {
     expect(passCaveat(s)).toBeTruthy()
   })
 })
+
+// 손으로 극단값을 넣어 보다 나온 것들.
+describe('기준이 없어졌을 때', () => {
+  const sig = { by: '김대리', dept: '재무', at: '2026-08-02 01:00:00' }
+
+  it('기준이 0개면 서명이 있어도 확인됨이 아니다', () => {
+    // 서명을 받은 뒤 기준을 전부 지우면 예전에는 확인됨/binding=true로
+    // 남았다. 화면은 "0개 항목을 모두 확인하셨습니다"라고 적었고,
+    // 아무 기준도 없는 통과가 근거 있는 통과로 나갔다.
+    const s = signoffState({ criteria: [], requiredDepts: ['재무'], signatures: [sig], signoff: sig })
+    expect(s.binding).toBe(false)
+    expect(s.status).toBe('준비중')
+  })
+
+  it('그때 통과에는 단서가 붙는다', () => {
+    const s = signoffState({ criteria: [], requiredDepts: ['재무'], signatures: [sig], signoff: sig })
+    expect(passCaveat(s)).toBeTruthy()
+  })
+
+  it('0개 항목을 모두 확인했다고 말하지 않는다', () => {
+    const s = signoffState({ criteria: [], requiredDepts: ['재무'], signatures: [sig], signoff: sig })
+    expect(s.headline).not.toContain('0개')
+  })
+
+  it('기준이 오히려 줄어든 것은 다시 안 받는다', () => {
+    // 서명한 것 중 일부를 지운 것뿐이라 새로 본 것이 없다.
+    const s = signoffState({
+      criteria: [crit('a')],
+      requiredDepts: ['재무'],
+      signatures: [{ ...sig, criterionIds: ['a', 'b', 'c'] }],
+      signoff: { ...sig, criterionIds: ['a', 'b', 'c'] },
+    })
+    expect(s.status).toBe('확인됨')
+  })
+})
+
+describe('어느 부서 서명인지 모를 때', () => {
+  it('앞을 비운 채로 문장을 시작하지 않는다', () => {
+    // "  확인하셨습니다. 재무·마케팅이 아직입니다"처럼 깨진 문장이 나왔다.
+    const s = signoffState({
+      criteria: [crit('a')],
+      requiredDepts: ['재무', '마케팅'],
+      signatures: [{ by: '김대리', dept: null, at: 'x' }],
+      signoff: { by: '김대리', at: 'x' },
+    })
+    expect(s.headline.trim()).toBe(s.headline)
+    expect(s.headline).not.toContain('  ')
+    expect(s.headline).toContain('재무·마케팅')
+  })
+})
