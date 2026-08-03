@@ -5231,3 +5231,151 @@ kbd {
   color: var(--text);
   margin-right: 5px;
 }
+
+/* ===== 무엇을 먼저 할까 ===== */
+/* 판이 순서를 정해 주지 않는다. 무엇이 어디에 있는지까지만 말한다.
+   차트 라이브러리를 안 쓴다 — SVG로 직접 그린다. */
+.board-wrap {
+  display: grid;
+  gap: 14px;
+}
+.board {
+  width: 100%;
+  max-width: 560px;
+  margin: 0 auto;
+  display: block;
+}
+.board-bg {
+  fill: var(--surface);
+  stroke: var(--border);
+}
+.board-mid {
+  stroke: var(--border);
+  stroke-dasharray: 4 4;
+}
+.board-q {
+  font-size: 10px;
+  fill: var(--text-muted);
+}
+.board-axis {
+  font-size: 11px;
+  fill: var(--text-muted);
+}
+.board-dot circle {
+  fill: var(--accent);
+  fill-opacity: 0.35;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+}
+/* 먼저 하기로 정한 것은 채워서 그린다. 판 위에서 바로 보여야 한다. */
+.board-dot.picked circle {
+  fill-opacity: 0.85;
+  stroke-width: 2.5;
+}
+
+.board-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.board-list > li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.board-list > li.picked {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.board-list-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+  margin-bottom: 5px;
+}
+.board-list-title {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-h);
+  margin-bottom: 7px;
+}
+
+.board-notes {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  display: grid;
+  gap: 7px;
+}
+.board-notes p {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text);
+}
+
+.picked-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 10px;
+}
+.picked-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.picked-why {
+  margin: 4px 0 7px;
+  padding: 8px 10px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+
+.pick-form {
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  display: grid;
+  gap: 10px;
+}
+.pick-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.pick-form label {
+  display: grid;
+  gap: 4px;
+}
+.pick-form label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.offboard-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+  font-size: 13px;
+}
+.offboard-list > li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
