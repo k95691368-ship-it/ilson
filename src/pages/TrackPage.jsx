@@ -176,7 +176,9 @@ function Result({ data, as, onChanged }) {
         <h2 style={{ margin: 0 }}>{a.title}</h2>
         <p className="card-note" style={{ marginTop: 4 }}>
           {a.applicant} · 지금{' '}
-          <strong>{data.currentStage}</strong> 단계까지 왔습니다
+          <strong>{data.currentStage}</strong> 단계에 있습니다
+          {data.stageProgress &&
+            ` — 끝난 것 ${data.stageProgress.done}, 남은 것 ${data.stageProgress.total - data.stageProgress.done}`}
           {a.annual_hours != null && ` · 연 ${num(a.annual_hours, 0)}시간이 드는 일로 접수됐습니다`}
         </p>
       </section>
@@ -829,6 +831,9 @@ function stageTone(s) {
 function stepClass(s) {
   if (s === '완료') return 'done'
   if (s === '진행중') return 'now'
+  // 성과는 계속 쌓이는 것이라 '진행중'과 다르게 칠한다. 같은 색이면
+  // 아직 뭔가 만들고 있는 것처럼 읽힌다.
+  if (s === '집계 중') return 'counting'
   if (s === '되돌림') return 'back'
   return 'wait'
 }

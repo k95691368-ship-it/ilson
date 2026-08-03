@@ -211,3 +211,25 @@ describe('지금 무엇을 먼저 하기로 해 뒀나', () => {
     expect(() => pickedState()).not.toThrow()
   })
 })
+
+// 이미 만들고 있거나 배포까지 끝난 건을 판에 올려 놓고 "이걸 놔두고 다른
+// 것을 하고 계시면 그 이유를 댈 수 있어야 합니다"라고 짚으면, 담당자는
+// 이미 하고 있는 일을 시작하라는 말을 듣는다.
+describe('아직 시작 안 한 것만 올린다', () => {
+  it('진행중인 것은 판에 안 올린다', () => {
+    const { items, off } = boardItems({ applications: [app({ status: '진행중' })] })
+    expect(items).toEqual([])
+    expect(off[0].why).toContain('이미 시작한 건')
+  })
+
+  it('수용만 올린다', () => {
+    const { items } = boardItems({ applications: [app({ status: '수용' })] })
+    expect(items).toHaveLength(1)
+  })
+
+  it('왜 안 올라오는지 말해 준다', () => {
+    // 안 밝히면 담당자는 이 판이 전부인 줄 안다.
+    const { off } = boardItems({ applications: [app({ status: '진행중' })] })
+    expect(off[0].why.length).toBeGreaterThan(10)
+  })
+})

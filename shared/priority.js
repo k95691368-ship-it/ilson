@@ -84,7 +84,14 @@ export function quadrantOf(impact, difficulty) {
 //
 // 점수가 없으면 못 올린다. 0,0에 찍으면 "안 걸리고 쉬운 것"으로 읽히는데
 // 실제로는 아직 판정을 안 한 것이다. **모르는 것을 아는 척 찍지 않는다.**
-const ON_BOARD = ['수용', '진행중']
+// 아직 시작 안 한 것만 올린다.
+//
+// 처음에는 '진행중'도 올렸다. 그런데 이 판이 답하려는 질문은
+// **"이 중에 무엇부터 시작하나"**다. 이미 만들고 있거나 배포까지 끝난
+// 건을 판에 올려 놓고 "이걸 놔두고 다른 것을 하고 계시면 그 이유를 댈 수
+// 있어야 합니다"라고 짚으면, 담당자는 이미 하고 있는 일을 시작하라는 말을
+// 듣는다. 그 한 줄로 이 판 전체를 못 믿게 된다.
+const ON_BOARD = ['수용']
 
 export function boardItems({ applications, joins } = {}) {
   const hoursByApp = joins ?? {}
@@ -117,6 +124,7 @@ export function boardItems({ applications, joins } = {}) {
 function whyOff(a, q) {
   if (!q) return '아직 임팩트·난이도를 안 매기셨습니다. 2단계에서 판정하시면 올라옵니다.'
   if (a.status === '접수' || a.status === '검토중') return '아직 판정 전입니다.'
+  if (a.status === '진행중') return '이미 시작한 건입니다. 이 판은 아직 시작 안 한 것만 놓습니다.'
   if (a.status === '반려') return '반려한 건입니다.'
   if (a.status === '보류') return '보류한 건입니다. 다시 볼 때가 되면 올라옵니다.'
   if (a.status === '완료') return '끝난 건입니다.'

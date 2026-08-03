@@ -194,7 +194,21 @@ export async function onRequestGet({ env, params, request }) {
       },
       {
         stage: '제작',
-        status: (builds?.n ?? 0) > 0 ? '진행중' : '대기',
+        // **완료로 갈 길이 없었다.**
+        //
+        // `만든 적 있으면 진행중, 아니면 대기` 둘뿐이라, 한 번이라도 만든
+        // 신청서는 배포가 끝나고 성과가 쌓여도 영영 "제작 중"으로 남았다.
+        // 그래서 여덟 단계 중 셋이 동시에 진행중이 되고, 상단 한 줄은
+        // "지금 성과 단계까지 왔습니다"라고 하는데 그 위에 제작이 진행중으로
+        // 떠 있었다. 부서 사람은 둘 중 하나가 거짓말이라고 읽는다.
+        //
+        // 다음 단계로 넘어갔으면 만들기는 끝난 것이다.
+        status:
+          beta || manual?.published_at || handover
+            ? '완료'
+            : (builds?.n ?? 0) > 0
+              ? '진행중'
+              : '대기',
         at: builds?.last ?? null,
         summary: (builds?.n ?? 0) > 0 ? `${builds.n}번 만들어 봤습니다.` : '아직 만들지 않았습니다.',
       },
@@ -233,7 +247,9 @@ export async function onRequestGet({ env, params, request }) {
       },
       {
         stage: '성과',
-        status: outcome?.dept_confirmed_at ? '완료' : (uses?.n ?? 0) > 0 ? '진행중' : '대기',
+        // 성과는 계속 쌓이는 것이라 '진행중'이라고 하면 아직 뭔가 만들고
+        // 있는 것처럼 읽힌다. 넘긴 뒤로는 쓰이는 만큼 숫자가 붙을 뿐이다.
+        status: outcome?.dept_confirmed_at ? '완료' : (uses?.n ?? 0) > 0 ? '집계 중' : '대기',
         at: outcome?.dept_confirmed_at ?? null,
         summary:
           (uses?.n ?? 0) > 0
@@ -242,7 +258,16 @@ export async function onRequestGet({ env, params, request }) {
       },
     ]
 
-    const currentIndex = timeline.findLastIndex((t) => t.status !== '대기')
+    // 지금 어디에 있는가.
+    //
+    // 예전에는 "대기가 아닌 가장 마지막 단계"를 집었다. 그러면 앞 단계가
+    // 안 끝났는데도 끝 단계 이름이 상단에 뜬다 — 부서 사람이 이 화면에
+    // 들어와 묻는 질문("내 거 지금 어디 있나요")에 답이 안 된다.
+    //
+    // 아직 안 끝난 첫 단계가 답이다. 그게 지금 멈춰 있는 자리다.
+    const stuckAt = timeline.findIndex((t) => t.status !== '완료' && t.status !== '되돌림')
+    const currentIndex = stuckAt >= 0 ? stuckAt : timeline.length - 1
+    const doneCount = timeline.filter((t) => t.status === '완료').length
 
     // 지금 이 부서가 움직여야 진행되는 것.
     //
@@ -299,6 +324,9 @@ export async function onRequestGet({ env, params, request }) {
       timeline,
       stages: STAGES,
       currentStage: currentIndex >= 0 ? timeline[currentIndex].stage : '신청서',
+      // 몇 단계가 끝났는지 같이 준다. 단계 이름만으로는 "많이 왔나 적게
+      // 왔나"를 모른다.
+      stageProgress: { done: doneCount, total: timeline.length },
       // 재신청으로 이어진 기록에는 상대 접수번호를 붙여 준다.
       //
       // link_id는 내부 id라 부서에게는 아무 뜻이 없다. 화면에서 "그 신청서
