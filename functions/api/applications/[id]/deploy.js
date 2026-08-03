@@ -5,8 +5,9 @@
 // 성과를 말하는 일이 흔하다.
 
 import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
-import { slugify } from '../../../_lib/ids.js'
+import { slugify, newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { ACCEPT_PROXY_KIND } from '../../../../shared/accept.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -162,20 +163,48 @@ export async function onRequestPost({ env, params, request }) {
       return jsonResponse({ ok: true, slug }, 201)
     }
 
-    // 부서가 받았다고 확인
+    // 담당자가 **대신** 받았다고 확인
+    //
+    // 이 버튼을 없애지 않는다. 전화로 확인받고 대신 눌러야 할 때가 실제로
+    // 있다. 다만 **대신 눌렀다고 적는다.**
+    //
+    // 예전에는 여기서 부서 사람 이름을 담당자가 타이핑해 넣었고, 기록에는
+    // 그 부서 사람이 확인한 것으로 남았다. 이 사이트가 "넘겼다고 받은 것이
+    // 아니다"라고 되풀이하는데, 정작 부서에게는 누를 자리를 안 주고
+    // 담당자가 부서 이름으로 대신 눌러 온 것이다.
+    //
+    // 부서가 직접 누르는 자리는 functions/api/tools/[slug]/accept.js 다.
     if (body.kind === 'accept') {
-      await env.DB.prepare(
-        `UPDATE handover SET accepted_at = datetime('now'), accepted_by = ?, updated_at = datetime('now')
-         WHERE application_id = ?`
-      )
-        .bind(t(body.accepted_by) || '부서 담당자', app.id)
-        .run()
-      await env.DB.prepare(
-        "UPDATE application SET status = '완료', updated_at = datetime('now') WHERE id = ?"
-      )
-        .bind(app.id)
-        .run()
-      return jsonResponse({ ok: true })
+      const who = t(body.accepted_by) || 'AX 담당자'
+      await env.DB.batch([
+        env.DB.prepare(
+          `UPDATE handover SET accepted_at = datetime('now'), accepted_by = ?, updated_at = datetime('now')
+           WHERE application_id = ?`
+        ).bind(who, app.id),
+        env.DB.prepare(
+          "UPDATE application SET status = '완료', updated_at = datetime('now') WHERE id = ?"
+        ).bind(app.id),
+        env.DB.prepare(
+          `INSERT INTO decision_log
+             (id, application_id, stage, actor, title, what, why, link_kind, link_id)
+           VALUES (?, ?, '배포', 'human', ?, ?, ?, ?, ?)`
+        ).bind(
+          newId('dec'),
+          app.id,
+          who,
+          t(body.heard_from)
+            ? `${t(body.heard_from)}에게 받았다는 말을 듣고 담당자가 대신 확인했습니다.`
+            : '담당자가 대신 확인했습니다. 부서가 직접 누른 것은 아닙니다.',
+          '대신 누른 확인을 부서 확인과 같은 것으로 세면, "부서가 확인해 줘야 성과다"가 자기 입으로 한 말이 된다.',
+          ACCEPT_PROXY_KIND,
+          app.id
+        ),
+      ])
+      return jsonResponse({
+        ok: true,
+        message:
+          '대신 확인한 것으로 남겼습니다. 부서가 도구 화면에서 직접 누르면 그때 부서 확인으로 바뀝니다.',
+      })
     }
 
     // 되돌리기

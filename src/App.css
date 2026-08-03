@@ -5389,3 +5389,68 @@ kbd {
 .track-step.counting .track-body strong {
   color: var(--text-h);
 }
+
+/* ===== 이걸 받으셨습니까 ===== */
+/* "받았습니다" 버튼만 두면 그건 도장 찍기다. 안 맞을 때 말할 자리가
+   없으면 부서는 그냥 안 누르고, 담당자는 왜 안 누르는지 모른다. */
+.accept-box {
+  padding: 14px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+  display: grid;
+  gap: 10px;
+}
+.accept-box.proxy {
+  border-color: var(--warning);
+  background: var(--warning-bg);
+}
+.accept-head {
+  display: grid;
+  gap: 3px;
+}
+.accept-head strong {
+  font-size: 15px;
+  color: var(--text-h);
+}
+.accept-proxy {
+  margin: 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 12.5px;
+  line-height: 1.75;
+}
+.accept-name {
+  display: grid;
+  gap: 4px;
+  max-width: 260px;
+}
+.accept-name > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.accept-reject {
+  display: grid;
+  gap: 8px;
+  padding-top: 9px;
+  border-top: 1px dashed var(--border);
+}
+.accept-reject label {
+  display: grid;
+  gap: 4px;
+}
+.accept-reject label > span {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+.accept-done {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-size: 13px;
+}

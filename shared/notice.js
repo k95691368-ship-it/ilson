@@ -167,7 +167,7 @@ export function noticesFrom(track) {
 const ACTION_TEXT = {
   handover_unconfirmed: {
     headline: '넘겨드린 것을 받으셨는지 확인해주세요',
-    body: '주소를 열어 한 번 돌려 보시고, 쓸 만하면 받았다고 눌러주세요.',
+    body: '주소를 열면 맨 위에 확인 칸이 있습니다. 한 번 돌려 보시고 받았다고 눌러주세요. 안 맞으면 안 맞는다고 눌러주셔도 됩니다.',
     why: '넘겼다고 받은 것이 아닙니다. 확인이 없으면 저희는 이게 실제로 쓰이는지 알 수 없습니다.',
   },
   outcome_unconfirmed: {

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
+import { validateAccept, validateReject, proxyNote } from '../../shared/accept.js'
 import ReportForm from '../components/ReportForm.jsx'
 import TeachQuarantine from '../components/TeachQuarantine.jsx'
 import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../shared/quota.js'
@@ -164,6 +165,12 @@ export default function ToolPage() {
           <Unclear slug={slug} section="when_to_run" notes={notes} reload={loadNotes} />
         </div>
       )}
+
+      {/* 넘겨받은 것을 부서가 직접 확인하는 자리.
+          이게 없어서 부서 사람은 조회 화면에서 "받았다고 눌러주세요"를 읽고
+          여기 왔다가 누를 것을 못 찾았다. 그동안 담당자가 부서 사람 이름을
+          대신 타이핑해 넣고 있었다. */}
+      <AcceptBox slug={slug} />
 
       {/* 누가 돌렸는지 남긴다. 이게 없으면 실행 기록이 전부 한 이름이 되고,
           "한 분만 쓰고 계십니다" 경보가 늘 켜져 있게 된다. */}
@@ -572,5 +579,119 @@ function Unclear({ slug, section, notes, reload }) {
         )
       )}
     </div>
+  )
+}
+
+// 넘겨받은 것을 부서가 직접 확인하는 자리.
+//
+// 이 사이트는 "넘겼다고 받은 것이 아니다"를 여러 화면에서 되풀이한다.
+// 그런데 그 확인을 누르는 자리가 담당자 화면에만 있었다. 부서 사람은
+// 조회 화면에서 "받았다고 눌러주세요"를 읽고 여기 왔다가 누를 것을
+// 못 찾았다. 시키는 일을 하러 왔다가 막다른 화면에서 끝난다.
+//
+// **"받았습니다" 버튼만 두지 않는다.** 그건 도장 찍기다. 안 맞을 때 말할
+// 자리가 없으면 부서는 그냥 안 누르고, 담당자는 왜 안 누르는지 모른다.
+function AcceptBox({ slug }) {
+  const { data, reload } = useApi(`/tools/${slug}/accept`)
+  const toast = useToast()
+  const [by, setBy] = useState('')
+  const [mode, setMode] = useState(null)
+  const [reason, setReason] = useState('')
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+
+  if (!data) return null
+  const s = data.state
+  if (!s.canAccept && s.status !== '부서가 확인함') return null
+
+  async function send(kind) {
+    const bad = kind === 'reject' ? validateReject({ by, reason }) : validateAccept({ by })
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/tools/${slug}/accept`, { kind, by, reason })
+      toast.success(r.message)
+      setMode(null)
+      setReason('')
+      reload()
+    } catch (err) {
+      setErrors({ by: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (s.status === '부서가 확인함') {
+    return (
+      <p className="accept-done">
+        {s.by}님이 {ago(s.at)} 받았다고 확인해주셨습니다.
+      </p>
+    )
+  }
+
+  return (
+    <section className={`accept-box${s.proxy ? ' proxy' : ''}`}>
+      <div className="accept-head">
+        <strong>이걸 받으셨습니까</strong>
+        <span className="card-note">
+          {data.handedTo.dept} {data.handedTo.person}에게 {ago(data.handedTo.at)} 넘겨드렸습니다.
+        </span>
+      </div>
+
+      {/* 담당자가 대신 눌러 둔 것은 부서 확인이 아니다. 그렇게 적는다. */}
+      {s.proxy && <p className="accept-proxy">{proxyNote(s)}</p>}
+
+      {s.rejects.length > 0 && (
+        <p className="accept-proxy">
+          앞서 <strong>{s.rejects[s.rejects.length - 1].by}</strong>님이 못 쓰겠다고 알려주셨습니다 —
+          &ldquo;{s.rejects[s.rejects.length - 1].what}&rdquo;. 고쳐졌으면 다시 확인해주세요.
+        </p>
+      )}
+
+      <p className="card-note">
+        한 번 돌려 보시고 판단해주세요. <strong>안 맞으면 안 맞는다고 해주셔야</strong> 고칠 수
+        있습니다. 그냥 두시면 저희는 잘 쓰고 계신 줄 압니다.
+      </p>
+
+      <label className="accept-name">
+        <span>받으시는 분</span>
+        <input value={by} onChange={(e) => setBy(e.target.value)} placeholder={data.handedTo.person} />
+        {errors.by && <em className="field-error">{errors.by}</em>}
+      </label>
+
+      {mode === 'reject' ? (
+        <div className="accept-reject">
+          <label>
+            <span>무엇이 안 맞습니까</span>
+            <textarea
+              rows={2}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="광고비 칸이 비어서 옵니다. 그것만 채워지면 쓸 수 있습니다."
+            />
+            {errors.reason && <em className="field-error">{errors.reason}</em>}
+            <small className="card-note">이 한 줄이면 고칠 수 있습니다.</small>
+          </label>
+          <div className="row">
+            <button type="button" className="btn-danger btn-sm" disabled={busy} onClick={() => send('reject')}>
+              {busy ? '보내는 중…' : '이대로는 못 쓰겠습니다'}
+            </button>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => setMode(null)}>
+              그만두기
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="row">
+          <button type="button" className="btn-primary" disabled={busy} onClick={() => send('accept')}>
+            {busy ? '남기는 중…' : '받았습니다'}
+          </button>
+          <button type="button" className="btn-ghost" onClick={() => setMode('reject')}>
+            이대로는 못 쓰겠습니다
+          </button>
+        </div>
+      )}
+    </section>
   )
 }
