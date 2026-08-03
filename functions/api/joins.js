@@ -12,7 +12,7 @@ import { JOIN_KIND, UNJOIN_KIND, joinCounts } from '../../shared/join.js'
 export async function onRequestGet({ env }) {
   try {
     const { results } = await env.DB.prepare(
-      `SELECT id, application_id, title, what, why, link_kind, link_id FROM decision_log
+      `SELECT id, application_id, title, what, why, alternatives, link_kind, link_id FROM decision_log
        WHERE link_kind IN (?, ?)`
     )
       .bind(JOIN_KIND, UNJOIN_KIND)
@@ -27,7 +27,7 @@ export async function onRequestGet({ env }) {
       if (r.link_kind !== JOIN_KIND) continue
       let dept = null
       try {
-        dept = JSON.parse(r.why).dept
+        dept = JSON.parse(r.alternatives || r.why).dept
       } catch {
         // 옛 기록은 제목에만 부서가 들어 있다.
         dept = String(r.title ?? '').split(' — ')[0] || null

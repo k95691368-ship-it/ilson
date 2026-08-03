@@ -13,7 +13,8 @@ import { REFUSE_LABELS } from '../../shared/review.js'
 
 export async function onRequestGet({ env }) {
   try {
-    const [apps, refuseMix, stageRows, handovers, uses, decisions, baselines] = await Promise.all([
+    const [apps, refuseMix, stageRows, handovers, uses, decisions, baselines, refuseNoAlt] =
+      await Promise.all([
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
                 current_minutes, current_people, current_frequency,
@@ -58,6 +59,13 @@ export async function onRequestGet({ env }) {
       env.DB.prepare(
         'SELECT application_id, median_seconds, sample_n FROM baseline'
       ).all(),
+
+      // 대안 없이 반려한 것. /honesty가 세는 것과 같은 조건으로 센다 —
+      // 두 화면이 서로 다른 말을 하면 둘 다 못 믿는다.
+      env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM review
+         WHERE verdict = '반려' AND (refuse_alternative IS NULL OR TRIM(refuse_alternative) = '')`
+      ).first(),
     ])
 
     const items = apps.results
@@ -125,6 +133,12 @@ export async function onRequestGet({ env }) {
       },
       // 반려율을 숨기지 않는다. 다 받아 주는 조직은 없고, 반려가 0이면
       // 오히려 아무 판단도 하지 않았다는 뜻이다.
+      // 대안 없이 반려한 것.
+      //
+      // 첫 화면 타일이 "전부 이유와 대안을 함께 보냈습니다"라고 단언하는
+      // 동안 /honesty는 "대안 없이 반려 N건"이라고 반대로 말하고 있었다.
+      // 두 화면이 같은 자리를 보게 세는 곳을 여기 둔다.
+      refusedWithoutAlternative: refuseNoAlt?.n ?? 0,
       refuseRate: reviewed > 0 ? Math.round((refused / reviewed) * 100) : null,
       refuseMix: refuseMix.results.map((r) => ({
         code: r.refuse_code,

@@ -3,6 +3,7 @@ import { STAGES } from '../lib/stages.js'
 import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
 import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
+import { readableWhy } from '../../shared/notice.js'
 
 // 첫 화면. 여덟 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
 // 일어나고 있는지가 숫자로 얹힌다.
@@ -189,7 +190,17 @@ function Overview({ data }) {
         <Tile
           label="반려"
           value={data.refuseRate != null ? `${data.refuseRate}%` : '—'}
-          note={`${c.refused}건 · 이유와 대안을 함께 보냈습니다`}
+          // 이 타일이 "전부 대안을 함께 보냈다"고 단언하는 동안, 같은
+          // 사이트의 /honesty는 "대안 없이 반려한 것 N건"이라고 반대로
+          // 말하고 있었다. 한 사이트가 서로 다른 말을 하면 둘 다 못 믿는다.
+          //
+          // 세는 자리를 하나로 두고, 안 지킨 것이 있으면 그것부터 적는다.
+          note={
+            data.refusedWithoutAlternative > 0
+              ? `${c.refused}건 · 그중 ${data.refusedWithoutAlternative}건은 대안 없이 반려`
+              : `${c.refused}건 · 전부 이유와 대안을 함께 보냈습니다`
+          }
+          tone={data.refusedWithoutAlternative > 0 ? 'warn' : undefined}
         />
         <Tile
           label="부서에 넘김"
@@ -291,9 +302,11 @@ function Overview({ data }) {
                 <div className="item-body" style={{ fontSize: 14, fontWeight: 700 }}>
                   {d.title}
                 </div>
-                <div className="decision-why">
-                  <strong>왜</strong> {d.why}
-                </div>
+                {readableWhy(d.why) && (
+                  <div className="decision-why">
+                    <strong>왜</strong> {readableWhy(d.why)}
+                  </div>
+                )}
               </div>
             ))}
           </div>

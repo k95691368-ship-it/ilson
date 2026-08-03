@@ -31,7 +31,7 @@ async function findApplication(env, id) {
 
 export async function loadJoins(env, applicationId) {
   const { results } = await env.DB.prepare(
-    `SELECT id, title, what, why, link_kind, link_id, created_at
+    `SELECT id, title, what, why, alternatives, link_kind, link_id, created_at
      FROM decision_log WHERE application_id = ? AND link_kind IN (?, ?)
      ORDER BY created_at`
   )
@@ -47,11 +47,19 @@ export async function loadJoins(env, applicationId) {
   return results
     .filter((r) => r.link_kind === JOIN_KIND)
     .map((r) => {
+      // 숫자는 alternatives에 있다. 옛 기록에는 why에 들어 있어서
+      // 둘 다 본다 — 안 그러면 이미 손든 부서의 시간이 통째로 사라진다.
       let detail = {}
-      try {
-        detail = JSON.parse(r.why)
-      } catch {
-        // 옛 기록이면 숫자가 없다. 그때는 부서 이름만 세고 시간은 못 센다.
+      for (const raw of [r.alternatives, r.why]) {
+        try {
+          const v = JSON.parse(raw)
+          if (v && typeof v === 'object') {
+            detail = v
+            break
+          }
+        } catch {
+          // 이 칸이 아니면 다음 칸을 본다.
+        }
       }
       return {
         id: r.id,
@@ -189,16 +197,21 @@ export async function onRequestPost({ env, request, params }) {
 
     await env.DB.prepare(
       `INSERT INTO decision_log
-         (id, application_id, stage, actor, title, what, why, link_kind, link_id)
-       VALUES (?, ?, '신청서', 'human', ?, ?, ?, ?, ?)`
+         (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
+       VALUES (?, ?, '신청서', 'human', ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         newId('dec'),
         app.id,
         `${detail.dept} — 우리도 같은 일을 겪는다`,
         t(body.story).slice(0, 1000),
-        // 숫자는 JSON으로 넣는다. 문장에 섞어 넣으면 나중에 다시 셀 때
-        // 글자를 뒤져야 하고, 문구를 고치는 날 조용히 틀린다.
+        // why는 결정 기록 화면에 "왜"로 그대로 그려지는 칸이다.
+        //
+        // 여기에 JSON을 넣어 뒀었다. 그래서 첫 화면 "최근 결정"과 /log에
+        // `{"dept":"재무","minutes":90,...}`이 통째로 찍혔다. 이 사이트가
+        // 스스로 핵심 증거라고 내세운 자리에 원시 데이터가 노출됐다.
+        '두 부서가 같은 일을 따로 겪고 있으면, 그것은 한 부서 일이 아니라 그만큼 큰 병목이다.',
+        // 숫자는 여기 넣는다. 이 칸은 화면에 안 그려진다.
         JSON.stringify(detail),
         JOIN_KIND,
         app.id

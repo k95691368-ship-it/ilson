@@ -31,7 +31,7 @@ async function load(env) {
       'SELECT application_id, impact_score, difficulty_score FROM review'
     ).all(),
     env.DB.prepare(
-      `SELECT id, application_id, title, what, why, link_kind, link_id, created_at
+      `SELECT id, application_id, title, what, why, alternatives, link_kind, link_id, created_at
        FROM decision_log WHERE link_kind IN (?, ?, ?, ?)
        ORDER BY created_at`
     )
@@ -56,7 +56,7 @@ async function load(env) {
     if (l.link_kind !== JOIN_KIND || released.has(l.id)) continue
     let d = {}
     try {
-      d = JSON.parse(l.why)
+      d = JSON.parse(l.alternatives || l.why)
     } catch {
       // 옛 기록에는 숫자가 없다. 부서 수만 세고 시간은 못 더한다.
     }

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { noticesFrom, actionsFrom, newSince, seenKey } from '../shared/notice.js'
+import { noticesFrom, actionsFrom, newSince, seenKey, readableWhy } from '../shared/notice.js'
 
 // 알림에서 가장 중요한 것은 "아무 일도 안 일어난 것을 알리지 않는 것"이다.
 // 대기 중인 단계를 소식으로 만들면 여덟 건이 매번 뜨고, 그러면 사람은
@@ -268,5 +268,34 @@ describe('손든 것과 풀린 것', () => {
     const t = { timeline: [{ stage: '신청서', status: '완료', at: '2026-08-01 00:00:00', summary: '냈습니다' }], decisions: [join(), unjoin] }
     const keys = noticesFrom(t).map((x) => x.key)
     expect(new Set(keys).size).toBe(keys.length)
+  })
+})
+
+// 손들기 기록의 why 칸에 JSON을 넣어 뒀다. 그래서 첫 화면 "최근 결정"과
+// /log에 {"dept":"재무",...}가 통째로 찍혔다. 이 사이트가 스스로 핵심
+// 증거라고 내세운 자리다.
+//
+// 쓰는 쪽은 고쳤지만 이미 쌓인 기록은 그대로 있다. decision_log는 일부러
+// 못 지우게 만든 표라 지울 수도 없다.
+describe('결정 기록의 "왜"', () => {
+  it('사람이 읽을 말이면 그대로 준다', () => {
+    expect(readableWhy('두 부서가 같은 일을 따로 겪고 있다')).toBe('두 부서가 같은 일을 따로 겪고 있다')
+  })
+
+  it('JSON이면 안 그린다', () => {
+    expect(readableWhy('{"dept":"재무","minutes":90}')).toBeNull()
+    expect(readableWhy('  [1,2,3]  ')).toBeNull()
+  })
+
+  it('빈 값이면 안 그린다', () => {
+    expect(readableWhy('')).toBeNull()
+    expect(readableWhy('   ')).toBeNull()
+    expect(readableWhy(null)).toBeNull()
+    expect(() => readableWhy()).not.toThrow()
+  })
+
+  it('중괄호가 문장 안에 있는 것은 그대로 준다', () => {
+    // 여는 괄호로 시작할 때만 JSON으로 본다.
+    expect(readableWhy('규칙이 {a}를 본다')).toBe('규칙이 {a}를 본다')
   })
 })

@@ -132,7 +132,7 @@ function joinNotices(track) {
 
 function deptOf(d) {
   try {
-    return JSON.parse(d.why).dept || '다른 부서'
+    return JSON.parse(d.alternatives || d.why).dept || '다른 부서'
   } catch {
     return String(d.title ?? '').split(' — ')[0] || '다른 부서'
   }
@@ -232,4 +232,19 @@ export const SEEN_PREFIX = 'ilson:seen:'
 
 export function seenKey(ticket) {
   return `${SEEN_PREFIX}${String(ticket ?? '').toUpperCase()}`
+}
+
+// 결정 기록의 "왜"에 사람이 읽을 말이 들어 있는가.
+//
+// 한동안 손들기 기록의 why 칸에 JSON을 넣어 뒀다. 그래서 첫 화면
+// "최근 결정"과 /log에 {"dept":"재무",...}가 통째로 찍혔다. 이 사이트가
+// 스스로 핵심 증거라고 내세운 자리다.
+//
+// 쓰는 쪽은 고쳤지만 이미 쌓인 기록은 그대로 있다. decision_log는 일부러
+// 못 지우게 만든 표라 지울 수도 없다. 그리는 쪽에서 걸러 준다.
+export function readableWhy(why) {
+  const t = String(why ?? '').trim()
+  if (!t) return null
+  if (t.startsWith('{') || t.startsWith('[')) return null
+  return t
 }

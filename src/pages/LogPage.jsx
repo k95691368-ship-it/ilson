@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { ago, dateTimeLabel, num } from '../lib/format.js'
+import { readableWhy } from '../../shared/notice.js'
 
 // 이 조직이 내린 결정 전부를 한 화면에서 본다.
 //
@@ -196,9 +197,13 @@ export default function LogPage() {
                 {d.what}
               </div>
 
-              <div className="decision-why">
-                <strong>왜</strong> {d.why}
-              </div>
+              {readableWhy(d.why) && (
+
+                <div className="decision-why">
+                  <strong>왜</strong> {readableWhy(d.why)}
+                </div>
+
+              )}
               {d.alternatives && (
                 <div className="decision-why">
                   <strong>고르지 않은 길</strong> {d.alternatives}

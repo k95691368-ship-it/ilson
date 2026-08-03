@@ -847,7 +847,7 @@ function AsDept({ data, dept }) {
   const mine = (data.decisions ?? []).find((d) => {
     if (d.link_kind !== JOIN_KIND) return false
     try {
-      return JSON.parse(d.why).dept === dept
+      return JSON.parse(d.alternatives || d.why).dept === dept
     } catch {
       return String(d.title ?? '').startsWith(dept)
     }
