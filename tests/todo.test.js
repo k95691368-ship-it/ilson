@@ -218,3 +218,40 @@ describe('부서가 단 합격 기준 이의', () => {
     expect(NOTHING_CHECKED.join()).toContain('이의')
   })
 })
+
+// 부서가 직접 말한 것이 담당자에게 닿는가.
+//
+// 이 사이트는 "부서가 확인해 줘야 성과다"라고 여러 화면에서 말한다.
+// 그런데 부서가 실제로 아니라고 했을 때 그 말이 그 화면 안에만 남으면,
+// 담당자는 그 화면을 열 때까지 모른다. 그 사이에 금액은 보고에 올라간다.
+describe('부서가 한 말이 첫 화면까지 오는가', () => {
+  it('부서가 성과 숫자를 다르다고 하면 금액 급으로 올라온다', () => {
+    const items = buildTodo({ overview: { deptDisagrees: 2 } })
+    const x = items.find((i) => i.key === 'dept_disagrees')
+    expect(x).toBeTruthy()
+    expect(x.kind).toBe('금액')
+    expect(x.title).toContain('2건')
+    expect(x.to).toBe('/result')
+  })
+
+  it('아무 말도 없으면 안 올라온다', () => {
+    expect(buildTodo({ overview: { deptDisagrees: 0 } }).some((i) => i.key === 'dept_disagrees')).toBe(false)
+    expect(buildTodo({ overview: {} }).some((i) => i.key === 'dept_disagrees')).toBe(false)
+  })
+
+  it('시험판 의견에 답을 안 했으면 대기 급으로 올라온다', () => {
+    const x = buildTodo({ overview: { betaUnanswered: 3 } }).find((i) => i.key === 'beta_unanswered')
+    expect(x).toBeTruthy()
+    expect(x.kind).toBe('대기')
+    expect(x.to).toBe('/beta')
+  })
+
+  it('부서가 다르다고 한 것이 시험판 의견보다 위에 온다', () => {
+    // 금액이 틀리는 것이 사람을 기다리게 하는 것보다 급하다.
+    const items = buildTodo({ overview: { deptDisagrees: 1, betaUnanswered: 9 } })
+    const a = items.findIndex((i) => i.key === 'dept_disagrees')
+    const b = items.findIndex((i) => i.key === 'beta_unanswered')
+    expect(a).toBeGreaterThanOrEqual(0)
+    expect(b).toBeGreaterThan(a)
+  })
+})

@@ -5454,3 +5454,149 @@ kbd {
   color: var(--success-text);
   font-size: 13px;
 }
+
+/* 부서가 직접 확인하는 자리 — 시험판 의견, 성과 확인.
+   둘 다 "부서가 해줘야 한다"고 화면에 적어 놓고 정작 누를 자리는 담당자
+   화면에만 있던 것들이다. 합격 기준 서명(.signoff)과 같은 생김새로 둔다 —
+   부서 입장에서는 같은 종류의 일이다. */
+.dconf {
+  padding: 15px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.dconf-done {
+  border-color: var(--success);
+  background: var(--surface);
+}
+.dconf-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.dconf h3 {
+  margin: 0 0 7px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.dconf-why {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.dconf-msg {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.dconf-proxy,
+.dconf-said {
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.dconf-proxy {
+  border-color: var(--warning);
+}
+.dconf-form {
+  margin-top: 12px;
+  display: grid;
+  gap: 11px;
+}
+.dconf-form label {
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+.dconf-form label > span {
+  font-weight: 600;
+}
+.dconf-form input[type='text'],
+.dconf-form input[type='number'],
+.dconf-form input:not([type]),
+.dconf-form textarea,
+.dconf-form select {
+  width: 100%;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.dconf-form textarea {
+  resize: vertical;
+  line-height: 1.7;
+}
+/* 맞다/다르다는 라디오 점보다 누를 수 있는 칸으로 보이는 편이 낫다.
+   점만 두면 손가락으로 누르기 어렵고, 안 고른 채로 넘기려 든다. */
+.dconf-pick {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.dconf-pick label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 13px;
+  cursor: pointer;
+}
+.dconf-pick label.on {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+.betasay-list {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.betasay-list > li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.betasay-list > li.answered {
+  border-left-color: var(--success);
+}
+.betasay-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.betasay-body {
+  font-size: 13px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+.betasay-answer {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--success-bg);
+  color: var(--success-text);
+  font-size: 13px;
+  line-height: 1.7;
+}

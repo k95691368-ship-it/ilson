@@ -46,6 +46,26 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
     )
   }
 
+  // 부서가 "그 숫자는 체감과 다릅니다"라고 한 것.
+  //
+  // 이 사이트는 "만든 사람만 아는 성과는 성과가 아니다"라고 여러 화면에서
+  // 말한다. 그런데 부서가 실제로 아니라고 했을 때 그 말이 성과 화면 안에만
+  // 남으면, 담당자는 그 화면을 열 때까지 모른다. 그 사이에 금액은 보고에
+  // 올라간다.
+  const disagreed = overview?.deptDisagrees ?? 0
+  if (disagreed > 0) {
+    out.push(
+      item({
+        kind: '금액',
+        key: 'dept_disagrees',
+        title: `부서가 "그렇게 안 걸린다"고 한 성과 ${disagreed}건`,
+        why: '저희가 잰 값 위에서 절감액을 계산했는데 부서는 다르다고 했습니다. 다시 재기 전까지 그 금액은 보수적 추정입니다.',
+        to: '/result',
+        cta: '얼마나 다른지 보기',
+      })
+    )
+  }
+
   const unchecked = codes?.summary?.needsCheck ?? 0
   if (unchecked > 0) {
     out.push(
@@ -150,6 +170,24 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         why: '이의는 담당자만 푸실 수 있습니다. 안 풀면 그 기준으로 낸 통과에 계속 단서가 붙고, 그 부서는 다음부터 확인을 안 해줍니다.',
         to: '/agreement',
         cta: '이의 보기',
+      })
+    )
+  }
+
+  // 부서가 시험판을 써 보고 적어 준 것.
+  //
+  // 이건 부서가 자기 시간을 써서 답해 준 것이다. 답을 안 하면 다음번에는
+  // 안 적어 주고, 그러면 기계 채점만 남는다.
+  const betaOpen = overview?.betaUnanswered ?? 0
+  if (betaOpen > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'beta_unanswered',
+        title: `시험판 써 보고 적어 주신 것 ${betaOpen}건에 아직 답을 안 하셨습니다`,
+        why: '부서가 자기 시간을 써서 적어 준 것입니다. 답이 없으면 다음 시험판에는 아무도 안 적어 줍니다.',
+        to: '/beta',
+        cta: '읽고 답하기',
       })
     )
   }

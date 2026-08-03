@@ -10,11 +10,22 @@
 
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { REFUSE_LABELS } from '../../shared/review.js'
+import { OUTCOME_KIND } from '../../shared/accept.js'
 
 export async function onRequestGet({ env }) {
   try {
-    const [apps, refuseMix, stageRows, handovers, uses, decisions, baselines, refuseNoAlt] =
-      await Promise.all([
+    const [
+      apps,
+      refuseMix,
+      stageRows,
+      handovers,
+      uses,
+      decisions,
+      baselines,
+      refuseNoAlt,
+      deptSaid,
+      betaOpen,
+    ] = await Promise.all([
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
                 current_minutes, current_people, current_frequency,
@@ -66,7 +77,36 @@ export async function onRequestGet({ env }) {
         `SELECT COUNT(*) AS n FROM review
          WHERE verdict = '반려' AND (refuse_alternative IS NULL OR TRIM(refuse_alternative) = '')`
       ).first(),
+
+      // 부서가 성과 숫자를 직접 확인하면서 남긴 것.
+      //
+      // 부서가 "그거 그렇게 안 걸립니다"라고 했는데 담당자가 그걸 모르면,
+      // 그 금액은 부서가 아니라고 한 채로 보고에 올라간다. 여기서 세서
+      // 첫 화면 할 일 목록에 올린다.
+      env.DB.prepare(
+        `SELECT id, application_id, alternatives FROM decision_log
+         WHERE link_kind = ? ORDER BY created_at DESC`
+      )
+        .bind(OUTCOME_KIND)
+        .all(),
+
+      // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
+      env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM beta_feedback WHERE resolved_at IS NULL`
+      ).first(),
     ])
+
+    // 체감이 우리가 잰 값과 크게 다르다고 한 건. 숫자는 alternatives에
+    // JSON으로 들어 있다 — why 칸에 넣었다가 첫 화면에 그대로 찍힌 적이 있다.
+    const disagreed = new Set()
+    for (const r of deptSaid.results) {
+      try {
+        const said = JSON.parse(r.alternatives)
+        if (said?.agree === false) disagreed.add(r.application_id)
+      } catch {
+        // 옛 기록에는 숫자가 없다. 그건 세지 않는다.
+      }
+    }
 
     const items = apps.results
     const stageBy = new Map(stageRows.results.map((s) => [s.id, s]))
@@ -139,6 +179,11 @@ export async function onRequestGet({ env }) {
       // 동안 /honesty는 "대안 없이 반려 N건"이라고 반대로 말하고 있었다.
       // 두 화면이 같은 자리를 보게 세는 곳을 여기 둔다.
       refusedWithoutAlternative: refuseNoAlt?.n ?? 0,
+      // 부서가 "그 숫자는 체감과 다릅니다"라고 한 건. 이게 살아 있는 동안
+      // 그 금액은 보수적 추정으로 내려가 있다.
+      deptDisagrees: disagreed.size,
+      // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
+      betaUnanswered: betaOpen?.n ?? 0,
       refuseRate: reviewed > 0 ? Math.round((refused / reviewed) * 100) : null,
       refuseMix: refuseMix.results.map((r) => ({
         code: r.refuse_code,

@@ -223,6 +223,33 @@ export const CHALLENGE_RULES = [
       '이번 기간의 처리량이 평소와 비슷했는지 확인하지 않았습니다. 유난히 바쁜 달이었다면 절감이 커 보이고, 한가한 달이었다면 작아 보입니다.',
   },
   {
+    code: 'dept_disagrees',
+    title: '부서가 재 본 값과 다르다고 했습니다',
+    // 물어봐 놓고 답이 계산에 아무 영향이 없으면, 묻는 것 자체가 연기다.
+    // 부서가 다르다고 한 순간 이 금액은 확정이 아니게 된다.
+    //
+    // `Number.isFinite(Number(deptFelt))`만으로는 안 된다. **Number(null)은
+    // NaN이 아니라 0이다.** 그래서 안 물어본 것이 "0분이라고 하셨다"로
+    // 읽혀 반박이 늘 붙었다. 이 프로젝트에서 이 덫에 걸린 것이 세 번째다
+    // (Number(undefined)는 NaN이라 ?? 로 안 걸러지는 것, 우선순위 판에서
+    // 점수 없는 신청서가 0점으로 찍힌 것, 그리고 여기).
+    applies: ({ deptFelt, outcome }) => {
+      if (deptFelt == null || deptFelt === '') return false
+      const felt = Number(deptFelt)
+      const base = Number(outcome.baselineSeconds)
+      if (!Number.isFinite(felt) || !Number.isFinite(base) || base <= 0) return false
+      // 체감은 원래 조금씩 다르다. 20% 안쪽은 흔들림으로 본다.
+      return Math.abs(felt * 60 - base) >= base * 0.2
+    },
+    body: ({ deptFelt, outcome }) => {
+      const measured = Math.round(Number(outcome.baselineSeconds) / 60)
+      const gap = Math.round(((Number(deptFelt) - measured) / measured) * 100)
+      return `저희는 ${measured}분으로 재 두었는데, 실제로 하시는 분은 ${deptFelt}분쯤 걸린다고 하십니다(${
+        gap > 0 ? `${gap}% 더` : `${Math.abs(gap)}% 덜`
+      }). 이 금액은 저희가 잰 값 위에 서 있습니다. 다시 재기 전까지는 부서 말이 맞다고 보는 편이 안전합니다.`
+    },
+  },
+  {
     code: 'no_dept_confirm',
     title: '부서가 확인해 주지 않았습니다',
     applies: ({ deptConfirmed }) => !deptConfirmed,

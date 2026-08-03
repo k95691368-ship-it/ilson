@@ -15,6 +15,7 @@ import {
   labelForOutcome,
   annualize,
 } from '../../../../shared/outcome.js'
+import { OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../../../shared/accept.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -66,6 +67,21 @@ export async function onRequestGet({ env, params }) {
   try {
     const { baseline, uses, saved, challenges, quarantineLeft } = await load(env, app)
 
+    // 부서가 직접 말한 체감 분.
+    const deptSaid = await env.DB.prepare(
+      `SELECT alternatives FROM decision_log
+       WHERE application_id = ? AND link_kind = ?
+       ORDER BY created_at DESC LIMIT 1`
+    )
+      .bind(app.id, OUTCOME_KIND)
+      .first()
+    let deptFelt = null
+    try {
+      deptFelt = JSON.parse(deptSaid?.alternatives)?.felt ?? null
+    } catch {
+      // 옛 기록에는 숫자가 없다.
+    }
+
     const outcome = computeOutcome({
       baseline,
       runs: uses,
@@ -79,6 +95,9 @@ export async function onRequestGet({ env, params }) {
       quarantineLeft,
       deptConfirmed: Boolean(saved?.dept_confirmed_at),
       baselineAgeDays: daysSince(baseline?.sealed_at),
+      // 부서가 체감으로 말한 분. 우리가 잰 값과 크게 다르면 반박이 붙는다 —
+      // 물어봐 놓고 답이 계산에 아무 영향이 없으면 묻는 것 자체가 연기다.
+      deptFelt,
     }
     const shouldHave = outcome.status === '산정불가' ? [] : buildChallenges(context)
 
@@ -160,6 +179,11 @@ export async function onRequestPost({ env, params, request }) {
     }
 
     // 부서가 이 숫자를 보고 맞다고 확인.
+    // 담당자가 **대신** 확인.
+    //
+    // 이 버튼을 없애지 않는다. 전화로 듣고 대신 눌러야 할 때가 있다.
+    // 다만 대신 눌렀다고 적는다 — 부서가 직접 누르는 자리는
+    // functions/api/track/[ticket]/outcome.js 다.
     if (body.kind === 'dept_confirm') {
       await env.DB.prepare(
         `INSERT INTO outcome (application_id, dept_confirmed_at, dept_confirmed_by, dept_comment)
@@ -175,10 +199,10 @@ export async function onRequestPost({ env, params, request }) {
       await logDecision(env, {
         applicationId: app.id,
         stage: '성과',
-        title: '부서가 성과를 확인했다',
+        title: '담당자가 대신 성과를 확인했다',
         what: `${t(body.by) || '부서 담당자'}가 이 숫자를 보고 맞다고 했다. ${t(body.comment) || ''}`.trim(),
         why: '만든 사람만 아는 성과는 성과가 아니다. 실제로 쓰는 사람이 확인해야 근거가 된다.',
-        linkKind: 'outcome',
+        linkKind: OUTCOME_PROXY_KIND,
         linkId: app.id,
       }).catch(() => {})
 

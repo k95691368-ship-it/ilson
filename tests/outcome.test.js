@@ -266,3 +266,78 @@ describe('인원수가 절감액에 그대로 곱해진다', () => {
     expect(o.formula[0].note).toContain('3명')
   })
 })
+
+// 성과를 부서에게 물어 놓고 그 답이 계산에 아무 영향이 없으면,
+// 묻는 것 자체가 연기다.
+describe('부서가 다르다고 하면', () => {
+  const baseline5 = { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 }
+  const runs = [{ duration_ms: 60000, human_review_seconds: 300 }]
+  const ctx = (deptFelt) => ({
+    outcome: computeOutcome({ baseline: baseline5, runs, devHours: 20 }),
+    quarantineLeft: 0,
+    deptConfirmed: true,
+    baselineAgeDays: 10,
+    deptFelt,
+  })
+
+  it('크게 다르면 반박이 붙는다', () => {
+    // 90분으로 재 뒀는데 실제로는 40분이라고 하면 절감이 절반이다.
+    const c = buildChallenges(ctx(40))
+    expect(c.some((x) => x.code === 'dept_disagrees')).toBe(true)
+  })
+
+  it('얼마나 다른지 적는다', () => {
+    const c = buildChallenges(ctx(40)).find((x) => x.code === 'dept_disagrees')
+    expect(c.body).toContain('90분')
+    expect(c.body).toContain('40분')
+  })
+
+  it('비슷하면 안 붙는다', () => {
+    // 체감은 원래 조금씩 다르다. 20% 안쪽은 흔들림으로 본다.
+    expect(buildChallenges(ctx(85)).some((x) => x.code === 'dept_disagrees')).toBe(false)
+  })
+
+  it('더 걸린다고 해도 붙는다', () => {
+    // 부서가 더 걸린다고 하면 절감은 오히려 커지는데, 그것도 우리가 잰
+    // 값이 틀렸다는 뜻이다.
+    expect(buildChallenges(ctx(150)).some((x) => x.code === 'dept_disagrees')).toBe(true)
+  })
+
+  it('안 물어봤으면 안 붙는다', () => {
+    expect(buildChallenges(ctx(null)).some((x) => x.code === 'dept_disagrees')).toBe(false)
+    expect(buildChallenges(ctx(undefined)).some((x) => x.code === 'dept_disagrees')).toBe(false)
+  })
+
+  it('그 반박이 남아 있으면 금액이 보수적 추정으로 내려간다', () => {
+    const c = buildChallenges(ctx(40))
+    expect(labelForOutcome({ status: '인정' }, c.length).label).toBe('보수적 추정')
+  })
+})
+
+// Number(null)은 NaN이 아니라 0이다. 이 프로젝트에서 이 덫에 걸린 것이
+// 세 번째다 — Number(undefined)가 ??로 안 걸러진 것, 우선순위 판에서
+// 점수 없는 신청서가 0점으로 찍힌 것, 그리고 부서 체감값.
+describe('안 물어본 것을 0이라고 읽지 않는다', () => {
+  const ctx = (deptFelt) => ({
+    outcome: computeOutcome({
+      baseline: { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 },
+      runs: [{ duration_ms: 60000, human_review_seconds: 300 }],
+      devHours: 20,
+    }),
+    quarantineLeft: 0,
+    deptConfirmed: true,
+    baselineAgeDays: 10,
+    deptFelt,
+  })
+
+  for (const [label, v] of [['null', null], ['undefined', undefined], ['빈 문자열', ''], ['글자', '몰라요']]) {
+    it(`${label}이면 반박이 안 붙는다`, () => {
+      expect(buildChallenges(ctx(v)).some((x) => x.code === 'dept_disagrees')).toBe(false)
+    })
+  }
+
+  it('진짜 0분이라고 하시면 붙는다', () => {
+    // 아예 안 걸린다는 답도 답이다. 그건 우리가 잰 90분이 틀렸다는 뜻이다.
+    expect(buildChallenges(ctx(0)).some((x) => x.code === 'dept_disagrees')).toBe(true)
+  })
+})

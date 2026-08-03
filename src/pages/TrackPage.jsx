@@ -7,6 +7,8 @@ import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
 import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
+import { validateOutcomeConfirm } from '../../shared/accept.js'
+import { validateBetaSay, BETA_SAY_KINDS, kindOf, betaSayHeadline, betaSayWhy } from '../../shared/betasay.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 import { RESUBMIT_BACK_KIND } from '../../shared/resubmit.js'
 
@@ -232,6 +234,15 @@ function Result({ data, as, onChanged }) {
           그런데 확정은 담당자 혼자 하고, 부서는 그 문장을 본 적이 없다.
           여기서 실제로 보여드리고 받는다. */}
       <Signoff ticket={data.ticket} as={as} onDone={onChanged} />
+
+      {/* "시험판을 써 보고 막힌 곳을 알려주세요"라고 적어 두고 정작 그 말을
+          적을 칸이 아무 데도 없었다. /beta는 담당자 화면이고 /t/:slug는
+          배포가 끝나야 생긴다 — 시험판은 배포 앞 단계다. */}
+      <BetaSay ticket={data.ticket} onDone={onChanged} />
+
+      {/* 성과 화면은 "만든 사람만 아는 성과는 성과가 아닙니다"라고 적어 두고,
+          정작 그 확인 버튼을 담당자 화면에만 뒀다. 여기서 부서가 직접 본다. */}
+      <OutcomeCheck ticket={data.ticket} onDone={onChanged} />
 
       {/* 지금 이 부서가 움직여야 진행되는 것.
           진행 상황보다 위에 둔다. 어디까지 왔는지보다, 지금 멈춰 있는
@@ -806,6 +817,308 @@ function Signoff({ ticket, as, onDone }) {
           </label>
           <button type="submit" className="btn-primary" disabled={busy}>
             {busy ? '남기는 중…' : '확인했습니다'}
+          </button>
+        </form>
+      )}
+    </section>
+  )
+}
+
+// 시험판을 써 본 부서가 막힌 곳을 직접 적는다.
+//
+// 조회 화면은 "시험판을 써 보고 막힌 곳을 알려주세요"라고 적어 두고, 정작
+// 그 말을 적을 칸을 아무 데도 안 뒀다. 시키기만 하고 갈 곳이 없는 문장은
+// 한 번 겪으면 그다음부터 그 목록을 통째로 안 읽게 만든다.
+function BetaSay({ ticket, onDone }) {
+  const [state, setState] = useState(null)
+  const [open, setOpen] = useState(false)
+  const [by, setBy] = useState('')
+  const [kind, setKind] = useState('막힌곳')
+  const [body, setBody] = useState('')
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const reload = useCallback(() => {
+    api
+      .get(`/track/${encodeURIComponent(ticket)}/beta`)
+      .then((r) => setState(r.state))
+      .catch(() => {})
+  }, [ticket])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  // 시험판을 아직 안 돌렸으면 물어볼 것이 없다.
+  if (!state?.canSay) return null
+
+  async function submit(e) {
+    e.preventDefault()
+    const bad = validateBetaSay({ by, kind, body })
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/beta`, { by, kind, body })
+      setMsg(r.message)
+      setState(r.state)
+      setBody('')
+      setOpen(false)
+      onChangedSafely(onDone)
+    } catch (err) {
+      setErrors({ body: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="dconf betasay">
+      <div className="dconf-head">
+        <span className="badge badge-neutral">시험판 {state.round.seq}차</span>
+        <span className={`badge ${state.round.overall === '통과' ? 'badge-success' : 'badge-warning'}`}>
+          기계 채점 {state.round.overall}
+        </span>
+        <span className="spacer" />
+        {state.open > 0 && <span className="badge badge-accent">답 못 드린 것 {state.open}건</span>}
+      </div>
+
+      <h3>{betaSayHeadline(state)}</h3>
+      <p className="dconf-why">{betaSayWhy(state)}</p>
+
+      {msg && <p className="dconf-msg">{msg}</p>}
+
+      {/* 이미 적어 주신 것과 그에 대한 답. 안 보여주면 부서는 자기가 낸
+          말이 읽히기는 했는지 모르고, 같은 말을 다시 적는다. */}
+      {state.says.length > 0 && (
+        <ul className="betasay-list">
+          {state.says.map((s) => (
+            <li key={s.id} className={s.resolved_at ? 'answered' : ''}>
+              <div className="betasay-top">
+                <span className="badge badge-neutral">{kindOf(s.kind)?.label ?? s.kind}</span>
+                <span className="card-note">{s.person_label}</span>
+                <span className="spacer" />
+                <span className="card-note">{ago(s.created_at)}</span>
+              </div>
+              <div className="betasay-body">{s.body}</div>
+              {s.resolved_at ? (
+                <p className="betasay-answer">
+                  <strong>답</strong> {s.resolution}
+                </p>
+              ) : (
+                <p className="card-note">아직 답을 못 드렸습니다.</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!open ? (
+        <button type="button" className="btn-primary btn-sm" onClick={() => setOpen(true)}>
+          {state.total === 0 ? '써 보고 느낀 것 적기' : '하나 더 적기'}
+        </button>
+      ) : (
+        <form className="dconf-form" onSubmit={submit}>
+          <div className="dconf-pick">
+            {BETA_SAY_KINDS.map((k) => (
+              <label key={k.code} className={kind === k.code ? 'on' : ''}>
+                <input
+                  type="radio"
+                  name="betakind"
+                  checked={kind === k.code}
+                  onChange={() => setKind(k.code)}
+                />
+                {k.label}
+              </label>
+            ))}
+          </div>
+          {errors.kind && <em className="field-error">{errors.kind}</em>}
+
+          <label>
+            <span>무슨 일이 있었습니까</span>
+            <textarea
+              rows={3}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={kindOf(kind)?.hint ?? ''}
+            />
+            {errors.body && <em className="field-error">{errors.body}</em>}
+            <small className="card-note">{kindOf(kind)?.hint}</small>
+          </label>
+
+          <label>
+            <span>적어주신 분</span>
+            <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="김대리" />
+            {errors.by && <em className="field-error">{errors.by}</em>}
+          </label>
+
+          <div className="row">
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? '남기는 중…' : '보내기'}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
+              그만두기
+            </button>
+          </div>
+        </form>
+      )}
+    </section>
+  )
+}
+
+// 적어 드린 성과 숫자가 체감과 맞는지 부서가 직접 본다.
+//
+// 성과 화면은 "만든 사람만 아는 성과는 성과가 아닙니다"라고 적어 두고,
+// 정작 그 확인 버튼을 담당자 화면에만 뒀다. 담당자가 창을 띄워 부서 사람
+// 이름을 대신 타이핑했다. 수령 확인과 똑같은 자리에서 똑같이 어긋나 있었다.
+//
+// **"맞습니다" 한 버튼으로 받지 않는다.** 그러면 아무도 안 읽고 누른다.
+// 실제로 한 번에 몇 분쯤 걸린다고 느끼는지를 숫자로 받고, 우리가 잰 값과
+// 20% 넘게 다르면 성과 화면의 금액이 '보수적 추정'으로 내려간다.
+function OutcomeCheck({ ticket, onDone }) {
+  const [state, setState] = useState(null)
+  const [by, setBy] = useState('')
+  const [agree, setAgree] = useState(null)
+  const [felt, setFelt] = useState('')
+  const [comment, setComment] = useState('')
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const reload = useCallback(() => {
+    api
+      .get(`/track/${encodeURIComponent(ticket)}/outcome`)
+      .then((r) => setState(r.state))
+      .catch(() => {})
+  }, [ticket])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  // 아직 한 번도 안 돌았거나 기준선이 없으면 물어볼 것이 없다. 쓰지도 않은
+  // 것에 "얼마나 줄었습니까"를 물으면 그 화면은 그때부터 안 읽힌다.
+  if (!state?.canConfirm) return null
+
+  const done = state.status === '부서가 확인함'
+
+  async function submit(e) {
+    e.preventDefault()
+    const bad = validateOutcomeConfirm({ by, agree, felt })
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    setBusy(true)
+    try {
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/outcome`, {
+        by,
+        agree,
+        felt: agree === false ? Number(felt) : null,
+        comment,
+      })
+      setMsg(r.message)
+      setState(r.state)
+      onChangedSafely(onDone)
+    } catch (err) {
+      setErrors({ by: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className={`dconf${done ? ' dconf-done' : ''}`}>
+      <div className="dconf-head">
+        <span className="badge badge-neutral">성과</span>
+        <span className={`badge ${done ? 'badge-success' : 'badge-warning'}`}>{state.status}</span>
+        <span className="spacer" />
+        <span className="card-note">지금까지 {num(state.runs, 0)}번 돌았습니다</span>
+      </div>
+
+      <h3>
+        저희는 이 일이 한 번에 <strong>{num(state.measuredMinutes, 0)}분</strong> 걸리는 것으로
+        재 두었습니다
+      </h3>
+      <p className="dconf-why">
+        이 숫자 위에서 절감액이 계산됩니다. 만든 사람만 아는 성과는 성과가 아닙니다.{' '}
+        <strong>부서가 아니라고 하면 아닌 것입니다.</strong>
+      </p>
+      <p className="card-note">
+        {state.sampleN > 0
+          ? `자동화 전에 ${state.sampleN}번 재서 나온 가운뎃값입니다`
+          : '표본이 적어 흔들릴 수 있는 값입니다'}
+        {state.people > 1 && ` · ${state.people}명이 붙는 일로 잡혀 있습니다`}
+      </p>
+
+      {/* 담당자가 대신 눌러 둔 것이 있으면 그렇게 적는다. 지우지 않는다 —
+          전화로 확인받고 대신 누르는 일이 실제로 있다. 다만 부서 확인과
+          같은 것으로 세지 않는다. */}
+      {state.proxy && (
+        <p className="dconf-proxy">
+          {state.by ?? '담당자'}가 대신 확인해 둔 것입니다. 부서가 직접 누르신 것은 아직 없습니다 —
+          한 번만 봐주시면 그때부터 이 숫자를 그대로 씁니다.
+        </p>
+      )}
+
+      {done && (
+        <p className="dconf-said">
+          <strong>{state.by}님</strong>{' '}
+          {state.deptFelt == null
+            ? '이 숫자가 체감과 맞다고 하셨습니다.'
+            : `실제로는 한 번에 ${num(state.deptFelt, 0)}분쯤 걸린다고 하셨습니다. 성과 화면에 그대로 적어 두었습니다.`}
+        </p>
+      )}
+      {msg && <p className="dconf-msg">{msg}</p>}
+
+      {!done && (
+        <form className="dconf-form" onSubmit={submit}>
+          <div className="dconf-pick">
+            <label className={agree === true ? 'on' : ''}>
+              <input type="radio" name="agree" checked={agree === true} onChange={() => setAgree(true)} />
+              대충 맞습니다
+            </label>
+            <label className={agree === false ? 'on' : ''}>
+              <input type="radio" name="agree" checked={agree === false} onChange={() => setAgree(false)} />
+              그것보다 적게/많이 걸립니다
+            </label>
+          </div>
+          {errors.agree && <em className="field-error">{errors.agree}</em>}
+
+          {agree === false && (
+            <label>
+              <span>실제로는 한 번에 몇 분쯤 걸리십니까</span>
+              <input
+                type="number"
+                min="0"
+                value={felt}
+                onChange={(e) => setFelt(e.target.value)}
+                placeholder="40"
+              />
+              {errors.felt && <em className="field-error">{errors.felt}</em>}
+              <small className="card-note">
+                정확하지 않아도 됩니다. 저희가 잰 값과 크게 다르면 성과 화면의 금액을{' '}
+                <strong>보수적 추정으로 내리고</strong> 다시 재겠습니다.
+              </small>
+            </label>
+          )}
+
+          <label>
+            <span>덧붙이실 말씀 (안 적으셔도 됩니다)</span>
+            <input
+              value={comment}
+              onChange={(e) => setComment(e.target.value)}
+              placeholder="월말에만 오래 걸립니다"
+            />
+          </label>
+
+          <label>
+            <span>확인하신 분</span>
+            <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="김대리" />
+            {errors.by && <em className="field-error">{errors.by}</em>}
+          </label>
+
+          <button type="submit" className="btn-primary" disabled={busy}>
+            {busy ? '남기는 중…' : '이대로 확인합니다'}
           </button>
         </form>
       )}
