@@ -236,6 +236,11 @@ function Result({ data, as, onChanged }) {
           여기서 실제로 보여드리고 받는다. */}
       <Signoff ticket={data.ticket} as={as} onDone={onChanged} />
 
+      {/* 부서가 이 화면을 여는 이유는 대개 하나다 — 낸 지 2주가 됐는데
+          아무 소식이 없어서다. "신청서 단계에 있습니다"는 이미 아는 것이고,
+          알고 싶은 것은 내 앞에 무엇이 있고 왜 그것이 먼저인가다. */}
+      <WaitLine ticket={data.ticket} />
+
       {/* "보류 조건이 풀리면 알려주세요"라고 적어 두고 알릴 자리가 없었다.
           수령·성과와 달리 담당자가 대신 누를 수도 없다 — 조건이 풀렸는지는
           부서만 안다. 아무도 안 움직이면 영원히 그대로다. */}
@@ -826,6 +831,91 @@ function Signoff({ ticket, as, onDone }) {
           </button>
         </form>
       )}
+    </section>
+  )
+}
+
+// "우리 것은 왜 아직입니까"에 답한다.
+//
+// 담당자는 우선순위 판에서 무엇을 먼저 할지 고를 때 이유를 반드시 적는다.
+// 그 입력칸의 안내문이 이렇다 — "뒤로 밀린 부서가 물어볼 때 답할 것이
+// 있어야 합니다." 그래 놓고 그 답을 부서가 볼 자리에 안 뒀다. 답을 적어
+// 서랍에 넣어 둔 셈이다.
+function WaitLine({ ticket }) {
+  const [state, setState] = useState(null)
+
+  useEffect(() => {
+    api
+      .get(`/track/${encodeURIComponent(ticket)}/waitline`)
+      .then((r) => setState(r.state))
+      .catch(() => {})
+  }, [ticket])
+
+  if (!state?.show) return null
+
+  return (
+    <section className={`waitline waitline-${state.phase}`}>
+      <div className="dconf-head">
+        <span className="badge badge-neutral">차례</span>
+        {state.mePicked && <span className="badge badge-success">먼저 할 것</span>}
+        {state.phase === 'behind' && (
+          <span className="badge badge-warning">앞에 {state.aheadPicked.length}건</span>
+        )}
+        {state.phase === 'unranked' && <span className="badge badge-warning">순서 미정</span>}
+      </div>
+
+      <h3>{state.headline}</h3>
+      <p className="dconf-why">{state.body}</p>
+
+      {/* 내 것을 먼저 하기로 한 이유. 담당자가 적은 그대로 보여준다. */}
+      {state.mePicked && state.pickWhy && (
+        <p className="waitline-why">
+          <strong>먼저 하기로 한 이유</strong> {state.pickWhy}
+        </p>
+      )}
+
+      {/* 지금 만들고 있는 것. 순서보다 앞에 있는 것은 사실 이쪽이다. */}
+      {state.aheadRunning.length > 0 && (
+        <div className="waitline-block">
+          <span className="card-note">지금 만들고 있는 것</span>
+          <ul className="waitline-list">
+            {state.aheadRunning.map((r) => (
+              <li key={r.id ?? r.ticket_no}>
+                <span className="badge badge-accent">만드는 중</span>
+                <span className="waitline-dept">{r.dept}</span>
+                <span className="waitline-title">{r.title}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {/* 내 앞에 있는 것들과, 왜 그것이 먼저인지. */}
+      {state.aheadPicked.length > 0 && (
+        <div className="waitline-block">
+          <span className="card-note">먼저 하기로 정한 것</span>
+          <ul className="waitline-list">
+            {state.aheadPicked.map((p) => (
+              <li key={p.application_id}>
+                <span className="badge badge-neutral">{p.dept}</span>
+                <span className="waitline-title">{p.title}</span>
+                {p.why && (
+                  <span className="waitline-reason">
+                    <strong>왜 먼저인가</strong> {p.why}
+                  </span>
+                )}
+                <span className="card-note">{ago(p.at)} 정함</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="card-note waitline-foot">
+        {state.phase === 'behind'
+          ? '납득이 안 되시면 아래 "되묻기"로 물어봐 주세요. 순서는 규칙이 아니라 사람이 정한 것이라 바뀔 수 있습니다.'
+          : '순서는 규칙이 자동으로 매기지 않습니다. 담당자가 정하고 그 이유가 기록에 남습니다.'}
+      </p>
     </section>
   )
 }

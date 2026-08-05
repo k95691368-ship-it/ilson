@@ -174,6 +174,26 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
     )
   }
 
+  // 하기로 해 놓고 순서를 안 정한 채 여럿이 기다리는 상태.
+  //
+  // 순서를 안 정하는 것 자체는 잘못이 아니다. 한 건만 있으면 정할 것도 없다.
+  // 다만 여럿이 기다리는데 안 정하면, 부서 조회 화면은 "아직 순서를 정하지
+  // 않았습니다"라고 그대로 적는다. 그걸 읽은 부서가 다음에 물어볼 때 댈 말이
+  // 없다.
+  const unranked = overview?.unranked ?? 0
+  if (unranked > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'unranked_queue',
+        title: `하기로 한 ${unranked}건이 순서 없이 기다립니다`,
+        why: '부서 조회 화면에 "아직 순서를 정하지 않았습니다"라고 그대로 적힙니다. 무엇을 먼저 할지 정하면 그 이유까지 부서가 읽습니다.',
+        to: '/priority',
+        cta: '순서 정하기',
+      })
+    )
+  }
+
   // 보류 조건이 풀렸다고 부서가 알려 온 것.
   //
   // 보류는 이 사이트에서 **아무도 안 움직이면 영원히 그대로**인 유일한

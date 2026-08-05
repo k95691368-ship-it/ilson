@@ -12,6 +12,8 @@ import { jsonResponse, jsonError } from '../_lib/http.js'
 import { REFUSE_LABELS } from '../../shared/review.js'
 import { OUTCOME_KIND } from '../../shared/accept.js'
 import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
+import { PICK_KIND, UNPICK_KIND } from '../../shared/priority.js'
+import { unrankedPressure } from '../../shared/waitline.js'
 
 export async function onRequestGet({ env }) {
   try {
@@ -27,6 +29,7 @@ export async function onRequestGet({ env }) {
       deptSaid,
       betaOpen,
       holdLifts,
+      pickRows,
     ] = await Promise.all([
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
@@ -111,6 +114,16 @@ export async function onRequestGet({ env }) {
       )
         .bind(HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND)
         .all(),
+
+      // 먼저 하기로 정해 둔 것. 취소는 자기 앞의 지정을 지운다.
+      env.DB.prepare(
+        `SELECT d.application_id, d.link_kind, a.status
+         FROM decision_log d JOIN application a ON a.id = d.application_id
+         WHERE d.link_kind IN (?, ?)
+         ORDER BY d.created_at`
+      )
+        .bind(PICK_KIND, UNPICK_KIND)
+        .all(),
     ])
 
     // 취소는 자기 앞의 요청을 지우고, 요청 뒤에 다시 판정했으면 답을 준 것이다.
@@ -123,6 +136,22 @@ export async function onRequestGet({ env }) {
     for (const r of liftOpen.values()) {
       if (!r.judged_at || String(r.judged_at) <= String(r.created_at)) holdLiftWaiting += 1
     }
+
+    // 하기로 해 놓고 아직 시작 안 한 것이 여럿인데 순서를 안 정한 상태.
+    //
+    // 순서를 안 정하는 것 자체는 잘못이 아니다. 한 건만 있으면 정할 것도
+    // 없다. 다만 **여럿이 기다리는데 안 정한 것**은 다르다 — 그때 부서가
+    // "왜 우리 것은 아직입니까"라고 물으면 댈 말이 없다.
+    const livePicks = new Map()
+    for (const r of pickRows.results) {
+      if (r.link_kind === UNPICK_KIND) livePicks.delete(r.application_id)
+      else livePicks.set(r.application_id, r)
+    }
+    const pickedLive = [...livePicks.values()].filter(
+      (r) => r.status !== '완료' && r.status !== '반려'
+    )
+    const waitingToStart = items.filter((a) => a.status === '수용').length
+    const rankPressure = unrankedPressure({ waiting: waitingToStart, picked: pickedLive })
 
     // 체감이 우리가 잰 값과 크게 다르다고 한 건. 숫자는 alternatives에
     // JSON으로 들어 있다 — why 칸에 넣었다가 첫 화면에 그대로 찍힌 적이 있다.
@@ -214,6 +243,9 @@ export async function onRequestGet({ env }) {
       betaUnanswered: betaOpen?.n ?? 0,
       // 보류 조건이 풀렸다고 알려 왔는데 아직 다시 판정 안 한 것.
       holdLiftWaiting,
+      // 하기로 해 놓고 순서를 안 정한 채 기다리는 것.
+      waitingToStart,
+      unranked: rankPressure.over ? waitingToStart : 0,
       refuseRate: reviewed > 0 ? Math.round((refused / reviewed) * 100) : null,
       refuseMix: refuseMix.results.map((r) => ({
         code: r.refuse_code,

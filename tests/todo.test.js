@@ -279,3 +279,24 @@ describe('보류 조건이 풀렸다는 알림', () => {
     expect(b).toBeGreaterThan(a)
   })
 })
+
+// 순서를 안 정하는 것 자체는 잘못이 아니다. 다만 여럿이 기다리는데 안 정하면
+// 부서 조회 화면에 "아직 순서를 정하지 않았습니다"가 그대로 적힌다.
+describe('순서 없이 기다리는 것', () => {
+  it('여럿이 기다리면 할 일에 올라온다', () => {
+    const x = buildTodo({ overview: { unranked: 4 } }).find((i) => i.key === 'unranked_queue')
+    expect(x).toBeTruthy()
+    expect(x.title).toContain('4건')
+    expect(x.to).toBe('/priority')
+  })
+
+  it('없으면 안 올라온다', () => {
+    expect(buildTodo({ overview: { unranked: 0 } }).some((i) => i.key === 'unranked_queue')).toBe(false)
+    expect(buildTodo({ overview: {} }).some((i) => i.key === 'unranked_queue')).toBe(false)
+  })
+
+  it('부서가 무엇을 읽게 되는지를 이유로 댄다', () => {
+    const x = buildTodo({ overview: { unranked: 4 } }).find((i) => i.key === 'unranked_queue')
+    expect(x.why).toContain('부서 조회 화면')
+  })
+})
