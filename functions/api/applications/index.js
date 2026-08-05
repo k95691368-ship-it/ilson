@@ -53,7 +53,20 @@ export async function onRequestGet({ env, request }) {
                   AND NOT EXISTS (
                     SELECT 1 FROM decision_log ans
                      WHERE ans.link_kind = '답변' AND ans.link_id = q.id
-                  )) AS waiting_answers
+                  )) AS waiting_answers,
+              -- 보류해 둔 것의 조건이 풀렸다고 부서가 알려 왔는가.
+              --
+              -- 목록에서 안 보이면 담당자는 첫 화면 할 일에서 "N건"만 읽고
+              -- 여기 와서 어느 것인지 찾아 헤맨다. 마지막 알림이 마지막
+              -- 취소보다 뒤이고, 그 뒤로 다시 판정하지 않았을 때만 센다.
+              (SELECT MAX(l.created_at) FROM decision_log l
+                WHERE l.application_id = a.id AND l.link_kind = '보류해제요청'
+                  AND l.created_at > COALESCE(
+                        (SELECT MAX(c.created_at) FROM decision_log c
+                          WHERE c.application_id = a.id AND c.link_kind = '보류해제취소'), '')
+                  AND l.created_at > COALESCE(
+                        (SELECT r.updated_at FROM review r WHERE r.application_id = a.id), '')
+              ) AS hold_lift_at
          FROM application a
          ${clause}
          ORDER BY a.created_at DESC

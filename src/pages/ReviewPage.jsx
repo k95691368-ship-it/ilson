@@ -599,6 +599,12 @@ export default function ReviewPage() {
                         {a.waiting_answers > 0 && (
                           <span className="badge badge-warning">답 기다리는 중</span>
                         )}
+                        {/* 부서가 "조건이 풀렸습니다"라고 알려 온 것.
+                            첫 화면 할 일에서 "N건"만 읽고 여기 와서 어느
+                            것인지 못 찾으면, 그 목록은 다음부터 안 읽힌다. */}
+                        {a.hold_lift_at && (
+                          <span className="badge badge-accent">조건 풀렸다고 알려 옴</span>
+                        )}
                         {a.status === '접수' && a.hours_since >= 24 && (
                           <span className="badge badge-warning">{Math.floor(a.hours_since / 24)}일 경과</span>
                         )}

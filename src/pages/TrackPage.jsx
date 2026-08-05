@@ -9,6 +9,7 @@ import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
 import { validateOutcomeConfirm } from '../../shared/accept.js'
 import { validateBetaSay, BETA_SAY_KINDS, kindOf, betaSayHeadline, betaSayWhy } from '../../shared/betasay.js'
+import { validateHoldLift, LIFT_KINDS, liftKindOf, holdHeadline, holdWhy } from '../../shared/holdlift.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 import { RESUBMIT_BACK_KIND } from '../../shared/resubmit.js'
 
@@ -234,6 +235,11 @@ function Result({ data, as, onChanged }) {
           그런데 확정은 담당자 혼자 하고, 부서는 그 문장을 본 적이 없다.
           여기서 실제로 보여드리고 받는다. */}
       <Signoff ticket={data.ticket} as={as} onDone={onChanged} />
+
+      {/* "보류 조건이 풀리면 알려주세요"라고 적어 두고 알릴 자리가 없었다.
+          수령·성과와 달리 담당자가 대신 누를 수도 없다 — 조건이 풀렸는지는
+          부서만 안다. 아무도 안 움직이면 영원히 그대로다. */}
+      <HoldLift ticket={data.ticket} onDone={onChanged} />
 
       {/* "시험판을 써 보고 막힌 곳을 알려주세요"라고 적어 두고 정작 그 말을
           적을 칸이 아무 데도 없었다. /beta는 담당자 화면이고 /t/:slug는
@@ -818,6 +824,171 @@ function Signoff({ ticket, as, onDone }) {
           <button type="submit" className="btn-primary" disabled={busy}>
             {busy ? '남기는 중…' : '확인했습니다'}
           </button>
+        </form>
+      )}
+    </section>
+  )
+}
+
+// 보류해 둔 신청서의 조건이 풀렸다고 부서가 직접 알린다.
+//
+// 검토에서 보류를 하면 화면은 "보류 조건이 풀리면 알려주세요"라고 적는다.
+// 그런데 알릴 자리가 아무 데도 없었다. 수령 확인·시험판 의견과 다른 점은,
+// 저 둘은 담당자가 대신이라도 누를 수 있었는데 **조건이 풀렸는지는 부서만
+// 안다**는 것이다. 담당자가 한 달에 한 번 전화를 돌리지 않는 한 보류함은
+// 조용히 무덤이 된다.
+function HoldLift({ ticket, onDone }) {
+  const [state, setState] = useState(null)
+  const [open, setOpen] = useState(false)
+  const [by, setBy] = useState('')
+  const [kind, setKind] = useState('met')
+  const [body, setBody] = useState('')
+  const [errors, setErrors] = useState({})
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState(null)
+
+  const reload = useCallback(() => {
+    api
+      .get(`/track/${encodeURIComponent(ticket)}/hold`)
+      .then((r) => setState(r.state))
+      .catch(() => {})
+  }, [ticket])
+
+  useEffect(() => {
+    reload()
+  }, [reload])
+
+  // 보류가 아니면 이 자리는 아무 말도 하지 않는다.
+  if (!state?.canTell) return null
+
+  async function send(payload, done) {
+    setBusy(true)
+    try {
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/hold`, payload)
+      setMsg(r.message)
+      setState(r.state)
+      done?.()
+      onChangedSafely(onDone)
+    } catch (err) {
+      setErrors({ body: err.message })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function submit(e) {
+    e.preventDefault()
+    const bad = validateHoldLift({ by, kind, body })
+    setErrors(bad)
+    if (Object.keys(bad).length > 0) return
+    send({ by, kind, body }, () => {
+      setBody('')
+      setOpen(false)
+    })
+  }
+
+  return (
+    <section className={`dconf holdlift${state.pending ? ' holdlift-pending' : ''}`}>
+      <div className="dconf-head">
+        <span className="badge badge-warning">보류 중</span>
+        {state.heldDays != null && (
+          <span className="badge badge-neutral">미뤄 둔 지 {num(state.heldDays, 0)}일</span>
+        )}
+        <span className="spacer" />
+        {state.pending && <span className="badge badge-accent">알려주신 것 확인 대기</span>}
+      </div>
+
+      <h3>{holdHeadline(state)}</h3>
+
+      {/* 무슨 조건이었는지 다시 보여준다. 안 보여주면 부서는 몇 주 전에 읽은
+          문장을 기억해 내야 하고, 대개 기억 못 한다. */}
+      {state.condition && (
+        <p className="holdlift-cond">
+          <strong>다시 보기로 한 조건</strong> {state.condition}
+        </p>
+      )}
+      <p className="dconf-why">{holdWhy(state)}</p>
+
+      {msg && <p className="dconf-msg">{msg}</p>}
+
+      {/* 이미 알려주신 것. 안 보여주면 같은 말을 또 적는다. */}
+      {state.history.length > 0 && (
+        <ul className="betasay-list">
+          {state.history.map((h) => (
+            <li key={h.id} className={h.kind === '보류해제취소' ? '' : 'answered'}>
+              <div className="betasay-top">
+                <span className="badge badge-neutral">
+                  {h.kind === '보류해제취소' ? '거두심' : (liftKindOf(h.liftKind)?.label ?? '알려주심')}
+                </span>
+                <span className="card-note">{h.by}</span>
+                <span className="spacer" />
+                <span className="card-note">{ago(h.at)}</span>
+              </div>
+              <div className="betasay-body">{h.body}</div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {state.pending ? (
+        <div className="row">
+          <span className="card-note">잘못 알리셨으면 거두실 수 있습니다.</span>
+          <button
+            type="button"
+            className="btn-ghost btn-sm"
+            disabled={busy}
+            onClick={() => send({ kind: 'cancel', by: state.open?.by ?? by ?? '부서' })}
+          >
+            거두기
+          </button>
+        </div>
+      ) : !open ? (
+        <button type="button" className="btn-primary btn-sm" onClick={() => setOpen(true)}>
+          달라진 것 알리기
+        </button>
+      ) : (
+        <form className="dconf-form" onSubmit={submit}>
+          <div className="dconf-pick">
+            {LIFT_KINDS.map((k) => (
+              <label key={k.code} className={kind === k.code ? 'on' : ''}>
+                <input
+                  type="radio"
+                  name="liftkind"
+                  checked={kind === k.code}
+                  onChange={() => setKind(k.code)}
+                />
+                {k.label}
+              </label>
+            ))}
+          </div>
+          {errors.kind && <em className="field-error">{errors.kind}</em>}
+
+          <label>
+            <span>무엇이 달라졌습니까</span>
+            <textarea
+              rows={3}
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              placeholder={liftKindOf(kind)?.hint ?? ''}
+            />
+            {errors.body && <em className="field-error">{errors.body}</em>}
+            <small className="card-note">{liftKindOf(kind)?.hint}</small>
+          </label>
+
+          <label>
+            <span>알려주시는 분</span>
+            <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="김대리" />
+            {errors.by && <em className="field-error">{errors.by}</em>}
+          </label>
+
+          <div className="row">
+            <button type="submit" className="btn-primary" disabled={busy}>
+              {busy ? '보내는 중…' : '알리기'}
+            </button>
+            <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
+              그만두기
+            </button>
+          </div>
         </form>
       )}
     </section>

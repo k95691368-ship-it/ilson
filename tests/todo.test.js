@@ -255,3 +255,27 @@ describe('부서가 한 말이 첫 화면까지 오는가', () => {
     expect(b).toBeGreaterThan(a)
   })
 })
+
+// 보류는 이 사이트에서 아무도 안 움직이면 영원히 그대로인 유일한 상태다.
+// 반려는 끝난 것이고 진행 중인 것은 다음 단계가 있는데, 보류는 누가 먼저
+// 말하지 않으면 그냥 묻힌다.
+describe('보류 조건이 풀렸다는 알림', () => {
+  it('알려 오면 할 일에 올라온다', () => {
+    const x = buildTodo({ overview: { holdLiftWaiting: 2 } }).find((i) => i.key === 'hold_lifted')
+    expect(x).toBeTruthy()
+    expect(x.title).toContain('2건')
+    expect(x.to).toBe('/review')
+  })
+
+  it('없으면 안 올라온다', () => {
+    expect(buildTodo({ overview: {} }).some((i) => i.key === 'hold_lifted')).toBe(false)
+    expect(buildTodo({ overview: { holdLiftWaiting: 0 } }).some((i) => i.key === 'hold_lifted')).toBe(false)
+  })
+
+  it('금액이 틀리는 것보다는 뒤에 온다', () => {
+    const items = buildTodo({ overview: { holdLiftWaiting: 9, deptDisagrees: 1 } })
+    const a = items.findIndex((i) => i.key === 'dept_disagrees')
+    const b = items.findIndex((i) => i.key === 'hold_lifted')
+    expect(b).toBeGreaterThan(a)
+  })
+})

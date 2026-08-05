@@ -174,6 +174,26 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
     )
   }
 
+  // 보류 조건이 풀렸다고 부서가 알려 온 것.
+  //
+  // 보류는 이 사이트에서 **아무도 안 움직이면 영원히 그대로**인 유일한
+  // 상태다. 반려는 끝난 것이고 진행 중인 것은 다음 단계가 있는데, 보류는
+  // 누가 먼저 말하지 않으면 그냥 묻힌다. 그래서 부서가 큰맘 먹고 알린 것을
+  // 놓치면 다음부터 그 부서는 아무것도 안 알린다.
+  const lifted = overview?.holdLiftWaiting ?? 0
+  if (lifted > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'hold_lifted',
+        title: `보류 조건이 풀렸다고 알려 온 것 ${lifted}건`,
+        why: '조건이 풀린 것은 부서만 압니다. 알려 왔는데 다시 판정하지 않으면, 그 부서는 다음부터 알리지 않습니다.',
+        to: '/review',
+        cta: '다시 판정하기',
+      })
+    )
+  }
+
   // 부서가 시험판을 써 보고 적어 준 것.
   //
   // 이건 부서가 자기 시간을 써서 답해 준 것이다. 답을 안 하면 다음번에는

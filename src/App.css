@@ -5600,3 +5600,24 @@ kbd {
   font-size: 13px;
   line-height: 1.7;
 }
+
+/* 보류 알림 — 부서가 "조건이 풀렸습니다"라고 알려 온 자리.
+   보류는 아무도 안 움직이면 영원히 그대로인 유일한 상태라, 다른 확인
+   카드보다 한 눈에 띄어야 한다. */
+.holdlift {
+  border-color: var(--warning);
+  background: var(--surface);
+}
+.holdlift-pending {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.holdlift-cond {
+  margin: 0 0 8px;
+  padding: 9px 11px;
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2, var(--surface));
+  font-size: 13px;
+  line-height: 1.8;
+}

@@ -11,6 +11,7 @@
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { REFUSE_LABELS } from '../../shared/review.js'
 import { OUTCOME_KIND } from '../../shared/accept.js'
+import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
 
 export async function onRequestGet({ env }) {
   try {
@@ -25,6 +26,7 @@ export async function onRequestGet({ env }) {
       refuseNoAlt,
       deptSaid,
       betaOpen,
+      holdLifts,
     ] = await Promise.all([
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
@@ -94,7 +96,33 @@ export async function onRequestGet({ env }) {
       env.DB.prepare(
         `SELECT COUNT(*) AS n FROM beta_feedback WHERE resolved_at IS NULL`
       ).first(),
+
+      // 보류해 둔 것의 조건이 풀렸다고 부서가 알려 온 것.
+      //
+      // 이건 다른 알림과 무게가 다르다. 보류는 **아무도 안 움직이면 영원히
+      // 그대로**인 유일한 상태다. 부서가 큰맘 먹고 알렸는데 그것마저 안
+      // 보이면, 그 부서는 다음부터 아무것도 안 알린다.
+      env.DB.prepare(
+        `SELECT d.application_id, d.link_kind, d.created_at, r.updated_at AS judged_at
+         FROM decision_log d
+         LEFT JOIN review r ON r.application_id = d.application_id
+         WHERE d.link_kind IN (?, ?)
+         ORDER BY d.created_at`
+      )
+        .bind(HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND)
+        .all(),
     ])
+
+    // 취소는 자기 앞의 요청을 지우고, 요청 뒤에 다시 판정했으면 답을 준 것이다.
+    const liftOpen = new Map()
+    for (const r of holdLifts.results) {
+      if (r.link_kind === HOLD_LIFT_CANCEL_KIND) liftOpen.delete(r.application_id)
+      else liftOpen.set(r.application_id, r)
+    }
+    let holdLiftWaiting = 0
+    for (const r of liftOpen.values()) {
+      if (!r.judged_at || String(r.judged_at) <= String(r.created_at)) holdLiftWaiting += 1
+    }
 
     // 체감이 우리가 잰 값과 크게 다르다고 한 건. 숫자는 alternatives에
     // JSON으로 들어 있다 — why 칸에 넣었다가 첫 화면에 그대로 찍힌 적이 있다.
@@ -184,6 +212,8 @@ export async function onRequestGet({ env }) {
       deptDisagrees: disagreed.size,
       // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
       betaUnanswered: betaOpen?.n ?? 0,
+      // 보류 조건이 풀렸다고 알려 왔는데 아직 다시 판정 안 한 것.
+      holdLiftWaiting,
       refuseRate: reviewed > 0 ? Math.round((refused / reviewed) * 100) : null,
       refuseMix: refuseMix.results.map((r) => ({
         code: r.refuse_code,
