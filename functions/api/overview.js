@@ -150,7 +150,10 @@ export async function onRequestGet({ env }) {
     const pickedLive = [...livePicks.values()].filter(
       (r) => r.status !== '완료' && r.status !== '반려'
     )
-    const waitingToStart = items.filter((a) => a.status === '수용').length
+    // apps.results 를 쓴다. items 는 이 아래에서 선언되고, 여기서 items 를
+    // 쓰면 TDZ에 걸려 이 라우트가 통째로 503이 된다 — 실제로 그렇게
+    // 배포했고 첫 화면이 안 열렸다.
+    const waitingToStart = apps.results.filter((a) => a.status === '수용').length
     const rankPressure = unrankedPressure({ waiting: waitingToStart, picked: pickedLive })
 
     // 체감이 우리가 잰 값과 크게 다르다고 한 건. 숫자는 alternatives에
