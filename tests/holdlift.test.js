@@ -20,6 +20,7 @@ const review = {
   verdict: '보류',
   hold_until_condition: 'SAP 이관이 끝나면 다시 봅니다',
   updated_at: '2026-07-01 00:00:00',
+  decided_at: '2026-07-01 00:00:00',
 }
 const rec = (kind, at, over = {}) => ({ id: at, kind, by: '김대리', body: '이관 끝났습니다', at, ...over })
 const NOW = Date.parse('2026-08-05T00:00:00Z')

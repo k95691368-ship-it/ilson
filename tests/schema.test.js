@@ -73,8 +73,94 @@ function aliasMap(sql, tables) {
   return map
 }
 
+// SQL 예약어와 함수 이름. 컬럼 자리에 와도 컬럼이 아니다.
+const NOT_A_COLUMN = new Set([
+  'select', 'from', 'where', 'and', 'or', 'not', 'null', 'is', 'in', 'as',
+  'order', 'group', 'by', 'having', 'limit', 'offset', 'asc', 'desc',
+  'inner', 'left', 'right', 'outer', 'join', 'on', 'using', 'union', 'all',
+  'insert', 'into', 'values', 'update', 'set', 'delete', 'case', 'when',
+  'then', 'else', 'end', 'distinct', 'exists', 'between', 'like', 'cast',
+  'count', 'sum', 'max', 'min', 'avg', 'coalesce', 'ifnull', 'nullif',
+  'datetime', 'date', 'julianday', 'strftime', 'trim', 'upper', 'lower',
+  'length', 'substr', 'replace', 'abs', 'round', 'integer', 'real', 'text',
+  'conflict', 'do', 'nothing', 'excluded', 'returning', 'true', 'false',
+])
+
+// 표 하나만 쓰는 SQL의 SELECT 목록에서 맨 컬럼 이름을 뽑는다.
+//
+// 위 검사는 `별칭.컬럼`만 본다. 그런데 표가 하나뿐이면 별칭을 안 붙이는 것이
+// 보통이고, 그때 오타는 아무도 안 잡는다. 실제로 당했다 —
+// `SELECT verdict, hold_until_condition, created_at FROM review` 라고 썼는데
+// review 표의 판정 시각 컬럼은 `decided_at`이었다. 시험·린트·빌드가 전부
+// 통과했고, 배포하고 나서 500이 떴다. 부서만 여는 화면이라 하마터면 아무도
+// 안 보는 자리에서 조용히 죽어 있을 뻔했다.
+function bareColumns(sql) {
+  // 표가 둘 이상이면 어느 표의 컬럼인지 알 수 없다. 그건 안 본다.
+  const froms = [...sql.matchAll(/\b(?:FROM|JOIN)\s+([a-z_][a-z0-9_]*)/gi)].map((m) => m[1])
+  if (new Set(froms).size !== 1) return null
+
+  const head = sql.match(/\bSELECT\s+([\s\S]*?)\s+FROM\b/i)
+  if (!head) return null
+
+  // 함수 호출이나 별칭이 섞인 항목은 통째로 버린다. 괄호 안까지 파싱할
+  // 값어치가 없다 — 오타를 잡는 것이 목적이지 SQL 파서를 만드는 것이 아니다.
+  const cols = []
+  for (const piece of head[1].split(',')) {
+    const t = piece.trim()
+    if (!t || t.includes('(') || t.includes('.') || t.includes('*')) continue
+    const name = t.split(/\s+/)[0].toLowerCase()
+    if (!/^[a-z_][a-z0-9_]*$/.test(name)) continue
+    if (NOT_A_COLUMN.has(name)) continue
+    cols.push({ table: froms[0], col: name })
+  }
+  return cols
+}
+
 describe('SQL이 없는 컬럼을 쓰고 있지 않은지', () => {
   const tables = readSchema()
+
+  it('별칭 없는 컬럼도 실제 컬럼인지 본다', () => {
+    // 표가 하나뿐인 SQL은 위 검사가 통째로 못 본다. 여기서 본다.
+    const problems = []
+
+    for (const file of jsFiles(join(ROOT, 'functions'))) {
+      const src = readFileSync(file, 'utf8')
+      const rel = file.slice(ROOT.length).replace(/\\/g, '/')
+
+      // 한 줄짜리 SQL은 홑따옴표로 쓴다. 백틱만 보면 그것들을 다 놓친다.
+      const literals = [...(src.match(/`[^`]*`/g) ?? []), ...(src.match(/'[^'\n]*'/g) ?? [])]
+      for (const raw of literals) {
+        if (!/\bSELECT\b/i.test(raw)) continue
+        const sql = raw.slice(1, -1).replace(/\$\{[^}]*\}/g, ' ')
+        const cols = bareColumns(sql)
+        if (!cols) continue
+        for (const { table, col } of cols) {
+          if (!tables.has(table)) continue
+          if (tables.get(table).has(col)) continue
+          problems.push(`${rel} — ${table} 표에 ${col} 컬럼이 없습니다`)
+        }
+      }
+    }
+
+    expect(problems).toEqual([])
+  })
+
+  it('그 검사가 헛돌지 않는다', () => {
+    // 정규식이 어긋나면 아무것도 안 보면서 통과한다. 실제로 당했던 그 SQL을
+    // 그대로 넣어 잡히는지 본다.
+    const bad = bareColumns('SELECT verdict, created_at FROM review WHERE application_id = ?')
+    expect(bad).toContainEqual({ table: 'review', col: 'created_at' })
+    expect(bad).toContainEqual({ table: 'review', col: 'verdict' })
+    expect(tables.get('review').has('created_at')).toBe(false)
+    expect(tables.get('review').has('decided_at')).toBe(true)
+
+    // 표가 둘이면 안 본다 — 어느 표의 컬럼인지 알 수 없다.
+    expect(
+      bareColumns('SELECT id FROM application a JOIN review r ON r.application_id = a.id')
+    ).toBeNull()
+    // 함수가 낀 항목은 건너뛴다.
+    expect(bareColumns('SELECT COUNT(*) AS n FROM review')).toEqual([])
+  })
 
   it('마이그레이션에서 표를 읽어 낸다', () => {
     // 이 시험 자체가 헛돌지 않는지 먼저 본다. 정규식이 안 맞아서 표를 하나도

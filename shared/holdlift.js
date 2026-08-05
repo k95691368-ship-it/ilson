@@ -81,7 +81,9 @@ export function holdState({ application, review, records, now } = {}) {
   }
 
   // 요청 뒤에 담당자가 다시 판정했으면 답을 받은 것이다.
-  const judgedAt = review?.updated_at ?? review?.created_at ?? null
+  // review 표는 created_at이 아니라 decided_at을 쓴다. 처음에 created_at으로
+  // 적었다가 배포하고 나서 500을 봤다.
+  const judgedAt = review?.updated_at ?? review?.decided_at ?? null
   const answered = Boolean(open && judgedAt && String(judgedAt) > String(open.at))
 
   return {

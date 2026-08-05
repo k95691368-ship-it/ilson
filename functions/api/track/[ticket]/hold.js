@@ -31,7 +31,7 @@ async function load(env, ticket) {
 
   const [review, records] = await Promise.all([
     env.DB.prepare(
-      'SELECT verdict, hold_until_condition, created_at, updated_at FROM review WHERE application_id = ?'
+      'SELECT verdict, hold_until_condition, decided_at, updated_at FROM review WHERE application_id = ?'
     )
       .bind(app.id)
       .first(),
