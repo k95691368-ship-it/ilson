@@ -24,7 +24,7 @@ export async function onRequestGet({ env, params }) {
     const [picks, running] = await Promise.all([
       // 먼저 하기로 정한 것과 그 이유. 취소는 자기 앞의 지정을 지운다.
       env.DB.prepare(
-        `SELECT d.application_id, d.what, d.why, d.link_kind, d.created_at,
+        `SELECT d.application_id, d.what, d.link_kind, d.created_at,
                 a.ticket_no, a.dept, a.title, a.status
          FROM decision_log d JOIN application a ON a.id = d.application_id
          WHERE d.link_kind IN (?, ?)
@@ -56,7 +56,13 @@ export async function onRequestGet({ env, params }) {
         status: r.status,
         // 담당자가 적은 이유를 그대로 보여준다. 다듬지 않는다 — 다듬으면
         // 부서가 읽는 것과 기록에 남은 것이 달라진다.
-        why: r.why ?? null,
+        //
+        // **`what`이다. `why`가 아니다.** 이 저장소에서 `why`는 "왜 이런
+        // 기록을 남기는가"라는 설계 취지가 들어가는 칸이고, 대개 코드에
+        // 박힌 고정 문장이다. 처음에 `why`를 읽었더니 부서 화면에
+        // "무엇을 먼저 할지 고른 것이 이 일에서 가장 사람다운 판단이다"가
+        // 떴다 — 담당자가 이 건에 대해 적은 말이 아니라 기능 소개문이다.
+        why: r.what ?? null,
         at: r.created_at,
       }))
 

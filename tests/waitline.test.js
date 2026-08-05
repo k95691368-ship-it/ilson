@@ -142,3 +142,42 @@ describe('담당자가 순서를 안 정한 채 여럿이 기다리는가', () =
     expect(waitLine().show).toBe(false)
   })
 })
+
+// decision_log의 what과 why는 다른 것이 들어간다.
+//
+// what = 담당자가 이 건에 대해 적은 말, why = "왜 이런 기록을 남기는가"라는
+// 설계 취지(대개 코드에 박힌 고정 문장). 부서에게 보여야 하는 것은 앞엣것인데
+// why를 읽어서, 화면에 "무엇을 먼저 할지 고른 것이 이 일에서 가장 사람다운
+// 판단이다"가 떴다. 담당자가 적은 말이 아니라 기능 소개문이다.
+describe('부서에게 보이는 이유는 담당자가 적은 말이다', () => {
+  it('기능 설계 취지가 아니라 이 건의 이유가 온다', () => {
+    const s = waitLine({
+      mine: { id: 'app_me', status: '수용' },
+      picked: [
+        {
+          application_id: 'app_a',
+          dept: 'SCM',
+          title: '재고 소진일',
+          status: '수용',
+          why: '재고가 떨어지면 그날 매출이 통째로 빈다',
+          at: '2026-08-05 00:00:00',
+        },
+      ],
+      running: [],
+    })
+    const shown = s.aheadPicked[0].why
+    expect(shown).toBe('재고가 떨어지면 그날 매출이 통째로 빈다')
+    // 설계 취지 문구가 새어 나오면 안 된다.
+    expect(shown).not.toContain('가장 사람다운 판단')
+  })
+
+  it('이유가 비어 있어도 터지지 않는다', () => {
+    const s = waitLine({
+      mine: { id: 'app_me', status: '수용' },
+      picked: [{ application_id: 'app_a', dept: 'SCM', title: 'x', status: '수용', why: null }],
+      running: [],
+    })
+    expect(s.aheadPicked[0].why).toBeNull()
+    expect(s.phase).toBe('behind')
+  })
+})
