@@ -14,6 +14,24 @@ import { readXlsx, toTable } from '../../../../../shared/xlsx.js'
 
 const PREVIEW_ROWS = 12
 
+// 응답 헤더에 넣어도 되는 형식인가.
+//
+// content_type 은 부서가 올릴 때 브라우저가 보낸 값을 **그대로** 저장한
+// 것이다. 아무도 안 걸렀다. 그런데 HTTP 헤더 값에는 라틴-1 밖의 글자를
+// 넣을 수 없어서, 한글이나 이모지가 섞여 있으면 내려받기가 통째로 500이
+// 된다. 파일은 멀쩡히 보관함에 있는데 화면에서는 그냥 안 열린다.
+//
+// 이상하면 버리고 일반 파일로 내려보낸다. 이름은 어차피 따로 적어 주니
+// 형식을 못 알아본다고 잃는 것이 없다.
+function safeContentType(value) {
+  const t = String(value ?? '').trim()
+  // 흔한 media type 모양만 통과시킨다. 라틴-1 밖의 글자는 여기서 걸린다.
+  if (!/^[a-zA-Z0-9!#$&^_.+-]+\/[a-zA-Z0-9!#$&^_.+-]+([;=\s a-zA-Z0-9!#$&^_.+-]*)$/.test(t)) {
+    return 'application/octet-stream'
+  }
+  return t.slice(0, 120)
+}
+
 async function findFile(env, appId, fileId) {
   return env.DB.prepare(
     `SELECT f.*, a.id AS app_id, a.ticket_no
@@ -91,7 +109,7 @@ export async function onRequestGet({ env, params, request }) {
   const encoded = encodeURIComponent(row.name)
   return new Response(object.body, {
     headers: {
-      'Content-Type': row.content_type || 'application/octet-stream',
+      'Content-Type': safeContentType(row.content_type),
       'Content-Disposition': `attachment; filename="${encoded}"; filename*=UTF-8''${encoded}`,
       'Content-Length': String(row.byte_size),
       // 신청서 첨부는 사내 자료다. 중간 서버가 들고 있지 않게 한다.

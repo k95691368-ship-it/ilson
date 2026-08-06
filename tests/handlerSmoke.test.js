@@ -52,6 +52,72 @@ function fakeDB() {
   }
 }
 
+// 줄이 **있는** 것처럼 구는 D1.
+//
+// 빈 데이터베이스만 주면 대부분의 라우트가 "그런 것이 없습니다"로 일찍
+// 되돌아간다. 그러면 정작 일하는 코드는 한 줄도 안 밟힌다. 어느 컬럼을
+// 물어도 그럴듯한 값을 내주는 줄을 하나 쥐여 주고 끝까지 가게 한다.
+const ANY_ROW = new Proxy(
+  {},
+  {
+    get(_, k) {
+      if (typeof k !== 'string') return undefined
+      // await 가 이 객체를 thenable 로 오해하면 영원히 안 끝난다.
+      if (k === 'then' || k === 'toJSON') return undefined
+      if (k === 'results') return []
+      if (/_at$|^created|^updated|^decided|^published|^handed/.test(k)) return '2026-08-01 00:00:00'
+      if (/^n$|count|score|minutes|seconds|people|krw|hours|days|seq|rank|total|size|bytes|ms$/i.test(k)) return 1
+      if (k === 'id' || k.endsWith('_id')) return 'app_x'
+      if (k === 'status' || k === 'verdict') return '수용'
+      if (k === 'ticket_no') return 'AX-XXX-000'
+      return '값'
+    },
+    has: () => true,
+  }
+)
+
+function fakeDBWithRows() {
+  const stmt = {
+    bind: () => stmt,
+    first: async () => ANY_ROW,
+    all: async () => ({ results: [ANY_ROW] }),
+    run: async () => ({ meta: {} }),
+  }
+  return {
+    prepare: () => stmt,
+    batch: async (list) => (list ?? []).map(() => ({ meta: {} })),
+    exec: async () => ({}),
+  }
+}
+
+// R2 흉내. 원본 파일 보관함이다.
+//
+// 이걸 안 주면 파일 내려받기 라우트가 `env.SOURCES.get`에서 터지는데,
+// 그건 코드가 틀린 것이 아니라 껍데기가 모자란 것이다. 실제로 한 번
+// 그렇게 잘못 짚었다.
+function fakeR2() {
+  const object = {
+    body: null,
+    arrayBuffer: async () => new ArrayBuffer(0),
+    httpMetadata: {},
+    size: 0,
+  }
+  return {
+    get: async () => object,
+    // 배포 상태 화면(/api/health)이 R2를 head로 두드린다. 이게 없으면
+    // "env.SOURCES.head is not a function"이 나오는데, 그건 코드가 틀린
+    // 것이 아니라 껍데기가 모자란 것이다.
+    head: async () => object,
+    list: async () => ({ objects: [], truncated: false }),
+    put: async () => ({}),
+    delete: async () => ({}),
+  }
+}
+
+function fakeEnv(withRows = false) {
+  return { DB: withRows ? fakeDBWithRows() : fakeDB(), SOURCES: fakeR2() }
+}
+
 function apiFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
@@ -70,7 +136,7 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
     expect(files.length).toBeGreaterThan(20)
   })
 
-  it('GET 라우트가 빈 데이터베이스에서 터지지 않는다', async () => {
+  it('GET 라우트가 빈 데이터베이스에서도, 줄이 있을 때도 터지지 않는다', async () => {
     const problems = []
 
     for (const file of files) {
@@ -86,31 +152,35 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
 
       // 경로 조각은 아무 값이나 준다. 없는 접수번호로 읽히면 404가 나올
       // 텐데 그것도 정상 동작이다.
-      const ctx = {
-        env: { DB: fakeDB() },
-        params: { ticket: 'AX-XXX-000', id: 'app_x', slug: 'demo', dept: '재무' },
-        request: new Request('https://example.test/api/x'),
-      }
+      // 빈 데이터베이스 한 번, 줄이 있는 데이터베이스 한 번.
+      // 빈 것만 보면 "없습니다"로 되돌아가는 길만 밟힌다.
+      for (const [label, withRows] of [['빈 표', false], ['줄이 있을 때', true]]) {
+        const ctx = {
+          env: fakeEnv(withRows),
+          params: { ticket: 'AX-XXX-000', id: 'app_x', slug: 'demo', dept: '재무' },
+          request: new Request('https://example.test/api/x'),
+        }
 
-      let res
-      try {
-        res = await mod.onRequestGet(ctx)
-      } catch (err) {
-        // 핸들러가 스스로 못 잡은 예외. 이건 500이 되어 화면이 안 열린다.
-        problems.push(`${rel} — 예외가 새어 나왔습니다: ${err.message}`)
-        continue
-      }
+        let res
+        try {
+          res = await mod.onRequestGet(ctx)
+        } catch (err) {
+          // 핸들러가 스스로 못 잡은 예외. 이건 500이 되어 화면이 안 열린다.
+          problems.push(`${rel} (${label}) — 예외가 새어 나왔습니다: ${err.message}`)
+          continue
+        }
 
-      if (!(res instanceof Response)) {
-        problems.push(`${rel} — Response를 안 돌려줬습니다`)
-        continue
-      }
+        if (!(res instanceof Response)) {
+          problems.push(`${rel} (${label}) — Response를 안 돌려줬습니다`)
+          continue
+        }
 
-      const body = await res.text()
-      const hit = RUNTIME_ERROR.find((sig) => body.includes(sig))
-      if (hit) {
-        // try/catch에 잡혀 503으로 나오는 경우. 화면에서는 그냥 안 열린다.
-        problems.push(`${rel} — 실행하다 터졌습니다: ${body.slice(0, 160)}`)
+        const body = await res.text()
+        const hit = RUNTIME_ERROR.find((sig) => body.includes(sig))
+        if (hit) {
+          // try/catch에 잡혀 503으로 나오는 경우. 화면에서는 그냥 안 열린다.
+          problems.push(`${rel} (${label}) — 실행하다 터졌습니다: ${body.slice(0, 160)}`)
+        }
       }
     }
 
@@ -118,6 +188,90 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
     // 라우트 마흔 개를 하나씩 불러온다. 혼자 돌면 2초쯤인데 전체 시험과
     // 같이 돌면 5초 기본값을 넘긴다 — 느린 것이 아니라 붐비는 것이라
     // 제한만 늘린다.
+  }, 60000)
+
+  // POST는 GET보다 잡기 어렵다. 대개 입력 검증에서 먼저 되돌아가기 때문에
+  // 그 뒤 코드는 안 밟힌다. 그래서 두 번 부른다 — 빈 몸으로 한 번(검증
+  // 앞쪽과 되돌아가는 길), 그럴듯한 값으로 한 번(검증을 지나가는 길).
+  //
+  // 값의 이름은 이 저장소에서 실제로 쓰는 것들을 모아 뒀다. 전부 맞을 리는
+  // 없고 그럴 필요도 없다. 한 칸이라도 더 들어가면 그만큼 더 밟힌다.
+  const PLAUSIBLE = {
+    by: '김대리',
+    why: '이것을 먼저 하는 것이 맞다고 판단했습니다',
+    body: '광고비 칸이 비어서 옵니다',
+    reason: '광고비 칸이 비어서 옵니다',
+    kind: '막힌곳',
+    agree: true,
+    felt: 40,
+    comment: '월말에만 오래 걸립니다',
+    dept: '재무',
+    application_id: 'app_x',
+    verdict: '수용',
+    impact_score: 3,
+    difficulty_score: 3,
+    impact_reason: '매주 반복되고 여러 부서가 결과를 씁니다',
+    difficulty_reason: '원천이 한 곳이고 규칙으로 풀립니다',
+    verdict_reason: '범위 안이고 재료가 다 있습니다',
+    alternatives_considered: '사람이 계속 하는 안을 견줬습니다',
+    title: '매주 정산서를 손으로 붙입니다',
+    minutes: 90,
+    people: 1,
+    frequency: '주 1회',
+    text: '적어 주신 내용을 확인했습니다',
+    answer: '그 칸은 채널에서 안 내려옵니다',
+    ids: [],
+    verdicts: {},
+    reasons: {},
+    criterionIds: [],
+  }
+
+  it('POST 라우트가 빈 몸과 그럴듯한 몸에서 터지지 않는다', async () => {
+    const problems = []
+
+    for (const file of files) {
+      const rel = file.slice(ROOT.length).replace(/\\/g, '/')
+      let mod
+      try {
+        mod = await import(pathToFileURL(file).href)
+      } catch {
+        continue // 위 검사가 이미 짚었다.
+      }
+      if (typeof mod.onRequestPost !== 'function') continue
+
+      for (const [label, payload, withRows] of [
+        ['빈 몸', {}, false],
+        ['그럴듯한 몸', PLAUSIBLE, false],
+        ['그럴듯한 몸 + 줄이 있을 때', PLAUSIBLE, true],
+      ]) {
+        const ctx = {
+          env: fakeEnv(withRows),
+          params: { ticket: 'AX-XXX-000', id: 'app_x', slug: 'demo', dept: '재무' },
+          request: new Request('https://example.test/api/x', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify(payload),
+          }),
+        }
+
+        let res
+        try {
+          res = await mod.onRequestPost(ctx)
+        } catch (err) {
+          problems.push(`${rel} (${label}) — 예외가 새어 나왔습니다: ${err.message}`)
+          continue
+        }
+        if (!(res instanceof Response)) {
+          problems.push(`${rel} (${label}) — Response를 안 돌려줬습니다`)
+          continue
+        }
+        const text = await res.text()
+        const hit = RUNTIME_ERROR.find((sig) => text.includes(sig))
+        if (hit) problems.push(`${rel} (${label}) — 실행하다 터졌습니다: ${text.slice(0, 160)}`)
+      }
+    }
+
+    expect(problems).toEqual([])
   }, 60000)
 
   it('그 검사가 헛돌지 않는다', async () => {
