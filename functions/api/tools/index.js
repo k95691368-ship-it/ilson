@@ -16,6 +16,7 @@
 import { jsonResponse, failUnexpected } from '../../_lib/http.js'
 import { UNCLEAR_KIND, UNCLEAR_FIXED_KIND } from '../../../shared/unclear.js'
 import { rollbackState } from '../../../shared/rollback.js'
+import { ACCEPT_KIND, REJECT_KIND } from '../../../shared/accept.js'
 
 // 최근 며칠을 "요즘"으로 볼 것인가. 주 1회 도는 도구가 많아서 이레로 잡는다.
 // 사흘로 잡으면 정상인 도구가 전부 "안 쓰임"으로 찍힌다.
@@ -119,6 +120,27 @@ export async function onRequestGet({ env }) {
       (r) => r.link_kind === UNCLEAR_KIND && !fixedFlagIds.has(r.id)
     ).length
 
+    // 부서가 "못 쓰겠습니다"를 누른 것.
+    //
+    // 이게 담당자 화면 어디에도 안 왔다. 부서는 이 사이트가 시킨 대로
+    // 버튼을 누르고 무엇이 안 맞는지까지 적어 줬는데, 담당자는 그 도구
+    // 화면을 따로 열어 보지 않는 한 모른다. 그동안 그 부서는 도구를 못
+    // 쓰고 있다 — 못 쓴다고 **말까지 해 준** 상태로.
+    //
+    // 거절한 뒤에 다시 받았다고 하면 그것이 최신이라 안 센다.
+    const { results: acceptRows } = await env.DB.prepare(
+      `SELECT application_id, link_kind, created_at FROM decision_log
+       WHERE link_kind IN (?, ?) ORDER BY created_at`
+    )
+      .bind(ACCEPT_KIND, REJECT_KIND)
+      .all()
+    const lastAccept = new Map()
+    for (const r of acceptRows) lastAccept.set(r.application_id, r.link_kind)
+    const rejectedIds = new Set(
+      [...lastAccept.entries()].filter(([, k]) => k === REJECT_KIND).map(([id]) => id)
+    )
+    for (const it of items) it.rejected = rejectedIds.has(it.application_id)
+
     const summary = {
       total: items.length,
       unclear: openUnclear,
@@ -135,6 +157,8 @@ export async function onRequestGet({ env }) {
       // 그 부서는 원래 하던 방식으로 일하고 있다 — 조용히 사라지는 자리다.
       downStale: items.filter((i) => rollbackState({ handover: i }).stale).length,
       down: items.filter((i) => i.rolled_back_at).length,
+      // 부서가 못 쓰겠다고 한 채로 남아 있는 것.
+      rejected: items.filter((i) => i.rejected).length,
       totalRuns: items.reduce((s, i) => s + i.runs, 0),
       totalFailed: items.reduce((s, i) => s + i.failedRuns, 0),
       totalRows: items.reduce((s, i) => s + i.rowsOut, 0),

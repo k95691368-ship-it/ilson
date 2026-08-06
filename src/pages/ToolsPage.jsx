@@ -111,6 +111,10 @@ export default function ToolsPage() {
                 <div className="tool-card-head">
                   <span className={`badge ${healthTone(t.health)}`}>{t.health}</span>
                   {t.rolled_back_at && <span className="badge badge-danger">되돌림</span>}
+                  {/* 부서가 "못 쓰겠습니다"를 누른 것.
+                      이 사이트가 "안 맞으면 안 맞는다고 눌러주셔도 됩니다"라고
+                      적어 두고, 정작 눌린 것을 담당자 화면 어디에도 안 보냈다. */}
+                  {t.rejected && <span className="badge badge-danger">부서가 못 쓰겠다고 함</span>}
                   <span className="spacer" />
                   <Link to={`/record/${t.ticket_no}`} className="mono card-note">
                     {t.ticket_no}

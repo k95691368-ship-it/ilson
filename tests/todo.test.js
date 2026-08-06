@@ -321,3 +321,28 @@ describe('내려 둔 채 잊은 도구', () => {
     expect(x.why).toContain('넘긴 목록에서도 빠져서')
   })
 })
+
+// 이 사이트는 부서에게 "안 맞으면 안 맞는다고 눌러주셔도 됩니다"라고 적어
+// 뒀다. 부서가 그대로 했는데 그 말이 담당자 화면 어디에도 안 왔다.
+describe('부서가 못 쓰겠다고 한 도구', () => {
+  it('금액 급으로 올라온다', () => {
+    // 도구가 그냥 안 쓰이는 것과 못 쓴다고 말까지 해 준 것은 다르다.
+    const x = buildTodo({ tools: { summary: { rejected: 1 } } }).find((i) => i.key === 'tool_rejected')
+    expect(x).toBeTruthy()
+    expect(x.kind).toBe('금액')
+    expect(x.why).toContain('무엇이 안 맞는지까지 적어')
+  })
+
+  it('없으면 안 올라온다', () => {
+    expect(buildTodo({ tools: { summary: { rejected: 0 } } }).some((i) => i.key === 'tool_rejected')).toBe(false)
+    expect(buildTodo({}).some((i) => i.key === 'tool_rejected')).toBe(false)
+  })
+
+  it('그냥 안 쓰는 것보다 위에 온다', () => {
+    const items = buildTodo({ tools: { summary: { rejected: 1, idle: 5 } } })
+    const a = items.findIndex((i) => i.key === 'tool_rejected')
+    const b = items.findIndex((i) => i.key === 'idle_tools')
+    expect(a).toBeGreaterThanOrEqual(0)
+    expect(b).toBeGreaterThan(a)
+  })
+})
