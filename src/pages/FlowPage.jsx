@@ -338,9 +338,12 @@ function Overview({ data }) {
           <div className="card-head">
             <span className="card-title">최근 결정</span>
             {data.unrequestedCount > 0 && (
-              <span className="card-note">
-                요청받지 않았는데 먼저 제안한 것 {data.unrequestedCount}건
-              </span>
+              // 이 숫자는 최근 것이 아니라 전체다. 옆의 목록은 최근 네 건만
+              // 보여주므로, 여기서 세는 범위가 다르다는 것을 링크로 분명히
+              // 한다 — 눌러 보면 그 셋이 나온다.
+              <Link to="/log?unrequested=1" className="card-note">
+                요청받지 않았는데 먼저 제안한 것 {data.unrequestedCount}건 전체 보기
+              </Link>
             )}
           </div>
           <div className="stack-sm">

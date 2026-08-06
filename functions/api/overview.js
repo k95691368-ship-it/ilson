@@ -32,6 +32,7 @@ export async function onRequestGet({ env }) {
       holdLifts,
       pickRows,
       answeredWaiting,
+      unrequestedAll,
     ] = await Promise.all([
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
@@ -154,6 +155,19 @@ export async function onRequestGet({ env }) {
                    WHERE a2.link_kind = '답변' AND a2.link_id = q2.id
                 )
            )`
+      ).first(),
+
+      // 요청받지 않았는데 먼저 꺼낸 것 — **전체**를 센다.
+      //
+      // 여태 최근 8건 안에서만 셌다. 그래서 첫 화면은 0인데 결정 기록
+      // 화면은 3이라고 말했다. 문구는 "요청받지 않았는데 먼저 제안한 것
+      // N건"이라 전체처럼 읽히는데 실제로는 최근 것만 본 숫자였다.
+      // 두 화면이 다른 숫자를 말하면 둘 다 못 믿는다.
+      env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM decision_log d
+         LEFT JOIN review r ON r.application_id = d.application_id
+         WHERE d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
+           AND TRIM(COALESCE(r.refuse_alternative, '')) <> '')`
       ).first(),
     ])
 
@@ -317,8 +331,8 @@ export async function onRequestGet({ env }) {
       },
       baselines: baselines.results.length,
       recentDecisions: decisions.results,
-      // 위 쿼리가 결정 기록 화면과 같은 규칙으로 판정해 준다.
-      unrequestedCount: decisions.results.filter((d) => d.unrequested === 1).length,
+      // 결정 기록 화면과 같은 규칙, 같은 범위(전체)를 본다.
+      unrequestedCount: unrequestedAll?.n ?? 0,
       recent: items.slice(0, 6).map((a) => ({ ...a, stage: stageOf(a) })),
     })
   } catch (err) {

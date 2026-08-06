@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { ago, dateTimeLabel, num } from '../lib/format.js'
 import { readableWhy } from '../../shared/notice.js'
@@ -11,7 +11,20 @@ import { SIDES, sideOf, sideLabel } from '../../shared/side.js'
 // 정했냐"는 질문은 신청서 단위가 아니라 사람 단위로 온다 — "요즘 뭘 반려하고
 // 계세요" 같은 식으로. 그 질문에 답하려면 이 화면이 필요하다.
 export default function LogPage() {
-  const [filters, setFilters] = useState({ stage: '', dept: '', actor: '', side: '', unrequested: false, q: '' })
+  // 다른 화면에서 조건을 걸고 들어올 수 있게 한다.
+  //
+  // 첫 화면이 "먼저 제안한 것 3건 전체 보기"라고 걸어 놓고, 눌러서 왔더니
+  // 조건 없는 목록이 뜨면 그 3건을 손으로 다시 찾아야 한다. 링크가 있는데
+  // 링크가 아무것도 안 하는 셈이다.
+  const [params] = useSearchParams()
+  const [filters, setFilters] = useState({
+    stage: params.get('stage') ?? '',
+    dept: params.get('dept') ?? '',
+    actor: params.get('actor') ?? '',
+    side: params.get('side') ?? '',
+    unrequested: params.get('unrequested') === '1',
+    q: params.get('q') ?? '',
+  })
   const [draft, setDraft] = useState('')
 
   const path = useMemo(() => {
