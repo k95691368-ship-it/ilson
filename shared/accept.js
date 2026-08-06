@@ -66,8 +66,11 @@ export function validateOutcomeConfirm({ by, agree, felt } = {}) {
 // 지금 수령이 어떤 상태인가.
 export function acceptState({ handover, records } = {}) {
   const list = records ?? []
-  const direct = list.find((r) => r.kind === ACCEPT_KIND)
-  const proxy = list.find((r) => r.kind === ACCEPT_PROXY_KIND)
+  // 마지막 것을 본다. 처음 것이 아니다 — 같은 사람이 두 번 누르면 나중
+  // 것이 맞다. 성과 확인에서 이것 때문에 부서가 고쳐 준 숫자가 조용히
+  // 버려지고 있었다.
+  const direct = list.filter((r) => r.kind === ACCEPT_KIND).at(-1) ?? null
+  const proxy = list.filter((r) => r.kind === ACCEPT_PROXY_KIND).at(-1) ?? null
   const rejected = list.filter((r) => r.kind === REJECT_KIND)
   // 거절한 뒤에 다시 받았다고 하면 그것이 최신이다.
   const openReject = rejected.filter(

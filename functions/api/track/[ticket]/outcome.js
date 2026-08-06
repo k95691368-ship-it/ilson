@@ -56,8 +56,18 @@ async function load(env, ticket) {
 }
 
 function stateOf({ baseline, saved, runs, records }) {
-  const direct = records.find((r) => r.kind === OUTCOME_KIND)
-  const proxy = records.find((r) => r.kind === OUTCOME_PROXY_KIND)
+  // **마지막 것**을 본다. 처음 것이 아니다.
+  //
+  // 기록은 시간순으로 오고 find 는 첫 번째를 집는다. 그래서 부서가 체감을
+  // 40분이라고 했다가 다시 재 보고 55분으로 고쳐 보내면, 서버는 200을
+  // 돌려주고 "고맙습니다"까지 적어 놓고 값은 40 그대로 뒀다. 부서가 애써
+  // 고쳐 준 숫자가 조용히 버려진다 — 이 사이트가 없애려는 것 그 자체다.
+  //
+  // 그리고 이건 돈이 걸린다. 성과 화면의 반박 규칙이 이 값으로 금액을
+  // '보수적 추정'으로 내릴지 정한다.
+  const latest = (kind) => records.filter((r) => r.kind === kind).at(-1) ?? null
+  const direct = latest(OUTCOME_KIND)
+  const proxy = latest(OUTCOME_PROXY_KIND)
 
   return {
     // 아직 한 번도 안 돌았으면 물어볼 것이 없다. 쓰지도 않은 것에

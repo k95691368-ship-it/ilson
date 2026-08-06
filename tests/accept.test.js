@@ -152,3 +152,35 @@ describe('대리 확인을 뭐라고 부르나', () => {
     expect(proxyNote()).toBeNull()
   })
 })
+
+// 같은 사람이 두 번 누르면 나중 것이 맞다.
+//
+// records 는 시간순으로 오는데 find 는 첫 번째를 집는다. 그래서 부서가
+// 체감을 40분이라고 했다가 다시 재 보고 55분으로 고쳐 보내면, 서버는 200을
+// 돌려주고 "고맙습니다"까지 적어 놓고 값은 40 그대로 뒀다. 부서가 애써
+// 고쳐 준 숫자가 조용히 버려진다.
+describe('두 번 누르면 나중 것이 맞다', () => {
+  it('나중에 누른 사람으로 바뀐다', () => {
+    const s = acceptState({
+      handover: handed,
+      records: [
+        rec(ACCEPT_KIND, '2026-08-01 00:00:00', '김대리'),
+        rec(ACCEPT_KIND, '2026-08-03 00:00:00', '박과장'),
+      ],
+    })
+    expect(s.by).toBe('박과장')
+    expect(s.at).toBe('2026-08-03 00:00:00')
+  })
+
+  it('대리 확인도 나중 것을 본다', () => {
+    const s = acceptState({
+      handover: { ...handed, accepted_at: '2026-08-01 00:00:00', accepted_by: '담당자' },
+      records: [
+        rec(ACCEPT_PROXY_KIND, '2026-08-01 00:00:00', '담당자'),
+        rec(ACCEPT_PROXY_KIND, '2026-08-04 00:00:00', '다른 담당자'),
+      ],
+    })
+    expect(s.proxy).toBe(true)
+    expect(s.by).toBe('다른 담당자')
+  })
+})
