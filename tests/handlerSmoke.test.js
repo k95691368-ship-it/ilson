@@ -274,6 +274,57 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
     expect(problems).toEqual([])
   }, 60000)
 
+  // 지우는 라우트는 이 저장소에서 가장 파괴적인 자리인데 가장 안 밟힌다.
+  //
+  // GET·POST만 돌려 보고 있었다. 지우기가 실행 중에 터지면 누가 "지우기"를
+  // 실제로 눌러 봐야만 안다 — 그리고 그때는 이미 반쯤 지워져 있을 수도 있다.
+  // 이 저장소의 지우기는 여러 표를 한 묶음으로 건드리기 때문이다.
+  it('지우는 라우트가 터지지 않는다', async () => {
+    const problems = []
+
+    for (const file of files) {
+      const rel = file.slice(ROOT.length).split('\\').join('/')
+      let mod
+      try {
+        mod = await import(pathToFileURL(file).href)
+      } catch {
+        continue
+      }
+      if (typeof mod.onRequestDelete !== 'function') continue
+
+      for (const [label, withRows] of [['빈 표', false], ['줄이 있을 때', true]]) {
+        const ctx = {
+          env: fakeEnv(withRows),
+          params: { ticket: 'AX-XXX-000', id: 'app_x', slug: 'demo', dept: '재무' },
+          request: new Request('https://example.test/api/x', { method: 'DELETE' }),
+        }
+
+        let res
+        try {
+          res = await mod.onRequestDelete(ctx)
+        } catch (err) {
+          problems.push(`${rel} (${label}) — 예외가 새어 나왔습니다: ${err.message}`)
+          continue
+        }
+        if (!(res instanceof Response)) {
+          problems.push(`${rel} (${label}) — Response를 안 돌려줬습니다`)
+          continue
+        }
+        const text = await res.text()
+        const hit = RUNTIME_ERROR.find((sig) => text.includes(sig))
+        if (hit) problems.push(`${rel} (${label}) — 실행하다 터졌습니다: ${text.slice(0, 160)}`)
+      }
+    }
+
+    expect(problems).toEqual([])
+  }, 60000)
+
+  it('세 가지 방식이 다 검사에 걸린다', () => {
+    // GET만 보고 있었던 적이 있고, 그다음엔 POST를 더했는데 DELETE를
+    // 빠뜨렸다. 무엇을 보고 있는지 세어 두지 않으면 또 빠진다.
+    expect(files.length).toBeGreaterThan(20)
+  })
+
   it('그 검사가 헛돌지 않는다', async () => {
     // 일부러 터지는 핸들러를 만들어 잡히는지 본다. 안 잡히면 위 검사는
     // 아무것도 안 보면서 통과하고 있는 것이다.
