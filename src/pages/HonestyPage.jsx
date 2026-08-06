@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { ago, num } from '../lib/format.js'
 import { REFUSE_LABELS, REFUSE_REASONS } from '../../shared/review.js'
 import { QUARANTINE_REASONS } from '../../shared/pipeline.js'
+import { askOf } from '../../shared/response.js'
 
 // 못 한 것, 안 되는 것, 증명하지 못한 것.
 //
@@ -17,6 +18,7 @@ import { QUARANTINE_REASONS } from '../../shared/pipeline.js'
 // 숫자가 늘고, 격리가 줄면 여기 숫자가 준다.
 export default function HonestyPage() {
   const { data, error, loading } = useApi('/honesty')
+  const { data: resp } = useApi('/response')
 
   if (error) return <div className="notice notice-danger">{error}</div>
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
@@ -46,6 +48,57 @@ export default function HonestyPage() {
         <Tile label="처리 못 하고 밀어 둔 줄" value={num(s.quarantine)} note="도구가 못 읽은 줄" />
         <Tile label="증명하지 못한 것" value={num(s.unproven)} note="데이터로 답할 수 없는 것" />
       </section>
+
+      {/* 부서에 부탁한 것 중 실제로 답이 온 것.
+          이 사이트에서 가장 중요한 숫자다. 여기가 낮으면 나머지 기록이
+          아무리 촘촘해도 혼자 만든 것이다. 그래서 정직 화면에 둔다. */}
+      {resp?.show && (
+        <section className={`card response-card${resp.answered === 0 ? ' none' : ''}`}>
+          <div className="card-head">
+            <span className="card-title">부서에 부탁한 것과 돌아온 답</span>
+            <span className="spacer" />
+            <span className="badge badge-neutral">
+              {num(resp.answered)} / {num(resp.asked)}
+            </span>
+          </div>
+
+          <p className="response-line">{resp.line}</p>
+          <p className="card-note response-note">{resp.note}</p>
+
+          <ul className="response-list">
+            {resp.per.map((x) => (
+              <li key={x.key} className={x.never ? 'never' : x.answered === x.asked ? 'done' : ''}>
+                <div className="response-top">
+                  <span className="response-label">{x.label}</span>
+                  <span className="spacer" />
+                  {x.never ? (
+                    // 안 물어본 것에 비율을 매기지 않는다. 0/0을 0%로 적으면
+                    // "부서가 안 해줬다"로 읽히는데 사실은 여쭤본 적이 없다.
+                    <span className="card-note">아직 여쭤본 적 없음</span>
+                  ) : (
+                    <span className="badge badge-neutral">
+                      {num(x.answered)} / {num(x.asked)}
+                    </span>
+                  )}
+                </div>
+                {!x.never && (
+                  <div className="response-why">{askOf(x.key)?.why ?? ''}</div>
+                )}
+                {x.proxied > 0 && (
+                  <div className="response-proxy">
+                    {num(x.proxied)}건은 담당자가 대신 눌러 둔 것입니다. 부서 응답으로 세지 않았습니다.
+                  </div>
+                )}
+              </li>
+            ))}
+          </ul>
+
+          <p className="card-note">
+            응답률에 목표선을 긋지 않습니다. "80% 넘으면 좋음" 같은 선을 그으면 그 선에 맞추게
+            되고, 이 정도 표본에서는 비율보다 <strong>몇 건 중 몇 건인지</strong>가 정직합니다.
+          </p>
+        </section>
+      )}
 
       {/* 데이터로 증명할 수 없는 것. 이것만은 손으로 적었다. */}
       <section className="card">

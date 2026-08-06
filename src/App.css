@@ -5750,3 +5750,66 @@ kbd {
   opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
+
+/* 부서에 부탁한 것과 돌아온 답. */
+.response-card {
+  border-color: var(--success);
+}
+/* 한 건도 답을 못 받았으면 그것부터 눈에 띄어야 한다. */
+.response-card.none {
+  border-color: var(--warning);
+}
+.response-line {
+  margin: 0 0 6px;
+  font-size: 14px;
+  line-height: 1.8;
+  font-weight: 600;
+}
+.response-note {
+  margin: 0 0 12px;
+  line-height: 1.8;
+}
+.response-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.response-list > li {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.response-list > li.done {
+  border-left-color: var(--success);
+}
+/* 여쭤본 적 없는 것은 잘잘못을 가릴 자리가 아니다. */
+.response-list > li.never {
+  border-left-color: var(--border);
+  opacity: 0.72;
+}
+.response-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.response-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+.response-why,
+.response-proxy {
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  color: var(--text-muted, inherit);
+  opacity: 0.85;
+}
+.response-proxy {
+  color: var(--warning-text, inherit);
+  opacity: 1;
+}
