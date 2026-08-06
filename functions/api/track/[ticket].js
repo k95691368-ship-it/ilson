@@ -367,7 +367,10 @@ export async function onRequestGet({ env, params, request }) {
         const undone = new Set(
           decisions.results.filter((d) => d.link_kind === '병합해제').map((d) => d.link_id)
         )
-        const m = decisions.results.find((d) => d.link_kind === '병합' && !undone.has(d.id))
+        // 마지막 것을 집는다. 첫 번째가 아니다 — 풀었다가 **다른** 신청서에
+        // 다시 묶으면 옛 상대를 가리키게 된다. 부서는 엉뚱한 접수번호를
+        // 열어 보게 되고, 그 화면에는 자기 일이 없다.
+        const m = decisions.results.filter((d) => d.link_kind === '병합' && !undone.has(d.id)).at(-1)
         if (!m) return null
         const into = await env.DB.prepare(
           'SELECT ticket_no, dept, title, status FROM application WHERE id = ?'
