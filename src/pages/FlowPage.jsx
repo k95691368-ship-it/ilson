@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { STAGES } from '../lib/stages.js'
 import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
 import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
+import { provenanceLine, provenanceDetail } from '../../shared/provenance.js'
 import { readableWhy } from '../../shared/notice.js'
 
 // 첫 화면. 여덟 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
@@ -174,11 +176,62 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
   )
 }
 
+// 이 화면의 숫자가 무엇 위에 서 있는가.
+//
+// 첫 화면은 "접수 12건, 완료 1건" 같은 숫자를 크게 보여 주는데 그중 여덟
+// 건은 시연을 위해 심은 것이다. 그 사실이 /review 한 군데에만 적혀 있었다.
+// 그 화면을 안 열면 모른다.
+//
+// 감추지도, 과장해서 사과하지도 않는다. 심은 것은 심었다고 하고, 심은 것이
+// 신청서 문장**뿐**이라는 것과 그 뒤는 실제로 돌아간 것이라는 사실을
+// 같이 적는다. 안 그러면 "전부 꾸며 낸 화면"으로 읽힌다.
+function Provenance({ p }) {
+  const [open, setOpen] = useState(false)
+  const line = provenanceLine(p)
+  if (!line) return null
+  const detail = provenanceDetail(p)
+
+  return (
+    <section className="provenance">
+      <div className="provenance-head">
+        <span className="badge badge-neutral">이 숫자의 출처</span>
+        <span className="provenance-line">{line}</span>
+        <span className="spacer" />
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen((v) => !v)}>
+          {open ? '접기' : '무엇이 심은 것인가'}
+        </button>
+      </div>
+
+      {open && detail && (
+        <dl className="provenance-detail">
+          <dt>심어 둔 것</dt>
+          <dd>{detail.seeded}</dd>
+          <dt>실제로 돌아간 것</dt>
+          <dd>{detail.real}</dd>
+          <dt>원본 파일</dt>
+          <dd>{detail.data}</dd>
+          <dt>더 볼 곳</dt>
+          <dd>
+            <Link to={detail.where}>증명하지 못한 것</Link>
+            <span className="card-note"> · 저장소의 {detail.doc}</span>
+          </dd>
+        </dl>
+      )}
+    </section>
+  )
+}
+
 function Overview({ data }) {
   const c = data.counts
 
   return (
     <>
+      {/* 이 숫자가 무엇 위에 서 있는지 먼저 말한다.
+          숫자를 보여 준 다음에 각주로 다는 것과, 보여 주기 전에 말하는 것은
+          다르다. 이 사이트가 파는 것이 기록인데 기록의 출처를 안 밝히면
+          나머지 기록도 못 믿는다. */}
+      <Provenance p={data.provenance} />
+
       <section className="stat-row">
         <Tile label="들어온 신청서" value={num(c.total)} note={`부서 ${data.byDept.length}곳`} />
         <Tile

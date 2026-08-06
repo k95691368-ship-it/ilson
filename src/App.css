@@ -5687,3 +5687,47 @@ kbd {
   margin: 12px 0 0;
   line-height: 1.7;
 }
+
+/* 이 숫자의 출처 — 심은 데이터 위에 서 있다는 것을 화면이 먼저 말한다. */
+.provenance {
+  padding: 11px 14px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.provenance-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.provenance-line {
+  font-size: 13px;
+  line-height: 1.7;
+}
+.provenance-detail {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 14px;
+  margin: 11px 0 0;
+  padding-top: 11px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.8;
+}
+.provenance-detail dt {
+  font-weight: 600;
+  white-space: nowrap;
+}
+.provenance-detail dd {
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .provenance-detail {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .provenance-detail dd {
+    margin-bottom: 8px;
+  }
+}

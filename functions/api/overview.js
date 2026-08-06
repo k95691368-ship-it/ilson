@@ -14,6 +14,7 @@ import { OUTCOME_KIND } from '../../shared/accept.js'
 import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
 import { PICK_KIND, UNPICK_KIND } from '../../shared/priority.js'
 import { unrankedPressure } from '../../shared/waitline.js'
+import { provenanceOf } from '../../shared/provenance.js'
 
 export async function onRequestGet({ env }) {
   try {
@@ -246,6 +247,9 @@ export async function onRequestGet({ env }) {
       betaUnanswered: betaOpen?.n ?? 0,
       // 보류 조건이 풀렸다고 알려 왔는데 아직 다시 판정 안 한 것.
       holdLiftWaiting,
+      // 이 숫자가 무엇 위에 서 있는가. 시연용으로 심은 것이 몇 건인지를
+      // 첫 화면이 스스로 말해야 한다 — 지금은 /review 한 군데에만 적혀 있다.
+      provenance: provenanceOf(items),
       // 하기로 해 놓고 순서를 안 정한 채 기다리는 것.
       waitingToStart,
       unranked: rankPressure.over ? waitingToStart : 0,
