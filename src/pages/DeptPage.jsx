@@ -1,6 +1,7 @@
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
+import { pendingText, pendingHeadline, pendingWhy } from '../../shared/pending.js'
 
 // 부서 한 곳과 나 사이에 있었던 일 전부.
 //
@@ -64,6 +65,48 @@ export default function DeptPage() {
             답을 못 준 신청서도, 사유 없이 기각한 요구도, 판정 못 낸 충돌도, 답 못 한 의견도
             없습니다. 이 상태를 유지하는 것이 이 화면의 목적입니다.
           </p>
+        </section>
+      )}
+
+      {/* 이 부서가 답해 주셔야 할 것.
+          위의 "내가 못 준 것"과 시점이 정반대다. 섞지 않는다 — 한 덩어리로
+          만들면 둘 다 자기 것이 아닌 줄 알고 안 읽는다.
+
+          부서 사람이 이 주소를 열면 신청서를 하나씩 안 열어 봐도 자기 몫이
+          몇 건인지 안다. 지금까지는 세 건을 낸 부서라면 세 번 열어서 각
+          화면 중간쯤에 있는 카드를 찾아야 알 수 있었다. */}
+      {data.pending && (
+        <section className={`pending${data.pending.length === 0 ? ' pending-clear' : ''}`}>
+          <div className="pending-head">
+            <span className="pending-title">{pendingHeadline(data.dept, data.pending)}</span>
+            <span className="spacer" />
+            <span className="card-note">이건 부서 몫입니다</span>
+          </div>
+          <p className="card-note pending-why">{pendingWhy(data.pending)}</p>
+
+          {data.pending.length > 0 && (
+            <ol className="pending-list">
+              {data.pending.map((x, i) => {
+                const t = pendingText(x.code)
+                return (
+                  <li key={`${x.ticket_no}-${x.code}-${i}`}>
+                    <div className="pending-top">
+                      <span className="badge badge-warning">{t?.label ?? x.code}</span>
+                      <span className="spacer" />
+                      {x.since && <span className="card-note">{ago(x.since)}부터</span>}
+                    </div>
+                    <div className="pending-what">{x.title}</div>
+                    <div className="pending-text">{t?.text}</div>
+                    {/* 조회 화면으로 보낸다. 답하는 자리가 거기 있다.
+                        기록 화면(/record)으로 보내면 읽기만 하고 끝난다. */}
+                    <Link to={`/track?no=${x.ticket_no}`} className="btn-primary btn-sm">
+                      열어서 답하기
+                    </Link>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
         </section>
       )}
 

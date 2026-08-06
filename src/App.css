@@ -5813,3 +5813,64 @@ kbd {
   color: var(--warning-text, inherit);
   opacity: 1;
 }
+
+/* 이 부서가 답해 주셔야 할 것.
+   바로 위 .owed 는 담당자 몫이다. 시점이 정반대라 색으로도 갈라 둔다 —
+   한 덩어리로 보이면 둘 다 자기 것이 아닌 줄 알고 안 읽는다. */
+.pending {
+  padding: 15px 16px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.pending-clear {
+  border-color: var(--border);
+  background: var(--surface);
+}
+.pending-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.pending-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+.pending-why {
+  margin: 6px 0 0;
+  line-height: 1.8;
+}
+.pending-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+}
+.pending-list > li {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.pending-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.pending-what {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+.pending-text {
+  font-size: 12.5px;
+  line-height: 1.8;
+  opacity: 0.9;
+}

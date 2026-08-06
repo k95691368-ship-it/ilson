@@ -10,6 +10,10 @@
 
 import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { annualHours } from '../../_lib/applications.js'
+import { sortPending } from '../../../shared/pending.js'
+import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
+import { SIGNOFF_KIND } from '../../../shared/signoff.js'
+import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
 
 const STALE_HOURS = 24
 
@@ -18,7 +22,7 @@ export async function onRequestGet({ env, params }) {
   if (!dept) return jsonError('부서를 알려주세요.', 400)
 
   try {
-    const [apps, stakeholders, meetings, reqs, conflicts, tools, feedback, decisions] =
+    const [apps, stakeholders, meetings, reqs, conflicts, tools, feedback, decisions, pendingRows] =
       await Promise.all([
         env.DB.prepare(
           `SELECT a.id, a.ticket_no, a.title, a.bottleneck, a.status, a.created_at,
@@ -106,9 +110,81 @@ export async function onRequestGet({ env, params }) {
         )
           .bind(dept)
           .all(),
+
+        // 이 부서가 아직 답 안 준 것을 세는 데 필요한 것들.
+        //
+        // 한 신청서에 대해 다섯 가지 부탁이 각각 걸렸는지/답했는지를
+        // 한 줄로 가져온다. 다섯 번 왕복하지 않는다 — 부서 화면은 이미
+        // 여덟 번 두드리고 있어서 더 늘리면 열릴 때마다 느려진다.
+        env.DB.prepare(
+          `SELECT a.id, a.ticket_no, a.title, a.status,
+                  r.decided_at,
+                  (SELECT COUNT(*) FROM acceptance_criterion c
+                    WHERE c.application_id = a.id) AS criteria_total,
+                  (SELECT COUNT(*) FROM acceptance_criterion c
+                    WHERE c.application_id = a.id AND c.confirmed_at IS NOT NULL) AS criteria_confirmed,
+                  (SELECT MAX(c.confirmed_at) FROM acceptance_criterion c
+                    WHERE c.application_id = a.id) AS criteria_at,
+                  (SELECT COUNT(*) FROM decision_log d
+                    WHERE d.application_id = a.id AND d.link_kind = ?) AS signed,
+                  (SELECT COUNT(*) FROM handover h
+                    WHERE h.application_id = a.id) AS handed,
+                  (SELECT COUNT(*) FROM handover h
+                    WHERE h.application_id = a.id AND h.rolled_back_at IS NOT NULL) AS rolled_back,
+                  (SELECT MAX(h.handed_at) FROM handover h
+                    WHERE h.application_id = a.id) AS handed_at,
+                  (SELECT COUNT(*) FROM decision_log d
+                    WHERE d.application_id = a.id AND d.link_kind = ?) AS accepted,
+                  (SELECT COUNT(*) FROM outcome o
+                    WHERE o.application_id = a.id) AS has_outcome,
+                  (SELECT COUNT(*) FROM tool_use u
+                    WHERE u.application_id = a.id) AS runs,
+                  (SELECT COUNT(*) FROM decision_log d
+                    WHERE d.application_id = a.id AND d.link_kind = ?) AS outcome_ok,
+                  (SELECT COUNT(*) FROM beta_round br
+                    WHERE br.application_id = a.id) AS beta_rounds,
+                  (SELECT MAX(br.created_at) FROM beta_round br
+                    WHERE br.application_id = a.id) AS beta_at,
+                  (SELECT COUNT(*) FROM beta_feedback f
+                    WHERE f.application_id = a.id) AS beta_says,
+                  (SELECT COUNT(*) FROM decision_log d
+                    WHERE d.application_id = a.id AND d.link_kind = ?) AS hold_told
+           FROM application a
+           LEFT JOIN review r ON r.application_id = a.id
+           WHERE a.dept = ? AND a.status NOT IN ('반려')`
+        )
+          .bind(SIGNOFF_KIND, ACCEPT_KIND, OUTCOME_KIND, HOLD_LIFT_KIND, dept)
+          .all(),
       ])
 
     const items = apps.results.map((r) => ({ ...r, annual_hours: annualHours(r) }))
+
+    // 이 부서가 답해 주셔야 할 것.
+    //
+    // 위의 owed 와 시점이 정반대다. 저건 내가 못 준 것이고 이건 부서가 아직
+    // 안 준 것이다. **섞지 않는다** — 한 덩어리로 만들면 둘 다 자기 것이
+    // 아닌 줄 알고 안 읽는다.
+    const pending = sortPending(
+      (pendingRows.results ?? []).flatMap((r) => {
+        const out = []
+        const add = (code, since) => out.push({ code, ticket_no: r.ticket_no, title: r.title, since })
+
+        // 기준이 전부 확정됐는데 아직 서명이 없다.
+        if (r.criteria_total > 0 && r.criteria_confirmed === r.criteria_total && !r.signed) {
+          add('signoff', r.criteria_at)
+        }
+        // 넘겼는데 받았다는 확인이 없다. 대리로 눌러 둔 것은 부서 몫이
+        // 그대로 남아 있는 것이라 여기서 빼지 않는다.
+        if (r.handed && !r.rolled_back && !r.accepted) add('accept', r.handed_at)
+        // 한 번이라도 돌았는데 성과 확인이 없다.
+        if (r.has_outcome && r.runs > 0 && !r.outcome_ok) add('outcome', r.handed_at)
+        // 시험판이 나왔는데 의견이 한 건도 없다.
+        if (r.beta_rounds > 0 && r.beta_says === 0) add('beta', r.beta_at)
+        // 보류인데 아직 아무 말도 없다.
+        if (r.status === '보류' && !r.hold_told) add('hold', r.decided_at)
+        return out
+      })
+    )
 
     // 내가 이 부서에 빚진 것.
     //
@@ -229,6 +305,8 @@ export async function onRequestGet({ env, params }) {
       feedback: feedback.results,
       decisions: decisions.results,
       owed,
+      // 부서 몫. owed 와 시점이 정반대다.
+      pending,
     })
   } catch (err) {
     return failUnexpected(err, '부서 기록을 모으지 못했습니다.')
