@@ -1,11 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { STAGES } from '../lib/stages.js'
 import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
 import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
 import { provenanceLine, provenanceDetail } from '../../shared/provenance.js'
-import { TRY_STEPS, TRY_TERMS, RESET_NOTE, resetLabel } from '../../shared/tryit.js'
+import { TRY_STEPS, TRY_TERMS, RESET_NOTE, VISITOR_NOTE, resetLabel, visitorLabel } from '../../shared/tryit.js'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { readableWhy } from '../../shared/notice.js'
@@ -194,8 +194,19 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
 function TryIt({ provenance }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [visitors, setVisitors] = useState(null)
   const toast = useToast()
   const demoCount = provenance?.demo ?? 0
+
+  // 펼칠 때만 센다. 첫 화면은 이미 일곱 곳을 두드리고 있어서 하나 더
+  // 늘리면 열릴 때마다 그만큼 느려진다.
+  useEffect(() => {
+    if (!open || visitors != null) return
+    api
+      .get('/demo/visitors')
+      .then((r) => setVisitors(r.count ?? 0))
+      .catch(() => setVisitors(0))
+  }, [open, visitors])
 
   async function reset() {
     setBusy(true)
@@ -258,6 +269,38 @@ function TryIt({ provenance }) {
               {busy ? '되돌리는 중…' : resetLabel(demoCount)}
             </button>
           </div>
+
+          {/* 보러 오신 분들이 시험 삼아 낸 것.
+              위 되돌리기는 시연 시드만 건드린다. 그것만 있으면 면접관이
+              낸 신청서가 영영 쌓여서, 첫 화면이 "하루 넘게 못 본 신청서
+              20건"을 띄우게 된다. 초대한 결과가 초대한 화면을 망친다. */}
+          {visitorLabel(visitors) && (
+            <div className="tryit-reset">
+              <div className="tryit-reset-text">
+                <strong>{VISITOR_NOTE.rule}</strong>
+                <div className="card-note">{VISITOR_NOTE.why}</div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    const r = await api.remove('/demo/visitors')
+                    toast.success(r.message)
+                    window.location.reload()
+                  } catch (err) {
+                    toast.error(err.message)
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                {visitorLabel(visitors)}
+              </button>
+            </div>
+          )}
         </>
       )}
     </section>
