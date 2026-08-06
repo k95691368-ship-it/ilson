@@ -54,7 +54,8 @@ export async function onRequestGet({ env, request }) {
       where.push(`(d.link_kind IS NULL OR d.link_kind NOT IN (${notMine.map(() => '?').join(', ')}))`)
       binds.push(...notMine)
     }
-    if (onlyUnrequested) where.push('d.unrequested = 1')
+    if (onlyUnrequested) where.push(`(d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
+                  AND TRIM(COALESCE(r.refuse_alternative, '')) <> ''))`)
     if (q) {
       // 제목·내용·근거·대안 어디에 있든 찾는다. 나중에 "그거 어디 적었더라"를
       // 찾을 때 어느 칸에 적었는지까지 기억하고 있을 리 없다.
@@ -68,10 +69,23 @@ export async function onRequestGet({ env, request }) {
     const [rows, stageCount, deptCount, totals, allKinds] = await Promise.all([
       env.DB.prepare(
         `SELECT d.id, d.application_id, d.stage, d.actor, d.title, d.what, d.why,
-                d.alternatives, d.unrequested, d.created_at, d.link_kind,
+                d.alternatives, d.created_at, d.link_kind,
+                -- 요청받지 않았는데 먼저 꺼낸 것.
+                --
+                -- 저장된 칸만 보면 예전에 남긴 기록은 영영 0이다. 그 칸을
+                -- 쓰기 시작한 것이 최근이라, 이미 남은 65건은 전부 0으로
+                -- 굳어 있다. 그래서 "먼저 제안한 것만" 필터가 늘 빈 화면이었다.
+                --
+                -- 남긴 글을 고치지 않는다. 대신 **읽을 때 판정한다** —
+                -- 반려하면서 대안을 함께 낸 판정이 정확히 그것이다. 부서는
+                -- A를 해달라고 했고 저희는 못 한다고 하면서, 아무도 안
+                -- 물어본 B를 꺼냈다. 옛 기록도 새 기록도 같은 규칙으로 잡힌다.
+                (d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
+                  AND TRIM(COALESCE(r.refuse_alternative, '')) <> '')) AS unrequested,
                 a.ticket_no, a.dept, a.title AS application_title
          FROM decision_log d
          LEFT JOIN application a ON a.id = d.application_id
+         LEFT JOIN review r ON r.application_id = d.application_id
          ${clause}
          ORDER BY d.created_at DESC
          LIMIT 200`
@@ -91,10 +105,12 @@ export async function onRequestGet({ env, request }) {
 
       env.DB.prepare(
         `SELECT COUNT(*) AS total,
-                SUM(CASE WHEN actor = 'human' THEN 1 ELSE 0 END) AS human,
-                SUM(CASE WHEN unrequested = 1 THEN 1 ELSE 0 END) AS unrequested,
-                SUM(CASE WHEN alternatives IS NOT NULL AND alternatives <> '' THEN 1 ELSE 0 END) AS with_alternatives
-         FROM decision_log`
+                SUM(CASE WHEN d.actor = 'human' THEN 1 ELSE 0 END) AS human,
+                SUM(CASE WHEN (d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
+                  AND TRIM(COALESCE(r.refuse_alternative, '')) <> '')) THEN 1 ELSE 0 END) AS unrequested,
+                SUM(CASE WHEN d.alternatives IS NOT NULL AND d.alternatives <> '' THEN 1 ELSE 0 END) AS with_alternatives
+         FROM decision_log d
+         LEFT JOIN review r ON r.application_id = d.application_id`
       ).first(),
 
       // 누가 남긴 것인지 세려면 종류가 필요하다. 거르기와 상관없이 전부

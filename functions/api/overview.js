@@ -70,8 +70,14 @@ export async function onRequestGet({ env }) {
       ).first(),
 
       env.DB.prepare(
-        `SELECT id, application_id, stage, actor, title, what, why, unrequested, created_at
-         FROM decision_log ORDER BY created_at DESC LIMIT 8`
+        `SELECT d.id, d.application_id, d.stage, d.actor, d.title, d.what, d.why, d.created_at,
+                -- 결정 기록 화면과 **같은 규칙**을 쓴다. 두 화면이 다른
+                -- 숫자를 말하면 둘 다 못 믿는다.
+                (d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
+                  AND TRIM(COALESCE(r.refuse_alternative, '')) <> '')) AS unrequested
+         FROM decision_log d
+         LEFT JOIN review r ON r.application_id = d.application_id
+         ORDER BY d.created_at DESC LIMIT 8`
       ).all(),
 
       env.DB.prepare(
@@ -311,6 +317,7 @@ export async function onRequestGet({ env }) {
       },
       baselines: baselines.results.length,
       recentDecisions: decisions.results,
+      // 위 쿼리가 결정 기록 화면과 같은 규칙으로 판정해 준다.
       unrequestedCount: decisions.results.filter((d) => d.unrequested === 1).length,
       recent: items.slice(0, 6).map((a) => ({ ...a, stage: stageOf(a) })),
     })
