@@ -346,3 +346,25 @@ describe('부서가 못 쓰겠다고 한 도구', () => {
     expect(b).toBeGreaterThan(a)
   })
 })
+
+// 담당자가 막혀서 되물었던 건이다. 답이 오면 막고 있던 것이 없어졌는데,
+// 지금까지는 "답 기다리는 중" 배지가 조용히 사라지는 것이 전부였다.
+describe('되물은 것에 답이 왔을 때', () => {
+  it('판정하라고 할 일에 올라온다', () => {
+    const x = buildTodo({ overview: { answered: 2 } }).find((i) => i.key === 'answered_ready')
+    expect(x).toBeTruthy()
+    expect(x.to).toBe('/review')
+    expect(x.why).toContain('이제 판정하실 수 있습니다')
+  })
+
+  it('부서가 기다리고 있다는 것을 이유로 댄다', () => {
+    // 놓치면 다음부터 "답해 봐야 소용없다"를 배운다.
+    const x = buildTodo({ overview: { answered: 1 } }).find((i) => i.key === 'answered_ready')
+    expect(x.why).toContain('답해 놓고 기다리고')
+  })
+
+  it('없으면 안 올라온다', () => {
+    expect(buildTodo({ overview: { answered: 0 } }).some((i) => i.key === 'answered_ready')).toBe(false)
+    expect(buildTodo({}).some((i) => i.key === 'answered_ready')).toBe(false)
+  })
+})

@@ -54,6 +54,16 @@ export async function onRequestGet({ env, request }) {
                     SELECT 1 FROM decision_log ans
                      WHERE ans.link_kind = '답변' AND ans.link_id = q.id
                   )) AS waiting_answers,
+              -- 되물었고 **답을 받은** 것. 이제 막고 있던 것이 없다.
+              --
+              -- 지금까지는 답이 오면 위의 waiting_answers 가 0이 되는 것이
+              -- 전부였다. 배지가 조용히 사라질 뿐, 아무도 "답이 왔습니다"라고
+              -- 말해 주지 않는다. 담당자는 막혀서 되물었던 건인데, 풀린 것을
+              -- 배지가 없어진 것으로 알아채야 했다. 한 번도 안 물어본 신청서와
+              -- 화면에서 구분이 안 된다.
+              (SELECT MAX(ans.created_at) FROM decision_log ans
+                JOIN decision_log q ON q.id = ans.link_id
+                WHERE ans.link_kind = '답변' AND q.application_id = a.id) AS answered_at,
               -- 보류해 둔 것의 조건이 풀렸다고 부서가 알려 왔는가.
               --
               -- 목록에서 안 보이면 담당자는 첫 화면 할 일에서 "N건"만 읽고

@@ -605,6 +605,13 @@ export default function ReviewPage() {
                         {a.hold_lift_at && (
                           <span className="badge badge-accent">조건 풀렸다고 알려 옴</span>
                         )}
+                        {/* 되물었고 답을 받았다. 막고 있던 것이 없어졌다.
+                            지금까지는 "답 기다리는 중" 배지가 조용히
+                            사라지는 것이 전부라, 한 번도 안 물어본
+                            신청서와 화면에서 구분이 안 됐다. */}
+                        {a.answered_at && a.waiting_answers === 0 && (
+                          <span className="badge badge-success">답 받음</span>
+                        )}
                         {a.status === '접수' && a.hours_since >= 24 && (
                           <span className="badge badge-warning">{Math.floor(a.hours_since / 24)}일 경과</span>
                         )}

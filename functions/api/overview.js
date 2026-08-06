@@ -31,6 +31,7 @@ export async function onRequestGet({ env }) {
       betaOpen,
       holdLifts,
       pickRows,
+      answeredWaiting,
     ] = await Promise.all([
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
@@ -125,6 +126,29 @@ export async function onRequestGet({ env }) {
       )
         .bind(PICK_KIND, UNPICK_KIND)
         .all(),
+
+      // 되물었고 답을 받았는데 아직 판정 안 한 것.
+      //
+      // 답이 오면 "답 기다리는 중" 배지가 조용히 사라지는 것이 전부였다.
+      // 담당자는 막혀서 되물었던 건인데, 풀린 것을 배지가 없어진 것으로
+      // 알아채야 했다.
+      env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM application a
+         WHERE a.status IN ('접수', '검토중')
+           AND EXISTS (
+             SELECT 1 FROM decision_log ans
+              JOIN decision_log q ON q.id = ans.link_id
+             WHERE ans.link_kind = '답변' AND q.application_id = a.id
+           )
+           AND NOT EXISTS (
+             SELECT 1 FROM decision_log q2
+              WHERE q2.application_id = a.id AND q2.link_kind = '질문'
+                AND NOT EXISTS (
+                  SELECT 1 FROM decision_log a2
+                   WHERE a2.link_kind = '답변' AND a2.link_id = q2.id
+                )
+           )`
+      ).first(),
     ])
 
     // 취소는 자기 앞의 요청을 지우고, 요청 뒤에 다시 판정했으면 답을 준 것이다.
@@ -250,6 +274,11 @@ export async function onRequestGet({ env }) {
       // 이 숫자가 무엇 위에 서 있는가. 시연용으로 심은 것이 몇 건인지를
       // 첫 화면이 스스로 말해야 한다 — 지금은 /review 한 군데에만 적혀 있다.
       provenance: provenanceOf(items),
+      // 되물었고 답을 받았는데 아직 판정 안 한 것.
+      //
+      // 부서가 시간을 써서 답해 줬다. 그걸 놓치면 부서는 "답해 봐야
+      // 소용없다"를 배운다.
+      answered: answeredWaiting?.n ?? 0,
       // 하기로 해 놓고 순서를 안 정한 채 기다리는 것.
       waitingToStart,
       unranked: rankPressure.over ? waitingToStart : 0,

@@ -216,6 +216,28 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
     )
   }
 
+  // 되물었고 답을 받았는데 아직 판정 안 한 것.
+  //
+  // 담당자가 막혀서 되물었던 건이다. 답이 오면 막고 있던 것이 없어졌는데,
+  // 지금까지는 "답 기다리는 중" 배지가 조용히 사라지는 것이 전부였다.
+  // 한 번도 안 물어본 신청서와 화면에서 구분이 안 됐다.
+  //
+  // 부서는 시간을 써서 답해 줬다. 그걸 놓치면 다음부터 "답해 봐야
+  // 소용없다"를 배운다.
+  const answered = overview?.answered ?? 0
+  if (answered > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'answered_ready',
+        title: `되물은 것에 답이 온 신청서 ${answered}건`,
+        why: '막고 있던 것이 없어졌습니다. 이제 판정하실 수 있습니다 — 부서는 답해 놓고 기다리고 있습니다.',
+        to: '/review',
+        cta: '판정하기',
+      })
+    )
+  }
+
   // 하기로 해 놓고 순서를 안 정한 채 여럿이 기다리는 상태.
   //
   // 순서를 안 정하는 것 자체는 잘못이 아니다. 한 건만 있으면 정할 것도 없다.
