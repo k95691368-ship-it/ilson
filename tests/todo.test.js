@@ -300,3 +300,24 @@ describe('순서 없이 기다리는 것', () => {
     expect(x.why).toContain('부서 조회 화면')
   })
 })
+
+// 부서가 쓰던 것을 내렸다는 것은 그 부서가 지금 일을 못 하고 있다는 뜻이다.
+// 그런데 내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보인다.
+describe('내려 둔 채 잊은 도구', () => {
+  it('사흘 넘으면 금액 급으로 올라온다', () => {
+    const x = buildTodo({ tools: { summary: { downStale: 2 } } }).find((i) => i.key === 'tool_down_stale')
+    expect(x).toBeTruthy()
+    expect(x.kind).toBe('금액')
+    expect(x.to).toBe('/tools')
+  })
+
+  it('없으면 안 올라온다', () => {
+    expect(buildTodo({ tools: { summary: { downStale: 0 } } }).some((i) => i.key === 'tool_down_stale')).toBe(false)
+    expect(buildTodo({}).some((i) => i.key === 'tool_down_stale')).toBe(false)
+  })
+
+  it('왜 안 보이는지를 이유로 댄다', () => {
+    const x = buildTodo({ tools: { summary: { downStale: 1 } } }).find((i) => i.key === 'tool_down_stale')
+    expect(x.why).toContain('넘긴 목록에서도 빠져서')
+  })
+})

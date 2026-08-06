@@ -1,0 +1,86 @@
+// 쓰던 도구를 내렸을 때 부서에게 무슨 말을 하는가.
+//
+// 담당자가 도구를 내리면 조회 화면에는 이 한 줄이 뜬다 —
+// **"문제가 있어 잠시 내렸습니다."**
+//
+// 그게 전부다. 왜 내렸는지는 `rollback_reason` 칸에 저장되는데 조회 화면으로
+// 안 간다. 언제 다시 올릴지도, 그동안 어떻게 해야 하는지도 아무 말이 없다.
+//
+// 부서 입장에서 보면 이렇다. 어제까지 그 도구로 정산서를 만들었는데 오늘
+// 안 열린다. 조회 화면을 열면 "문제가 있어 잠시 내렸습니다" 한 줄. **그래서
+// 전화한다.** 이 사이트가 없애려는 것이 정확히 그 전화다.
+//
+// 그리고 이건 이 사이트에서 가장 급한 상황인데 가장 말이 없던 자리다.
+// 다른 것들(판정이 늦다, 확인이 안 됐다)은 기다리면 되지만, 이건 부서가
+// **지금 일을 못 하고 있는** 것이다.
+
+export const ROLLBACK_KIND = 'handover'
+
+// 내린 지 얼마나 됐으면 담당자를 짚어야 하는가.
+//
+// 내려 두고 잊는 것이 최악이다. 부서는 "고쳐 주겠지" 하고 기다리는데
+// 담당자 화면에는 그 도구가 아예 안 보인다 — 넘긴 목록에서도 빠지기
+// 때문이다. 조용히 사라진다.
+export const STALE_DAYS = 3
+
+export function rollbackState({ handover, now } = {}) {
+  const at = handover?.rolled_back_at ?? null
+  if (!at) return { down: false, days: null, reason: null, stale: false }
+
+  const days = daysBetween(at, now)
+  return {
+    down: true,
+    at,
+    days,
+    // 왜 내렸는지. 담당자가 적은 그대로 보여준다 — 다듬으면 부서가 읽는
+    // 것과 기록에 남은 것이 달라진다.
+    reason: handover.rollback_reason ?? null,
+    stale: days != null && days >= STALE_DAYS,
+  }
+}
+
+function daysBetween(from, now) {
+  const a = Date.parse(`${String(from).replace(' ', 'T')}Z`)
+  const b = typeof now === 'number' ? now : Date.parse(`${String(now ?? '').replace(' ', 'T')}Z`)
+  const end = Number.isFinite(b) ? b : Date.now()
+  if (!Number.isFinite(a)) return null
+  return Math.max(0, Math.floor((end - a) / 86400000))
+}
+
+// 부서에게 뭐라고 말할 것인가.
+export function rollbackHeadline(s) {
+  if (!s?.down) return null
+  if (s.days === 0) return '쓰시던 도구를 오늘 내렸습니다'
+  return `쓰시던 도구를 내린 지 ${s.days}일 됐습니다`
+}
+
+// 그동안 어떻게 해야 하는가.
+//
+// **여기서 "곧 고치겠습니다"라고 하지 않는다.** 언제 올릴지 모르면서 곧
+// 이라고 하면, 부서는 그 말을 믿고 기다리다가 두 번 손해를 본다 — 도구도
+// 없고 대비도 안 한 채로.
+export function rollbackWhatNow(s) {
+  if (!s?.down) return null
+  const base =
+    '그동안은 이 일을 원래 하시던 방식으로 해주셔야 합니다. 죄송합니다 — 잘못 넘긴 것을 그대로 두는 것보다는 낫다고 판단했습니다.'
+  if (s.stale) {
+    // 오래 내려가 있으면 그것도 사실대로 말한다. 부서가 언제까지 기다려야
+    // 할지 모르는 채로 두는 것이 가장 나쁘다.
+    return `${base} 내려간 지 ${s.days}일이 지났습니다. 이만큼 걸리고 있다면 담당자에게 다시 여쭤보셔도 됩니다 — 저희 쪽에서 놓치고 있는 것일 수 있습니다.`
+  }
+  return base
+}
+
+// 담당자에게 뭐라고 말할 것인가.
+//
+// 내려 두고 잊으면 부서는 영영 기다린다. 그리고 그 도구는 넘긴 목록에서도
+// 빠져서 담당자 화면 어디에도 안 보인다.
+export function rollbackNudge(list) {
+  const stale = (list ?? []).filter((x) => x?.stale)
+  if (stale.length === 0) return null
+  return {
+    n: stale.length,
+    title: `내려 둔 채 ${STALE_DAYS}일이 지난 도구 ${stale.length}개`,
+    why: '내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보입니다. 그동안 그 부서는 원래 하던 방식으로 일하고 있습니다.',
+  }
+}

@@ -10,6 +10,7 @@ import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
 import { validateOutcomeConfirm } from '../../shared/accept.js'
 import { validateBetaSay, BETA_SAY_KINDS, kindOf, betaSayHeadline, betaSayWhy } from '../../shared/betasay.js'
 import { validateHoldLift, LIFT_KINDS, liftKindOf, holdHeadline, holdWhy } from '../../shared/holdlift.js'
+import { rollbackState, rollbackHeadline, rollbackWhatNow } from '../../shared/rollback.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
 import { RESUBMIT_BACK_KIND } from '../../shared/resubmit.js'
 
@@ -235,6 +236,13 @@ function Result({ data, as, onChanged }) {
           그런데 확정은 담당자 혼자 하고, 부서는 그 문장을 본 적이 없다.
           여기서 실제로 보여드리고 받는다. */}
       <Signoff ticket={data.ticket} as={as} onDone={onChanged} />
+
+      {/* 쓰던 도구가 내려가 있다.
+          이 사이트에서 가장 급한 상황인데 지금까지 가장 말이 없던 자리다 —
+          "문제가 있어 잠시 내렸습니다" 한 줄이 전부였고, 왜 내렸는지는
+          저장해 두고도 화면으로 안 보냈다. 부서는 어제까지 쓰던 도구가
+          안 열리는데 이유도 기한도 모른 채로 남는다. 그래서 전화한다. */}
+      <ToolDown data={data} />
 
       {/* 부서가 이 화면을 여는 이유는 대개 하나다 — 낸 지 2주가 됐는데
           아무 소식이 없어서다. "신청서 단계에 있습니다"는 이미 아는 것이고,
@@ -831,6 +839,48 @@ function Signoff({ ticket, as, onDone }) {
           </button>
         </form>
       )}
+    </section>
+  )
+}
+
+// 쓰던 도구를 내렸다는 것을 부서에게 제대로 말한다.
+//
+// 담당자가 도구를 내리면 조회 화면에는 "문제가 있어 잠시 내렸습니다" 한
+// 줄이 떴다. 왜 내렸는지는 rollback_reason 칸에 저장되는데 화면으로 안
+// 갔고, 언제 다시 올릴지도 그동안 어떻게 해야 하는지도 아무 말이 없었다.
+//
+// 부서 입장에서 보면 어제까지 그 도구로 일했는데 오늘 안 열린다. 그래서
+// 전화한다. 이 사이트가 없애려는 것이 정확히 그 전화다.
+function ToolDown({ data }) {
+  const h = data?.handover ?? null
+  const s = rollbackState({ handover: h })
+  if (!s.down) return null
+
+  return (
+    <section className={`tooldown${s.stale ? ' tooldown-stale' : ''}`}>
+      <div className="dconf-head">
+        <span className="badge badge-danger">도구 내려감</span>
+        {s.days != null && <span className="badge badge-neutral">{num(s.days, 0)}일째</span>}
+        <span className="spacer" />
+        {s.at && <span className="card-note">{ago(s.at)}</span>}
+      </div>
+
+      <h3>{rollbackHeadline(s)}</h3>
+
+      {/* 왜 내렸는지. 담당자가 적은 그대로 보여준다 — 다듬으면 부서가
+          읽는 것과 기록에 남은 것이 달라진다. */}
+      {s.reason ? (
+        <p className="tooldown-reason">
+          <strong>왜 내렸나</strong> {s.reason}
+        </p>
+      ) : (
+        <p className="card-note">
+          왜 내렸는지 적어 두지 않았습니다. 담당자에게 여쭤보시면 답을 드립니다 — 이건 저희
+          잘못입니다.
+        </p>
+      )}
+
+      <p className="dconf-why">{rollbackWhatNow(s)}</p>
     </section>
   )
 }

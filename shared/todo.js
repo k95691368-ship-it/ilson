@@ -66,6 +66,26 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
     )
   }
 
+  // 내려 둔 채 잊은 도구.
+  //
+  // 부서가 쓰던 것을 내렸다는 것은 **그 부서가 지금 일을 못 하고 있다**는
+  // 뜻이다. 그런데 내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안
+  // 보인다. 부서는 "고쳐 주겠지" 하고 기다리고, 담당자 화면에는 그 도구가
+  // 아예 없다. 조용히 사라지는 자리라 금액 급으로 올린다.
+  const downStale = tools?.summary?.downStale ?? 0
+  if (downStale > 0) {
+    out.push(
+      item({
+        kind: '금액',
+        key: 'tool_down_stale',
+        title: `내려 둔 채 사흘이 지난 도구 ${downStale}개`,
+        why: '내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보입니다. 그동안 그 부서는 원래 하던 방식으로 일하고 있습니다.',
+        to: '/tools',
+        cta: '어느 것인지 보기',
+      })
+    )
+  }
+
   const unchecked = codes?.summary?.needsCheck ?? 0
   if (unchecked > 0) {
     out.push(

@@ -5874,3 +5874,31 @@ kbd {
   line-height: 1.8;
   opacity: 0.9;
 }
+
+/* 쓰던 도구가 내려갔을 때.
+   이 사이트에서 가장 급한 상황이라 가장 눈에 띄어야 한다 — 부서가 지금
+   일을 못 하고 있다는 뜻이다. */
+.tooldown {
+  padding: 15px 16px;
+  border: 1px solid var(--danger, var(--warning));
+  border-radius: var(--radius);
+  background: var(--danger-bg, var(--surface));
+}
+/* 오래 내려가 있으면 더 세게. */
+.tooldown-stale {
+  border-width: 2px;
+}
+.tooldown h3 {
+  margin: 0 0 8px;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.tooldown-reason {
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.8;
+}

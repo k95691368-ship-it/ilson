@@ -15,6 +15,7 @@
 
 import { jsonResponse, failUnexpected } from '../../_lib/http.js'
 import { UNCLEAR_KIND, UNCLEAR_FIXED_KIND } from '../../../shared/unclear.js'
+import { rollbackState } from '../../../shared/rollback.js'
 
 // 최근 며칠을 "요즘"으로 볼 것인가. 주 1회 도는 도구가 많아서 이레로 잡는다.
 // 사흘로 잡으면 정상인 도구가 전부 "안 쓰임"으로 찍힌다.
@@ -128,6 +129,12 @@ export async function onRequestGet({ env }) {
       rolledBack: items.filter((i) => i.health === '내림').length,
       unconfirmed: items.filter((i) => !i.accepted_at && !i.rolled_back_at).length,
       noManual: items.filter((i) => !i.manual_published_at && !i.rolled_back_at).length,
+      // 내려 둔 채 잊은 것.
+      //
+      // 내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보인다. 그동안
+      // 그 부서는 원래 하던 방식으로 일하고 있다 — 조용히 사라지는 자리다.
+      downStale: items.filter((i) => rollbackState({ handover: i }).stale).length,
+      down: items.filter((i) => i.rolled_back_at).length,
       totalRuns: items.reduce((s, i) => s + i.runs, 0),
       totalFailed: items.reduce((s, i) => s + i.failedRuns, 0),
       totalRows: items.reduce((s, i) => s + i.rowsOut, 0),

@@ -118,7 +118,7 @@ export async function onRequestGet({ env, params, request }) {
         env.DB.prepare('SELECT published_at, contact FROM manual WHERE application_id = ?')
           .bind(app.id)
           .first(),
-        env.DB.prepare('SELECT slug, handed_to_person, handed_at, accepted_at, rolled_back_at FROM handover WHERE application_id = ?')
+        env.DB.prepare('SELECT slug, handed_to_person, handed_at, accepted_at, rolled_back_at, rollback_reason FROM handover WHERE application_id = ?')
           .bind(app.id)
           .first(),
         env.DB.prepare('SELECT COUNT(*) AS n, MAX(used_at) AS last FROM tool_use WHERE application_id = ?')
@@ -238,7 +238,9 @@ export async function onRequestGet({ env, params, request }) {
         at: handover?.handed_at ?? null,
         summary: handover
           ? handover.rolled_back_at
-            ? '문제가 있어 잠시 내렸습니다.'
+            ? `문제가 있어 잠시 내렸습니다.${
+                handover.rollback_reason ? ` ${handover.rollback_reason}` : ''
+              }`
             : `${handover.handed_to_person}에게 넘겼습니다.${
                 handover.accepted_at ? ' 받았다고 확인해 주셨습니다.' : ' 아직 받았다는 확인이 없습니다.'
               }`
@@ -287,6 +289,18 @@ export async function onRequestGet({ env, params, request }) {
     if (beta && (feedbackCount?.n ?? 0) === 0) {
       needs.push({ code: 'beta_feedback' })
     }
+    // 쓰던 도구가 내려가 있다.
+    //
+    // 이건 다른 것들과 무게가 다르다. 판정이 늦거나 확인이 안 된 것은
+    // 기다리면 되지만, 이건 **부서가 지금 일을 못 하고 있는** 것이다.
+    // 그래서 맨 앞에 넣는다.
+    if (handover?.rolled_back_at) {
+      needs.unshift({
+        code: 'tool_down',
+        body: handover.rollback_reason ?? null,
+        at: handover.rolled_back_at,
+      })
+    }
     if (handover && !handover.accepted_at && !handover.rolled_back_at) {
       needs.push({ code: 'handover_unconfirmed', link: `/t/${handover.slug}` })
     }
@@ -321,6 +335,17 @@ export async function onRequestGet({ env, params, request }) {
         annual_hours: annualHours(app),
       },
       files: files.results,
+      // 내려간 도구를 화면이 제대로 말하려면 이유와 시각이 필요하다.
+      // 저장은 하면서 화면으로는 안 보내고 있었다.
+      handover: handover
+        ? {
+            slug: handover.slug,
+            handed_at: handover.handed_at,
+            accepted_at: handover.accepted_at,
+            rolled_back_at: handover.rolled_back_at,
+            rollback_reason: handover.rollback_reason ?? null,
+          }
+        : null,
       timeline,
       stages: STAGES,
       currentStage: currentIndex >= 0 ? timeline[currentIndex].stage : '신청서',
