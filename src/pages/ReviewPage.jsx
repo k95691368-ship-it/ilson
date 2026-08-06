@@ -966,7 +966,7 @@ function Detail({ id, onSaved, pool }) {
           {fieldErrors.verdict && <div className="field-error">{fieldErrors.verdict}</div>}
         </div>
 
-        <Field label="판정 근거" hint="비워 둬도 저장됩니다" error={fieldErrors.verdict_reason}>
+        <Field label="판정 근거" hint="20자 이상. 근거 없이 누른 것은 결정이 아니라 클릭입니다" error={fieldErrors.verdict_reason}>
           <textarea
             rows={3}
             value={form.verdict_reason}
@@ -977,7 +977,7 @@ function Detail({ id, onSaved, pool }) {
 
         <Field
           label="고려했다 뺀 것"
-          hint="비워 둬도 저장됩니다"
+          hint="20자 이상. 무엇을 고르지 않았는지를 적어야 판단이 판단이 됩니다"
           error={fieldErrors.alternatives_considered}
         >
           <textarea
@@ -1008,7 +1008,7 @@ function Detail({ id, onSaved, pool }) {
 
             <Field
               label="대신 무엇을 해 드릴 수 있나"
-              hint='정말 없으면 "다른 도구로 가야 합니다"라고 적으세요'
+              hint='20자 이상. 정말 없으면 "다른 도구로 가야 합니다"라고 적으세요'
               error={fieldErrors.refuse_alternative}
             >
               <textarea

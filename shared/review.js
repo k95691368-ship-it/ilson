@@ -5,6 +5,12 @@
 
 export const VERDICTS = ['수용', '반려', '보류']
 
+// 근거·대안·조건에 요구하는 최소 길이.
+//
+// 첫 화면 초대문이 "20자"라고 적어 뒀다. 그 문장과 이 숫자가 갈라지면
+// 화면이 또 거짓말을 한다.
+export const MIN_REASON = 20
+
 // 반려 사유. 이 목록이 곧 "우리가 만들지 않는 것"의 선언이다.
 //
 // 목록이 짧은 것은 능력이 모자라서가 아니라 정한 것이다. "무엇이든 만들어
@@ -117,14 +123,46 @@ export function validateReview(input) {
     reviewer_label: text(input.reviewer_label) || 'AX 담당자',
   }
 
-  // 막는 것은 이 셋뿐이다. 없으면 기록 자체가 성립하지 않는다.
   if (impact == null) errors.impact_score = '임팩트를 골라주세요.'
   if (difficulty == null) errors.difficulty_score = '난이도를 골라주세요.'
   if (!VERDICTS.includes(v.verdict)) errors.verdict = '판정을 골라주세요.'
 
-  // 반려 사유는 값이 들어왔을 때만 목록에 있는지 본다. 비어 있어도 저장된다.
-  if (v.verdict === '반려' && v.refuse_code && !REFUSE_CODES.includes(v.refuse_code)) {
-    errors.refuse_code = '목록에 있는 사유를 골라주세요.'
+  // 근거 없이 누른 것은 결정이 아니라 클릭이다.
+  //
+  // 이 저장소는 처음부터 그렇게 말해 왔다 — 의사결정 로그 파일 머리에
+  // "why가 비어 있으면 결정이 아니라 클릭이다"라고 적혀 있고, /honesty 는
+  // "대안 없이 반려한 것"을 실패로 센다. 부서 화면은 "반려했지만 대신
+  // 해볼 수 있는 것을 적어 뒀습니다"라고 약속한다.
+  //
+  // **그런데 아무것도 안 막고 있었다.** 막는 것은 임팩트·난이도·판정
+  // 셋뿐이었고, 근거 열다섯 자에 대안 없는 반려가 실제로 저장돼 있다.
+  //
+  // 결정적인 것은 첫 화면의 초대문이다. 보러 오신 분께 "근거를 20자 안
+  // 적으면 서버가 막습니다, 반려는 대안까지 받습니다"라고 적어 뒀는데
+  // 사실이 아니었다. 면접관이 빈칸으로 눌러 보면 그대로 저장된다 —
+  // 평가하러 온 사람에게 사이트가 거짓말을 하는 셈이다.
+  if (v.verdict_reason.length < MIN_REASON) {
+    errors.verdict_reason = `왜 그렇게 판정하셨는지 ${MIN_REASON}자 이상 적어주세요. 근거 없이 누른 것은 결정이 아니라 클릭입니다.`
+  }
+  if (v.alternatives_considered.length < MIN_REASON) {
+    // 무엇을 고르지 않았는지를 적어야 판단이 판단이 된다.
+    errors.alternatives_considered = `무엇을 고르지 않으셨는지 ${MIN_REASON}자 이상 적어주세요. 대안을 적어야 판단이 판단이 됩니다.`
+  }
+
+  if (v.verdict === '반려') {
+    if (v.refuse_code && !REFUSE_CODES.includes(v.refuse_code)) {
+      errors.refuse_code = '목록에 있는 사유를 골라주세요.'
+    }
+    // 만들지 못한다는 말만 하고 끝내면 병목은 그대로 남는다.
+    if (v.refuse_alternative.length < MIN_REASON) {
+      errors.refuse_alternative = `대신 해보실 수 있는 것을 ${MIN_REASON}자 이상 적어주세요. 못 만든다는 말만 하고 끝내면 그 부서의 병목은 그대로 남습니다.`
+    }
+  }
+
+  if (v.verdict === '보류' && v.hold_until_condition.length < MIN_REASON) {
+    // 조건 없이 미뤄 두면 부서는 언제까지 기다려야 하는지 모른다. 그리고
+    // 보류는 아무도 안 움직이면 영원히 그대로인 유일한 상태다.
+    errors.hold_until_condition = `무엇이 풀리면 다시 볼지 ${MIN_REASON}자 이상 적어주세요. 조건이 없으면 부서는 언제까지 기다려야 하는지 모릅니다.`
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors }

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { TRY_STEPS, TRY_TERMS, RESET_NOTE, VISITOR_NOTE, tryStep, resetLabel, visitorLabel } from '../shared/tryit.js'
+import { validateReview, MIN_REASON } from '../shared/review.js'
 
 // 이 사이트에는 로그인이 없다. 실수가 아니라 정한 것이다 — 부서 담당자에게
 // 계정을 만들게 하면 그 순간부터 아무도 안 쓴다. 그래서 처음 온 사람도
@@ -119,5 +120,72 @@ describe('시험 삼아 낸 것을 치울 때', () => {
     expect(visitorLabel(null)).toBeNull()
     expect(visitorLabel()).toBeNull()
     expect(visitorLabel('셋')).toBeNull()
+  })
+})
+
+// 첫 화면 초대문이 "근거를 20자 안 적으면 서버가 막습니다"라고 적어 뒀다.
+// **그런데 서버는 안 막고 있었다.** 막는 것은 임팩트·난이도·판정 셋뿐이었고,
+// 근거 열다섯 자에 대안 없는 반려가 실제로 저장돼 있다.
+//
+// 면접관이 그 문장을 읽고 빈칸으로 눌러 보면 그대로 저장된다 — 평가하러
+// 온 사람에게 사이트가 거짓말을 하는 셈이다. 그래서 서버를 문장에 맞췄고,
+// 여기서 둘이 다시 갈라지지 않게 묶어 둔다.
+describe('초대문이 서버와 같은 말을 하는가', () => {
+  it('초대문이 말한 글자 수가 서버가 요구하는 것과 같다', () => {
+    expect(tryStep('review').note).toContain(`${MIN_REASON}자`)
+  })
+
+  it('반려에 대안을 받는다는 것도 서버가 실제로 막는다', () => {
+    expect(tryStep('review').note).toContain('대안')
+    const bad = validateReview({
+      impact_score: 3,
+      difficulty_score: 3,
+      verdict: '반려',
+      verdict_reason: '범위 밖이라 못 만듭니다 정말로 그렇습니다',
+      alternatives_considered: '사람이 계속 하는 안을 견줬습니다 그것뿐입니다',
+      refuse_alternative: '',
+    })
+    expect(bad.ok).toBe(false)
+    expect(bad.errors.refuse_alternative).toBeTruthy()
+  })
+
+  it('근거가 짧으면 막는다', () => {
+    const bad = validateReview({
+      impact_score: 3,
+      difficulty_score: 3,
+      verdict: '수용',
+      verdict_reason: '자동화할 자료가 아직 없습니다.',
+      alternatives_considered: '사람이 계속 하는 안을 견줬습니다 그것뿐입니다',
+    })
+    expect(bad.ok).toBe(false)
+    expect(bad.errors.verdict_reason).toBeTruthy()
+  })
+
+  it('보류는 다시 볼 조건을 받는다', () => {
+    // 조건이 없으면 부서는 언제까지 기다려야 하는지 모른다. 그리고 보류는
+    // 아무도 안 움직이면 영원히 그대로인 유일한 상태다.
+    const bad = validateReview({
+      impact_score: 3,
+      difficulty_score: 3,
+      verdict: '보류',
+      verdict_reason: '지금은 재료가 없어서 만들 수가 없습니다',
+      alternatives_considered: '그냥 진행하는 안을 견줬으나 추측이 됩니다',
+      hold_until_condition: '',
+    })
+    expect(bad.ok).toBe(false)
+    expect(bad.errors.hold_until_condition).toBeTruthy()
+  })
+
+  it('다 적으면 통과한다', () => {
+    const ok = validateReview({
+      impact_score: 3,
+      difficulty_score: 3,
+      verdict: '반려',
+      verdict_reason: '외부 시스템에 대신 써 넣는 일은 범위 밖입니다',
+      alternatives_considered: '사람이 계속 하는 안과 반쯤 자동화하는 안을 견줬습니다',
+      refuse_code: 'external_write',
+      refuse_alternative: '올리실 양식 파일까지는 만들어 드립니다',
+    })
+    expect(ok.ok).toBe(true)
   })
 })
