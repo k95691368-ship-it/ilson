@@ -8,6 +8,7 @@
 // 계세요"로 온다. 그 질문에 답하려면 결정을 가로로 훑을 수 있어야 한다.
 
 import { jsonResponse, jsonError } from '../_lib/http.js'
+import { DEPT_KINDS, PROXY_KINDS, sideTally, sideLine } from '../../shared/side.js'
 
 const STAGES = ['신청서', '검토', '협의안', '제작', '베타테스트', '사용법서', '배포', '성과']
 
@@ -18,6 +19,7 @@ export async function onRequestGet({ env, request }) {
   const actor = url.searchParams.get('actor')
   const onlyUnrequested = url.searchParams.get('unrequested') === '1'
   const q = (url.searchParams.get('q') ?? '').trim()
+  const side = (url.searchParams.get('side') ?? '').trim()
 
   try {
     const where = []
@@ -35,6 +37,23 @@ export async function onRequestGet({ env, request }) {
       where.push('d.actor = ?')
       binds.push(actor)
     }
+    // 담당자가 한 것 / 부서가 한 것 / 담당자가 대신 누른 것.
+    //
+    // 사람 이름으로 가르지 않는다 — 담당자가 부서 사람 이름으로 대신 눌러
+    // 준 것이 실제로 있고, 그건 부서 응답이 아니다.
+    const deptList = [...DEPT_KINDS]
+    const proxyList = [...PROXY_KINDS]
+    if (side === 'dept') {
+      where.push(`d.link_kind IN (${deptList.map(() => '?').join(', ')})`)
+      binds.push(...deptList)
+    } else if (side === 'proxy') {
+      where.push(`d.link_kind IN (${proxyList.map(() => '?').join(', ')})`)
+      binds.push(...proxyList)
+    } else if (side === 'ax') {
+      const notMine = [...deptList, ...proxyList]
+      where.push(`(d.link_kind IS NULL OR d.link_kind NOT IN (${notMine.map(() => '?').join(', ')}))`)
+      binds.push(...notMine)
+    }
     if (onlyUnrequested) where.push('d.unrequested = 1')
     if (q) {
       // 제목·내용·근거·대안 어디에 있든 찾는다. 나중에 "그거 어디 적었더라"를
@@ -46,10 +65,10 @@ export async function onRequestGet({ env, request }) {
 
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : ''
 
-    const [rows, stageCount, deptCount, totals] = await Promise.all([
+    const [rows, stageCount, deptCount, totals, allKinds] = await Promise.all([
       env.DB.prepare(
         `SELECT d.id, d.application_id, d.stage, d.actor, d.title, d.what, d.why,
-                d.alternatives, d.unrequested, d.created_at,
+                d.alternatives, d.unrequested, d.created_at, d.link_kind,
                 a.ticket_no, a.dept, a.title AS application_title
          FROM decision_log d
          LEFT JOIN application a ON a.id = d.application_id
@@ -77,6 +96,11 @@ export async function onRequestGet({ env, request }) {
                 SUM(CASE WHEN alternatives IS NOT NULL AND alternatives <> '' THEN 1 ELSE 0 END) AS with_alternatives
          FROM decision_log`
       ).first(),
+
+      // 누가 남긴 것인지 세려면 종류가 필요하다. 거르기와 상관없이 전부
+      // 가져온다 — 걸러 놓고 세면 "부서가 0건"이 필터 때문인지 진짜인지
+      // 알 수 없다.
+      env.DB.prepare('SELECT link_kind FROM decision_log').all(),
     ])
 
     return jsonResponse({
@@ -91,6 +115,10 @@ export async function onRequestGet({ env, request }) {
         withAlternatives: totals?.with_alternatives ?? 0,
       },
       filtered: rows.results.length,
+      // 누가 한 것인지. 거르기와 무관하게 **전체**를 센다 — 걸러 놓고 세면
+      // "부서가 0건"이 필터 때문인지 진짜인지 알 수 없다.
+      sides: sideTally(allKinds.results),
+      sideLine: sideLine(sideTally(allKinds.results)),
     })
   } catch (err) {
     return jsonError(`결정 기록을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

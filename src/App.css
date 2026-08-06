@@ -5731,3 +5731,22 @@ kbd {
     margin-bottom: 8px;
   }
 }
+
+/* 결정 기록에서 어느 쪽이 한 것인지. */
+.log-sideline {
+  margin: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.8;
+}
+/* 부서가 하나도 안 눌렀으면 그것부터 눈에 띄어야 한다. */
+.log-sideline.none {
+  border-color: var(--warning);
+}
+.chip-count {
+  opacity: 0.65;
+  font-variant-numeric: tabular-nums;
+}

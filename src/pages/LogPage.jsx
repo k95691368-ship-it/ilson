@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { ago, dateTimeLabel, num } from '../lib/format.js'
 import { readableWhy } from '../../shared/notice.js'
+import { SIDES, sideOf, sideLabel } from '../../shared/side.js'
 
 // 이 조직이 내린 결정 전부를 한 화면에서 본다.
 //
@@ -10,7 +11,7 @@ import { readableWhy } from '../../shared/notice.js'
 // 정했냐"는 질문은 신청서 단위가 아니라 사람 단위로 온다 — "요즘 뭘 반려하고
 // 계세요" 같은 식으로. 그 질문에 답하려면 이 화면이 필요하다.
 export default function LogPage() {
-  const [filters, setFilters] = useState({ stage: '', dept: '', actor: '', unrequested: false, q: '' })
+  const [filters, setFilters] = useState({ stage: '', dept: '', actor: '', side: '', unrequested: false, q: '' })
   const [draft, setDraft] = useState('')
 
   const path = useMemo(() => {
@@ -18,6 +19,7 @@ export default function LogPage() {
     if (filters.stage) p.set('stage', filters.stage)
     if (filters.dept) p.set('dept', filters.dept)
     if (filters.actor) p.set('actor', filters.actor)
+    if (filters.side) p.set('side', filters.side)
     if (filters.unrequested) p.set('unrequested', '1')
     if (filters.q) p.set('q', filters.q)
     const s = p.toString()
@@ -61,15 +63,22 @@ export default function LogPage() {
         </section>
       )}
 
+      {/* 부서가 얼마나 응답했는가. 이 사이트의 주장을 뒷받침하는 숫자다.
+          하나도 없으면 그것부터 말한다 — 숨기면 이 화면이 "부서가
+          참여했다"는 인상만 주고 근거는 안 준다. */}
+      {data?.sideLine && (
+        <p className={`log-sideline${data.sides?.dept === 0 ? ' none' : ''}`}>{data.sideLine}</p>
+      )}
+
       <section className="card">
         <div className="card-head">
           <span className="card-title">골라 보기</span>
-          {(filters.stage || filters.dept || filters.actor || filters.unrequested || filters.q) && (
+          {(filters.stage || filters.dept || filters.actor || filters.side || filters.unrequested || filters.q) && (
             <button
               type="button"
               className="btn-ghost btn-sm"
               onClick={() => {
-                setFilters({ stage: '', dept: '', actor: '', unrequested: false, q: '' })
+                setFilters({ stage: '', dept: '', actor: '', side: '', unrequested: false, q: '' })
                 setDraft('')
               }}
             >
@@ -135,6 +144,30 @@ export default function LogPage() {
           </div>
         )}
 
+        {/* 담당자가 한 것과 부서가 한 것을 가른다.
+            이 화면이 이 사이트가 파는 것 그 자체인데, 지금까지 둘이
+            뭉뚱그려져 있어서 "부서가 확인해 줘야 성과다"라는 주장의
+            증거를 정작 셀 수가 없었다. */}
+        <div className="filter-row">
+          <span className="filter-label">어느 쪽이</span>
+          <div className="chip-row">
+            {SIDES.map((sd) => (
+              <button
+                key={sd.key}
+                type="button"
+                className={`chip${filters.side === sd.key ? ' on' : ''}`}
+                title={sd.hint}
+                onClick={() => toggle('side', sd.key)}
+              >
+                {sd.label}
+                {data?.sides?.[sd.key] != null && (
+                  <span className="chip-count"> {num(data.sides[sd.key])}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="filter-row">
           <span className="filter-label">누가</span>
           <div className="chip-row">
@@ -173,6 +206,15 @@ export default function LogPage() {
               <div className="row" style={{ marginBottom: 5 }}>
                 <span className="badge badge-accent">{d.stage}</span>
                 {d.dept && <span className="badge badge-neutral">{d.dept}</span>}
+                {/* 누가 남긴 것인지. 대리로 누른 것은 그렇게 적는다 —
+                    지우지 않되 부서 응답과 같은 것으로 세지 않는다. */}
+                {sideOf(d.link_kind) !== 'ax' && (
+                  <span
+                    className={`badge ${sideOf(d.link_kind) === 'dept' ? 'badge-success' : 'badge-warning'}`}
+                  >
+                    {sideLabel(sideOf(d.link_kind))}
+                  </span>
+                )}
                 {d.unrequested === 1 && <span className="badge badge-warning">먼저 제안</span>}
                 <span className="spacer" />
                 {d.ticket_no && (
