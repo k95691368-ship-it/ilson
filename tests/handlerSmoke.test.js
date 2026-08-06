@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readdirSync, statSync } from 'node:fs'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 
@@ -319,9 +319,79 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
     expect(problems).toEqual([])
   }, 60000)
 
-  it('세 가지 방식이 다 검사에 걸린다', () => {
-    // GET만 보고 있었던 적이 있고, 그다음엔 POST를 더했는데 DELETE를
-    // 빠뜨렸다. 무엇을 보고 있는지 세어 두지 않으면 또 빠진다.
+  // 고치는 라우트(PATCH·PUT)도 돌려 본다.
+  //
+  // GET만 보다가 POST를 더했고, 그때 DELETE를 빠뜨렸다. DELETE를 더하면서
+  // "세어 두지 않으면 또 빠진다"고 적어 놓고 **바로 그다음 회차에 PATCH를
+  // 빠뜨렸다.** 협의안의 요구 기각이 PATCH인데, 거기 검증을 새로 넣고도
+  // 검사가 그 라우트를 한 번도 안 불러 봤다.
+  it('고치는 라우트가 터지지 않는다', async () => {
+    const problems = []
+
+    for (const file of files) {
+      const rel = file.slice(ROOT.length).split('\\').join('/')
+      let mod
+      try {
+        mod = await import(pathToFileURL(file).href)
+      } catch {
+        continue
+      }
+
+      for (const method of ['PATCH', 'PUT']) {
+        const fn = method === 'PATCH' ? mod.onRequestPatch : mod.onRequestPut
+        if (typeof fn !== 'function') continue
+
+        for (const [label, payload, withRows] of [
+          ['빈 몸', {}, false],
+          ['그럴듯한 몸', PLAUSIBLE, false],
+          ['그럴듯한 몸 + 줄이 있을 때', PLAUSIBLE, true],
+        ]) {
+          const ctx = {
+            env: fakeEnv(withRows),
+            params: { ticket: 'AX-XXX-000', id: 'app_x', slug: 'demo', dept: '재무' },
+            request: new Request('https://example.test/api/x', {
+              method,
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(payload),
+            }),
+          }
+
+          let res
+          try {
+            res = await fn(ctx)
+          } catch (err) {
+            problems.push(`${rel} ${method} (${label}) — 예외가 새어 나왔습니다: ${err.message}`)
+            continue
+          }
+          if (!(res instanceof Response)) {
+            problems.push(`${rel} ${method} (${label}) — Response를 안 돌려줬습니다`)
+            continue
+          }
+          const text = await res.text()
+          const hit = RUNTIME_ERROR.find((sig) => text.includes(sig))
+          if (hit) problems.push(`${rel} ${method} (${label}) — 실행하다 터졌습니다: ${text.slice(0, 160)}`)
+        }
+      }
+    }
+
+    expect(problems).toEqual([])
+  }, 60000)
+
+  it('내보내는 방식을 하나도 안 빠뜨렸다', () => {
+    // 무엇을 보고 있는지 세어 두지 않으면 또 빠진다. 실제로 두 번 빠뜨렸다.
+    //
+    // 라우트 파일이 내보내는 onRequest* 를 전부 모아, 이 검사가 아는
+    // 목록에 없는 것이 있으면 여기서 깨진다. 새 방식을 쓰기 시작하면
+    // 그날 바로 알게 된다.
+    const known = new Set(['onRequestGet', 'onRequestPost', 'onRequestDelete', 'onRequestPatch', 'onRequestPut'])
+    const unseen = new Set()
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8')
+      for (const m of src.matchAll(/export async function (onRequest\w*)/g)) {
+        if (!known.has(m[1])) unseen.add(m[1])
+      }
+    }
+    expect([...unseen]).toEqual([])
     expect(files.length).toBeGreaterThan(20)
   })
 
