@@ -5,6 +5,9 @@ import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
 import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
 import { provenanceLine, provenanceDetail } from '../../shared/provenance.js'
+import { TRY_STEPS, TRY_TERMS, RESET_NOTE, resetLabel } from '../../shared/tryit.js'
+import { api } from '../api/client.js'
+import { useToast } from '../context/ToastContext.jsx'
 import { readableWhy } from '../../shared/notice.js'
 
 // 첫 화면. 여덟 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
@@ -37,6 +40,13 @@ export default function FlowPage() {
           비교해 성과를 정리합니다. 그 과정 전체가 신청서 한 건 아래 기록으로 남습니다.
         </p>
       </header>
+
+      {/* 보러 온 사람에게 눌러도 된다고 말한다.
+          이 사이트에는 로그인이 없어서 처음 온 사람도 판정하고 반려할 수
+          있는데, 그 사실을 아무 데도 안 적어 뒀다. 화면이 전부 "담당자가
+          자기 일을 하는 중"으로 쓰여 있어서 보러 온 사람은 읽기만 하고
+          나간다. 할 수 있게 만들어 놓고 할 수 있다고 말을 안 한 것이다. */}
+      <TryIt provenance={data?.provenance} />
 
       {data && data.counts.total > 0 && (
         <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} signoffs={signoffs} />
@@ -172,6 +182,84 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
           </li>
         ))}
       </ol>
+    </section>
+  )
+}
+
+// 직접 눌러 보시라고 초대한다.
+//
+// 초대하면서 두 가지를 같이 준다 — 누른 것이 기록에 남는다는 사실과,
+// 되돌리는 법. 앞엣것을 숨기면 나중에 알았을 때 속은 기분이 들고,
+// 뒤엣것이 없으면 망칠까 봐 아무도 안 누른다.
+function TryIt({ provenance }) {
+  const [open, setOpen] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const toast = useToast()
+  const demoCount = provenance?.demo ?? 0
+
+  async function reset() {
+    setBusy(true)
+    try {
+      // 지우고 다시 심는다. 지우기만 하면 다음 사람은 빈 화면을 본다.
+      if (demoCount > 0) await api.remove('/demo/seed')
+      const r = await api.post('/demo/seed', {})
+      toast.success(`시연 신청서 ${r.added}건을 처음 상태로 되돌렸습니다.`)
+      // 숫자가 화면 곳곳에 걸려 있어서 다시 읽는 편이 확실하다.
+      window.location.reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <section className="tryit">
+      <div className="tryit-head">
+        <span className="badge badge-accent">보러 오신 분께</span>
+        <strong className="tryit-title">읽기만 하지 마시고 직접 눌러 보셔도 됩니다</strong>
+        <span className="spacer" />
+        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen((v) => !v)}>
+          {open ? '접기' : '무엇을 해볼 수 있나'}
+        </button>
+      </div>
+
+      <p className="tryit-sub">
+        로그인이 없습니다. 판정도, 반려도, 도구 실행도 지금 그대로 하실 수 있습니다.
+      </p>
+
+      {open && (
+        <>
+          <ol className="tryit-list">
+            {TRY_STEPS.map((s) => (
+              <li key={s.key}>
+                <Link to={s.to} className="tryit-label">
+                  {s.label}
+                </Link>
+                <div className="tryit-what">{s.what}</div>
+                <div className="tryit-note">{s.note}</div>
+              </li>
+            ))}
+          </ol>
+
+          <ul className="tryit-terms">
+            {TRY_TERMS.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+
+          <div className="tryit-reset">
+            <div className="tryit-reset-text">
+              <strong>{RESET_NOTE.does}</strong>
+              <div className="card-note">{RESET_NOTE.keeps}</div>
+              <div className="card-note">{RESET_NOTE.why}</div>
+            </div>
+            <button type="button" className="btn-primary btn-sm" onClick={reset} disabled={busy}>
+              {busy ? '되돌리는 중…' : resetLabel(demoCount)}
+            </button>
+          </div>
+        </>
+      )}
     </section>
   )
 }

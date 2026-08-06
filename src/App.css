@@ -5902,3 +5902,77 @@ kbd {
   font-size: 13px;
   line-height: 1.8;
 }
+
+/* 보러 오신 분께 — 눌러도 된다고 말하는 자리.
+   맨 위에 두되 담당자의 할 일 목록보다 조용해야 한다. 매일 쓰는 사람에게는
+   매번 읽을 것이 아니라서 접어 둔다. */
+.tryit {
+  padding: 13px 15px;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--accent-bg);
+}
+.tryit-head {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.tryit-title {
+  font-size: 14px;
+}
+.tryit-sub {
+  margin: 6px 0 0;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.tryit-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 9px;
+  counter-reset: tryit;
+}
+.tryit-list > li {
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.tryit-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+.tryit-what {
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+/* 이 사이트가 무엇을 요구하는지가 여기서 드러난다. 흐리게 두지 않는다. */
+.tryit-note {
+  margin-top: 5px;
+  font-size: 12.5px;
+  line-height: 1.75;
+  opacity: 0.85;
+}
+.tryit-terms {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.85;
+}
+.tryit-reset {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.tryit-reset-text {
+  flex: 1 1 260px;
+  font-size: 12.5px;
+  line-height: 1.75;
+}
