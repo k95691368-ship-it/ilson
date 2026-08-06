@@ -123,7 +123,17 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
   }
 
   // ── 사람을 기다리게 하는 것 ────────────────────────────
-  const stale = overview?.counts?.stale ?? 0
+  //
+  // 되물어서 답을 받은 것은 바로 위에서 이미 올렸다. 여기서 또 세면 같은
+  // 신청서가 한 화면에 두 번 뜬다 — "답이 온 것 1건"과 "하루 넘게 못 본 것
+  // 4건"에 같은 건이 들어 있고, 담당자는 두 가지 일인 줄 안다.
+  //
+  // 이 목록의 값어치는 짧다는 데 있다. 스무 개가 올라온 목록은 아무것도
+  // 안 올라온 것과 같고, 그중 겹치는 것이 있으면 나머지도 못 믿는다.
+  // `answered` 를 여기서 다시 읽는다. 아래에서 선언한 것을 쓰면 TDZ에
+  // 걸린다 — 같은 실수로 /api/overview 가 통째로 503이 나서 첫 화면이
+  // 안 열린 적이 있다.
+  const stale = Math.max(0, (overview?.counts?.stale ?? 0) - (overview?.answered ?? 0))
   if (stale > 0) {
     out.push(
       item({

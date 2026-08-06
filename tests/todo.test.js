@@ -368,3 +368,24 @@ describe('되물은 것에 답이 왔을 때', () => {
     expect(buildTodo({}).some((i) => i.key === 'answered_ready')).toBe(false)
   })
 })
+
+// 같은 신청서가 한 화면에 두 번 뜨면 담당자는 두 가지 일인 줄 안다.
+// 이 목록의 값어치는 짧다는 데 있고, 겹치는 것이 있으면 나머지도 못 믿는다.
+describe('같은 것을 두 번 세지 않는다', () => {
+  it('답이 온 것은 "못 본 신청서"에서 뺀다', () => {
+    const items = buildTodo({ overview: { counts: { stale: 4 }, answered: 1 } })
+    expect(items.find((i) => i.key === 'stale_applications').title).toContain('3건')
+    expect(items.find((i) => i.key === 'answered_ready').title).toContain('1건')
+  })
+
+  it('전부 답이 온 것이면 "못 본 신청서"는 안 뜬다', () => {
+    const items = buildTodo({ overview: { counts: { stale: 2 }, answered: 2 } })
+    expect(items.some((i) => i.key === 'stale_applications')).toBe(false)
+    expect(items.some((i) => i.key === 'answered_ready')).toBe(true)
+  })
+
+  it('답이 더 많아도 음수가 안 된다', () => {
+    const items = buildTodo({ overview: { counts: { stale: 1 }, answered: 3 } })
+    expect(items.some((i) => i.key === 'stale_applications')).toBe(false)
+  })
+})
