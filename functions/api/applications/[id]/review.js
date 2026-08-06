@@ -86,8 +86,8 @@ export async function onRequestPost({ env, params, request }) {
 
     env.DB.prepare(
       `INSERT INTO decision_log
-         (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
-       VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, 'review', ?)`
+         (id, application_id, stage, actor, title, what, why, alternatives, unrequested, link_kind, link_id)
+       VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?, 'review', ?)`
     ).bind(
       newId('dec'),
       application.id,
@@ -95,6 +95,16 @@ export async function onRequestPost({ env, params, request }) {
       buildWhat(application, v),
       v.verdict_reason,
       v.alternatives_considered,
+      // 요청받지 않았는데 먼저 꺼낸 것.
+      //
+      // 이 칸은 읽는 자리가 셋인데(/log 거르기, 결정 기록 집계, 첫 화면)
+      // **쓰는 자리가 하나도 없었다.** 65건 전부 0이라 "먼저 제안한 것만"
+      // 필터는 늘 빈 화면을 보여줬다. 있다고 해 놓고 없는 기능이다.
+      //
+      // 반려하면서 대안을 함께 낸 것이 정확히 이것이다. 부서는 A를
+      // 해달라고 했고 저희는 못 한다고 했다. 그러면서 아무도 안 물어본
+      // B를 꺼냈다. 시킨 일을 한 것이 아니라 먼저 움직인 것이다.
+      v.verdict === '반려' && v.refuse_alternative ? 1 : 0,
       application.id
     ),
   ]
