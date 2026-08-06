@@ -20,6 +20,10 @@ import {
   PRIORITIES,
 } from '../../../../shared/acceptance.js'
 
+// 요구를 기각할 때 받는 최소 길이. 판정 근거와 같은 선을 쓴다 — 화면마다
+// 다른 기준을 두면 담당자는 어디서 얼마나 적어야 하는지 매번 헷갈린다.
+const MIN_REJECT_REASON = 20
+
 async function findApplication(env, id) {
   return env.DB.prepare(
     `SELECT id, ticket_no, dept, title, status,
@@ -407,6 +411,21 @@ export async function onRequestPatch({ env, params, request }) {
       if (!REQUIREMENT_STATUSES.includes(t(body.status))) {
         return failFields({ status: '채택·수정채택·기각 중에서 골라주세요.' })
       }
+
+      // 기각하려면 왜인지를 받는다.
+      //
+      // 지금까지는 비워 둬도 저장됐고, 기록에는 `(사유 미기재)`가 그대로
+      // 남았다. 그런데 부서 화면은 그걸 **"사유 없이 기각한 요구"**라고
+      // 담당자가 그 부서에 진 빚으로 세고 있다. 어길 수 있게 열어 두고
+      // 어긴 것을 세는 셈이다.
+      //
+      // 요구를 낸 것은 회의에서 부서 사람이 입으로 말한 것이다. 그걸
+      // 이유 없이 접으면 그 사람은 다음 회의에서 아무 말도 안 한다.
+      if (t(body.status) === '기각' && t(body.reject_reason).length < MIN_REJECT_REASON) {
+        return failFields({
+          reject_reason: `왜 기각하시는지 ${MIN_REJECT_REASON}자 이상 적어주세요. 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다.`,
+        })
+      }
       await env.DB.prepare(
         `UPDATE requirement
          SET status = ?, decided_body = ?, reject_reason = ?, decided_at = datetime('now')
@@ -427,7 +446,8 @@ export async function onRequestPatch({ env, params, request }) {
           stage: '협의안',
           title: '요구 하나를 기각했다',
           what: t(body.summary) || '요구를 기각했다.',
-          why: t(body.reject_reason) || '(사유 미기재)',
+          // 위에서 막으므로 여기 오는 것은 반드시 사유가 있다.
+          why: t(body.reject_reason),
           linkKind: 'requirement',
           linkId: t(body.id),
         }).catch(() => {})
