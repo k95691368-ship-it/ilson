@@ -1,0 +1,48 @@
+# 린트·시험·빌드를 여기서 돌린다.
+#
+# 왜 내 컴퓨터가 아니라 여기인가:
+# 이 저장소를 만드는 컴퓨터는 Windows 11 Home이고 **스마트 앱 컨트롤**이 켜져
+# 있다. 그게 서명 없는 실행 파일을 통째로 막는데, oxlint의 네이티브 바이너리가
+# 서명이 없어서 걸린다(CodeIntegrity 이벤트 3077/3033). 스마트 앱 컨트롤에는
+# 파일 하나만 허용하는 예외 목록이 없고, 끄면 Windows를 다시 깔기 전에는 못
+# 켠다. 되돌릴 수 없는 설정을 린트 하나 때문에 끄는 것은 값이 안 맞는다.
+#
+# 그래서 리눅스에서 돌린다. 부수 효과가 하나 더 있는데, 이게 오히려 본론에
+# 가깝다 — **검사가 내 컴퓨터 안에서만 돌고 끝나지 않고 기록으로 남는다.**
+# 이 저장소가 파는 것이 "기록이 끊기지 않는다"인데 정작 품질 검사만 기록이
+# 없었다.
+
+name: 검사
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  # 손으로도 돌릴 수 있게 둔다. 고치고 나서 확인할 때 빈 커밋을 만들지
+  # 않아도 된다.
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: 의존성 설치
+        run: npm ci
+
+      # 셋을 따로 둔다. 하나로 묶으면 먼저 넘어진 것 뒤는 안 돌아서,
+      # "린트가 깨졌나 시험이 깨졌나"를 알려면 두 번 돌려야 한다.
+      - name: 린트
+        run: npx oxlint src shared functions
+
+      - name: 시험
+        run: npm test
+
+      - name: 빌드
+        run: npm run build
