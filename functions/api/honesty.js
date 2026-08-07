@@ -12,6 +12,15 @@
 // 반성문이 아니다. 반려가 늘면 여기 숫자가 늘고, 격리가 줄면 여기 숫자가 준다.
 
 import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { computeOutcome, buildChallenges } from '../../shared/outcome.js'
+import { OUTCOME_KIND } from '../../shared/accept.js'
+
+// 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
+function daysSince(sqlTime) {
+  if (!sqlTime) return 0
+  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
 
 // 데이터로 증명할 수 없는 것들.
 //
@@ -107,11 +116,34 @@ export async function onRequestGet({ env }) {
 
         // 성과 숫자에 붙은 반박 중 아직 못 푼 것. 미해소 반박이 있으면
         // 그 금액은 '보수적 추정치'로 강등된다.
+        //
+        // **`outcome_challenge` 표를 세면 안 된다.** 그 표에는 해소한 것만
+        // 저장되고, 살아 있는 반박은 읽을 때 규칙으로 계산한다. 그래서
+        // `resolved_at IS NULL` 로 세면 영원히 0이다.
+        //
+        // 하필 이 화면에서 그랬다. 자기 한계를 보여주는 자리가 자기 반박
+        // 다섯 건을 0건이라고 말하고 있었다. 성과 화면은 같은 건에 표본
+        // 부족·실행 횟수 부족·격리 미해소·계절성·부서가 다르다고 함을
+        // 띄우는 중이었다.
         env.DB.prepare(
-          `SELECT c.rule_code, c.title, c.body, a.ticket_no
-           FROM outcome_challenge c JOIN application a ON a.id = c.application_id
-           WHERE c.resolved_at IS NULL ORDER BY c.created_at LIMIT 20`
-        ).all(),
+          `SELECT a.ticket_no, a.title,
+                  b.median_seconds, b.people, b.sample_n, b.sealed_at,
+                  o.dev_hours, o.ops_cost_krw, o.amortize_months, o.dept_confirmed_at,
+                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) AS run_count,
+                  (SELECT u.quarantined FROM tool_use u
+                    WHERE u.application_id = a.id ORDER BY u.used_at DESC LIMIT 1) AS quarantine_left,
+                  (SELECT d.alternatives FROM decision_log d
+                    WHERE d.application_id = a.id AND d.link_kind = ?
+                    ORDER BY d.created_at DESC LIMIT 1) AS dept_said,
+                  (SELECT GROUP_CONCAT(c.rule_code) FROM outcome_challenge c
+                    WHERE c.application_id = a.id AND c.resolved_at IS NOT NULL) AS resolved_codes
+           FROM application a
+           JOIN baseline b ON b.application_id = a.id
+           LEFT JOIN outcome o ON o.application_id = a.id
+           WHERE (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) > 0`
+        )
+          .bind(OUTCOME_KIND)
+          .all(),
 
         env.DB.prepare(
           `SELECT h.slug, h.title, h.handed_to_dept, h.handed_at,
@@ -132,6 +164,40 @@ export async function onRequestGet({ env }) {
     const quarantineTotal = quarantine.results.reduce((s, q) => s + q.n, 0)
     const idle = unusedTools.results.filter((t) => t.runs === 0)
 
+    // 성과 화면과 **같은 함수**로 살아 있는 반박을 만든 뒤, 이미 해소한
+    // 것만 걷어낸다.
+    const openChallenges = []
+    for (const r of unresolved.results) {
+      let deptFelt = null
+      try {
+        deptFelt = JSON.parse(r.dept_said)?.felt ?? null
+      } catch {
+        // 옛 기록에는 숫자가 없다.
+      }
+      const computed = computeOutcome({
+        baseline: r,
+        runs: Array.from({ length: Number(r.run_count) || 0 }, () => ({
+          duration_ms: 0,
+          human_review_seconds: 0,
+        })),
+        devHours: r.dev_hours ?? 0,
+        opsCostKrw: r.ops_cost_krw ?? 0,
+        amortizeMonths: r.amortize_months ?? 24,
+      })
+      if (computed.status === '산정불가') continue
+      const done = new Set(String(r.resolved_codes ?? '').split(',').filter(Boolean))
+      for (const c of buildChallenges({
+        outcome: computed,
+        quarantineLeft: r.quarantine_left ?? 0,
+        deptConfirmed: Boolean(r.dept_confirmed_at),
+        baselineAgeDays: daysSince(r.sealed_at),
+        deptFelt,
+      })) {
+        if (done.has(c.code)) continue
+        openChallenges.push({ rule_code: c.code, title: c.title, body: c.body, ticket_no: r.ticket_no })
+      }
+    }
+
     return jsonResponse({
       unproven: UNPROVEN,
       refused: refused.results,
@@ -141,7 +207,7 @@ export async function onRequestGet({ env }) {
       quarantine: quarantine.results,
       quarantineTotal,
       failedChecks: failedChecks.results,
-      unresolvedChallenges: unresolved.results,
+      unresolvedChallenges: openChallenges,
       idleTools: idle,
       acceptedWithoutBaseline: noBaseline.results,
       summary: {
@@ -150,7 +216,7 @@ export async function onRequestGet({ env }) {
         stuck: stuck.results.length,
         quarantine: quarantineTotal,
         failedChecks: failedChecks.results.length,
-        unresolvedChallenges: unresolved.results.length,
+        unresolvedChallenges: openChallenges.length,
         idleTools: idle.length,
         unproven: UNPROVEN.length,
       },
