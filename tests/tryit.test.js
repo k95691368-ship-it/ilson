@@ -286,11 +286,11 @@ describe('아무것도 없을 때', () => {
     expect(terms).toContain('다시 지울 수 있습니다')
   })
 
-  it('심는 것이 실제로 여덟 건이다', () => {
+  it('심는 것이 실제로 세 건이다', () => {
     // 화면에 적은 숫자와 실제로 심기는 개수가 어긋나면, 눌러 본 사람이
     // 그 자리에서 거짓말을 발견한다.
-    expect(EMPTY_INVITE.actions[0].what).toContain('여덟 건')
-    expect(DEMO_APPLICATIONS).toHaveLength(8)
+    expect(EMPTY_INVITE.actions[0].what).toContain('세 건')
+    expect(DEMO_APPLICATIONS).toHaveLength(3)
   })
 
   it('심는 것이 전부 그 앞자리를 쓴다', () => {
@@ -303,9 +303,11 @@ describe('아무것도 없을 때', () => {
 
   it('반려·보류로 갈 것이 섞여 있다', () => {
     // 전부 수용될 것만 심으면 반려 화면도 보류 화면도 빈 채로 남는다.
-    // 여덟 건이 서로 성격이 달라야 우선순위를 견주는 일이 뜻을 갖는다.
+    // 셋이 서로 다르게 갈려야 우선순위를 견주는 일도 반려의 뜻도 보인다.
+    // 하나만 심으면 둘 다 안 보인다.
+    expect(DEMO_APPLICATIONS.length).toBe(3)
     const depts = new Set(DEMO_APPLICATIONS.map((a) => a.dept))
-    expect(depts.size).toBeGreaterThan(2)
+    expect(depts.size).toBeGreaterThan(1)
   })
 })
 

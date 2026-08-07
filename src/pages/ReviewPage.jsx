@@ -254,7 +254,7 @@ export default function ReviewPage() {
           <div className="card-title">아직 접수된 신청서가 없습니다</div>
           <p className="card-note" style={{ marginBottom: 12 }}>
             검토는 여럿을 놓고 견주는 일이라 한 건만으로는 보여줄 것이 없습니다. 서로 성격이 다른
-            신청서 여덟 건을 심어 두면, 우선순위를 정하고 반려를 판정하는 과정을 그대로 보실 수
+            신청서 세 건을 심어 두면, 우선순위를 정하고 반려를 판정하는 과정을 그대로 보실 수
             있습니다.
           </p>
           <button type="button" className="btn-primary" onClick={seed} disabled={seeding}>
