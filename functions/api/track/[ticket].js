@@ -174,7 +174,9 @@ export async function onRequestGet({ env, params, request }) {
           ? review.verdict === '반려'
             ? `반려했습니다 — ${refuseReason?.label ?? '범위 밖'}`
             : review.verdict === '보류'
-              ? '보류했습니다'
+              ? review.bulk
+                ? '여러 건을 함께 보면서 보류로 미뤘습니다. 점수는 아직 안 매겼습니다.'
+                : '보류했습니다'
               : `수용했습니다 (임팩트 ${review.impact_score} / 난이도 ${review.difficulty_score})`
           : bulkHold
             ? '여러 건을 함께 보면서 보류로 미뤘습니다. 점수는 아직 안 매겼습니다.'

@@ -137,7 +137,10 @@ export function holdState({ application, review, records, decisions, now } = {})
     condition: review?.hold_until_condition ?? bulk?.condition ?? null,
     // 한 번에 미룬 것인지 밝힌다. 부서가 "왜 이건 점수가 없나"를 물을 때
     // 답할 수 있어야 하고, 감춰 두면 다음에 알았을 때 속은 기분이 든다.
-    bulk: Boolean(!review?.hold_until_condition && bulk?.condition),
+    //
+    // review.bulk 를 먼저 본다. 이 칸이 생기기 전에 미룬 건은 그 칸이 없으니
+    // 기록 쪽으로 되짚는다 — 옛 기록도 똑같이 읽혀야 한다.
+    bulk: Boolean(review?.bulk) || Boolean(!review?.hold_until_condition && bulk?.condition),
     heldSince: judgedAt,
     heldDays: daysBetween(judgedAt, now),
     pending: Boolean(open) && !answered,

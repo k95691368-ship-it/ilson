@@ -273,6 +273,26 @@ describe('한 번에 미룬 보류', () => {
     expect(holdHeadline(state)).toContain('미뤄 둔 지')
   })
 
+  it('표에 한 번에 미뤘다고 적혀 있으면 그대로 읽는다', () => {
+    // 이제 한 번에 미룬 것도 review 표에 적힌다. 조건이 표에서 오므로
+    // 기록 쪽으로 안 되짚는데, 그때 "한 번에"가 꺼져서 새로 미룬 건이
+    // 오히려 보통 보류로 보였다. 옛 건은 한 번에로 나오고 새 건은 안
+    // 나오는, 정확히 거꾸로 된 상태였다.
+    const state = holdState({
+      application: { status: '보류' },
+      review: {
+        verdict: '보류',
+        hold_until_condition: '9월 마감 뒤에 봅니다',
+        bulk: 1,
+        decided_at: '2026-02-01',
+      },
+      records: [],
+      decisions: [],
+    })
+    expect(state.bulk).toBe(true)
+    expect(state.condition).toBe('9월 마감 뒤에 봅니다')
+  })
+
   it('한 건씩 판정한 것이 우선이다', () => {
     // 그쪽이 더 자세하고 점수까지 매긴 것이다.
     const state = holdState({
