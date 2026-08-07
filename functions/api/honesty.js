@@ -12,24 +12,8 @@
 // 반성문이 아니다. 반려가 늘면 여기 숫자가 늘고, 격리가 줄면 여기 숫자가 준다.
 
 import { jsonResponse, failUnexpected } from '../_lib/http.js'
-import { computeOutcome, buildChallenges } from '../../shared/outcome.js'
+import { computeOutcome, buildChallenges, runsFromTotals } from '../../shared/outcome.js'
 import { OUTCOME_KIND } from '../../shared/accept.js'
-
-// 실행 기록을 합계에서 되돌린다.
-//
-// computeOutcome 은 실행 한 줄씩을 받는데, 여기서는 합계만 갖고 있다.
-// 값을 **0으로 지어내면 안 된다** — "검수 시간을 안 쟀습니다"라는 반박이
-// 실제로는 쟀는데도 붙는다. 정직 화면이 그렇게 없는 반박을 하나 더
-// 띄우고 있었다. 합계를 첫 줄에 몰아 주면 총합이 맞고, 반박 규칙은
-// 전부 총합만 본다.
-function spreadRuns(r) {
-  const n = Number(r.run_count) || 0
-  return Array.from({ length: n }, (_, i) => ({
-    duration_ms: i === 0 ? Number(r.duration_total_ms) || 0 : 0,
-    human_review_seconds: i === 0 ? Number(r.review_total_seconds) || 0 : 0,
-    rework_seconds: i === 0 ? Number(r.rework_total_seconds) || 0 : 0,
-  }))
-}
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 function daysSince(sqlTime) {
@@ -200,7 +184,12 @@ export async function onRequestGet({ env }) {
       }
       const computed = computeOutcome({
         baseline: r,
-        runs: spreadRuns(r),
+        runs: runsFromTotals({
+          count: r.run_count,
+          durationMs: r.duration_total_ms,
+          reviewSeconds: r.review_total_seconds,
+          reworkSeconds: r.rework_total_seconds,
+        }),
         devHours: r.dev_hours ?? 0,
         opsCostKrw: r.ops_cost_krw ?? 0,
         amortizeMonths: r.amortize_months ?? 24,

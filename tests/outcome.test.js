@@ -7,6 +7,7 @@ import {
   CHALLENGE_RULES,
   RUNS_PER_YEAR,
   HOURLY_WAGE_KRW,
+  runsFromTotals,
 } from '../shared/outcome.js'
 
 // 이 파일에 시험이 없었다. 그래서 단위가 안 맞는 뺄셈이 살아남았다.
@@ -339,5 +340,57 @@ describe('안 물어본 것을 0이라고 읽지 않는다', () => {
   it('진짜 0분이라고 하시면 붙는다', () => {
     // 아예 안 걸린다는 답도 답이다. 그건 우리가 잰 90분이 틀렸다는 뜻이다.
     expect(buildChallenges(ctx(0)).some((x) => x.code === 'dept_disagrees')).toBe(true)
+  })
+})
+
+// 합계만 있을 때 실행 기록을 되돌리는 함수.
+//
+// 부서 화면과 정직 화면은 신청서를 여러 건 훑어서 실행 줄을 다 가져오지
+// 않고 합계만 갖고 온다. 처음에 그 자리를 **0으로 지어내** 넘겼더니
+// "사람이 검토한 시간을 0으로 뒀습니다"라는 반박이 실제로는 쟀는데도
+// 붙었다. 성과 화면은 다섯 건인데 정직 화면은 여섯 건이 되었다.
+describe('합계에서 실행 기록을 되돌릴 때', () => {
+  const totals = { count: 3, durationMs: 90000, reviewSeconds: 600, reworkSeconds: 120 }
+
+  it('실행 수만큼 만든다', () => {
+    expect(runsFromTotals(totals)).toHaveLength(3)
+  })
+
+  it('총합이 그대로 보존된다', () => {
+    // 반박 규칙은 전부 총합만 본다. 첫 줄에 몰아 줘도 판정이 같다.
+    const runs = runsFromTotals(totals)
+    const sum = (k) => runs.reduce((n, r) => n + (r[k] ?? 0), 0)
+    expect(sum('duration_ms')).toBe(90000)
+    expect(sum('human_review_seconds')).toBe(600)
+    expect(sum('rework_seconds')).toBe(120)
+  })
+
+  it('잰 검수 시간이 0으로 뭉개지지 않는다', () => {
+    // 이게 이 함수를 만든 이유다. 0으로 지어내면 없는 반박이 붙는다.
+    const outcome = computeOutcome({
+      baseline: { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 },
+      runs: runsFromTotals(totals),
+      devHours: 20,
+    })
+    expect(outcome.reviewSeconds).toBe(600)
+    expect(buildChallenges({ outcome, quarantineLeft: 0, deptConfirmed: true, baselineAgeDays: 5 })
+      .some((c) => c.code === 'no_review_time')).toBe(false)
+  })
+
+  it('정말 0이면 그 반박이 붙는다', () => {
+    // 안 잰 것은 안 잰 것이다. 그건 짚어야 한다.
+    const outcome = computeOutcome({
+      baseline: { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 },
+      runs: runsFromTotals({ ...totals, reviewSeconds: 0 }),
+      devHours: 20,
+    })
+    expect(buildChallenges({ outcome, quarantineLeft: 0, deptConfirmed: true, baselineAgeDays: 5 })
+      .some((c) => c.code === 'no_review_time')).toBe(true)
+  })
+
+  it('빈 입력에도 터지지 않는다', () => {
+    expect(() => runsFromTotals()).not.toThrow()
+    expect(runsFromTotals()).toEqual([])
+    expect(runsFromTotals({ count: -1 })).toEqual([])
   })
 })

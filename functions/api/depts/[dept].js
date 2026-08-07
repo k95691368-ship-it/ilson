@@ -12,7 +12,7 @@ import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { annualHours } from '../../_lib/applications.js'
 import { sortPending } from '../../../shared/pending.js'
 import { returnedFor } from '../../../shared/returned.js'
-import { computeOutcome, buildChallenges } from '../../../shared/outcome.js'
+import { computeOutcome, buildChallenges, runsFromTotals } from '../../../shared/outcome.js'
 import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
@@ -369,13 +369,14 @@ export async function onRequestGet({ env, params }) {
           }
           const outcome = computeOutcome({
             baseline: r,
-            // 실제로 잰 값을 넘긴다. 0으로 지어내면 "검수 시간을 안
-            // 쟀습니다"라는 반박이 없는데도 붙는다.
-            runs: Array.from({ length: Number(r.runs) || 0 }, (_, i) => ({
-              duration_ms: i === 0 ? Number(r.duration_total_ms) || 0 : 0,
-              human_review_seconds: i === 0 ? Number(r.review_seconds) || 0 : 0,
-              rework_seconds: i === 0 ? Number(r.rework_seconds) || 0 : 0,
-            })),
+            // 정직 화면과 **같은 함수**로 되돌린다. 각자 복사해 두면
+            // 한쪽만 고쳐지고 두 화면이 다른 말을 한다.
+            runs: runsFromTotals({
+              count: r.runs,
+              durationMs: r.duration_total_ms,
+              reviewSeconds: r.review_seconds,
+              reworkSeconds: r.rework_seconds,
+            }),
             devHours: r.dev_hours ?? 0,
             opsCostKrw: r.ops_cost_krw ?? 0,
             amortizeMonths: r.amortize_months ?? 24,

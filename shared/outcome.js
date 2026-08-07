@@ -34,6 +34,31 @@ function round(n, digits = 0) {
 //
 // 자동 실행 시간을 빼는 것은 당연하지만, 나머지 셋을 빼지 않는 곳이 대부분이다.
 // 자동화 뒤에도 사람이 검토함을 보고 있으면 그 시간은 절감이 아니다.
+// 합계만 있을 때 실행 기록을 되돌린다.
+//
+// computeOutcome 은 실행을 한 줄씩 받는다. 그런데 부서 화면과 정직 화면은
+// 신청서를 여러 건 훑기 때문에 실행 줄을 다 가져오지 않고 합계만 갖고
+// 온다. 그때 이 함수로 되돌린다.
+//
+// **값을 0으로 지어내면 안 된다.** 처음에 그렇게 했더니 "사람이 검토한
+// 시간을 0으로 뒀습니다"라는 반박이 실제로는 쟀는데도 붙었다. 성과 화면은
+// 다섯 건인데 정직 화면은 여섯 건이 되었다. 지어낸 값을 계산에 넣으면
+// 그 계산은 지어낸 답을 낸다.
+//
+// 합계를 첫 줄에 몰아 준다. 총합이 맞고, 반박 규칙은 전부 총합만 본다.
+//
+// 이 함수를 여기 두는 이유는 쓰는 곳이 둘이기 때문이다. 각자 복사해 두면
+// 한쪽만 고쳐지고, 그러면 두 화면이 같은 건을 두고 다른 말을 한다 —
+// 이 저장소에서 실제로 네 번 일어난 일이다.
+export function runsFromTotals({ count, durationMs, reviewSeconds, reworkSeconds } = {}) {
+  const n = Math.max(0, Number(count) || 0)
+  return Array.from({ length: n }, (_, i) => ({
+    duration_ms: i === 0 ? Number(durationMs) || 0 : 0,
+    human_review_seconds: i === 0 ? Number(reviewSeconds) || 0 : 0,
+    rework_seconds: i === 0 ? Number(reworkSeconds) || 0 : 0,
+  }))
+}
+
 export function computeOutcome({
   baseline, // 3단계에서 봉인한 값 { median_seconds, sample_n, people, frequency, hourly_wage_krw }
   runs = [], // 실제 실행 기록 [{ duration_ms, human_review_seconds, rework_seconds }]
