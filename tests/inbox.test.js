@@ -1,4 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 import {
   isWaitingAnswer,
   applyQuery,
@@ -12,6 +17,7 @@ import {
   queueStats,
   EMPTY_QUERY,
   STALE_HOURS,
+  isAskedByDept,
 } from '../src/lib/inbox.js'
 
 // 이 규칙이 틀리면 담당자가 잘못된 것을 먼저 보게 된다. 순서가 흔들리거나,
@@ -326,16 +332,16 @@ describe('상태 칩에 낼 것', () => {
 
 describe('지금 보고 있는 것 안의 대기', () => {
   it('아직 판정 안 한 것과 그중 묵은 것을 센다', () => {
-    expect(queueStats(ITEMS)).toEqual({ waiting: 2, stale: 1, askedBack: 0 })
+    expect(queueStats(ITEMS)).toEqual({ waiting: 2, stale: 1, askedBack: 0, deptAsked: 0 })
   })
 
   it('조건을 건 결과에 대고 세면 그만큼만 센다', () => {
-    expect(queueStats(applyQuery(ITEMS, { dept: '마케팅' }))).toEqual({ waiting: 1, stale: 0, askedBack: 0 })
+    expect(queueStats(applyQuery(ITEMS, { dept: '마케팅' }))).toEqual({ waiting: 1, stale: 0, askedBack: 0, deptAsked: 0 })
   })
 
   it('빈 목록에서도 터지지 않는다', () => {
-    expect(queueStats([])).toEqual({ waiting: 0, stale: 0, askedBack: 0 })
-    expect(queueStats(undefined)).toEqual({ waiting: 0, stale: 0, askedBack: 0 })
+    expect(queueStats([])).toEqual({ waiting: 0, stale: 0, askedBack: 0, deptAsked: 0 })
+    expect(queueStats(undefined)).toEqual({ waiting: 0, stale: 0, askedBack: 0, deptAsked: 0 })
   })
 })
 
@@ -382,5 +388,73 @@ describe('부서 답을 기다리는 건', () => {
   it('조건을 걸었다고 표시한다', () => {
     expect(isFiltered({ onlyWaiting: true })).toBe(true)
     expect(describeQuery({ onlyWaiting: true }, 1, 5)).toContain('부서 답을 기다리는 것')
+  })
+})
+
+// 부서가 먼저 물어 온 건이 목록에서 안 보였다.
+//
+// 부서가 먼저 묻는 길을 열어 놓고 접수함은 그걸 안 셌다. 첫 화면 할 일에는
+// "부서가 물어 놓고 답을 기다리는 것 N건"이 뜨는데, 눌러서 접수함에 와도
+// 어느 줄인지 표시가 없었다. 담당자는 N건이 있다는 것만 알고 그게 어느
+// 건인지는 모른다. 그러면 그 목록은 다음부터 안 읽힌다.
+describe('부서가 먼저 물어 온 건', () => {
+  const asked = (over = {}) => ({
+    id: 'a1',
+    dept: '재무',
+    title: '언제쯤 시작되나요',
+    status: '접수',
+    hours_since: 30,
+    dept_asked: 1,
+    waiting_answers: 0,
+    ...over,
+  })
+
+  it('공이 담당자 쪽에 있다고 센다', () => {
+    expect(isAskedByDept(asked())).toBe(true)
+    expect(isAskedByDept({ dept_asked: 0 })).toBe(false)
+    expect(isAskedByDept({})).toBe(false)
+    expect(isAskedByDept(null)).toBe(false)
+  })
+
+  it('부서 답을 기다리는 것과 뜻이 반대다', () => {
+    // 한 칸으로 합치면 접수함이 둘을 같은 색으로 칠하고, 담당자는
+    // "기다리는 중"이라고 읽고 넘긴다.
+    const theirs = asked({ dept_asked: 0, waiting_answers: 1 })
+    expect(isWaitingAnswer(theirs)).toBe(true)
+    expect(isAskedByDept(theirs)).toBe(false)
+
+    const mine = asked()
+    expect(isWaitingAnswer(mine)).toBe(false)
+    expect(isAskedByDept(mine)).toBe(true)
+  })
+
+  it('묵은 것으로 센다', () => {
+    // 부서 답을 기다리는 것은 묵은 것이 아니지만, 부서가 물어 온 것은
+    // 담당자가 안 본 것이 맞다. 오히려 보통 건보다 급하다.
+    expect(isStale(asked())).toBe(true)
+    expect(isStale(asked({ dept_asked: 0, waiting_answers: 1 }))).toBe(false)
+  })
+
+  it('머릿수에 따로 잡힌다', () => {
+    const q = queueStats([asked(), asked({ id: 'a2', dept_asked: 0 })])
+    expect(q.deptAsked).toBe(1)
+    expect(q.askedBack).toBe(0)
+  })
+
+  it('서버가 그 칸을 실제로 내려보낸다', () => {
+    // 화면만 만들고 서버가 안 주면 배지가 영영 안 뜬다.
+    const src = readFileSync(
+      join(ROOT, 'functions', 'api', 'applications', 'index.js'),
+      'utf8'
+    )
+    expect(src).toContain('AS dept_asked')
+    expect(src).toContain("'부서질문'")
+    expect(src).toContain("'담당자답'")
+  })
+
+  it('화면이 그 값을 그린다', () => {
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ReviewPage.jsx'), 'utf8')
+    expect(page).toContain('a.dept_asked')
+    expect(page).toContain('부서가 물어봤습니다')
   })
 })

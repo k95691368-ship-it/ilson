@@ -320,6 +320,15 @@ export default function ReviewPage() {
                   : '하루 넘게 밀린 것은 없습니다'
               }
             />
+            {/* 부서가 먼저 물어 온 것. 0이면 안 띄운다 — 늘 0인 칸이 있으면
+                그 자리는 다음부터 안 읽힌다. */}
+            {queue.deptAsked > 0 && (
+              <Tile
+                label="부서가 물어봤습니다"
+                value={num(queue.deptAsked)}
+                note="부서에는 재촉할 길이 없습니다. 짧게라도 답하면 그 자리에서 부서 화면에 뜹니다."
+              />
+            )}
             {/* 이 화면의 머릿수는 건수가 아니라 이 값이다 — 아무도 손대지
                 않은 채로 흘러가는 시간. */}
             <Tile
@@ -599,6 +608,19 @@ export default function ReviewPage() {
                         <span className={`badge ${statusTone(a.status)}`}>{a.status}</span>
                         {a.waiting_answers > 0 && (
                           <span className="badge badge-warning">답 기다리는 중</span>
+                        )}
+                        {/* 부서가 **먼저** 물어 온 것.
+                            부서가 먼저 묻는 길을 열어 놓고 이 목록은 그걸
+                            안 보여줬다. 첫 화면 할 일에는 "부서가 물어 놓고
+                            답을 기다리는 것 N건"이 뜨는데, 눌러서 여기 와도
+                            어느 줄인지 표시가 없었다. 그러면 담당자는 N건이
+                            있다는 것만 알고 그게 어느 건인지는 모른다.
+                            위의 "답 기다리는 중"과 공이 반대편에 있어서
+                            색도 다르게 준다. */}
+                        {a.dept_asked > 0 && (
+                          <span className="badge badge-danger">
+                            부서가 물어봤습니다{a.dept_asked > 1 && ` ${a.dept_asked}`}
+                          </span>
                         )}
                         {/* 부서가 "조건이 풀렸습니다"라고 알려 온 것.
                             첫 화면 할 일에서 "N건"만 읽고 여기 와서 어느

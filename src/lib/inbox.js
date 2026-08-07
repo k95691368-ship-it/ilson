@@ -43,6 +43,8 @@ export function queueStats(items) {
     // 부서 답을 기다리는 것은 내 할 일이 아니다. 따로 센다.
     waiting: list.filter((i) => i.status === '접수' && !isWaitingAnswer(i)).length,
     askedBack: list.filter(isWaitingAnswer).length,
+    // 부서가 먼저 물어 온 것. 위와 공이 반대편에 있다.
+    deptAsked: list.filter(isAskedByDept).length,
     stale: list.filter(isStale).length,
   }
 }
@@ -67,6 +69,9 @@ export const STALE_HOURS = 24
 export function isStale(item) {
   // 부서 답을 기다리는 중이면 묵은 것이 아니다. 담당자가 안 본 것이 아니라
   // 물어 놓고 기다리는 것이라, 이걸 밀린 일로 세면 접수함이 늘 빨갛다.
+  //
+  // 부서가 먼저 물어 온 것은 반대다. 그건 담당자가 안 본 것이 맞으므로
+  // 묵은 것으로 센다 — 오히려 보통 건보다 급하다.
   if (isWaitingAnswer(item)) return false
   return item.status === '접수' && (item.hours_since ?? 0) >= STALE_HOURS
 }
@@ -74,6 +79,15 @@ export function isStale(item) {
 // 지금 공이 부서 쪽에 있는 건.
 export function isWaitingAnswer(item) {
   return (item?.waiting_answers ?? 0) > 0
+}
+
+// 지금 공이 담당자 쪽에 있는 건 — 부서가 먼저 물어 놓고 기다린다.
+//
+// 위의 isWaitingAnswer 와 뜻이 반대다. 한 칸으로 합치면 접수함이 둘을 같은
+// 색으로 칠하고, 담당자는 "기다리는 중"이라고 읽고 넘긴다. 부서는 그동안
+// 답을 기다린다 — 로그인이 없어서 재촉할 길도 없다.
+export function isAskedByDept(item) {
+  return (item?.dept_asked ?? 0) > 0
 }
 
 // 검색이 훑는 자리.

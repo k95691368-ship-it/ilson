@@ -61,6 +61,25 @@ export async function onRequestGet({ env, request }) {
               (SELECT MAX(ans.created_at) FROM decision_log ans
                 JOIN decision_log q ON q.id = ans.link_id
                 WHERE ans.link_kind = '답변' AND q.application_id = a.id) AS answered_at,
+              -- 부서가 **먼저** 물어 놓고 답을 기다리는 것.
+              --
+              -- 부서가 먼저 묻는 길을 열어 놓고 이 목록은 그걸 안 셌다.
+              -- 첫 화면 할 일에는 "부서가 물어 놓고 답을 기다리는 것 N건"이
+              -- 뜨는데, 눌러서 접수함에 와도 어느 줄인지 표시가 없었다.
+              -- 담당자는 N건이라는 것만 알고 그게 어느 건인지는 모른다.
+              --
+              -- 그리고 위의 waiting_answers 와 뜻이 반대다. 저건 공이 부서
+              -- 쪽에 있다는 뜻이고, 이건 공이 담당자 쪽에 있다는 뜻이다.
+              -- 한 칸으로 합치면 접수함이 둘을 같은 색으로 칠한다.
+              (SELECT COUNT(*) FROM decision_log q
+                WHERE q.application_id = a.id AND q.link_kind = '부서질문'
+                  AND NOT EXISTS (
+                    -- 별칭을 r 로 쓰면 같은 문장 안의 review r 과 겹친다.
+                    -- 사람도 헷갈리고 스키마 검사기도 review 표에서
+                    -- link_kind 를 찾다가 없다고 한다.
+                    SELECT 1 FROM decision_log dr
+                     WHERE dr.link_kind = '담당자답' AND dr.link_id = q.id
+                  )) AS dept_asked,
               -- 보류해 둔 것의 조건이 풀렸다고 부서가 알려 왔는가.
               --
               -- 목록에서 안 보이면 담당자는 첫 화면 할 일에서 "N건"만 읽고
