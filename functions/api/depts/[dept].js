@@ -369,9 +369,12 @@ export async function onRequestGet({ env, params }) {
           }
           const outcome = computeOutcome({
             baseline: r,
-            runs: Array.from({ length: Number(r.runs) || 0 }, () => ({
-              duration_ms: 0,
-              human_review_seconds: 0,
+            // 실제로 잰 값을 넘긴다. 0으로 지어내면 "검수 시간을 안
+            // 쟀습니다"라는 반박이 없는데도 붙는다.
+            runs: Array.from({ length: Number(r.runs) || 0 }, (_, i) => ({
+              duration_ms: i === 0 ? Number(r.duration_total_ms) || 0 : 0,
+              human_review_seconds: i === 0 ? Number(r.review_seconds) || 0 : 0,
+              rework_seconds: i === 0 ? Number(r.rework_seconds) || 0 : 0,
             })),
             devHours: r.dev_hours ?? 0,
             opsCostKrw: r.ops_cost_krw ?? 0,

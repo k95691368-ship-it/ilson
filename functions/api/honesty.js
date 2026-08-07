@@ -15,6 +15,22 @@ import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { computeOutcome, buildChallenges } from '../../shared/outcome.js'
 import { OUTCOME_KIND } from '../../shared/accept.js'
 
+// 실행 기록을 합계에서 되돌린다.
+//
+// computeOutcome 은 실행 한 줄씩을 받는데, 여기서는 합계만 갖고 있다.
+// 값을 **0으로 지어내면 안 된다** — "검수 시간을 안 쟀습니다"라는 반박이
+// 실제로는 쟀는데도 붙는다. 정직 화면이 그렇게 없는 반박을 하나 더
+// 띄우고 있었다. 합계를 첫 줄에 몰아 주면 총합이 맞고, 반박 규칙은
+// 전부 총합만 본다.
+function spreadRuns(r) {
+  const n = Number(r.run_count) || 0
+  return Array.from({ length: n }, (_, i) => ({
+    duration_ms: i === 0 ? Number(r.duration_total_ms) || 0 : 0,
+    human_review_seconds: i === 0 ? Number(r.review_total_seconds) || 0 : 0,
+    rework_seconds: i === 0 ? Number(r.rework_total_seconds) || 0 : 0,
+  }))
+}
+
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 function daysSince(sqlTime) {
   if (!sqlTime) return 0
@@ -130,6 +146,14 @@ export async function onRequestGet({ env }) {
                   b.median_seconds, b.people, b.sample_n, b.sealed_at,
                   o.dev_hours, o.ops_cost_krw, o.amortize_months, o.dept_confirmed_at,
                   (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) AS run_count,
+                  -- 실제로 잰 값을 넘겨야 한다. 0으로 지어내면 "검수 시간을
+                  -- 안 쟀습니다"라는 반박이 없는데도 붙는다. 실제로 그랬다.
+                  (SELECT COALESCE(SUM(u.duration_ms), 0) FROM tool_use u
+                    WHERE u.application_id = a.id) AS duration_total_ms,
+                  (SELECT COALESCE(SUM(u.human_review_seconds), 0) FROM tool_use u
+                    WHERE u.application_id = a.id) AS review_total_seconds,
+                  (SELECT COALESCE(SUM(u.rework_seconds), 0) FROM tool_use u
+                    WHERE u.application_id = a.id) AS rework_total_seconds,
                   (SELECT u.quarantined FROM tool_use u
                     WHERE u.application_id = a.id ORDER BY u.used_at DESC LIMIT 1) AS quarantine_left,
                   (SELECT d.alternatives FROM decision_log d
@@ -176,10 +200,7 @@ export async function onRequestGet({ env }) {
       }
       const computed = computeOutcome({
         baseline: r,
-        runs: Array.from({ length: Number(r.run_count) || 0 }, () => ({
-          duration_ms: 0,
-          human_review_seconds: 0,
-        })),
+        runs: spreadRuns(r),
         devHours: r.dev_hours ?? 0,
         opsCostKrw: r.ops_cost_krw ?? 0,
         amortizeMonths: r.amortize_months ?? 24,
