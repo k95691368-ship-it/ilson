@@ -6358,3 +6358,23 @@ kbd {
   line-height: 1.6;
   white-space: pre-wrap;
 }
+
+/* 할 일에서 짚어 온 카드.
+   색만 칠하면 화면 밖에 있을 때 도움이 안 되므로 스크롤도 같이 한다.
+   테두리만 준다 — 상태 색(빨강·주황)을 덮으면 그 카드가 무슨 상태인지가
+   안 보인다. */
+.tool-card.picked {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.tool-picked-note {
+  display: inline-block;
+  margin-bottom: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 11.5px;
+  font-weight: 600;
+}

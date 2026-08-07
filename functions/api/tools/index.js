@@ -202,6 +202,27 @@ export async function onRequestGet({ env }) {
       totalFailed: items.reduce((s, i) => s + i.failedRuns, 0),
       totalRows: items.reduce((s, i) => s + i.rowsOut, 0),
       recentDays: RECENT_DAYS,
+
+      // 세는 것으로 끝내지 않고 **어느 것인지**까지 준다.
+      //
+      // 첫 화면 할 일 다섯 줄 중 셋이 이 화면을 가리킨다. 눌러서 오면
+      // 카드가 늘어서 있고, 담당자는 "못 쓰겠다고 한 게 어느 거지"를 다시
+      // 찾아야 한다. 세 줄이면 세 번 찾는다. 그러다 다른 걸 열게 되고,
+      // 결국 그 목록을 안 쓰게 된다.
+      //
+      // 목록은 세는 것과 **같은 조건**에서 뽑는다. 따로 쓰면 "3개"라고
+      // 해 놓고 두 개만 짚어 준다.
+      rejectedIds: items.filter((i) => i.rejected).map((i) => i.application_id),
+      untrustedIds: items
+        .filter((i) => i.trust?.level === '결과를 믿을 수 없음')
+        .map((i) => i.application_id),
+      idleIds: items.filter((i) => i.health === '안 쓰임').map((i) => i.application_id),
+      downStaleIds: items
+        .filter((i) => rollbackState({ handover: i }).stale)
+        .map((i) => i.application_id),
+      noManualIds: items
+        .filter((i) => !i.manual_published_at && !i.rolled_back_at)
+        .map((i) => i.application_id),
     }
 
     return jsonResponse({ items, failures: fails.results, summary })

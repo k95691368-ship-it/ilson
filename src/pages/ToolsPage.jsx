@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
@@ -18,6 +18,13 @@ import { ago, dateTimeLabel, duration, ms, num } from '../lib/format.js'
 // 넘겨 놓고 아무도 안 쓰는 도구를 숨기지 않는다. 그게 가장 중요한 신호다.
 export default function ToolsPage() {
   const { data, error, loading } = useApi('/tools')
+  // 첫 화면 할 일이 "어느 도구인지"까지 실어 보낸다.
+  //
+  // 할 일 다섯 줄 중 셋이 이 화면을 가리킨다. 눌러서 오면 카드가 늘어서
+  // 있고, 담당자는 "못 쓰겠다고 한 게 어느 거지"를 다시 찾아야 했다. 세
+  // 줄이면 세 번 찾는다. 그러다 다른 걸 열게 되고, 결국 그 목록을 안 쓴다.
+  const [params] = useSearchParams()
+  const wanted = params.get('id')
   // 넘긴 뒤 부서가 겪은 것. 이게 없으면 "돌고 있음"만 보고 잘 되는 줄 안다.
   const { data: reports, reload: reloadReports } = useApi('/reports')
   // 부서가 알려준 상품코드 중 아직 담당자가 안 본 것. 잘못 이어져 있으면
@@ -107,7 +114,7 @@ export default function ToolsPage() {
 
           <div className="tool-cards">
             {data.items.map((t) => (
-              <article key={t.application_id} className={`tool-card ${healthClass(t.health)}`}>
+              <ToolCard key={t.application_id} t={t} wanted={wanted}>
                 <div className="tool-card-head">
                   <span className={`badge ${healthTone(t.health)}`}>{t.health}</span>
                   {/* 도는 것과 맞는 것은 다르다.
@@ -257,7 +264,7 @@ export default function ToolsPage() {
                     하루 {t.daily_limit}회 · 파일 {t.max_file_mb}MB
                   </span>
                 </div>
-              </article>
+              </ToolCard>
             ))}
           </div>
 
@@ -462,5 +469,33 @@ function Tile({ label, value, note, tone }) {
       <div className="stat-value">{value}</div>
       <div className="stat-note">{note}</div>
     </div>
+  )
+}
+
+// 도구 카드 껍데기.
+//
+// 할 일에서 "이 도구요"라고 실어 보낸 건이면 눈에 띄게 하고 그 자리로
+// 스크롤한다. 색만 칠하면 화면 밖에 있을 때 아무 도움이 안 된다 — 카드가
+// 열 개쯤 되면 짚어 준 것이 접혀 있는 아래쪽에 있기 마련이다.
+function ToolCard({ t, wanted, children }) {
+  const ref = useRef(null)
+  const picked = Boolean(wanted) && wanted === t.application_id
+
+  useEffect(() => {
+    if (!picked) return
+    // 화면이 갑자기 튀지 않게 부드럽게. 키보드로 온 사람도 있으므로
+    // 가운데로 맞춘다.
+    ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [picked])
+
+  return (
+    <article
+      ref={ref}
+      className={`tool-card ${healthClass(t.health)}${picked ? ' picked' : ''}`}
+      aria-current={picked ? 'true' : undefined}
+    >
+      {picked && <span className="tool-picked-note">할 일에서 짚어 드린 도구입니다</span>}
+      {children}
+    </article>
   )
 }

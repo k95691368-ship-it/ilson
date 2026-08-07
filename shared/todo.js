@@ -58,7 +58,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'untrusted_tool',
         title: `결과를 믿을 수 없다는 신고 ${untrusted}건`,
         why: '숫자가 틀린다는 신고가 살아 있는 동안은 그 도구가 낸 숫자를 보고에 쓰면 안 됩니다.',
-        to: '/tools',
+        to: at('/tools', tools?.summary?.untrustedIds),
         cta: '신고 보기',
       })
     )
@@ -100,7 +100,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'tool_rejected',
         title: `부서가 "못 쓰겠다"고 한 도구 ${rejected}개`,
         why: '무엇이 안 맞는지까지 적어 주셨습니다. 그동안 그 부서는 원래 하던 방식으로 일하고 있습니다.',
-        to: '/tools',
+        to: at('/tools', tools?.summary?.rejectedIds),
         cta: '무엇이 안 맞는지 보기',
       })
     )
@@ -120,7 +120,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'tool_down_stale',
         title: `내려 둔 채 사흘이 지난 도구 ${downStale}개`,
         why: '내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보입니다. 그동안 그 부서는 원래 하던 방식으로 일하고 있습니다.',
-        to: '/tools',
+        to: at('/tools', tools?.summary?.downStaleIds),
         cta: '어느 것인지 보기',
       })
     )
@@ -356,7 +356,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'idle_tools',
         title: `넘겨 놓고 아무도 안 쓰는 도구 ${idle}개`,
         why: '만든 것으로 끝난 도구입니다. 왜 안 쓰는지 물어보지 않으면 다음에도 같은 것을 만듭니다.',
-        to: '/tools',
+        to: at('/tools', tools?.summary?.idleIds),
         cta: '어떤 도구인지 보기',
       })
     )

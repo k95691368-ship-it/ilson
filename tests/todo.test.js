@@ -475,3 +475,62 @@ describe('할 일이 어느 건인지까지 알려주는가', () => {
     }
   })
 })
+
+// 도구 화면으로 보내는 할 일도 어느 카드인지 짚어 준다.
+//
+// 첫 화면 할 일 다섯 줄 중 셋이 도구 화면을 가리킨다. 눌러서 오면 카드가
+// 늘어서 있고, 담당자는 "못 쓰겠다고 한 게 어느 거지"를 다시 찾아야 했다.
+// 세 줄이면 세 번 찾는다. 그러다 다른 걸 열게 되고, 결국 그 목록을 안 쓴다.
+describe('도구 할 일이 어느 카드인지 알려주는가', () => {
+  const tools = (over = {}) => ({
+    summary: {
+      rejected: 1,
+      rejectedIds: ['app_r'],
+      untrusted: 1,
+      untrustedIds: ['app_u'],
+      idle: 1,
+      idleIds: ['app_i'],
+      downStale: 1,
+      downStaleIds: ['app_d'],
+      ...over,
+    },
+  })
+
+  it('항목마다 자기 목록을 쓴다', () => {
+    // 한 목록을 돌려쓰면 문제가 없는 카드 앞으로 데려간다. 화면은 열리고
+    // 카드도 그려지니 눌러 보기 전엔 아무도 모른다.
+    const items = buildTodo({
+      tools: tools(),
+      reports: { summary: { urgent: 1, open: 1 } },
+    })
+    expect(items.find((i) => i.key === 'tool_rejected').to).toBe('/tools?id=app_r')
+    expect(items.find((i) => i.key === 'untrusted_tool').to).toBe('/tools?id=app_u')
+    expect(items.find((i) => i.key === 'idle_tools').to).toBe('/tools?id=app_i')
+    expect(items.find((i) => i.key === 'tool_down_stale').to).toBe('/tools?id=app_d')
+  })
+
+  it('목록이 없으면 화면만 연다', () => {
+    const items = buildTodo({ tools: { summary: { rejected: 1 } } })
+    expect(items.find((i) => i.key === 'tool_rejected').to).toBe('/tools')
+  })
+
+  it('세는 것과 짚는 것이 같은 조건에서 나온다', () => {
+    // 따로 뽑으면 "3개"라고 해 놓고 두 개만 짚어 준다.
+    const src = readFileSync(join(ROOT, 'functions', 'api', 'tools', 'index.js'), 'utf8')
+    for (const [count, ids] of [
+      ["i.rejected).length", "i.rejected).map"],
+      ["i.health === '안 쓰임').length", "i.health === '안 쓰임').map"],
+    ]) {
+      expect(src, count).toContain(count)
+      expect(src, ids).toContain(ids)
+    }
+  })
+
+  it('받는 화면이 그 값을 읽고 그 자리로 데려간다', () => {
+    // 색만 칠하면 화면 밖에 있을 때 아무 도움이 안 된다.
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+    expect(page).toMatch(/params\.get\('id'\)/)
+    expect(page).toContain('scrollIntoView')
+    expect(page).toContain('할 일에서 짚어 드린 도구입니다')
+  })
+})
