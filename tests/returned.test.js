@@ -121,3 +121,31 @@ describe('할 말이 없을 때', () => {
     expect(returnedFor().show).toBe(false)
   })
 })
+
+// 살아 있는 반박은 저장되지 않는다. `outcome_challenge` 표에는 **해소한
+// 것만** 들어간다. 그래서 "미해소 반박 수"를 그 표에서 세면 영원히 0이다.
+//
+// 처음에 그렇게 짰다. 그 결과 성과 화면은 같은 건을 "보수적 추정"이라
+// 하는데 부서 화면은 "반박 없음"이라고 말했다. 한 사이트가 같은 숫자를
+// 두고 다른 말을 하면 둘 다 못 믿는다.
+describe('반박을 세는 자리가 성과 화면과 같은가', () => {
+  it('반박이 있으면 부서 화면도 보수적 추정이라고 한다', () => {
+    const r = returnedFor([row({ open_challenges: 1 })])
+    expect(r.shaky).toBe(true)
+    expect(returnedNote(r)).toContain('보수적으로 잡은 숫자')
+  })
+
+  it('해소된 것은 빼고 센다', () => {
+    // 살아 있는 것 2개 중 1개를 해소했으면 남은 것은 1개다. 그걸 안 빼면
+    // 다 풀고 나서도 영영 "보수적 추정"으로 남는다.
+    const open = Math.max(0, 2 - 1)
+    expect(returnedFor([row({ open_challenges: open })]).shaky).toBe(true)
+    expect(returnedFor([row({ open_challenges: Math.max(0, 2 - 2) })]).shaky).toBe(false)
+  })
+
+  it('반박 수가 없으면 반박 없음으로 본다', () => {
+    // 값이 안 오면 조용히 0이 되는 자리다. 그래도 화면이 안 깨져야 한다.
+    expect(returnedFor([row({ open_challenges: undefined })]).shaky).toBe(false)
+    expect(returnedFor([row({ open_challenges: null })]).shaky).toBe(false)
+  })
+})

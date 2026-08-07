@@ -12,11 +12,19 @@ import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { annualHours } from '../../_lib/applications.js'
 import { sortPending } from '../../../shared/pending.js'
 import { returnedFor } from '../../../shared/returned.js'
+import { computeOutcome, buildChallenges } from '../../../shared/outcome.js'
 import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
 
 const STALE_HOURS = 24
+
+// 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
+function daysSince(sqlTime) {
+  if (!sqlTime) return 0
+  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
 
 export async function onRequestGet({ env, params }) {
   const dept = decodeURIComponent(params.dept ?? '').trim()
@@ -173,14 +181,28 @@ export async function onRequestGet({ env, params }) {
                     WHERE u.application_id = a.id) AS review_seconds,
                   (SELECT COALESCE(SUM(u.rework_seconds), 0) FROM tool_use u
                     WHERE u.application_id = a.id) AS rework_seconds,
+                  b.sample_n, b.sealed_at,
+                  o.dev_hours, o.ops_cost_krw, o.amortize_months,
+                  -- 마지막 실행에서 아직 안 푼 격리 줄.
+                  (SELECT u.quarantined FROM tool_use u
+                    WHERE u.application_id = a.id ORDER BY u.used_at DESC LIMIT 1) AS quarantine_left,
+                  -- 부서가 체감으로 말한 분. 우리가 잰 값과 크게 다르면
+                  -- 반박이 붙는다.
+                  (SELECT d.alternatives FROM decision_log d
+                    WHERE d.application_id = a.id AND d.link_kind = ?
+                    ORDER BY d.created_at DESC LIMIT 1) AS dept_said,
+                  -- **해소한 반박만** 이 표에 저장된다. 살아 있는 반박은
+                  -- 읽을 때 계산한다 — 그래서 여기서 미해소를 세면 영원히
+                  -- 0이다. 실제로 그렇게 짰다가 성과 화면은 '보수적 추정'인데
+                  -- 부서 화면은 '반박 없음'이라고 말했다.
                   (SELECT COUNT(*) FROM outcome_challenge c
-                    WHERE c.application_id = a.id AND c.resolved_at IS NULL) AS open_challenges
+                    WHERE c.application_id = a.id AND c.resolved_at IS NOT NULL) AS resolved_challenges
            FROM application a
            JOIN baseline b ON b.application_id = a.id
            LEFT JOIN outcome o ON o.application_id = a.id
            WHERE a.dept = ?`
         )
-          .bind(dept)
+          .bind(OUTCOME_KIND, dept)
           .all(),
       ])
 
@@ -335,7 +357,42 @@ export async function onRequestGet({ env, params }) {
       // 부서 몫. owed 와 시점이 정반대다.
       pending,
       // 이 부서에 돌려드린 시간. 부서가 확인한 것과 아직 아닌 것을 가른다.
-      returned: returnedFor(returnedRows.results),
+      returned: returnedFor(
+        returnedRows.results.map((r) => {
+          // 성과 화면과 **같은 함수**로 센다. 저장된 줄을 세면 안 된다 —
+          // 살아 있는 반박은 저장되지 않기 때문이다.
+          let deptFelt = null
+          try {
+            deptFelt = JSON.parse(r.dept_said)?.felt ?? null
+          } catch {
+            // 옛 기록에는 숫자가 없다.
+          }
+          const outcome = computeOutcome({
+            baseline: r,
+            runs: Array.from({ length: Number(r.runs) || 0 }, () => ({
+              duration_ms: 0,
+              human_review_seconds: 0,
+            })),
+            devHours: r.dev_hours ?? 0,
+            opsCostKrw: r.ops_cost_krw ?? 0,
+            amortizeMonths: r.amortize_months ?? 24,
+          })
+          const live =
+            outcome.status === '산정불가'
+              ? []
+              : buildChallenges({
+                  outcome,
+                  quarantineLeft: r.quarantine_left ?? 0,
+                  deptConfirmed: Boolean(r.dept_confirmed_at),
+                  baselineAgeDays: daysSince(r.sealed_at),
+                  deptFelt,
+                })
+          return {
+            ...r,
+            open_challenges: Math.max(0, live.length - (Number(r.resolved_challenges) || 0)),
+          }
+        })
+      ),
     })
   } catch (err) {
     return failUnexpected(err, '부서 기록을 모으지 못했습니다.')
