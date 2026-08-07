@@ -12,6 +12,15 @@
 // 인쇄하거나 텍스트로 내려받는다.
 
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
+import { computeOutcome, buildChallenges } from '../../../../shared/outcome.js'
+import { OUTCOME_KIND } from '../../../../shared/accept.js'
+
+// 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
+function daysSince(sqlTime) {
+  if (!sqlTime) return 0
+  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
 
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)
 
@@ -70,6 +79,49 @@ export async function onRequestGet({ env, params }) {
       q(env, 'SELECT * FROM decision_log WHERE application_id = ? ORDER BY created_at', id).all(),
     ])
 
+    // 살아 있는 반박을 성과 화면과 **같은 함수**로 만든다. 저장된 해소분은
+    // 그대로 지킨다.
+    let liveChallenges = challenges.results
+    if (baseline && uses.results.length > 0) {
+      let deptFelt = null
+      const said = decisions.results
+        .filter((d) => d.link_kind === OUTCOME_KIND)
+        .at(-1)
+      try {
+        deptFelt = JSON.parse(said?.alternatives)?.felt ?? null
+      } catch {
+        // 옛 기록에는 숫자가 없다.
+      }
+      const computed = computeOutcome({
+        baseline,
+        runs: uses.results,
+        devHours: outcome?.dev_hours ?? 0,
+        opsCostKrw: outcome?.ops_cost_krw ?? 0,
+        amortizeMonths: outcome?.amortize_months ?? 24,
+      })
+      const shouldHave =
+        computed.status === '산정불가'
+          ? []
+          : buildChallenges({
+              outcome: computed,
+              quarantineLeft: uses.results.at(-1)?.quarantined ?? 0,
+              deptConfirmed: Boolean(outcome?.dept_confirmed_at),
+              baselineAgeDays: daysSince(baseline?.sealed_at),
+              deptFelt,
+            })
+      const byCode = new Map(challenges.results.map((c) => [c.rule_code, c]))
+      liveChallenges = shouldHave.map((c) => {
+        const saved = byCode.get(c.code)
+        return {
+          rule_code: c.code,
+          title: c.title,
+          body: c.body,
+          resolved_at: saved?.resolved_at ?? null,
+          resolution: saved?.resolution ?? null,
+        }
+      })
+    }
+
     // 회차별 기준 판정. 회차가 없으면 한 번도 안 돌린 것이고, 그것도 기록이다.
     const roundIds = betaRounds.results.map((r) => r.id)
     let betaResults = []
@@ -118,7 +170,19 @@ export async function onRequestGet({ env, params }) {
       handover,
       uses: uses.results,
       outcome,
-      challenges: challenges.results,
+      // 살아 있는 반박까지 넣는다.
+      //
+      // `outcome_challenge` 표에는 **해소한 것만** 저장된다. 살아 있는
+      // 반박은 읽을 때 규칙으로 계산한다. 그래서 이 표만 실으면 인쇄
+      // 기록의 "이 숫자를 의심해보세요" 칸이 통째로 비고, 해소한 것이
+      // 하나도 없으면 그 칸 자체가 안 그려진다.
+      //
+      // 실제로 그랬다. 성과 화면은 반박 다섯 건(표본 부족·실행 횟수 부족·
+      // 격리 미해소·계절성·부서가 다르다고 함)을 띄우는데, 같은 건의 인쇄
+      // 기록은 0건이었다. **평가하는 사람이 들고 가는 종이에서 자기 반박이
+      // 통째로 사라진다.** 이 저장소가 파는 것이 기록인데 가장 불리한
+      // 대목만 빠지는 셈이다.
+      challenges: liveChallenges,
       decisions: decisions.results,
       done,
       // 이 문서를 언제 뽑았는지. 인쇄물에는 이게 있어야 나중에 어느 시점의

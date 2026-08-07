@@ -529,7 +529,9 @@ export default function RecordPage() {
                 >
                   <ul className="record-list">
                     {rec.challenges.map((c) => (
-                      <li key={c.id}>
+                      // 살아 있는 반박은 저장된 줄이 아니라 규칙이 만든
+                      // 것이라 id 가 없다. 규칙 코드가 그 자리를 대신한다.
+                      <li key={c.rule_code ?? c.id}>
                         <span className={`badge ${c.resolved_at ? 'badge-accent' : 'badge-warning'}`}>
                           {c.resolved_at ? '해소' : '미해소'}
                         </span>{' '}
