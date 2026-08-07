@@ -173,7 +173,7 @@ export default function ApplyPage() {
               </div>
               <p className="draft-restore-body">
                 {describeDraft(restorable.form)} — 이어서 쓰시겠습니까? 이 브라우저에만 두었고
-                서버로 보낸 적은 없습니다. 첨부하셨던 파일은 다시 골라주셔야 합니다.
+                서버로 보낸 적은 없습니다.
               </p>
               <div className="row">
                 <button
@@ -408,7 +408,6 @@ export default function ApplyPage() {
                         {ago(a.created_at)}
                         {a.annual_hours != null && ` · 연 ${num(a.annual_hours, 1)}시간`}
                         {a.current_minutes != null && ` · 1회 ${duration(a.current_minutes * 60)}`}
-                        {a.file_count > 0 && ` · 첨부 ${a.file_count}`}
                       </div>
                     </li>
                   ))}

@@ -62,9 +62,6 @@ export async function onRequestDelete({ env }) {
     const ids = rows.map((r) => r.id)
     const holes = ids.map(() => '?').join(', ')
     await env.DB.batch([
-      // 첨부는 표에서만 지운다. R2 객체는 그대로 두는데, 지우다 실패하면
-      // 표만 사라지고 파일은 남아 어느 것이 고아인지 알 수 없게 된다.
-      env.DB.prepare(`DELETE FROM application_file WHERE application_id IN (${holes})`).bind(...ids),
       env.DB.prepare(`DELETE FROM application WHERE id IN (${holes})`).bind(...ids),
     ])
 

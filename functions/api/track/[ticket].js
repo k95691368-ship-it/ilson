@@ -76,7 +76,11 @@ export async function onRequestGet({ env, params, request }) {
       return jsonError('그 접수번호로 낸 신청서를 찾지 못했습니다. 번호를 다시 확인해주세요.', 404)
     }
 
-    const [review, files, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions, feedbackCount] =
+    // 이름 개수와 아래 쿼리 개수가 반드시 같아야 한다. 첨부 기능을 걷어낼 때
+    // 쿼리만 지우고 이름(files)은 안 지워서 그 뒤가 전부 한 칸씩 밀렸다.
+    // 부서가 접수번호를 넣으면 그 자리에서 500이 났다. tests/schema.test.js가
+    // 이제 개수를 센다.
+    const [review, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions, feedbackCount] =
       await Promise.all([
         env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id).first(),
         env.DB.prepare(
@@ -153,7 +157,7 @@ export async function onRequestGet({ env, params, request }) {
         stage: '신청서',
         status: '완료',
         at: app.created_at,
-        summary: `${app.dept}에서 냈습니다. 첨부 ${files.results.length}개.`,
+        summary: `${app.dept}에서 냈습니다.`,
       },
       {
         stage: '검토',

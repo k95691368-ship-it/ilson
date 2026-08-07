@@ -20,7 +20,6 @@ const DeptPage = lazy(() => import('./pages/DeptPage.jsx'))
 const ToolsPage = lazy(() => import('./pages/ToolsPage.jsx'))
 const HonestyPage = lazy(() => import('./pages/HonestyPage.jsx'))
 const ComparePage = lazy(() => import('./pages/ComparePage.jsx'))
-const WeeklyPage = lazy(() => import('./pages/WeeklyPage.jsx'))
 const CodesPage = lazy(() => import('./pages/CodesPage.jsx'))
 const StallPage = lazy(() => import('./pages/StallPage.jsx'))
 const PriorityPage = lazy(() => import('./pages/PriorityPage.jsx'))
@@ -73,45 +72,13 @@ export default function App() {
           </nav>
 
           <div className="topbar-right">
-            {/* 단계가 아니라 여덟 단계를 가로로 훑는 화면이라 목차와 분리해 둔다. */}
-            <NavLink
-              to="/priority"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              먼저 할 것
-            </NavLink>
-            <NavLink
-              to="/stall"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              막힌 곳
-            </NavLink>
-            <NavLink
-              to="/weekly"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              주간
-            </NavLink>
-            <NavLink
-              to="/tools"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              넘긴 뒤
-            </NavLink>
-            <NavLink
-              to="/honesty"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              못 한 것
-            </NavLink>
-            <NavLink
-              to="/log"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              기록
-            </NavLink>
-            {/* 이 사이트를 처음 보는 사람이 "무엇을 만든 건가"를 물을 자리.
-                여덟 단계 어디에도 안 들어가므로 목차가 아니라 여기 둔다. */}
+            {/* 여기 여섯 칸이 더 있었다 — 먼저 할 것·막힌 곳·주간·넘긴 뒤·
+                못 한 것·기록. 전부 뺐다.
+                셋(먼저 할 것·막힌 곳·주간)은 첫 화면 할 일 목록이 이미
+                같은 것을 말하고 있었다. 나머지 셋은 화면은 남기고 링크만
+                제 자리로 옮겼다 — 넘긴 뒤는 배포 단계에서, 못 한 것과
+                기록은 첫 화면에서 간다. 목차 옆에 늘어놓을수록 처음 온
+                사람은 어디부터 눌러야 할지 모른다. */}
             <NavLink
               to="/built"
               className={({ isActive }) => `topbar-link built-link${isActive ? ' active' : ''}`}
@@ -143,7 +110,6 @@ export default function App() {
             <Route path="/tools" element={<ToolsPage />} />
             <Route path="/honesty" element={<HonestyPage />} />
             <Route path="/compare" element={<ComparePage />} />
-            <Route path="/weekly" element={<WeeklyPage />} />
             <Route path="/codes" element={<CodesPage />} />
             <Route path="/stall" element={<StallPage />} />
             <Route path="/priority" element={<PriorityPage />} />
@@ -180,7 +146,7 @@ export default function App() {
             </div>
           </div>
           <div className="footer-bottom">
-            <span>Cloudflare Pages Functions · D1 · R2 · 외부 서비스 호출 없음</span>
+            <span>Cloudflare Pages Functions · D1 · 외부 서비스 호출 없음</span>
             <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>
         </footer>

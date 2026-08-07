@@ -12,7 +12,7 @@ import { jsonResponse } from '../_lib/http.js'
 const CORE_TABLES = ['users', 'sessions', 'rate_limit_hits', 'audit_log', 'decision_log', 'notifications']
 
 export async function onRequestGet({ env }) {
-  const checks = { db: false, schema: false, r2: false }
+  const checks = { db: false, schema: false }
   const notes = []
   let tables = []
 
@@ -35,19 +35,10 @@ export async function onRequestGet({ env }) {
     }
   }
 
-  if (!env.SOURCES) {
-    notes.push('R2 바인딩(SOURCES)이 없습니다. 원본 파일 보관이 필요한 단계에서 막힙니다.')
-  } else {
-    try {
-      // 없는 키를 읽는 것만으로 바인딩 여부를 알 수 있다. 쓰기는 하지 않는다.
-      await env.SOURCES.head('__healthcheck__')
-      checks.r2 = true
-    } catch (err) {
-      notes.push(`R2를 읽지 못했습니다: ${String(err.message).slice(0, 140)}`)
-    }
-  }
-
-  const ready = checks.db && checks.schema && checks.r2
+  // R2 바인딩도 여기서 봤었다. 첨부 기능을 걷어낸 뒤로는 아무 데서도
+  // 파일을 저장하지 않으므로, 그 바인딩이 없다고 "준비 안 됨"이라고 답하면
+  // 멀쩡한 배포를 고장으로 신고하는 셈이 된다.
+  const ready = checks.db && checks.schema
   return jsonResponse({
     ready,
     checks,

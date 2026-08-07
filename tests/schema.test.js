@@ -219,3 +219,127 @@ describe('CHECK 목록과 코드 목록', () => {
     expect([...REFUSE_CODES].sort()).toEqual(allowed)
   })
 })
+
+// Promise.all 을 구조분해할 때 이름 수와 쿼리 수가 어긋난 것.
+//
+// 첨부 기능을 걷어내면서 `functions/api/track/[ticket].js` 의 쿼리 하나만
+// 지우고 이름(`files`)은 그대로 뒀다. 이름이 14개, 쿼리가 13개. 자바스크립트는
+// 아무 말도 하지 않는다 — 모자란 이름에 undefined 를 넣고 나머지를 한 칸씩
+// 당긴다. 그래서 review 는 맞고 그 뒤가 전부 딴 표의 값이 됐다.
+//
+// 결과: 부서가 접수번호를 넣으면 `files.results.length` 에서 500. 접수번호
+// 조회는 로그인 없는 이 사이트에서 부서가 자기 신청서를 보는 **유일한**
+// 길이다. 그게 통째로 막혀 있었다.
+//
+// 왜 라우트 스모크가 못 잡았나. 그 검사는 [ticket] 자리에 아무 문자열이나
+// 넣는데, 이 라우트는 쿼리 전에 접수번호 모양(AX-000-000)을 본다. 모양이
+// 틀리니 400 으로 먼저 돌아가고 문제의 줄까지 가지도 않았다. 실행해 보는
+// 검사에도 못 가는 자리가 있다 — 그래서 세어 보는 검사를 따로 둔다.
+// 대괄호 안에서 맨 바깥 쉼표로 갈린 항목 수를 센다.
+//
+// 그냥 쉼표를 세면 세 군데서 틀린다. ① SQL 문자열 안의 쉼표와 괄호
+// (`SELECT a, b FROM ...`, `IN (?, ?)`) ② 마지막 항목 뒤의 쉼표
+// ③ 쿼리 사이에 끼워 둔 주석 안의 쉼표. 셋 다 실제로 이 저장소 코드에 있다.
+function topLevelItems(body) {
+  let depth = 0
+  const parts = ['']
+  for (let i = 0; i < body.length; i++) {
+    const ch = body[i]
+    // 주석은 코드가 아니다. 이 저장소는 쿼리 사이에 왜 그렇게 했는지를
+    // 길게 적어 두는데, 그 안의 쉼표를 세면 쿼리가 늘어난 것으로 보인다.
+    if (ch === '/' && body[i + 1] === '/') {
+      while (i < body.length && body[i] !== '\n') i++
+      continue
+    }
+    if (ch === '/' && body[i + 1] === '*') {
+      i += 2
+      while (i < body.length && !(body[i] === '*' && body[i + 1] === '/')) i++
+      i++
+      continue
+    }
+    // 문자열·템플릿 안은 통째로 건너뛴다. 그 안의 괄호와 쉼표는 코드가 아니다.
+    if (ch === "'" || ch === '"' || ch === '`') {
+      const quote = ch
+      i++
+      while (i < body.length && body[i] !== quote) {
+        if (body[i] === '\\') i++
+        i++
+      }
+      parts[parts.length - 1] += 'S'
+      continue
+    }
+    if ('([{'.includes(ch)) depth++
+    else if (')]}'.includes(ch)) depth--
+    else if (ch === ',' && depth === 0) {
+      parts.push('')
+      continue
+    }
+    parts[parts.length - 1] += ch
+  }
+  // 빈 조각은 항목이 아니다 — 마지막 쉼표 뒤의 공백이 여기 걸린다.
+  return parts.filter((p) => p.trim() !== '').length
+}
+
+describe('구조분해와 Promise.all', () => {
+  const files = jsFiles(join(ROOT, 'functions'))
+
+  it('받는 이름 수와 기다리는 쿼리 수가 같다', () => {
+    const problems = []
+    for (const file of files) {
+      const rel = file.slice(ROOT.length)
+      const src = readFileSync(file, 'utf8')
+      // `const [a, b, c] = await Promise.all([ ... ])` 만 본다.
+      const re = /const \[([^\]]+)\]\s*=\s*\n?\s*await Promise\.all\(\[/g
+      let m
+      while ((m = re.exec(src))) {
+        const names = m[1]
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+        // 여는 대괄호부터 짝이 맞는 닫는 대괄호까지 잘라 낸다.
+        const start = m.index + m[0].length - 1
+        let depth = 0
+        let end = start
+        for (let i = start; i < src.length; i++) {
+          const ch = src[i]
+          if (ch === '[') depth++
+          else if (ch === ']') {
+            depth--
+            if (depth === 0) {
+              end = i
+              break
+            }
+          }
+        }
+        const items = topLevelItems(src.slice(start + 1, end))
+        if (names.length !== items) {
+          problems.push(`${rel} — 이름 ${names.length}개인데 쿼리 ${items}개 (${names.join(', ')})`)
+        }
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
+  it('이 검사가 헛돌지 않는다', () => {
+    // 실제로 세고 있는지 확인한다. 하나도 못 찾으면 위 검사는 늘 통과한다.
+    const found = files.filter((f) =>
+      /const \[[^\]]+\]\s*=\s*\n?\s*await Promise\.all\(\[/.test(readFileSync(f, 'utf8'))
+    )
+    expect(found.length).toBeGreaterThan(3)
+
+    // 세는 규칙 자체를 확인한다. 이게 틀리면 위 검사는 조용히 헛돈다.
+    expect(topLevelItems('a, b, c')).toBe(3)
+    expect(topLevelItems('a, b,')).toBe(2) // 마지막 쉼표
+    expect(topLevelItems('f(x, y), g(z)')).toBe(2) // 안쪽 괄호
+    expect(topLevelItems("q('SELECT a, b FROM t'), r()")).toBe(2) // 문자열 안의 쉼표
+    expect(topLevelItems('a(),\n// 왜 이렇게 했나, 그 이유\nb()')).toBe(2) // 주석 안의 쉼표
+    expect(topLevelItems('a(),\n/* 이유, 근거 */\nb()')).toBe(2)
+    expect(topLevelItems('')).toBe(0)
+
+    // 그리고 실제로 났던 그 모양을 잡는지 본다.
+    const broken = `const [a, b, c] =\n      await Promise.all([\n        one(),\n        two(),\n      ])`
+    const m = /const \[([^\]]+)\]\s*=\s*\n?\s*await Promise\.all\(\[([\s\S]*)\]\)/.exec(broken)
+    expect(m[1].split(',').length).toBe(3)
+    expect(topLevelItems(m[2])).toBe(2)
+  })
+})
