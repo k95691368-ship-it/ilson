@@ -48,8 +48,17 @@ const PICK_ALL = `
 // 외래키에 ON DELETE CASCADE 를 걸어 뒀지만 그것에만 기대지 않는다 —
 // 마이그레이션이 부분 적용된 환경에서 캐스케이드가 안 걸린 표가 남으면
 // 고아 행이 조용히 남는다.
+// 신청서를 손자로 두는 표. application_id 가 없어서 부모를 거쳐 지운다.
+//
+// beta_result 가 그렇다. 이걸 모르고 `DELETE FROM beta_result WHERE
+// application_id IN (...)` 을 붙였다가 배치 전체가 터져서 503 이 났다.
+// 아래 CHILD_TABLES 는 전부 application_id 를 갖고 있어야 하고,
+// tests/schema.test.js 가 그걸 센다.
+const GRANDCHILD = [
+  { table: 'beta_result', via: 'round_id', parent: 'beta_round' },
+]
+
 const CHILD_TABLES = [
-  'beta_result',
   'beta_feedback',
   'beta_round',
   'build_run',
@@ -150,6 +159,21 @@ export async function onRequestDelete({ env, request }) {
     const ids = rows.map((r) => r.id)
     const holes = ids.map(() => '?').join(', ')
     const statements = []
+    // 손자부터. 부모를 거쳐 찾는다.
+    for (const g of GRANDCHILD) {
+      try {
+        await env.DB.prepare(`SELECT 1 FROM ${g.table} LIMIT 1`).first()
+      } catch {
+        continue
+      }
+      statements.push(
+        env.DB.prepare(
+          `DELETE FROM ${g.table} WHERE ${g.via} IN (
+             SELECT id FROM ${g.parent} WHERE application_id IN (${holes})
+           )`
+        ).bind(...ids)
+      )
+    }
     for (const t of CHILD_TABLES) {
       try {
         // 없는 표가 있을 수 있다. 미리 한 번 두드려 본다.

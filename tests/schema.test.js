@@ -394,3 +394,62 @@ describe('걸러 내는 칸을 실제로 뽑는가', () => {
     for (const need of NEEDS) expect(thread).toContain(`r.${need}`)
   })
 })
+
+// 지우는 목록에 application_id 없는 표를 넣은 것.
+//
+// 방문 자료를 딸린 기록까지 지우는 라우트가 자식 표 목록을 들고 있다.
+// 거기에 beta_result 를 넣었는데, 그 표에는 application_id 가 없다 —
+// beta_round 를 거쳐야 신청서에 닿는다. `DELETE FROM beta_result WHERE
+// application_id IN (...)` 이 되어 배치 전체가 터지고 503 이 났다.
+//
+// 라이브에서 눌러 보고서야 알았다. SQL 은 문자열이라 아무도 안 읽어 준다.
+describe('자식 표 목록이 실제 스키마와 맞는가', () => {
+  const tables = readSchema()
+
+  it('application_id 로 지우는 표는 그 컬럼을 갖고 있다', () => {
+    const src = readFileSync(
+      join(ROOT, 'functions', 'api', 'demo', 'visitors.js'),
+      'utf8'
+    )
+    const block = src.slice(src.indexOf('const CHILD_TABLES = ['))
+    const list = block.slice(0, block.indexOf(']'))
+    const names = [...list.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
+
+    expect(names.length).toBeGreaterThan(10)
+    const problems = []
+    for (const t of names) {
+      if (!tables.has(t)) {
+        problems.push(`${t} — 그런 표가 없습니다`)
+      } else if (!tables.get(t).has('application_id')) {
+        problems.push(`${t} — application_id 컬럼이 없습니다`)
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
+  it('부모를 거쳐 지우는 표는 그 길이 실제로 있다', () => {
+    const src = readFileSync(
+      join(ROOT, 'functions', 'api', 'demo', 'visitors.js'),
+      'utf8'
+    )
+    const rows = [
+      ...src.matchAll(/\{\s*table:\s*'([a-z_]+)',\s*via:\s*'([a-z_]+)',\s*parent:\s*'([a-z_]+)'\s*\}/g),
+    ]
+    expect(rows.length).toBeGreaterThan(0)
+    for (const [, table, via, parent] of rows) {
+      expect(tables.has(table), table).toBe(true)
+      expect(tables.get(table).has(via), `${table}.${via}`).toBe(true)
+      expect(tables.has(parent), parent).toBe(true)
+      expect(tables.get(parent).has('application_id'), `${parent}.application_id`).toBe(true)
+      // 그리고 그 표는 자식 목록에 있으면 안 된다 — 두 번 지우려 든다.
+      expect(tables.get(table).has('application_id'), `${table} 은 손자가 아닙니다`).toBe(false)
+    }
+  })
+
+  it('이 검사가 헛돌지 않는다', () => {
+    // 실제로 났던 그 상태를 확인한다.
+    expect(tables.get('beta_result').has('application_id')).toBe(false)
+    expect(tables.get('beta_result').has('round_id')).toBe(true)
+    expect(tables.get('beta_round').has('application_id')).toBe(true)
+  })
+})
