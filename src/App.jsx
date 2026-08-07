@@ -26,6 +26,22 @@ const PriorityPage = lazy(() => import('./pages/PriorityPage.jsx'))
 const BuiltPage = lazy(() => import('./pages/BuiltPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
+// 여덟 단계 어디에도 안 들어가는 화면들. 단계를 가로로 지르며 본다.
+//
+// 순서는 담당자가 하루를 시작하는 순서다 — 무엇을 먼저 할지 정하고, 멈춘
+// 것을 보고, 넘긴 것이 잘 도는지 보고, 그다음 기록과 못 한 것을 본다.
+// 부서용 두 개(접수번호 조회)는 맨 뒤에 둔다.
+export const CROSSCUT = [
+  { to: '/priority', label: '먼저 할 것', note: '무엇부터 할지 정하는 자리' },
+  { to: '/stall', label: '막힌 곳', note: '어느 단계에서 멈춰 있나' },
+  { to: '/tools', label: '넘긴 뒤', note: '배포한 도구가 실제로 쓰이나' },
+  { to: '/codes', label: '알려 준 코드', note: '부서가 이어 둔 상품코드' },
+  { to: '/log', label: '결정 기록', note: '무엇을 왜 그렇게 정했나' },
+  { to: '/honesty', label: '못 한 것', note: '안 되는 것과 증명 못 한 것' },
+  { to: '/built', label: '기술 구현', note: '무엇을 어떻게 만들었나' },
+  { to: '/track', label: '접수번호 조회', note: '부서가 자기 신청서를 보는 자리' },
+]
+
 // 목차와 꼬리말 없이 여는 화면들.
 //
 // /t/:slug, /track — 부서 담당자가 여는 자리다. 제작 과정도 상단 목차도
@@ -143,6 +159,25 @@ export default function App() {
                 같은 파일을 넣으면 언제나 같은 결과가 나오고, 어느 숫자든 눌러서 원본
                 파일의 몇 번째 줄에서 왔는지까지 되짚을 수 있습니다.
               </p>
+            </div>
+            {/* 여덟 단계를 세로로 내려가는 것이 아니라 **가로로 훑는** 화면들.
+                목차에 같이 걸어 뒀다가 뺐다 — 처음 온 사람에게 열네 칸을 한꺼번에
+                내밀면 어디부터 눌러야 할지 모른다.
+                그렇다고 링크를 아예 없애면 안 된다. 이 화면들로 가는 다른 길은
+                첫 화면 할 일 목록뿐인데, 그건 **할 일이 있을 때만** 뜬다. 지금처럼
+                신청서가 없는 상태에서는 아무 데서도 못 간다. 이 저장소에서 제일
+                자주 난 사고가 바로 그것이다 — 만들어는 뒀는데 아무도 못 가는 것.
+                꼬리말은 늘 있고, 목차와 자리를 다투지 않는다. */}
+            <div className="footer-col">
+              <div className="footer-title">가로로 훑어보기</div>
+              <nav className="footer-links" aria-label="전체를 가로로 보는 화면">
+                {CROSSCUT.map((c) => (
+                  <Link key={c.to} to={c.to} className="footer-link">
+                    {c.label}
+                    <span className="footer-link-note">{c.note}</span>
+                  </Link>
+                ))}
+              </nav>
             </div>
           </div>
           <div className="footer-bottom">

@@ -179,8 +179,16 @@
   max-width: 1180px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr;
+  /* 네 번째 칸(가로로 훑어보기)이 늘어나면서 앞의 글이 눌리지 않게 한다. */
+  grid-template-columns: 1.3fr 0.9fr 1.1fr 0.9fr;
   gap: 32px;
+}
+
+@media (max-width: 1080px) {
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 26px;
+  }
 }
 
 @media (max-width: 860px) {
@@ -188,6 +196,41 @@
     grid-template-columns: 1fr;
     gap: 22px;
   }
+}
+
+/* 꼬리말의 가로 훑기 링크.
+   글이 아니라 목록이므로 줄 간격을 좁히고, 각 줄에 "여기 눌러서 무엇을
+   보는가"를 한 마디로 붙인다. 이름만 있으면 안 누른다. */
+.footer-links {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.footer-link {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 8px;
+  margin-left: -8px;
+  border-radius: 8px;
+  color: var(--text-h);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: background 0.14s ease;
+}
+
+.footer-link:hover,
+.footer-link:focus-visible {
+  background: var(--surface);
+}
+
+.footer-link-note {
+  font-size: 11.5px;
+  font-weight: 400;
+  color: var(--text-muted);
+  line-height: 1.35;
 }
 
 .footer-title {
