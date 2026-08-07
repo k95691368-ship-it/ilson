@@ -7,7 +7,7 @@
     "dev": "vite",
     "dev:full": "wrangler pages dev -- npm run dev",
     "build": "vite build",
-    "lint": "oxlint",
+    "lint": "oxlint src shared functions",
     "test": "vitest run --exclude tests/smoke.test.js --exclude tests/e2e.test.js",
     "smoke": "vitest run tests/smoke.test.js",
     "e2e": "vitest run tests/e2e.test.js",

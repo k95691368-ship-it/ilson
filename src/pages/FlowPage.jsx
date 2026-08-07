@@ -303,6 +303,24 @@ function TryIt({ provenance, counts }) {
   const toast = useToast()
   const demoCount = provenance?.demo ?? 0
 
+  // 펼칠 때만 센다. 첫 화면은 이미 일곱 곳을 두드리고 있어서 하나 더
+  // 늘리면 열릴 때마다 그만큼 느려진다.
+  //
+  // 이 훅이 아래 "아무것도 없을 때" 분기 **뒤에** 있었다. 그러면 신청서가
+  // 없을 때는 훅이 안 불리고 생기면 불린다 — 리액트는 렌더마다 훅 개수가
+  // 같아야 하므로, 예시를 넣어 개수가 0에서 8로 바뀌는 순간 첫 화면이
+  // 통째로 깨질 수 있다. 조건 앞으로 올린다.
+  useEffect(() => {
+    if (!open || visitors != null) return
+    api
+      .get('/demo/visitors')
+      .then((r) => {
+        setVisitors(r.count ?? 0)
+        setTouched(r.touched ?? 0)
+      })
+      .catch(() => setVisitors(0))
+  }, [open, visitors])
+
   async function seed() {
     setBusy(true)
     try {
@@ -367,18 +385,6 @@ function TryIt({ provenance, counts }) {
     )
   }
 
-  // 펼칠 때만 센다. 첫 화면은 이미 일곱 곳을 두드리고 있어서 하나 더
-  // 늘리면 열릴 때마다 그만큼 느려진다.
-  useEffect(() => {
-    if (!open || visitors != null) return
-    api
-      .get('/demo/visitors')
-      .then((r) => {
-        setVisitors(r.count ?? 0)
-        setTouched(r.touched ?? 0)
-      })
-      .catch(() => setVisitors(0))
-  }, [open, visitors])
 
   async function reset() {
     setBusy(true)

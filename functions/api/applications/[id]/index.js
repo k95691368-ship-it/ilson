@@ -67,10 +67,3 @@ export async function onRequestGet({ env, params }) {
   }
 }
 
-function safeParse(text, fallback) {
-  try {
-    return text ? JSON.parse(text) : fallback
-  } catch {
-    return fallback
-  }
-}

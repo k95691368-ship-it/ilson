@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'

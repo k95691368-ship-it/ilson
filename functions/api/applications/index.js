@@ -6,12 +6,10 @@
 
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { checkRateLimit, releaseRateLimit } from '../../_lib/rateLimit.js'
-import { newId, newTicketNo, hashIp, sha256Hex } from '../../_lib/ids.js'
+import { newId, newTicketNo, hashIp } from '../../_lib/ids.js'
 import {
   validateApplication,
-  validateFile,
   annualHours,
-  MAX_FILES,
   DEPTS,
   APP_STATUSES,
 } from '../../_lib/applications.js'
