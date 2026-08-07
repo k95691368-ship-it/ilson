@@ -5,7 +5,16 @@ import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
 import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
 import { provenanceLine, provenanceDetail } from '../../shared/provenance.js'
-import { TRY_STEPS, TRY_TERMS, RESET_NOTE, VISITOR_NOTE, resetLabel, visitorLabel } from '../../shared/tryit.js'
+import {
+  TRY_STEPS,
+  TRY_TERMS,
+  RESET_NOTE,
+  VISITOR_NOTE,
+  EMPTY_INVITE,
+  isEmptySite,
+  resetLabel,
+  visitorLabel,
+} from '../../shared/tryit.js'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { readableWhy } from '../../shared/notice.js'
@@ -46,7 +55,7 @@ export default function FlowPage() {
           있는데, 그 사실을 아무 데도 안 적어 뒀다. 화면이 전부 "담당자가
           자기 일을 하는 중"으로 쓰여 있어서 보러 온 사람은 읽기만 하고
           나간다. 할 수 있게 만들어 놓고 할 수 있다고 말을 안 한 것이다. */}
-      <TryIt provenance={data?.provenance} />
+      <TryIt provenance={data?.provenance} counts={data?.counts} />
 
       {data && data.counts.total > 0 && (
         <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} signoffs={signoffs} />
@@ -191,12 +200,80 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
 // 초대하면서 두 가지를 같이 준다 — 누른 것이 기록에 남는다는 사실과,
 // 되돌리는 법. 앞엣것을 숨기면 나중에 알았을 때 속은 기분이 들고,
 // 뒤엣것이 없으면 망칠까 봐 아무도 안 누른다.
-function TryIt({ provenance }) {
+function TryIt({ provenance, counts }) {
+  const empty = isEmptySite(counts)
+  // 비어 있으면 접어 두지 않는다. 접어 두면 "무엇을 해볼 수 있나"를 눌러야
+  // 채우는 자리가 나오는데, 화면에 아무것도 없는 상태에서 그걸 누를 이유를
+  // 아무도 모른다.
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [visitors, setVisitors] = useState(null)
   const toast = useToast()
   const demoCount = provenance?.demo ?? 0
+
+  async function seed() {
+    setBusy(true)
+    try {
+      const r = await api.post('/demo/seed', {})
+      toast.success(`예시 신청서 ${r.added}건을 넣었습니다.`)
+      // 숫자가 화면 곳곳에 걸려 있어서 다시 읽는 편이 확실하다.
+      window.location.reload()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // 아무것도 없을 때는 초대문 대신 채우는 자리를 보여 준다.
+  //
+  // 원래 초대문의 첫 항목은 "접수함에서 아무거나 골라 판정해 보세요"다.
+  // 접수함이 비어 있으면 그건 빈 방으로 안내하는 말이 된다.
+  if (empty) {
+    return (
+      <section className="tryit tryit-empty">
+        <div className="tryit-head">
+          <span className="badge badge-accent">보러 오신 분께</span>
+          <strong className="tryit-title">{EMPTY_INVITE.title}</strong>
+        </div>
+        <p className="tryit-sub">{EMPTY_INVITE.why}</p>
+
+        <div className="tryit-empty-actions">
+          {EMPTY_INVITE.actions.map((a) =>
+            a.key === 'seed' ? (
+              <div key={a.key} className="tryit-empty-action">
+                <button
+                  type="button"
+                  className="btn-primary btn-sm"
+                  onClick={seed}
+                  disabled={busy}
+                >
+                  {busy ? '넣는 중…' : a.label}
+                </button>
+                <div className="tryit-what">{a.what}</div>
+                <div className="tryit-note">{a.note}</div>
+              </div>
+            ) : (
+              <div key={a.key} className="tryit-empty-action">
+                <Link to={a.to} className="btn-ghost btn-sm">
+                  {a.label}
+                </Link>
+                <div className="tryit-what">{a.what}</div>
+                <div className="tryit-note">{a.note}</div>
+              </div>
+            )
+          )}
+        </div>
+
+        {/* 넣기 전에 밝힌다. 넣고 나서 알면 속은 기분이 든다. */}
+        <ul className="tryit-terms">
+          {EMPTY_INVITE.terms.map((t) => (
+            <li key={t}>{t}</li>
+          ))}
+        </ul>
+      </section>
+    )
+  }
 
   // 펼칠 때만 센다. 첫 화면은 이미 일곱 곳을 두드리고 있어서 하나 더
   // 늘리면 열릴 때마다 그만큼 느려진다.

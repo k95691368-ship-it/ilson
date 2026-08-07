@@ -6230,3 +6230,44 @@ kbd {
     margin-bottom: 9px;
   }
 }
+
+/* 아무것도 없을 때의 초대문.
+   접혀 있지 않고, 목록이 아니라 두 갈래 선택이다. 처음 오신 분이 화면에서
+   제일 먼저 보게 되는 자리라 조금 더 자리를 준다. */
+.tryit-empty {
+  padding: 17px 19px 15px;
+}
+
+.tryit-empty-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-top: 14px;
+}
+
+@media (max-width: 760px) {
+  .tryit-empty-actions {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
+.tryit-empty-action {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 13px;
+  border-radius: var(--radius);
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+
+.tryit-empty-action .tryit-what,
+.tryit-empty-action .tryit-note {
+  margin: 0;
+}
+
+.tryit-empty .tryit-terms {
+  margin-top: 14px;
+}

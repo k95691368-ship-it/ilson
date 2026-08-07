@@ -1,5 +1,17 @@
 import { describe, it, expect } from 'vitest'
-import { TRY_STEPS, TRY_TERMS, RESET_NOTE, VISITOR_NOTE, tryStep, resetLabel, visitorLabel } from '../shared/tryit.js'
+import {
+  TRY_STEPS,
+  TRY_TERMS,
+  RESET_NOTE,
+  VISITOR_NOTE,
+  EMPTY_INVITE,
+  isEmptySite,
+  tryStep,
+  resetLabel,
+  visitorLabel,
+} from '../shared/tryit.js'
+import { DEMO_PREFIX } from '../shared/provenance.js'
+import { DEMO_APPLICATIONS } from '../functions/_lib/demoApplications.js'
 import { validateReview, MIN_REASON } from '../shared/review.js'
 
 // 이 사이트에는 로그인이 없다. 실수가 아니라 정한 것이다 — 부서 담당자에게
@@ -207,5 +219,85 @@ describe('넘기기 전에 무엇을 막는다고 말했나', () => {
     // "잘 보이려고 손댈 수 없다"는 주장은 손으로 적은 목록이면 거짓이 된다.
     expect(tryStep('honesty').note).toContain('데이터에서 만들어지므로')
     expect(tryStep('honesty').note).toContain('손댈 수 없습니다')
+  })
+})
+
+// 아무것도 없을 때.
+//
+// 초대문을 만들어 놓고 정작 빈 상태를 생각 안 했다. 예시를 전부 지운 뒤로
+// 첫 화면은 "접수함에서 아무거나 골라 판정해 보세요"라고 적어 놓고, 눌러서
+// 들어가면 접수함이 비어 있었다. 초대해 놓고 빈 방으로 안내한 것이다.
+//
+// 라이브에서 /api/overview 가 counts.total 0 을 돌려주는 것을 눈으로 보고
+// 알았다. 시험도 빌드도 린트도 전부 통과하고 있었다 — 데이터가 없는 상태를
+// 아무도 안 세고 있었기 때문이다.
+describe('아무것도 없을 때', () => {
+  it('비었는지를 숫자로 가른다', () => {
+    expect(isEmptySite({ total: 0 })).toBe(true)
+    expect(isEmptySite({ total: 3 })).toBe(false)
+  })
+
+  it('아직 못 읽었으면 비었다고 하지 않는다', () => {
+    // 불러오는 중에 "비어 있습니다"가 번쩍했다가 사라지면 잘못 만든
+    // 화면처럼 보인다. undefined 는 모른다는 뜻이지 0이 아니다.
+    expect(isEmptySite(undefined)).toBe(false)
+    expect(isEmptySite(null)).toBe(false)
+    expect(isEmptySite({})).toBe(false)
+    expect(isEmptySite({ total: null })).toBe(false)
+  })
+
+  it('왜 비어 있는지를 먼저 말한다', () => {
+    // 빈 화면만 보여주면 고장 난 사이트로 읽힌다.
+    expect(EMPTY_INVITE.why.length).toBeGreaterThan(30)
+    expect(EMPTY_INVITE.title).toContain('한 건도 없습니다')
+  })
+
+  it('한 번에 채우는 쪽을 먼저 놓는다', () => {
+    // 직접 한 건 적는 데 십 분이 걸리고, 그 한 건으로는 우선순위도
+    // 반려 대비도 안 보인다.
+    expect(EMPTY_INVITE.actions[0].key).toBe('seed')
+    expect(EMPTY_INVITE.actions[1].to).toBe('/apply')
+  })
+
+  it('갈래마다 무엇을 하는 것인지 적는다', () => {
+    for (const a of EMPTY_INVITE.actions) {
+      expect(a.label.length).toBeGreaterThan(5)
+      expect(a.what.length).toBeGreaterThan(15)
+      expect(a.note.length).toBeGreaterThan(20)
+    }
+  })
+
+  it('넣기 전에 심은 것이라고 밝힌다', () => {
+    // 넣고 나서 알면 속은 기분이 든다. 이 사이트가 부서에게 요구하는
+    // 것과 같은 태도여야 한다.
+    const terms = EMPTY_INVITE.terms.join(' ')
+    expect(terms).toContain(DEMO_PREFIX)
+    // 심는 것은 신청서뿐이고 그 뒤는 실제로 돈다는 것도 같이 말한다.
+    // 이걸 빼면 화면 전체가 꾸며 낸 것으로 읽힌다.
+    expect(terms).toContain('실제로 돌아간 결과')
+    // 되돌리는 법이 없으면 아무도 안 누른다.
+    expect(terms).toContain('다시 지울 수 있습니다')
+  })
+
+  it('심는 것이 실제로 여덟 건이다', () => {
+    // 화면에 적은 숫자와 실제로 심기는 개수가 어긋나면, 눌러 본 사람이
+    // 그 자리에서 거짓말을 발견한다.
+    expect(EMPTY_INVITE.actions[0].what).toContain('여덟 건')
+    expect(DEMO_APPLICATIONS).toHaveLength(8)
+  })
+
+  it('심는 것이 전부 그 앞자리를 쓴다', () => {
+    // 하나라도 다른 앞자리면 그 건은 "직접 낸 것"으로 세어져서,
+    // 화면이 출처를 잘못 밝힌다.
+    for (const a of DEMO_APPLICATIONS) {
+      expect(a.ticket_no.startsWith(DEMO_PREFIX)).toBe(true)
+    }
+  })
+
+  it('반려·보류로 갈 것이 섞여 있다', () => {
+    // 전부 수용될 것만 심으면 반려 화면도 보류 화면도 빈 채로 남는다.
+    // 여덟 건이 서로 성격이 달라야 우선순위를 견주는 일이 뜻을 갖는다.
+    const depts = new Set(DEMO_APPLICATIONS.map((a) => a.dept))
+    expect(depts.size).toBeGreaterThan(2)
   })
 })
