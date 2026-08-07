@@ -150,16 +150,34 @@ export default function RecordPage() {
               <KV>
                 <dt>판정 근거</dt>
                 <dd>{rec.review.verdict_reason}</dd>
-                <dt>임팩트</dt>
-                <dd>
-                  {rec.review.impact_score}점 — {rec.review.impact_reason}
-                </dd>
-                <dt>난이도</dt>
-                <dd>
-                  {rec.review.difficulty_score}점 — {rec.review.difficulty_reason}
-                </dd>
-                <dt>고려한 대안</dt>
-                <dd>{rec.review.alternatives_considered}</dd>
+                {/* 점수가 비어 있을 수 있다. 한 번에 여러 건을 미룰 때는
+                    점수를 매기지 않는다. 그때 "null점"이라고 찍히면 서류가
+                    고장 난 것처럼 보이므로, 안 매겼다고 적는다. */}
+                {rec.review.impact_score != null ? (
+                  <>
+                    <dt>임팩트</dt>
+                    <dd>
+                      {rec.review.impact_score}점 — {rec.review.impact_reason}
+                    </dd>
+                    <dt>난이도</dt>
+                    <dd>
+                      {rec.review.difficulty_score}점 — {rec.review.difficulty_reason}
+                    </dd>
+                  </>
+                ) : (
+                  <>
+                    <dt>점수</dt>
+                    <dd>
+                      매기지 않았습니다 — 여러 건을 한 번에 보면서 미룬 건입니다.
+                    </dd>
+                  </>
+                )}
+                {rec.review.alternatives_considered && (
+                  <>
+                    <dt>고려한 대안</dt>
+                    <dd>{rec.review.alternatives_considered}</dd>
+                  </>
+                )}
                 {rec.review.refuse_alternative && (
                   <>
                     <dt>반려하며 제시한 대안</dt>

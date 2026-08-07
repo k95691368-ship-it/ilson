@@ -49,6 +49,32 @@ export async function onRequestPost({ env, request }) {
     // 건 안 바뀐 상태가 남는데, 무엇이 됐는지 아무도 모른다.
     const stmts = []
     for (const app of ok) {
+      // 한 번에 미루는 것도 판정이다. 조건을 review 표에 적는다.
+      //
+      // 여태 기록에만 남겼다. review 표가 점수 네 칸을 NOT NULL 로 받았고,
+      // 한 번에 미루는 것은 점수를 매기는 일이 아니라 넣을 값이 없었기
+      // 때문이다. 그 결과 담당자가 **의무로 적은** 다시 볼 조건을 읽는
+      // 자리가 넷 다 비어 있었고 30일 넘김 경보도 안 켜졌다.
+      //
+      // 0이나 3 같은 값으로 채우지 않는다. 그러면 우선순위 화면이 그
+      // 신청서를 실제로 견줘 본 것처럼 그린다. 안 매긴 것은 비워 두고,
+      // bulk 칸으로 "한 번에 미루면서 남긴 것"임을 밝힌다.
+      if (spec.code === 'hold') {
+        stmts.push(
+          env.DB.prepare(
+            `INSERT INTO review
+               (application_id, verdict, verdict_reason, hold_until_condition,
+                bulk, reviewer_label, decided_at, updated_at)
+             VALUES (?, '보류', ?, ?, 1, ?, datetime('now'), datetime('now'))
+             ON CONFLICT(application_id) DO UPDATE SET
+               verdict = '보류',
+               verdict_reason = excluded.verdict_reason,
+               hold_until_condition = excluded.hold_until_condition,
+               bulk = 1,
+               updated_at = datetime('now')`
+          ).bind(app.id, `한 번에 여러 건을 보면서 미뤘습니다. ${reason}`, reason, author)
+        )
+      }
       if (spec.changesStatus) {
         stmts.push(
           env.DB.prepare(

@@ -28,19 +28,39 @@ function readSchema() {
     .join('\n')
 
   const tables = new Map()
-  const re = /CREATE TABLE (?:IF NOT EXISTS )?([a-z_]+)\s*\(([\s\S]*?)\n\);/g
+
+  // 마이그레이션을 **순서대로 훑으며** 표가 생기고 이름이 바뀌고 사라지는
+  // 것을 따라간다.
+  //
+  // 여태 CREATE TABLE 만 봤다. 그런데 SQLite 에는 컬럼의 NOT NULL 을 떼는
+  // 문법이 없어서, 그럴 때는 새 표를 만들고 옮기고 이름을 바꾼다. 그 방식을
+  // 안 따라가면 검사기가 **옛 정의를 붙들고 있게 된다** — 새로 생긴 컬럼을
+  // "없는 컬럼"이라고 하고, 없어진 컬럼은 있다고 한다.
+  //
+  // 검사기가 틀리는 것이 진짜 오타를 놓치는 것보다 나쁘다. 빨간 불이
+  // 거짓이면 사람은 빨간 불 자체를 안 믿게 된다.
+  const step =
+    /CREATE TABLE (?:IF NOT EXISTS )?([a-z_]+)\s*\(([\s\S]*?)\n\);|DROP TABLE (?:IF EXISTS )?([a-z_]+)\s*;|ALTER TABLE ([a-z_]+) RENAME TO ([a-z_]+)\s*;/g
   let m
-  while ((m = re.exec(sql))) {
-    const [, name, body] = m
-    const cols = new Set()
-    for (const line of body.split('\n')) {
-      const t = line.trim()
-      // 제약조건 줄은 컬럼이 아니다.
-      if (/^(PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\b/i.test(t)) continue
-      const col = t.match(/^([a-z_][a-z0-9_]*)\s+[A-Z]/)
-      if (col) cols.add(col[1])
+  while ((m = step.exec(sql))) {
+    const [, created, body, dropped, from, to] = m
+    if (created) {
+      const cols = new Set()
+      for (const line of body.split('\n')) {
+        const t = line.trim()
+        // 제약조건 줄은 컬럼이 아니다.
+        if (/^(PRIMARY|FOREIGN|UNIQUE|CHECK|CONSTRAINT)\b/i.test(t)) continue
+        const col = t.match(/^([a-z_][a-z0-9_]*)\s+[A-Z]/)
+        if (col) cols.add(col[1])
+      }
+      tables.set(created, cols)
+    } else if (dropped) {
+      tables.delete(dropped)
+    } else if (from) {
+      const cols = tables.get(from)
+      tables.delete(from)
+      if (cols) tables.set(to, cols)
     }
-    tables.set(name, cols)
   }
   return tables
 }
@@ -160,6 +180,15 @@ describe('SQL이 없는 컬럼을 쓰고 있지 않은지', () => {
     ).toBeNull()
     // 함수가 낀 항목은 건너뛴다.
     expect(bareColumns('SELECT COUNT(*) AS n FROM review')).toEqual([])
+  })
+
+  it('이름을 바꾼 표를 따라간다', () => {
+    // 0010 이 review 를 새로 만들고 옮기고 이름을 바꾼다. 그걸 못 따라가면
+    // 검사기가 옛 정의를 붙들고 새 컬럼을 "없는 컬럼"이라고 한다.
+    expect(tables.has('review_new')).toBe(false)
+    expect(tables.get('review')?.has('bulk')).toBe(true)
+    // 옛 정의에만 있던 것이 아니라 새 정의를 보고 있는지 확인한다.
+    expect(tables.get('review')?.has('hold_until_condition')).toBe(true)
   })
 
   it('마이그레이션에서 표를 읽어 낸다', () => {
@@ -451,5 +480,65 @@ describe('자식 표 목록이 실제 스키마와 맞는가', () => {
     expect(tables.get('beta_result').has('application_id')).toBe(false)
     expect(tables.get('beta_result').has('round_id')).toBe(true)
     expect(tables.get('beta_round').has('application_id')).toBe(true)
+  })
+})
+
+// 한 사실이 두 곳에 나뉘어 있던 것.
+//
+// 보류가 두 길로 들어왔다. 한 건씩 판정하면 review 표에 조건이 적히고,
+// 한 번에 미루면 decision_log 에만 남았다. review 표가 점수 네 칸을
+// NOT NULL 로 받아서, 점수를 안 매기는 일괄 보류는 넣을 값이 없었기
+// 때문이다.
+//
+// 읽는 쪽에서 두 자리를 다 보게 해서 급한 불은 껐지만, 새 화면을 만들 때마다
+// 두 곳을 기억해야 하고 한 곳만 보면 조용히 빈 값이 된다. 점수를 비워 둘 수
+// 있게 하고 한 곳에만 적는다.
+describe('보류를 한 곳에만 적는가', () => {
+  const tables = readSchema()
+
+  it('점수를 안 매길 수 있다', () => {
+    // 0이나 3으로 채우면 우선순위 화면이 그 신청서를 실제로 견줘 본 것처럼
+    // 그린다. 안 매긴 것은 안 매겼다고 적어야 한다.
+    const sql = readFileSync(join(ROOT, 'migrations', '0010_review_hold.sql'), 'utf8')
+    expect(sql).toContain('impact_score REAL CHECK')
+    expect(sql).not.toMatch(/impact_score REAL NOT NULL/)
+    expect(sql).not.toMatch(/difficulty_score REAL NOT NULL/)
+  })
+
+  it('한 번에 미룬 것인지 표에 남긴다', () => {
+    // 점수가 비었다는 것만으로 짐작하면, 나중에 점수를 선택 입력으로 바꾸는
+    // 날 뜻이 달라진다.
+    expect(tables.get('review').has('bulk')).toBe(true)
+  })
+
+  it('판정과 근거는 여전히 반드시 받는다', () => {
+    // 여기까지 비우면 "왜 미뤘는지 모르는 보류"가 생긴다.
+    const sql = readFileSync(join(ROOT, 'migrations', '0010_review_hold.sql'), 'utf8')
+    expect(sql).toMatch(/verdict TEXT NOT NULL/)
+    expect(sql).toMatch(/verdict_reason TEXT NOT NULL/)
+  })
+
+  it('한 번에 미루면 그 표에 실제로 쓴다', () => {
+    const bulk = readFileSync(
+      join(ROOT, 'functions', 'api', 'applications', 'bulk.js'),
+      'utf8'
+    )
+    expect(bulk).toContain('INSERT INTO review')
+    expect(bulk).toContain('hold_until_condition')
+    // 점수를 지어내지 않는다.
+    const stmt = bulk.slice(bulk.indexOf('INSERT INTO review'), bulk.indexOf('.bind(app.id'))
+    expect(stmt).not.toContain('impact_score')
+    expect(stmt).not.toContain('difficulty_score')
+  })
+
+  it('옮겨 담을 때 있던 줄을 안 잃는다', () => {
+    // 표를 새로 만들고 옮기는 마이그레이션이다. INSERT ... SELECT 가
+    // 빠지면 그동안의 판정이 통째로 사라진다.
+    const sql = readFileSync(join(ROOT, 'migrations', '0010_review_hold.sql'), 'utf8')
+    expect(sql).toContain('INSERT INTO review_new')
+    expect(sql).toContain('FROM review')
+    expect(sql).toContain('ALTER TABLE review_new RENAME TO review')
+    // 옮기기 전에 지우면 안 된다.
+    expect(sql.indexOf('INSERT INTO review_new')).toBeLessThan(sql.indexOf('DROP TABLE review'))
   })
 })

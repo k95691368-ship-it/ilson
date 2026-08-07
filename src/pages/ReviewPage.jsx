@@ -773,13 +773,16 @@ function Detail({ id, onSaved, pool }) {
     if (!data) return
     if (data.review) {
       setForm({
-        impact_score: String(data.review.impact_score),
-        impact_reason: data.review.impact_reason,
-        difficulty_score: String(data.review.difficulty_score),
-        difficulty_reason: data.review.difficulty_reason,
+        // 한 번에 미룬 건은 점수가 비어 있다. String(null) 은 "null" 이라
+        // 그대로 넣으면 점수 칸에 그 글자가 뜬다.
+        impact_score: data.review.impact_score != null ? String(data.review.impact_score) : '3',
+        impact_reason: data.review.impact_reason ?? '',
+        difficulty_score:
+          data.review.difficulty_score != null ? String(data.review.difficulty_score) : '3',
+        difficulty_reason: data.review.difficulty_reason ?? '',
         verdict: data.review.verdict,
         verdict_reason: data.review.verdict_reason,
-        alternatives_considered: data.review.alternatives_considered,
+        alternatives_considered: data.review.alternatives_considered ?? '',
         refuse_code: data.review.refuse_code ?? '',
         refuse_alternative: data.review.refuse_alternative ?? '',
         hold_until_condition: data.review.hold_until_condition ?? '',
