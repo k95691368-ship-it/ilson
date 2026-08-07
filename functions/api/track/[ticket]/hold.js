@@ -16,6 +16,7 @@ import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import {
   validateHoldLift,
   holdState,
+  BULK_HOLD_KIND,
   liftKindOf,
   HOLD_LIFT_KIND,
   HOLD_LIFT_CANCEL_KIND,
@@ -29,18 +30,27 @@ async function load(env, ticket) {
     .first()
   if (!app) return null
 
-  const [review, records] = await Promise.all([
+  const [review, records, bulkRows] = await Promise.all([
     env.DB.prepare(
       'SELECT verdict, hold_until_condition, decided_at, updated_at FROM review WHERE application_id = ?'
     )
       .bind(app.id)
       .first(),
     env.DB.prepare(
-      `SELECT id, title, what, alternatives, link_kind, created_at FROM decision_log
+      `SELECT id, title, what, alternatives, link_kind, link_id, created_at FROM decision_log
        WHERE application_id = ? AND link_kind IN (?, ?)
        ORDER BY created_at`
     )
       .bind(app.id, HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND)
+      .all(),
+    // 한 번에 미룬 기록. review 표에 조건이 없는 건은 여기에만 남아 있다.
+    // 이걸 안 읽어서 "다시 볼 조건"이 안 보이고 30일 경보도 안 켜졌다.
+    env.DB.prepare(
+      `SELECT what, link_kind, link_id, created_at FROM decision_log
+       WHERE application_id = ? AND link_kind = ?
+       ORDER BY created_at`
+    )
+      .bind(app.id, BULK_HOLD_KIND)
       .all(),
   ])
 
@@ -55,7 +65,7 @@ async function load(env, ticket) {
     at: r.created_at,
   }))
 
-  return { app, review, records: rows }
+  return { app, review, records: rows, decisions: bulkRows.results }
 }
 
 export async function onRequestGet({ env, params }) {
@@ -66,6 +76,7 @@ export async function onRequestGet({ env, params }) {
       application: loaded.app,
       review: loaded.review,
       records: loaded.records,
+      decisions: loaded.decisions,
     }),
   })
 }
@@ -122,7 +133,12 @@ export async function onRequestPost({ env, request, params }) {
       const after = await load(env, loaded.app.ticket_no)
       return jsonResponse({
         ok: true,
-        state: holdState({ application: after.app, review: after.review, records: after.records }),
+        state: holdState({
+          application: after.app,
+          review: after.review,
+          records: after.records,
+          decisions: after.decisions,
+        }),
         message: '거두었습니다. 다시 알려주셔도 됩니다.',
       })
     } catch (err) {
@@ -162,7 +178,12 @@ export async function onRequestPost({ env, request, params }) {
     const after = await load(env, loaded.app.ticket_no)
     return jsonResponse({
       ok: true,
-      state: holdState({ application: after.app, review: after.review, records: after.records }),
+      state: holdState({
+          application: after.app,
+          review: after.review,
+          records: after.records,
+          decisions: after.decisions,
+        }),
       message: kind.ready
         ? '알려주셔서 고맙습니다. 담당자 할 일 목록에 올려 두었습니다 — 다시 판정하면 이 화면에 뜹니다.'
         : '알려주셔서 고맙습니다. 조건은 그대로여도 사정이 달라진 것은 판정에 반영됩니다.',

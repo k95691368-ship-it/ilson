@@ -83,10 +83,24 @@ export async function onRequestGet({ env }) {
            WHERE r.verdict = '반려' ORDER BY r.updated_at DESC LIMIT 20`
         ).all(),
 
+        // 보류는 두 길로 들어온다. 한 건씩 판정하면 review 에 조건이 적히고,
+        // 접수함에서 한 번에 미루면 decision_log 에만 남는다. review 만 보면
+        // 한 번에 미룬 건이 이 화면에서 통째로 빠진다 — 이 화면은 못 한 것을
+        // 모아 보여주는 자리인데, 정작 미뤄 둔 것 절반을 빠뜨리고 있었다.
         env.DB.prepare(
-          `SELECT a.id, a.ticket_no, a.dept, a.title, r.hold_until_condition, r.updated_at
-           FROM review r JOIN application a ON a.id = r.application_id
-           WHERE r.verdict = '보류' ORDER BY r.updated_at DESC LIMIT 20`
+          `SELECT a.id, a.ticket_no, a.dept, a.title,
+                  r.hold_until_condition,
+                  COALESCE(r.updated_at, b.created_at) AS updated_at,
+                  b.what AS bulk_what
+           FROM application a
+           LEFT JOIN review r ON r.application_id = a.id
+           LEFT JOIN (
+             SELECT application_id, what, created_at,
+                    ROW_NUMBER() OVER (PARTITION BY application_id ORDER BY created_at DESC) AS rn
+             FROM decision_log WHERE link_kind = '일괄:hold'
+           ) b ON b.application_id = a.id AND b.rn = 1
+           WHERE a.status = '보류'
+           ORDER BY updated_at DESC LIMIT 20`
         ).all(),
 
         // 접수만 되고 아직 아무도 안 본 것. 이게 가장 정직하게 아픈 숫자다.
@@ -212,7 +226,16 @@ export async function onRequestGet({ env }) {
       unproven: UNPROVEN,
       refused: refused.results,
       refusedWithoutAlternative: refused.results.filter((r) => !r.refuse_alternative).length,
-      held: held.results,
+      // 어느 길로 들어온 보류든 조건 한 칸으로 내보낸다. 화면은 두 길을
+      // 알 필요가 없다.
+      held: held.results.map((h) => ({
+        ...h,
+        hold_until_condition:
+          h.hold_until_condition ||
+          String(h.bulk_what ?? '').replace(/^보류로 미룹니다\.\s*/, '') ||
+          null,
+        bulk: !h.hold_until_condition && Boolean(h.bulk_what),
+      })),
       stuck: stuck.results,
       quarantine: quarantine.results,
       quarantineTotal,

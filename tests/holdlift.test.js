@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { BULK_BY_CODE } from '../shared/bulk.js'
 import {
   validateHoldLift,
   holdState,
+  bulkHoldFrom,
+  BULK_HOLD_KIND,
   holdHeadline,
   holdWhy,
   liftKindOf,
@@ -178,5 +184,150 @@ describe('고를 수 있는 것', () => {
       expect(k.hint.length).toBeGreaterThan(10)
       expect(k.label.length).toBeGreaterThan(4)
     }
+  })
+})
+
+// 한 번에 미룬 보류가 어디에도 안 보였다.
+//
+// 보류가 두 길로 들어온다. 한 건씩 판정하면 review 표에
+// hold_until_condition 이 적히고, 접수함에서 여러 건을 한 번에 미루면
+// decision_log 에만 남는다. 한 번에 미루는 화면은 "언제 다시 보시겠습니까"를
+// **필수로** 받는데(5자 이상), 그 답이 review 표에는 안 들어갔다.
+//
+// 그래서 담당자가 의무로 적은 조건을 읽는 자리가 전부 비어 있었다 —
+// 부서 조회 화면, 부서별 화면, 못 한 것 화면, 그리고 30일 넘김 경보.
+// 경보가 특히 나쁘다. 한 달이 지나도 안 켜지니 한 번에 미룬 건은 영영
+// 잊힌다. 한 번에 미룬다는 것은 원래 급하지 않아서 미루는 것인데, 그게
+// 곧 아무도 다시 안 본다는 뜻이 되어 버렸다.
+describe('한 번에 미룬 보류', () => {
+  const bulkRow = (what, at) => ({
+    link_kind: BULK_HOLD_KIND,
+    what,
+    created_at: at,
+  })
+
+  it('기록에서 조건만 뽑아낸다', () => {
+    // 기록에는 "보류로 미룹니다. {조건}"으로 적힌다. 앞머리를 떼야 부서가
+    // 읽을 문장이 된다.
+    const got = bulkHoldFrom([bulkRow('보류로 미룹니다. 9월 마감 뒤에 봅니다.', '2026-01-01')])
+    expect(got.condition).toBe('9월 마감 뒤에 봅니다.')
+    expect(got.at).toBe('2026-01-01')
+  })
+
+  it('앞머리가 없으면 본문을 그대로 쓴다', () => {
+    // 문구를 고치는 날 조용히 끊기면 안 된다.
+    expect(bulkHoldFrom([bulkRow('손이 없습니다', '2026-01-01')]).condition).toBe('손이 없습니다')
+  })
+
+  it('여러 번 미뤘으면 마지막 것이 지금 상태다', () => {
+    // append-only 로그다. 첫 줄을 집으면 나중에 고친 값이 버려진다 —
+    // 이 저장소에서 이미 두 번 당한 자리다.
+    const got = bulkHoldFrom([
+      bulkRow('보류로 미룹니다. 처음 조건', '2026-01-01'),
+      bulkRow('보류로 미룹니다. 나중 조건', '2026-03-01'),
+    ])
+    expect(got.condition).toBe('나중 조건')
+    expect(got.at).toBe('2026-03-01')
+  })
+
+  it('순서가 뒤섞여 와도 마지막을 집는다', () => {
+    const got = bulkHoldFrom([
+      bulkRow('보류로 미룹니다. 나중 조건', '2026-03-01'),
+      bulkRow('보류로 미룹니다. 처음 조건', '2026-01-01'),
+    ])
+    expect(got.condition).toBe('나중 조건')
+  })
+
+  it('없으면 null', () => {
+    expect(bulkHoldFrom([])).toBeNull()
+    expect(bulkHoldFrom(null)).toBeNull()
+    // 다른 종류는 안 센다.
+    expect(bulkHoldFrom([{ link_kind: '일괄:ack', what: '읽었습니다.' }])).toBeNull()
+  })
+
+  it('조건이 부서 화면까지 간다', () => {
+    const state = holdState({
+      application: { status: '보류' },
+      review: null,
+      records: [],
+      decisions: [bulkRow('보류로 미룹니다. 9월 마감 뒤에 봅니다.', '2026-01-01')],
+      now: '2026-01-10 00:00:00',
+    })
+    expect(state.condition).toBe('9월 마감 뒤에 봅니다.')
+    expect(state.canTell).toBe(true)
+    // 한 번에 미룬 것이라고 밝힌다. 감춰 두면 나중에 알았을 때 속은 기분이 든다.
+    expect(state.bulk).toBe(true)
+  })
+
+  it('30일 넘김 경보가 켜진다', () => {
+    // 이게 이 버그에서 제일 나빴다. 한 달이 지나도 안 켜지니 한 번에 미룬
+    // 건은 영영 잊혔다.
+    const state = holdState({
+      application: { status: '보류' },
+      review: null,
+      records: [],
+      decisions: [bulkRow('보류로 미룹니다. 9월 마감 뒤에 봅니다.', '2026-01-01 00:00:00')],
+      now: '2026-03-01 00:00:00',
+    })
+    expect(state.heldDays).toBeGreaterThanOrEqual(30)
+    expect(holdHeadline(state)).toContain('미뤄 둔 지')
+  })
+
+  it('한 건씩 판정한 것이 우선이다', () => {
+    // 그쪽이 더 자세하고 점수까지 매긴 것이다.
+    const state = holdState({
+      application: { status: '보류' },
+      review: { verdict: '보류', hold_until_condition: '한 건씩 적은 조건', decided_at: '2026-02-01' },
+      records: [],
+      decisions: [bulkRow('보류로 미룹니다. 한 번에 적은 조건', '2026-01-01')],
+    })
+    expect(state.condition).toBe('한 건씩 적은 조건')
+    expect(state.bulk).toBe(false)
+  })
+
+  it('보류가 아니면 아무 말도 안 한다', () => {
+    // 미뤄 뒀다가 다시 판정해 수용한 건에 "보류 중"이 뜨면 안 된다.
+    const state = holdState({
+      application: { status: '수용' },
+      review: null,
+      records: [],
+      decisions: [bulkRow('보류로 미룹니다. 옛 조건', '2026-01-01')],
+    })
+    expect(state.canTell).toBe(false)
+    expect(holdHeadline(state)).toBeNull()
+  })
+
+  it('종류 이름이 서버가 쓰는 것과 같다', () => {
+    // 다르면 아무것도 안 걸러지고 조용히 빈 값이 된다.
+    expect(BULK_HOLD_KIND).toBe('일괄:hold')
+  })
+})
+
+describe('두 길이 같은 이름을 쓰는가', () => {
+  const ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+  it('쓰는 쪽 이름이 읽는 쪽과 같다', () => {
+    // 한쪽만 고치면 아무것도 안 걸러지고 조용히 빈 값이 된다. 예외도 안 나고
+    // 화면도 안 깨진다 — 이 저장소에서 제일 자주 난 사고의 모양이다.
+    const bulk = readFileSync(join(ROOT, 'functions', 'api', 'applications', 'bulk.js'), 'utf8')
+    expect(bulk).toContain('`일괄:${spec.code}`')
+    expect(BULK_BY_CODE.hold).toBeTruthy()
+    expect(`일괄:${BULK_BY_CODE.hold.code}`).toBe(BULK_HOLD_KIND)
+  })
+
+  it('SQL로 읽는 자리도 같은 이름을 쓴다', () => {
+    // 이 둘은 JS가 아니라 SQL 문자열이라 이름을 바꿔도 아무도 안 알려 준다.
+    for (const f of [
+      join('functions', 'api', 'honesty.js'),
+      join('functions', 'api', 'depts', '[dept].js'),
+    ]) {
+      expect(readFileSync(join(ROOT, f), 'utf8'), f).toContain(BULK_HOLD_KIND)
+    }
+  })
+
+  it('한 번에 미루는 화면이 조건을 필수로 받는다', () => {
+    // 안 받으면 여기서 읽어 낼 것이 없다.
+    expect(BULK_BY_CODE.hold.needsReason).toBe(true)
+    expect(BULK_BY_CODE.hold.changesStatus).toBe('보류')
   })
 })

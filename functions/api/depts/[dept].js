@@ -39,10 +39,17 @@ export async function onRequestGet({ env, params }) {
                   CAST((julianday('now') - julianday(a.created_at)) * 24 AS INTEGER) AS hours_since,
                   r.verdict, r.decided_at, r.verdict_reason, r.refuse_alternative,
                   r.hold_until_condition, r.impact_score, r.difficulty_score,
-                  b.median_seconds, b.sample_n
+                  b.median_seconds, b.sample_n,
+                  h.what AS bulk_hold_what
            FROM application a
            LEFT JOIN review r ON r.application_id = a.id
            LEFT JOIN baseline b ON b.application_id = a.id
+           -- 한 번에 미룬 건은 review 행이 없다. 그 조건이 여기에만 남는다.
+           LEFT JOIN (
+             SELECT application_id, what,
+                    ROW_NUMBER() OVER (PARTITION BY application_id ORDER BY created_at DESC) AS rn
+             FROM decision_log WHERE link_kind = '일괄:hold'
+           ) h ON h.application_id = a.id AND h.rn = 1
            WHERE a.dept = ?
            ORDER BY a.created_at DESC`
         )
@@ -259,12 +266,19 @@ export async function onRequestGet({ env, params }) {
           text: '반려만 하고 대신 해볼 것을 못 드렸습니다. 병목은 그대로 남아 있습니다.',
         })
       }
-      if (a.verdict === '보류' && a.hold_until_condition) {
+      // 보류는 두 길로 들어온다. 한 건씩 판정한 것과 한 번에 미룬 것.
+      // review 만 보면 한 번에 미룬 건이 부서 화면에서 통째로 빠진다 —
+      // 부서는 자기 신청서가 왜 멈춰 있는지 모른 채 기다리게 된다.
+      const heldWhy =
+        a.hold_until_condition ||
+        String(a.bulk_hold_what ?? '').replace(/^보류로 미룹니다\.\s*/, '') ||
+        null
+      if ((a.verdict === '보류' || a.status === '보류') && heldWhy) {
         owed.push({
           code: 'held',
           ticket_no: a.ticket_no,
           title: a.title,
-          text: `보류 중입니다 — ${a.hold_until_condition}`,
+          text: `보류 중입니다 — ${heldWhy}`,
         })
       }
     }

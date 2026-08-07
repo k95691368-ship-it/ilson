@@ -16,6 +16,7 @@ import { annualHours } from '../../_lib/applications.js'
 import { REFUSE_REASONS } from '../../../shared/review.js'
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
+import { bulkHoldFrom } from '../../../shared/holdlift.js'
 
 // 기록이 다른 신청서를 가리키고 있으면 그 접수번호를 붙여 준다.
 //
@@ -174,7 +175,8 @@ export async function onRequestGet({ env, params, request }) {
           ? {
               판정_이유: review.verdict_reason || null,
               대안: review.refuse_alternative || null,
-              다시_볼_조건: review.hold_until_condition || null,
+              다시_볼_조건:
+                review.hold_until_condition || bulkHoldFrom(decisions.results)?.condition || null,
             }
           : null,
       },
@@ -279,8 +281,13 @@ export async function onRequestGet({ env, params, request }) {
     // 아직 안 만들어서 멈춘 것은 다른 일인데 화면에서는 똑같아 보인다.
     const needs = []
 
-    if (review?.verdict === '보류' && review.hold_until_condition) {
-      needs.push({ code: 'hold_condition', body: review.hold_until_condition })
+    // 보류는 두 길로 들어온다. 한 건씩 판정한 것과 접수함에서 한 번에 미룬 것.
+    // review 만 보면 한 번에 미룬 건은 부서에게 아무 말도 못 한다 — 담당자가
+    // "언제 다시 보겠다"를 **의무로** 적었는데 그게 부서에게 안 갔다.
+    const bulkHold = bulkHoldFrom(decisions.results)
+    const heldWhy = review?.hold_until_condition || bulkHold?.condition || null
+    if ((review?.verdict === '보류' || app.status === '보류') && heldWhy) {
+      needs.push({ code: 'hold_condition', body: heldWhy })
     }
     if (review?.verdict === '반려' && review.refuse_alternative) {
       needs.push({ code: 'refused_alternative', body: review.refuse_alternative })
