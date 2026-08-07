@@ -45,9 +45,16 @@ function alwaysVisibleTargets() {
   const fromFooter = [...crosscut.matchAll(/to:\s*'([^']+)'/g)].map((m) => m[1])
   // 상단 목차 옆에 직접 박아 둔 링크(기술 구현 보러가기 등)도 늘 보인다.
   const fromTopbar = [...APP.matchAll(/<NavLink\s+to="([^"]+)"/g)].map((m) => m[1])
+  // 첫 화면에서 조건 없이 그려지는 링크들. 데이터가 없어도 보인다.
+  const flow = readFileSync(join(ROOT, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
+  const fromFlow = []
+  if (/to={`\/dept\/\$\{encodeURIComponent\(d\)\}`}/.test(flow)) fromFlow.push('/dept/:dept')
+  for (const m of flow.matchAll(/<Link to="([^"]+)" className="btn-ghost btn-sm">/g)) {
+    fromFlow.push(m[1])
+  }
   // 왼쪽 위 이름표가 첫 화면으로 돌아가는 문이다. 어느 화면에서나 보인다.
   const brand = /<Link to="\/" className="topbar-brand">/.test(APP) ? ['/'] : []
-  return new Set([...fromStages, ...fromFooter, ...fromTopbar, ...brand])
+  return new Set([...fromStages, ...fromFooter, ...fromTopbar, ...fromFlow, ...brand])
 }
 
 describe('화면마다 들어갈 문이 있는가', () => {
@@ -56,13 +63,20 @@ describe('화면마다 들어갈 문이 있는가', () => {
 
   // 주소를 손에 쥐고 오는 화면들. 링크로 가는 자리가 아니다.
   //
-  //   /t/:slug     — 부서가 인수인계 때 받은 도구 주소
-  //   /record/:id  — 인쇄·PDF용 문서. 기록 화면에서 열린다
-  //   /dept/:dept  — 부서 알림에 실려 가는 주소
-  //   /compare     — 비슷한 신청서가 걸렸을 때만 뜻이 있다. 둘을 고르지 않고
-  //                  들어오면 "견줄 신청서 둘을 골라주세요"만 보여 준다
-  //   /apply 외 8단계 — 상단 목차에 있다
-  const BY_ADDRESS = ['/t/:slug', '/record/:id', '/dept/:dept', '/compare']
+  //   /t/:slug     — 인수인계할 때 **그 자리에서 만들어지는** 주소다.
+  //                  넘긴 것이 없으면 가리킬 slug 자체가 없다. 대신 배포
+  //                  화면의 빈 상태가 "이 주소는 여기서 만들어집니다"라고
+  //                  말하고 앞 단계로 되돌려 보낸다.
+  //   /record/:id  — 인쇄·PDF용 문서. 어느 기록이냐가 정해져야 뜻이 있다
+  //   /compare     — 견줄 둘이 정해져야 뜻이 있다. 안 고르고 들어오면
+  //                  "견줄 신청서 둘을 골라주세요"만 보여 준다
+  //
+  // /dept/:dept 가 여기 있었다. 뺐다 — 부서 이름은 미리 정해져 있으므로
+  // 첫 화면에 그냥 늘어놓으면 된다. "주소로만 여는 화면"이라고 적어 둔 것이
+  // 사실은 링크를 안 놓은 것에 대한 변명이었다. 담당자와 부서가 같은 사이트를
+  // 쓰는데, 부서 사람이 첫 화면에서 자기 부서를 못 찾으면 그런 화면이
+  // 있다는 것 자체를 모른다.
+  const BY_ADDRESS = ['/t/:slug', '/record/:id', '/compare']
 
   it('모든 화면에 늘 보이는 문이 있다', () => {
     const orphans = all.filter((r) => !always.has(r) && !BY_ADDRESS.includes(r))
@@ -82,6 +96,8 @@ describe('화면마다 들어갈 문이 있는가', () => {
     expect(always.has('/apply')).toBe(true) // 목차
     expect(always.has('/log')).toBe(true) // 꼬리말
     expect(always.has('/built')).toBe(true) // 목차 옆
+    expect(always.has('/dept/:dept')).toBe(true) // 첫 화면 부서 이름표
+    expect(always.has('/tools')).toBe(true) // 첫 화면 "넘긴 도구는 지금 어떻게 됐나"
   })
 })
 

@@ -18,6 +18,8 @@ import {
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { readableWhy } from '../../shared/notice.js'
+import { DEPTS } from '../../shared/depts.js'
+import { nextStep, tourProgress } from '../../shared/tour.js'
 
 // 첫 화면. 여덟 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
 // 일어나고 있는지가 숫자로 얹힌다.
@@ -63,11 +65,25 @@ export default function FlowPage() {
 
       {data && data.counts.total > 0 && <Overview data={data} />}
 
+      {/* 예시를 넣은 다음 무엇을 눌러야 하는가.
+          앞 회차에서 "예시 여덟 건 넣기"를 놨더니, 눌러 보면 접수함에 여덟
+          건이 들어오고 거기서 끝이었다. 나머지 일곱 단계는 비어 있는데
+          무엇을 해야 채워지는지가 아무 데도 없었다. 한 칸씩 밀어 준다. */}
+      {data && <NextStep overview={data} />}
+
       <div className="row-between" style={{ marginTop: 4 }}>
         <h2 style={{ margin: 0 }}>여덟 단계</h2>
-        <Link to="/track" className="btn-ghost btn-sm">
-          접수번호로 내 신청서 찾기
-        </Link>
+        <div className="row">
+          {/* 넘긴 도구 화면은 아래 '부서에 넘긴 도구' 칸으로만 갈 수 있었는데,
+              그 칸은 넘긴 것이 있어야 뜬다. 넘긴 것이 없을 때 "넘기면 어떻게
+              되는지"를 보러 갈 길이 없었다. */}
+          <Link to="/tools" className="btn-ghost btn-sm">
+            넘긴 도구는 지금 어떻게 됐나
+          </Link>
+          <Link to="/track" className="btn-ghost btn-sm">
+            접수번호로 내 신청서 찾기
+          </Link>
+        </div>
       </div>
 
       <ol className="flow-list">
@@ -94,6 +110,31 @@ export default function FlowPage() {
           )
         })}
       </ol>
+
+      {/* 부서별로 보는 화면으로 가는 문.
+          이 화면 아래쪽에 "이름을 누르면 그 부서와 있었던 일 전부"라고 이미
+          적혀 있는데, 그 약속이 **데이터가 있을 때만** 지켜지고 있었다.
+          신청서가 없으면 /dept 로 가는 링크가 사이트 어디에도 없었다.
+          담당자와 부서가 같은 사이트를 쓰는데, 부서 사람이 첫 화면에서 자기
+          부서 이름을 못 찾으면 그런 화면이 있다는 것 자체를 모른다. */}
+      <section className="card">
+        <div className="card-head">
+          <span className="card-title">부서별로 보기</span>
+          <span className="card-note">이름을 누르면 그 부서와 있었던 일 전부</span>
+        </div>
+        <div className="chip-row">
+          {DEPTS.map((d) => (
+            <Link key={d} to={`/dept/${encodeURIComponent(d)}`} className="chip">
+              {d}
+              {data?.byDept?.find((x) => x.dept === d)?.total > 0 && (
+                <span className="chip-count">
+                  {data.byDept.find((x) => x.dept === d).total}
+                </span>
+              )}
+            </Link>
+          ))}
+        </div>
+      </section>
 
       {data?.tools?.list?.length > 0 && (
         <section className="card">
@@ -138,6 +179,53 @@ export default function FlowPage() {
         </div>
       </section>
     </div>
+  )
+}
+
+// 다음에 할 것 한 가지.
+//
+// 담당자용 할 일 목록(Todo)과 다른 것이다. 저쪽은 "지금 문제가 되는 것"을
+// 급한 순서로 올린다 — 금액이 틀리는 것, 사람이 기다리는 것. 이쪽은
+// **아무 문제가 없어도** 다음 단계로 한 칸 밀어 준다.
+//
+// 보러 오신 분에게 필요한 것은 문제 목록이 아니라 길이다. 예시를 넣고 나면
+// 접수함에 여덟 건이 쌓이는데, 그다음 일곱 단계를 무엇으로 채우는지가
+// 아무 데도 안 적혀 있었다.
+//
+// 한 가지만 말한다. 여덟 개를 한꺼번에 늘어놓으면 첫 번째도 안 누른다.
+function NextStep({ overview }) {
+  const step = nextStep(overview)
+  const p = tourProgress(overview)
+  if (!step) return null
+
+  return (
+    <section className="nextstep">
+      <div className="nextstep-head">
+        <span className="badge badge-neutral">다음은 이것</span>
+        <strong className="nextstep-title">{step.label}</strong>
+        <span className="spacer" />
+        {/* 몇 칸 남았는지 안 보이면 끝이 없는 일처럼 느껴진다. */}
+        <span className="card-note">
+          여덟 단계 중 {p.done}칸까지 왔습니다
+        </span>
+      </div>
+
+      <div className="nextstep-bar" aria-hidden="true">
+        {Array.from({ length: p.total }, (_, i) => (
+          <span key={i} className={`nextstep-tick${i < p.done ? ' on' : ''}`} />
+        ))}
+      </div>
+
+      <p className="nextstep-what">{step.what}</p>
+      {/* 그 화면이 무엇을 안 받아 주는지를 **미리** 말한다. 눌러 봤다가
+          막히면 고장인 줄 안다. */}
+      <p className="nextstep-need">{step.need}</p>
+      <p className="nextstep-shows">{step.shows}</p>
+
+      <Link to={step.where} className="btn-primary btn-sm">
+        {step.stage} 화면으로
+      </Link>
+    </section>
   )
 }
 

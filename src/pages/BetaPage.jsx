@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -16,7 +17,6 @@ const SAMPLE_NAMES = [
   '05_Qoo10_JP_決済明細_2026Q2.xlsx',
 ]
 
-const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '기타']
 
 export default function BetaPage() {
   const { data: list } = useApi('/applications')

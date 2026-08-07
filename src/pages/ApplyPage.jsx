@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
+import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { ago, duration, num } from '../lib/format.js'
 
-const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
 const FREQUENCIES = ['하루 여러 번', '매일', '주 2~3회', '주 1회', '격주', '매월', '분기', '비정기']
 
 import SimilarNotice from '../components/SimilarNotice.jsx'

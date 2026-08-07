@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DEPTS } from '../../shared/depts.js'
 import { Link } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
@@ -6,7 +7,6 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { num, ms, ago, duration } from '../lib/format.js'
 
-const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '기타']
 
 export default function DeployPage() {
   const { data: list } = useApi('/applications')
@@ -29,6 +29,15 @@ export default function DeployPage() {
         <div className="empty">
           <div className="empty-title">넘길 도구가 없습니다</div>
           <div className="empty-sub">베타 테스트를 통과한 것이 여기로 넘어옵니다.</div>
+          {/* 여기가 막다른 길이었다. 부서가 여는 주소(/t/…)는 이 화면에서
+              넘길 때 만들어지는데, 그 사실도 앞 단계로 돌아가는 길도 없어서
+              "그럼 그 주소는 언제 생기나"에 아무 데서도 답하지 않았다. */}
+          <div className="empty-sub">
+            부서가 여는 주소(<span className="mono">/t/…</span>)는 여기서 넘길 때 만들어집니다.
+          </div>
+          <Link to="/beta" className="btn-ghost btn-sm">
+            베타 테스트로 돌아가기
+          </Link>
         </div>
       ) : (
         <>

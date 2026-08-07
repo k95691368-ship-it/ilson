@@ -4,7 +4,9 @@
 // 막거나, 그 반대가 되면 사용자는 무엇이 잘못됐는지 알 수 없다. 그래서 검증은
 // 여기 한 곳에만 둔다.
 
-export const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
+// 목록은 shared/depts.js 한 곳에만 둔다. 화면과 서버가 같은 파일을 읽어야
+// 화면에 없는 부서를 서버가 받아 주는 일이 안 생긴다.
+export { DEPTS } from '../../shared/depts.js'
 
 // migrations/0002_application.sql 의 CHECK 목록과 같은 값이다.
 // 목록 API의 ?status= 화이트리스트로 쓴다 — 여기 없는 값이 오면 조건을 안 붙인다.

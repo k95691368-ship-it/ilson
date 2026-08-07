@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import Stopwatch from '../components/Stopwatch.jsx'
 import { useApi } from '../hooks/useApi.js'
@@ -16,7 +17,6 @@ import {
   PRIORITIES,
 } from '../../shared/acceptance.js'
 
-const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
 
 export default function AgreementPage() {
   const { data: list } = useApi('/applications')
