@@ -1,10 +1,17 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 import {
   TRY_STEPS,
   TRY_TERMS,
   RESET_NOTE,
   VISITOR_NOTE,
   EMPTY_INVITE,
+  DEEP_NOTE,
+  deepLabel,
   isEmptySite,
   tryStep,
   resetLabel,
@@ -299,5 +306,57 @@ describe('아무것도 없을 때', () => {
     // 여덟 건이 서로 성격이 달라야 우선순위를 견주는 일이 뜻을 갖는다.
     const depts = new Set(DEMO_APPLICATIONS.map((a) => a.dept))
     expect(depts.size).toBeGreaterThan(2)
+  })
+})
+
+// 초대문의 "어지르셔도 됩니다"가 거짓말이었다.
+//
+// 안전한 치우기는 "낸 뒤로 아무 일도 안 일어난 것"만 지운다. 그런데 이
+// 화면은 판정해 보시라고 권한다 — **권한 대로 하신 흔적이 정확히 그 규칙이
+// 못 지우는 자료다.** 읽기만 하고 나간 분의 흔적은 지워지는데, 시키는 대로
+// 눌러 보신 분의 흔적만 영영 남았다.
+describe('만져 본 것까지 치우기', () => {
+  it('없으면 단추를 안 만든다', () => {
+    expect(deepLabel(0)).toBeNull()
+    expect(deepLabel(null)).toBeNull()
+    expect(deepLabel(undefined)).toBeNull()
+    expect(deepLabel('아무거나')).toBeNull()
+  })
+
+  it('있으면 몇 건인지 적는다', () => {
+    expect(deepLabel(3)).toContain('3건')
+  })
+
+  it('무엇을 지우는지와 왜 필요한지를 갈라 적는다', () => {
+    // "초기화"라고만 적으면 무엇이 사라지는지 모른 채 누른다.
+    expect(DEEP_NOTE.rule.length).toBeGreaterThan(15)
+    expect(DEEP_NOTE.why.length).toBeGreaterThan(30)
+  })
+
+  it('되돌릴 수 없다고 밝힌다', () => {
+    expect(DEEP_NOTE.warn).toContain('되돌릴 수 없습니다')
+    // 시연 신청서는 안 건드린다는 것도 같이 말한다. 안 그러면 아무도
+    // 안 누르거나, 누르고 나서 놀란다.
+    expect(DEEP_NOTE.warn).toContain('시연 신청서')
+  })
+
+  it('실수로 눌리지 않게 뜻을 적게 한다', () => {
+    expect(DEEP_NOTE.confirm).toBe('만져 본 것까지 지웁니다')
+  })
+
+  it('서버가 그 문장을 그대로 받는다', async () => {
+    // 화면과 서버가 다른 문장을 쓰면 단추가 늘 400을 받는다. 눌러 보기
+    // 전까지는 아무도 모른다.
+    const src = readFileSync(
+      join(ROOT, 'functions', 'api', 'demo', 'visitors.js'),
+      'utf8'
+    )
+    expect(src).toContain(DEEP_NOTE.confirm)
+  })
+
+  it('안전한 쪽 문구는 그대로다', () => {
+    // 이미 있던 것이 바뀌면 안 된다.
+    expect(visitorLabel(2)).toContain('시험 삼아 낸')
+    expect(VISITOR_NOTE.rule).toContain('한 줄이라도 기록이 달린')
   })
 })

@@ -11,9 +11,11 @@ import {
   RESET_NOTE,
   VISITOR_NOTE,
   EMPTY_INVITE,
+  DEEP_NOTE,
   isEmptySite,
   resetLabel,
   visitorLabel,
+  deepLabel,
 } from '../../shared/tryit.js'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -296,6 +298,8 @@ function TryIt({ provenance, counts }) {
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [visitors, setVisitors] = useState(null)
+  // 만져 본 것까지 몇 건인가. 안전한 치우기가 못 지우는 쪽이다.
+  const [touched, setTouched] = useState(0)
   const toast = useToast()
   const demoCount = provenance?.demo ?? 0
 
@@ -369,7 +373,10 @@ function TryIt({ provenance, counts }) {
     if (!open || visitors != null) return
     api
       .get('/demo/visitors')
-      .then((r) => setVisitors(r.count ?? 0))
+      .then((r) => {
+        setVisitors(r.count ?? 0)
+        setTouched(r.touched ?? 0)
+      })
       .catch(() => setVisitors(0))
   }, [open, visitors])
 
@@ -463,6 +470,43 @@ function TryIt({ provenance, counts }) {
                 }}
               >
                 {visitorLabel(visitors)}
+              </button>
+            </div>
+          )}
+
+          {/* 위 단추가 못 지우는 쪽.
+              위쪽은 "낸 뒤로 아무 일도 안 일어난 것"만 지운다. 그런데 이
+              화면은 판정해 보시라고 권한다 — **권한 대로 하신 흔적이 정확히
+              위 규칙이 못 지우는 자료다.** 읽기만 하고 나간 분의 흔적은
+              지워지는데 눌러 보신 분의 흔적만 영영 남았다. */}
+          {deepLabel(touched) && (
+            <div className="tryit-reset">
+              <div className="tryit-reset-text">
+                <strong>{DEEP_NOTE.rule}</strong>
+                <div className="card-note">{DEEP_NOTE.why}</div>
+                <div className="card-note">{DEEP_NOTE.warn}</div>
+              </div>
+              <button
+                type="button"
+                className="btn-ghost btn-sm"
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true)
+                  try {
+                    const r = await api.remove('/demo/visitors', {
+                      deep: true,
+                      confirm: DEEP_NOTE.confirm,
+                    })
+                    toast.success(r.message)
+                    window.location.reload()
+                  } catch (err) {
+                    toast.error(err.message)
+                  } finally {
+                    setBusy(false)
+                  }
+                }}
+              >
+                {deepLabel(touched)}
               </button>
             </div>
           )}
