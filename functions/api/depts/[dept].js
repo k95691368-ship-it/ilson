@@ -11,6 +11,7 @@
 import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { annualHours } from '../../_lib/applications.js'
 import { sortPending } from '../../../shared/pending.js'
+import { returnedFor } from '../../../shared/returned.js'
 import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
@@ -22,7 +23,7 @@ export async function onRequestGet({ env, params }) {
   if (!dept) return jsonError('부서를 알려주세요.', 400)
 
   try {
-    const [apps, stakeholders, meetings, reqs, conflicts, tools, feedback, decisions, pendingRows] =
+    const [apps, stakeholders, meetings, reqs, conflicts, tools, feedback, decisions, pendingRows, returnedRows] =
       await Promise.all([
         env.DB.prepare(
           `SELECT a.id, a.ticket_no, a.title, a.bottleneck, a.status, a.created_at,
@@ -154,6 +155,32 @@ export async function onRequestGet({ env, params }) {
            WHERE a.dept = ? AND a.status NOT IN ('반려')`
         )
           .bind(SIGNOFF_KIND, ACCEPT_KIND, OUTCOME_KIND, HOLD_LIFT_KIND, dept)
+          .all(),
+
+        // 이 부서에 얼마를 돌려드렸는가.
+        //
+        // 부서 화면은 지금 "내가 못 준 것"과 "부서가 답해 주셔야 할 것"만
+        // 말한다. 둘 다 빚 이야기다. 준 것은 한 마디도 안 해서, 만날 때마다
+        // 사과만 하는 자리가 되어 있었다.
+        env.DB.prepare(
+          `SELECT a.ticket_no, a.title,
+                  b.median_seconds, b.people,
+                  o.dept_confirmed_at,
+                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) AS runs,
+                  (SELECT COALESCE(SUM(u.duration_ms), 0) FROM tool_use u
+                    WHERE u.application_id = a.id) AS duration_total_ms,
+                  (SELECT COALESCE(SUM(u.human_review_seconds), 0) FROM tool_use u
+                    WHERE u.application_id = a.id) AS review_seconds,
+                  (SELECT COALESCE(SUM(u.rework_seconds), 0) FROM tool_use u
+                    WHERE u.application_id = a.id) AS rework_seconds,
+                  (SELECT COUNT(*) FROM outcome_challenge c
+                    WHERE c.application_id = a.id AND c.resolved_at IS NULL) AS open_challenges
+           FROM application a
+           JOIN baseline b ON b.application_id = a.id
+           LEFT JOIN outcome o ON o.application_id = a.id
+           WHERE a.dept = ?`
+        )
+          .bind(dept)
           .all(),
       ])
 
@@ -307,6 +334,8 @@ export async function onRequestGet({ env, params }) {
       owed,
       // 부서 몫. owed 와 시점이 정반대다.
       pending,
+      // 이 부서에 돌려드린 시간. 부서가 확인한 것과 아직 아닌 것을 가른다.
+      returned: returnedFor(returnedRows.results),
     })
   } catch (err) {
     return failUnexpected(err, '부서 기록을 모으지 못했습니다.')

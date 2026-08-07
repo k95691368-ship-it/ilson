@@ -5976,3 +5976,56 @@ kbd {
   font-size: 12.5px;
   line-height: 1.75;
 }
+
+/* 이 부서에 돌려드린 것.
+   위의 두 덩어리(내가 못 준 것 · 부서가 안 준 것)는 둘 다 빚 이야기라
+   경고색이다. 이건 갚은 쪽이라 색을 달리한다. */
+.returned {
+  padding: 15px 16px;
+  border: 1px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.returned-head {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.returned-line {
+  font-size: 15px;
+}
+.returned-note {
+  margin: 7px 0 0;
+  line-height: 1.8;
+}
+.returned-list {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.returned-list > li {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  flex-wrap: wrap;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+/* 아직 확인 못 받은 것. 성과로 안 세지만 숨기지도 않는다. */
+.returned-list.pending-confirm > li {
+  border-style: dashed;
+  opacity: 0.82;
+}
+.returned-title {
+  flex: 1 1 200px;
+  line-height: 1.6;
+}
+.returned-hours {
+  font-weight: 600;
+  white-space: nowrap;
+}

@@ -2,6 +2,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { pendingText, pendingHeadline, pendingWhy } from '../../shared/pending.js'
+import { returnedLine, returnedNote } from '../../shared/returned.js'
 
 // 부서 한 곳과 나 사이에 있었던 일 전부.
 //
@@ -65,6 +66,58 @@ export default function DeptPage() {
             답을 못 준 신청서도, 사유 없이 기각한 요구도, 판정 못 낸 충돌도, 답 못 한 의견도
             없습니다. 이 상태를 유지하는 것이 이 화면의 목적입니다.
           </p>
+        </section>
+      )}
+
+      {/* 이 부서에 돌려드린 것.
+          위의 두 덩어리는 둘 다 빚 이야기다 — 내가 못 준 것, 부서가 아직
+          안 준 것. 준 것은 한 마디도 안 해서 이 화면이 만날 때마다 사과만
+          하는 자리가 되어 있었다. */}
+      {data.returned?.show && (
+        <section className="returned">
+          <div className="returned-head">
+            <span className="badge badge-success">돌려드린 것</span>
+            <strong className="returned-line">{returnedLine(data.dept, data.returned)}</strong>
+          </div>
+          <p className="card-note returned-note">{returnedNote(data.returned)}</p>
+
+          {data.returned.confirmed.length > 0 && (
+            <ul className="returned-list">
+              {data.returned.confirmed.map((x) => (
+                <li key={x.ticket_no}>
+                  <Link to={`/record/${x.ticket_no}`} className="mono card-note">
+                    {x.ticket_no}
+                  </Link>
+                  <span className="returned-title">{x.title}</span>
+                  <span className="returned-hours">
+                    {num(x.hours, 1)}시간
+                    <span className="card-note"> · {num(x.runs, 0)}번 돌림</span>
+                  </span>
+                  {/* 반박이 남아 있으면 성과 화면이 '보수적 추정'으로
+                      내린다. 여기서만 당당하면 두 화면이 다른 말을 한다. */}
+                  {x.shaky && <span className="badge badge-warning">보수적 추정</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {/* 부서가 아직 확인 안 해 준 것. 성과로 안 세지만 숨기지도 않는다. */}
+          {data.returned.unconfirmed.length > 0 && (
+            <ul className="returned-list pending-confirm">
+              {data.returned.unconfirmed.map((x) => (
+                <li key={x.ticket_no}>
+                  <Link to={`/track?no=${x.ticket_no}`} className="mono card-note">
+                    {x.ticket_no}
+                  </Link>
+                  <span className="returned-title">{x.title}</span>
+                  <span className="returned-hours">
+                    {num(x.hours, 1)}시간분
+                    <span className="card-note"> · 확인 전</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
         </section>
       )}
 
