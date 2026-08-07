@@ -6,7 +6,14 @@
 
 // 목록은 shared/depts.js 한 곳에만 둔다. 화면과 서버가 같은 파일을 읽어야
 // 화면에 없는 부서를 서버가 받아 주는 일이 안 생긴다.
-export { DEPTS } from '../../shared/depts.js'
+//
+// `export { DEPTS } from '...'` 로 썼다가 신청서 접수가 통째로 500이 났다.
+// 그 문법은 **다시 내보내기만** 한다 — 이 파일 안에는 DEPTS 라는 이름이
+// 생기지 않는다. 아래 검증이 DEPTS.includes(...) 를 부르는 순간
+// ReferenceError 가 났고, 부서가 신청서를 내면 그 자리에서 500이었다.
+// 들여온 다음에 내보내야 이 파일 안에서도 쓸 수 있다.
+import { DEPTS } from '../../shared/depts.js'
+export { DEPTS }
 
 // migrations/0002_application.sql 의 CHECK 목록과 같은 값이다.
 // 목록 API의 ?status= 화이트리스트로 쓴다 — 여기 없는 값이 오면 조건을 안 붙인다.

@@ -97,3 +97,75 @@ describe('없는 이름을 가져오는 import가 없는지', () => {
     expect(problems).toEqual([])
   })
 })
+
+// 다시 내보내기만 해 놓고 그 이름을 자기 파일에서 쓴 것.
+//
+// `export { DEPTS } from './x.js'` 는 **다시 내보내기만** 한다. 그 파일 안에는
+// DEPTS 라는 이름이 생기지 않는다. 그런데 눈으로 보면 import 처럼 읽힌다.
+//
+// 실제로 당했다. functions/_lib/applications.js 를 그렇게 고쳤더니 같은 파일
+// 75번째 줄의 DEPTS.includes(...) 가 ReferenceError 를 던졌고, 부서가
+// 신청서를 내면 그 자리에서 500이 났다. **접수가 통째로 막혔다.**
+//
+// 빌드는 통과한다 — 화면 코드가 아니라 서버 코드라 번들러가 안 본다.
+// 라우트 스모크도 못 잡았다. 그 검사는 JSON 몸을 보내는데 이 라우트는
+// multipart 폼을 받아서, 문제의 줄까지 가기 전에 400 으로 돌아갔다.
+describe('다시 내보낸 이름을 자기가 쓰고 있지 않은가', () => {
+  // 경로 구분자. 문자열 안에 역슬래시를 직접 쓰면 편집 중에 자주 뭉개진다.
+  const SEP = sep
+
+  // 줄 주석과 블록 주석을 지운다. 문자열 안의 // 까지 지우지는 않지만,
+  // 여기서 찾는 것은 export 문 하나라 그 정도면 충분하다.
+  function stripComments(src) {
+    return src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^[ \t]*\/\/.*$/gm, '')
+  }
+  const files = [
+    ...jsFiles(join(ROOT, 'functions')),
+    ...jsFiles(join(ROOT, 'shared')),
+  ]
+
+  it('re-export 한 이름은 그 파일 안에서 안 쓴다', () => {
+    const problems = []
+    for (const file of files) {
+      // 주석을 뺀다. 이 저장소는 왜 그렇게 했는지를 길게 적어 두는데,
+      // 거기에 "이렇게 쓰면 안 된다"는 예시가 그대로 들어 있다. 그것까지
+      // 코드로 읽으면 고쳐 놓은 파일이 계속 걸린다.
+      const src = stripComments(readFileSync(file, 'utf8'))
+      const rel = file.slice(ROOT.length).split(SEP).join('/')
+      for (const m of src.matchAll(/export\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/g)) {
+        const names = m[1]
+          .split(',')
+          .map((s) => s.trim().split(/\s+as\s+/)[0].trim())
+          .filter(Boolean)
+        // 그 줄을 뺀 나머지에서 이름이 또 나오면 쓰고 있는 것이다.
+        const rest = src.slice(0, m.index) + src.slice(m.index + m[0].length)
+        for (const name of names) {
+          if (new RegExp(`\\b${name}\\b`).test(rest)) {
+            problems.push(`${rel} — ${name} 을 다시 내보내기만 해 놓고 같은 파일에서 씁니다`)
+          }
+        }
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
+  it('이 검사가 헛돌지 않는다', () => {
+    // 정규식이 어긋나면 아무것도 안 보면서 통과한다. 실제로 났던 그 모양을
+    // 그대로 넣어 잡히는지 본다.
+    const bad = `export { DEPTS } from '../../shared/depts.js'\nif (!DEPTS.includes(x)) fail()`
+    const m = /export\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/.exec(bad)
+    expect(m).toBeTruthy()
+    const rest = bad.slice(0, m.index) + bad.slice(m.index + m[0].length)
+    expect(/\bDEPTS\b/.test(rest)).toBe(true)
+
+    // 고친 모양은 안 걸려야 한다.
+    const good = `import { DEPTS } from '../../shared/depts.js'\nexport { DEPTS }\nif (!DEPTS.includes(x)) fail()`
+    expect(/export\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/.test(good)).toBe(false)
+
+    // 주석에 적어 둔 "이렇게 쓰면 안 된다" 예시까지 코드로 읽으면, 고쳐
+    // 놓은 파일이 영영 걸린 채로 남는다. 실제로 그랬다.
+    const commented = `// \`export { X } from './a.js'\` 로 썼다가 500이 났다\nimport { X } from './a.js'\nexport { X }`
+    expect(/export\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/.test(commented)).toBe(true)
+    expect(/export\s*\{([^}]+)\}\s*from\s*['"][^'"]+['"]/.test(stripComments(commented))).toBe(false)
+  })
+})
