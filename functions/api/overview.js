@@ -32,6 +32,7 @@ export async function onRequestGet({ env }) {
       holdLifts,
       pickRows,
       answeredWaiting,
+      deptAsked,
       unrequestedAll,
     ] = await Promise.all([
       env.DB.prepare(
@@ -154,6 +155,20 @@ export async function onRequestGet({ env }) {
                   SELECT 1 FROM decision_log a2
                    WHERE a2.link_kind = '답변' AND a2.link_id = q2.id
                 )
+           )`
+      ).first(),
+
+      // 부서가 먼저 물어 온 것 중 아직 답 안 한 것.
+      //
+      // 부서는 로그인이 없어서 재촉할 길이 없다. 조회 화면을 다시 열어 보는
+      // 것 말고는 아무것도 못 한다. 담당자가 첫 화면에서 못 보면 그냥 잊힌다.
+      // 물을 자리만 만들고 답할 자리를 안 만들면 물을 데가 없던 것보다 나쁘다.
+      env.DB.prepare(
+        `SELECT COUNT(*) AS n FROM decision_log q
+         WHERE q.link_kind = '부서질문'
+           AND NOT EXISTS (
+             SELECT 1 FROM decision_log r
+              WHERE r.link_kind = '담당자답' AND r.link_id = q.id
            )`
       ).first(),
 
@@ -299,6 +314,8 @@ export async function onRequestGet({ env }) {
       // 부서가 시간을 써서 답해 줬다. 그걸 놓치면 부서는 "답해 봐야
       // 소용없다"를 배운다.
       answered: answeredWaiting?.n ?? 0,
+      // 부서가 물어 놓고 답을 기다리는 것.
+      deptAsked: deptAsked?.n ?? 0,
       // 하기로 해 놓고 순서를 안 정한 채 기다리는 것.
       waitingToStart,
       unranked: rankPressure.over ? waitingToStart : 0,

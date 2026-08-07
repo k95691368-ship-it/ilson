@@ -234,6 +234,26 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
   //
   // 부서는 시간을 써서 답해 줬다. 그걸 놓치면 다음부터 "답해 봐야
   // 소용없다"를 배운다.
+  // 부서가 먼저 물어 온 것.
+  //
+  // 이건 답이 온 것보다 급하다. 답이 온 건은 담당자가 이미 그 건을 알고
+  // 있지만, 부서가 먼저 물은 건은 담당자가 그 건을 보고 있지도 않은 채로
+  // 누군가 기다리고 있는 것이다. 그리고 부서는 재촉할 길이 없다 —
+  // 로그인이 없어서 조회 화면을 다시 열어 보는 것 말고는 못 한다.
+  const deptAsked = overview?.deptAsked ?? 0
+  if (deptAsked > 0) {
+    out.push(
+      item({
+        kind: '대기',
+        key: 'dept_asked',
+        title: `부서가 물어 놓고 답을 기다리는 것 ${deptAsked}건`,
+        why: '부서에는 재촉할 길이 없습니다. 이 화면에서 못 보시면 그냥 잊힙니다. 짧게라도 답하면 그 자리에서 부서 화면에 뜹니다.',
+        to: '/review',
+        cta: '무엇을 물었는지 보기',
+      })
+    )
+  }
+
   const answered = overview?.answered ?? 0
   if (answered > 0) {
     out.push(
@@ -402,6 +422,7 @@ export const NOTHING_CHECKED = [
   '다른 부서가 손든 신청서',
   '손든 부서 사정이 협의안에 안 들어온 신청서',
   '부서가 합격 기준에 단 이의',
+  '부서가 물어 놓고 답을 기다리는 것',
 ]
 
 export function todoSummary(items) {

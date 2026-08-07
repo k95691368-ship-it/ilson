@@ -343,3 +343,54 @@ describe('구조분해와 Promise.all', () => {
     expect(topLevelItems(m[2])).toBe(2)
   })
 })
+
+// 골라내는 데 쓰는 칸을 안 뽑아서 목록이 늘 비었던 것.
+//
+// functions/api/applications/[id]/index.js 가 decision_log 에서 link_kind 와
+// link_id 를 안 뽑고 있었다. 화면은 그 줄들을 shared/thread.js 의 toThread 로
+// 넘기는데, 그 함수는 link_kind 로 주고받은 말만 골라낸다. 칸이 안 오니
+// 하나도 안 골라졌다.
+//
+// 담당자가 되물어도 자기 화면에 아무것도 안 나왔다. 부서가 답해도 못 봤다.
+// 첫 화면이 "되물은 것에 답이 온 신청서 N건"이라고 알려 줘도 눌러서 가면
+// 그 답이 없었다. 예외도 안 나고 화면도 안 깨진다 — 그냥 늘 빈 목록이다.
+//
+// 스키마 검사는 **없는 컬럼**을 잡는다. 이건 반대다 — 있는 컬럼을 안 뽑은
+// 것이라 SQL 자체는 완벽히 유효하다. 그래서 따로 센다.
+describe('걸러 내는 칸을 실제로 뽑는가', () => {
+  // 화면이 이 이름으로 받아서 실을 만든다.
+  const NEEDS = ['link_kind', 'link_id']
+
+  it('decisions 를 내려보내는 라우트는 종류 칸을 함께 뽑는다', () => {
+    const problems = []
+    for (const file of jsFiles(join(ROOT, 'functions'))) {
+      const src = readFileSync(file, 'utf8')
+      const rel = file.slice(ROOT.length).split('\\').join('/')
+      // 응답에 decisions 를 실어 보내지 않으면 상관없다.
+      if (!/\bdecisions:/.test(src)) continue
+      // decision_log 를 SELECT 하는 문장만 본다.
+      for (const m of src.matchAll(/SELECT([\s\S]*?)FROM decision_log/g)) {
+        const cols = m[1]
+        // SELECT * 는 다 가져오므로 통과.
+        if (cols.includes('*')) continue
+        for (const need of NEEDS) {
+          if (!cols.includes(need)) problems.push(`${rel} — decision_log 에서 ${need} 를 안 뽑습니다`)
+        }
+      }
+    }
+    expect(problems).toEqual([])
+  })
+
+  it('이 검사가 헛돌지 않는다', () => {
+    // 아무 파일도 안 보면 늘 통과한다.
+    const looked = jsFiles(join(ROOT, 'functions')).filter((f) => {
+      const src = readFileSync(f, 'utf8')
+      return /\bdecisions:/.test(src) && /FROM decision_log/.test(src)
+    })
+    expect(looked.length).toBeGreaterThan(1)
+
+    // 그리고 실제로 그 이름들이 화면 쪽에서 쓰이고 있어야 한다.
+    const thread = readFileSync(join(ROOT, 'shared', 'thread.js'), 'utf8')
+    for (const need of NEEDS) expect(thread).toContain(`r.${need}`)
+  })
+})

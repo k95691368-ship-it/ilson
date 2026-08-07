@@ -24,8 +24,18 @@ export async function onRequestGet({ env, params }) {
         .bind(application.id)
         .first(),
 
+      // link_kind·link_id 가 빠져 있었다.
+      //
+      // 화면은 이 줄들을 shared/thread.js 의 toThread 로 넘긴다. 그 함수는
+      // link_kind 로 주고받은 말만 골라내는데, 그 칸이 안 오니 **하나도 안
+      // 골라졌다.** 담당자가 되물어도 자기 화면에는 아무것도 안 나오고
+      // "되물어보기" 버튼만 계속 보였다. 부서가 답해도 못 봤다. 첫 화면이
+      // "되물은 것에 답이 온 신청서 N건"이라고 알려 줘도 눌러서 가면 없었다.
+      //
+      // 예외도 안 나고 화면도 안 깨진다. 그냥 늘 빈 목록이다.
       env.DB.prepare(
-        `SELECT id, stage, actor, title, what, why, alternatives, unrequested, created_at
+        `SELECT id, stage, actor, title, what, why, alternatives, unrequested,
+                link_kind, link_id, created_at
          FROM decision_log WHERE application_id = ? ORDER BY created_at`
       )
         .bind(application.id)
