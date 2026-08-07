@@ -65,7 +65,6 @@ export function progressOf(done) {
 export function dossierText(record) {
   const {
     application: a,
-    files = [],
     review,
     stakeholders = [],
     meetings = [],
@@ -121,7 +120,6 @@ export function dossierText(record) {
           : null
       ),
       line('연락처', a.contact),
-      files.length > 0 ? line('첨부', files.map((f) => f.name).join(', ')) : null,
     ])
   )
 

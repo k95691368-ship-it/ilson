@@ -134,12 +134,6 @@ export default function RecordPage() {
                 </dd>
               </>
             )}
-            {rec.files.length > 0 && (
-              <>
-                <dt>첨부</dt>
-                <dd>{rec.files.map((f) => f.name).join(', ')}</dd>
-              </>
-            )}
           </KV>
         </Sec>
 

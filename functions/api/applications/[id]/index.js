@@ -19,14 +19,7 @@ export async function onRequestGet({ env, params }) {
 
     if (!application) return jsonError('그런 신청서가 없습니다.', 404)
 
-    const [files, review, decisions, siblings] = await Promise.all([
-      env.DB.prepare(
-        `SELECT id, name, byte_size, content_type, checksum, profile_json, uploaded_at
-         FROM application_file WHERE application_id = ? ORDER BY uploaded_at`
-      )
-        .bind(application.id)
-        .all(),
-
+    const [review, decisions, siblings] = await Promise.all([
       env.DB.prepare(`SELECT * FROM review WHERE application_id = ?`)
         .bind(application.id)
         .first(),
@@ -55,10 +48,6 @@ export async function onRequestGet({ env, params }) {
         ...application,
         annual_hours: annualHours(application),
       },
-      files: files.results.map((f) => ({
-        ...f,
-        profile: safeParse(f.profile_json, null),
-      })),
       review: review ?? null,
       decisions: decisions.results,
       siblings: siblings.results,

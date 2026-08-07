@@ -31,7 +31,6 @@ const ITEMS = [
     created_at: '2026-07-20 09:00:00',
     hours_since: 200,
     annual_hours: 84,
-    file_count: 3,
   },
   {
     id: 'b',
@@ -45,7 +44,6 @@ const ITEMS = [
     created_at: '2026-07-30 09:00:00',
     hours_since: 4,
     annual_hours: 120,
-    file_count: 0,
   },
   {
     id: 'c',
@@ -59,7 +57,6 @@ const ITEMS = [
     created_at: '2026-07-10 09:00:00',
     hours_since: 500,
     annual_hours: null, // 소요를 안 적은 신청서
-    file_count: 1,
   },
   {
     id: 'd',
@@ -73,7 +70,6 @@ const ITEMS = [
     created_at: '2026-07-25 09:00:00',
     hours_since: 120,
     annual_hours: 40,
-    file_count: 0,
   },
 ]
 
@@ -196,16 +192,13 @@ describe('조건 걸기', () => {
     expect(ids(applyQuery(ITEMS, { status: '반려' }))).toEqual(['c'])
   })
 
-  it('첨부가 있는 것만', () => {
-    expect(ids(applyQuery(ITEMS, { onlyWithFiles: true }))).toEqual(['a', 'c'])
-  })
 
   it('묵은 것만', () => {
     expect(ids(applyQuery(ITEMS, { onlyStale: true }))).toEqual(['a'])
   })
 
   it('조건이 여럿이면 전부 만족하는 것만 (AND)', () => {
-    expect(ids(applyQuery(ITEMS, { dept: '재무', onlyWithFiles: true }))).toEqual(['a', 'c'])
+    expect(ids(applyQuery(ITEMS, { dept: '재무', onlyStale: true }))).toEqual(['a'])
     expect(ids(applyQuery(ITEMS, { dept: '재무', status: '접수' }))).toEqual(['a'])
   })
 
@@ -220,21 +213,20 @@ describe('칩에 적히는 숫자', () => {
     expect(f.byDept).toEqual({ 재무: 2, 마케팅: 1, 영업: 1 })
     expect(f.byStatus).toEqual({ 접수: 2, 반려: 1, 수용: 1 })
     expect(f.stale).toBe(1)
-    expect(f.withFiles).toBe(2)
   })
 
   it('부서 칩의 숫자는 다른 조건을 반영하되 부서 조건 자체는 빼고 센다', () => {
-    // 첨부 있는 것만 걸어 둔 상태. 이때 각 부서 칩에 적힐 숫자는
-    // "첨부 있는 것 중 그 부서" 건수여야 한다. 첨부 없는 마케팅·영업은 빠진다.
-    const f = facetCounts(ITEMS, { onlyWithFiles: true })
-    expect(f.byDept).toEqual({ 재무: 2 })
+    // 묵은 것만 걸어 둔 상태. 이때 각 부서 칩에 적힐 숫자는 "묵은 것 중
+    // 그 부서" 건수여야 한다. 묵은 것이 없는 마케팅·영업은 빠진다.
+    const f = facetCounts(ITEMS, { onlyStale: true })
+    expect(f.byDept).toEqual({ 재무: 1 })
   })
 
   it('눌러서 0건이 나올 칩은 0이라고 적힌다 — 눌러 보기 전에 알 수 있어야 한다', () => {
-    const f = facetCounts(ITEMS, { onlyWithFiles: true })
-    // 마케팅(b)은 첨부가 없다. 그러니 '마케팅' 칩은 아예 0이거나 목록에 없다.
+    const f = facetCounts(ITEMS, { onlyStale: true })
+    // 마케팅(b)은 묵은 것이 없다. 그러니 '마케팅' 칩은 아예 0이거나 목록에 없다.
     expect(f.byDept['마케팅'] ?? 0).toBe(0)
-    expect(f.byDept['재무']).toBe(2)
+    expect(f.byDept['재무']).toBe(1)
   })
 
   it('검색어는 모든 칩 숫자에 반영된다', () => {

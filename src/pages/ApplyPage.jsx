@@ -4,11 +4,9 @@ import { useApi } from '../hooks/useApi.js'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { ago, duration, num } from '../lib/format.js'
-import { peekFile, formatBytes } from '../lib/filePeek.js'
 
 const DEPTS = ['재무', '마케팅', '영업', 'SCM', '운영', '인사', '기타']
 const FREQUENCIES = ['하루 여러 번', '매일', '주 2~3회', '주 1회', '격주', '매월', '분기', '비정기']
-const MAX_FILES = 5
 
 import SimilarNotice from '../components/SimilarNotice.jsx'
 import {
@@ -65,11 +63,8 @@ export default function ApplyPage() {
   const [similar, setSimilar] = useState([])
   const [similarHidden, setSimilarHidden] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
-  const [files, setFiles] = useState([])
-  const [peeks, setPeeks] = useState([])
   const [submitting, setSubmitting] = useState(false)
   const [receipt, setReceipt] = useState(null)
-  const fileInput = useRef(null)
 
   useEffect(() => {
     const found = loadDraft(browserStore())
@@ -114,19 +109,6 @@ export default function ApplyPage() {
     if (fieldErrors[key]) setFieldErrors((e) => ({ ...e, [key]: undefined }))
   }
 
-  async function addFiles(list) {
-    const picked = [...list].slice(0, MAX_FILES - files.length)
-    if (picked.length === 0) return
-    setFiles((prev) => [...prev, ...picked])
-    const results = await Promise.all(picked.map((f) => peekFile(f)))
-    setPeeks((prev) => [...prev, ...results])
-  }
-
-  function removeFile(index) {
-    setFiles((prev) => prev.filter((_, i) => i !== index))
-    setPeeks((prev) => prev.filter((_, i) => i !== index))
-  }
-
   async function submit(e) {
     e.preventDefault()
     setSubmitting(true)
@@ -134,7 +116,6 @@ export default function ApplyPage() {
 
     const body = new FormData()
     Object.entries(form).forEach(([k, v]) => body.append(k, v))
-    files.forEach((f) => body.append('files', f))
 
     try {
       const json = await api.form('/applications', body)
@@ -143,13 +124,7 @@ export default function ApplyPage() {
       clearDraft(browserStore())
       setReceipt(json)
       setForm(EMPTY)
-      setFiles([])
-      setPeeks([])
-      if (json.failed_files?.length) {
-        toast.error(`파일 ${json.failed_files.length}개가 올라가지 않았습니다.`)
-      } else {
-        toast.success(`접수됐습니다. 접수번호 ${json.ticket_no}`)
-      }
+      toast.success(`접수됐습니다. 접수번호 ${json.ticket_no}`)
       await reload()
     } catch (err) {
       // 칸별 오류가 있으면 그 칸 아래에 붙이고, 아니면 알림으로 알린다.
@@ -178,9 +153,6 @@ export default function ApplyPage() {
               확인하실 수 있습니다. 담당자가 <strong>영업일 1일 안에</strong> 열람하고, 만들 수 있는
               일인지부터 알려드립니다. 만들 수 없는 경우에도 이유와 대안을 함께 보내드립니다.
             </p>
-            {receipt.saved_files?.length > 0 && (
-              <p className="card-note">첨부 {receipt.saved_files.length}개 저장됨</p>
-            )}
             <a className="btn-ghost btn-sm" href={`/track?no=${receipt.ticket_no}`}>
               지금 진행 상황 보기
             </a>
@@ -391,57 +363,6 @@ export default function ApplyPage() {
             </div>
           </section>
 
-          <section className="card">
-            <div className="card-head">
-              <span className="card-title">지금 다루고 계신 파일</span>
-              <span className="card-note">
-                {files.length}/{MAX_FILES}
-              </span>
-            </div>
-            <p className="card-note" style={{ marginBottom: 12 }}>
-              말로 설명하는 것보다 실제 파일 하나가 정확합니다. 올리시면{' '}
-              <strong>브라우저에서 바로</strong> 구조를 읽어 보여드립니다. 서버로 보내기 전이고,
-              AI도 부르지 않습니다.
-            </p>
-
-            <div
-              className="dropzone"
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => {
-                e.preventDefault()
-                addFiles(e.dataTransfer.files)
-              }}
-            >
-              <input
-                ref={fileInput}
-                type="file"
-                multiple
-                className="sr-only"
-                accept=".csv,.xlsx,.xls,.txt,.json,.pdf,.png,.jpg,.jpeg"
-                onChange={(e) => {
-                  addFiles(e.target.files)
-                  e.target.value = ''
-                }}
-              />
-              <button
-                type="button"
-                className="btn-ghost"
-                onClick={() => fileInput.current?.click()}
-                disabled={files.length >= MAX_FILES}
-              >
-                파일 고르기
-              </button>
-              <span className="card-note">또는 여기로 끌어다 놓으세요 · 하나당 10MB까지</span>
-            </div>
-
-            {peeks.length > 0 && (
-              <div className="stack-sm" style={{ marginTop: 12 }}>
-                {peeks.map((p, i) => (
-                  <FilePeek key={`${p.name}-${i}`} peek={p} onRemove={() => removeFile(i)} />
-                ))}
-              </div>
-            )}
-          </section>
 
           <button type="submit" className="btn-primary btn-block" disabled={submitting}>
             {submitting ? '접수하는 중…' : '신청서 내기'}
@@ -518,63 +439,6 @@ function Field({ label, required, hint, error, count, children }) {
           </span>
         )}
       </div>
-    </div>
-  )
-}
-
-function FilePeek({ peek, onRemove }) {
-  return (
-    <div className="peek">
-      <div className="peek-top">
-        <strong className="peek-name">{peek.name}</strong>
-        <span className="card-note">{formatBytes(peek.size)}</span>
-        {peek.encoding && (
-          <span className={`badge ${peek.encodingSuspect ? 'badge-warning' : 'badge-neutral'}`}>
-            {peek.encoding}
-          </span>
-        )}
-        <span className="spacer" />
-        <button type="button" className="btn-ghost btn-sm" onClick={onRemove}>
-          빼기
-        </button>
-      </div>
-
-      {peek.encoding === 'CP949(EUC-KR)' && (
-        <p className="peek-note">
-          UTF-8이 아니라 CP949로 저장된 파일입니다. 그냥 열면 한글이 깨지는 파일인데, 여기서는
-          제대로 읽었습니다.
-        </p>
-      )}
-      {peek.note && <p className="peek-note">{peek.note}</p>}
-
-      {peek.headers && (
-        <>
-          <div className="peek-meta">
-            컬럼 {peek.headers.length}개 · 구분자 <code>{peek.delimiter}</code> · 약{' '}
-            {num(peek.estimatedRows)}행{peek.rowsAreEstimate && ' (추정)'}
-          </div>
-          <div className="table-wrap peek-table">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  {peek.headers.map((h, i) => (
-                    <th key={i}>{h || <span className="card-note">(빈 헤더)</span>}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {peek.sampleRows?.map((row, ri) => (
-                  <tr key={ri}>
-                    {peek.headers.map((_, ci) => (
-                      <td key={ci}>{row[ci] ?? ''}</td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
     </div>
   )
 }

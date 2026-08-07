@@ -38,7 +38,6 @@ export async function onRequestGet({ env, params }) {
 
     const id = app.id
     const [
-      files,
       review,
       stakeholders,
       meetings,
@@ -58,7 +57,6 @@ export async function onRequestGet({ env, params }) {
       challenges,
       decisions,
     ] = await Promise.all([
-      q(env, 'SELECT id, name, byte_size, uploaded_at FROM application_file WHERE application_id = ? ORDER BY uploaded_at', id).all(),
       q(env, 'SELECT * FROM review WHERE application_id = ?', id).first(),
       q(env, 'SELECT * FROM stakeholder WHERE application_id = ? ORDER BY is_owner DESC, created_at', id).all(),
       q(env, 'SELECT * FROM meeting WHERE application_id = ? ORDER BY seq', id).all(),
@@ -152,7 +150,6 @@ export async function onRequestGet({ env, params }) {
 
     return jsonResponse({
       application: app,
-      files: files.results,
       review,
       stakeholders: stakeholders.results,
       meetings: meetings.results,

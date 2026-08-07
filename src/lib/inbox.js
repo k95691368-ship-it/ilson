@@ -53,7 +53,6 @@ export const EMPTY_QUERY = {
   status: '',
   dept: '',
   onlyStale: false,
-  onlyWithFiles: false,
   onlyWaiting: false,
   sort: 'stale',
 }
@@ -119,7 +118,6 @@ function passesFacets(item, query, { skip } = {}) {
   if (skip !== 'status' && query.status && item.status !== query.status) return false
   if (skip !== 'dept' && query.dept && item.dept !== query.dept) return false
   if (skip !== 'stale' && query.onlyStale && !isStale(item)) return false
-  if (skip !== 'files' && query.onlyWithFiles && !(item.file_count > 0)) return false
   if (skip !== 'waiting' && query.onlyWaiting && !isWaitingAnswer(item)) return false
   return true
 }
@@ -198,7 +196,6 @@ export function facetCounts(items, query) {
     byDept,
     stale: base.filter((i) => passesFacets(i, q, { skip: 'stale' }) && isStale(i)).length,
     waiting: base.filter((i) => passesFacets(i, q, { skip: 'waiting' }) && isWaitingAnswer(i)).length,
-    withFiles: base.filter((i) => passesFacets(i, q, { skip: 'files' }) && i.file_count > 0).length,
   }
 }
 
@@ -210,7 +207,6 @@ export function describeQuery(query, shown, total) {
   if (q.dept) parts.push(`${q.dept} 부서`)
   if (q.status) parts.push(`${q.status} 상태`)
   if (q.onlyStale) parts.push(`${STALE_HOURS}시간 넘게 안 본 것`)
-  if (q.onlyWithFiles) parts.push('첨부가 있는 것')
   if (q.onlyWaiting) parts.push('부서 답을 기다리는 것')
   if (q.q) parts.push(`"${q.q}"가 들어간 것`)
 
@@ -220,7 +216,7 @@ export function describeQuery(query, shown, total) {
 
 export function isFiltered(query) {
   const q = { ...EMPTY_QUERY, ...query }
-  return Boolean(q.q || q.status || q.dept || q.onlyStale || q.onlyWithFiles || q.onlyWaiting)
+  return Boolean(q.q || q.status || q.dept || q.onlyStale || q.onlyWaiting)
 }
 
 // 걸린 조건 안에서 합계. 필터를 걸면 이 숫자도 따라 움직여야 한다.

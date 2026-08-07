@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
-import FileList from '../components/FileList.jsx'
 import Thread from '../components/Thread.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
@@ -409,14 +408,6 @@ function Result({ data, as, onChanged }) {
               </>
             )}
           </dl>
-          {data.files.length > 0 && (
-            <div style={{ marginTop: 10 }}>
-              <div className="card-note" style={{ marginBottom: 6 }}>
-                함께 올리신 파일 {data.files.length}개 — 그대로 보관 중입니다
-              </div>
-              <FileList applicationId={data.ticket} files={data.files} compact />
-            </div>
-          )}
         </div>
       </details>
 

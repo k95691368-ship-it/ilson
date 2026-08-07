@@ -79,9 +79,6 @@ export async function onRequestGet({ env, params, request }) {
     const [review, files, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions, feedbackCount] =
       await Promise.all([
         env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id).first(),
-        env.DB.prepare('SELECT id, name, byte_size FROM application_file WHERE application_id = ?')
-          .bind(app.id)
-          .all(),
         env.DB.prepare(
           "SELECT COUNT(*) AS n FROM meeting WHERE application_id = ? AND status = '완료'"
         )
@@ -334,7 +331,6 @@ export async function onRequestGet({ env, params, request }) {
         claimed_frequency: app.current_frequency,
         annual_hours: annualHours(app),
       },
-      files: files.results,
       // 내려간 도구를 화면이 제대로 말하려면 이유와 시각이 필요하다.
       // 저장은 하면서 화면으로는 안 보내고 있었다.
       handover: handover

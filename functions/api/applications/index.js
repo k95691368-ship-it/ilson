@@ -45,7 +45,6 @@ export async function onRequestGet({ env, request }) {
                 a.current_minutes, a.current_people, a.current_frequency, a.is_measured,
                 a.status, a.created_at,
                 CAST((julianday('now') - julianday(a.created_at)) * 24 AS INTEGER) AS hours_since,
-                (SELECT COUNT(*) FROM application_file f WHERE f.application_id = a.id) AS file_count,
               -- 아직 답 못 받은 질문. 이게 있으면 지금 멈춰 있는 이유가
               -- 부서 쪽에 있다는 뜻이라, 담당자 할 일로 세면 안 된다.
               (SELECT COUNT(*) FROM decision_log q
@@ -135,24 +134,11 @@ export async function onRequestPost({ env, request }) {
   const fields = Object.fromEntries(
     [...form.entries()].filter(([, v]) => typeof v === 'string')
   )
-  const files = form.getAll('files').filter((f) => typeof f !== 'string')
 
   const check = validateApplication(fields)
   if (!check.ok) {
     await releaseRateLimit(env, `apply:${ip}`, ticket)
     return jsonResponse({ error: '적어 주신 내용을 확인해주세요.', fields: check.errors }, 400)
-  }
-
-  if (files.length > MAX_FILES) {
-    await releaseRateLimit(env, `apply:${ip}`, ticket)
-    return jsonError(`파일은 ${MAX_FILES}개까지 올릴 수 있습니다.`, 400)
-  }
-  for (const f of files) {
-    const problem = validateFile(f)
-    if (problem) {
-      await releaseRateLimit(env, `apply:${ip}`, ticket)
-      return jsonError(problem, 400)
-    }
   }
 
   const v = check.value
@@ -189,43 +175,11 @@ export async function onRequestPost({ env, request }) {
     return jsonError(`신청서를 저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
   }
 
-  // 파일은 신청서가 저장된 뒤에 올린다. 파일이 실패해도 신청 자체는 남아야
-  // 한다 — 다 적어 낸 내용을 파일 하나 때문에 날리면 다시 쓰지 않는다.
-  const saved = []
-  const failed = []
-  for (const f of files) {
-    try {
-      const buf = await f.arrayBuffer()
-      const checksum = await sha256Hex(
-        `${f.name}:${f.size}:${[...new Uint8Array(buf.slice(0, 4096))].join(',')}`
-      )
-      const key = `applications/${id}/${crypto.randomUUID()}-${f.name}`
-      await env.SOURCES.put(key, buf, {
-        httpMetadata: { contentType: f.type || 'application/octet-stream' },
-      })
-      await env.DB.prepare(
-        `INSERT INTO application_file
-           (id, application_id, name, byte_size, content_type, checksum, r2_key)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
-      )
-        .bind(newId('afl'), id, f.name, f.size, f.type || null, checksum, key)
-        .run()
-      saved.push(f.name)
-    } catch {
-      failed.push(f.name)
-    }
-  }
-
   return jsonResponse(
     {
       id,
       ticket_no: ticketNo,
-      saved_files: saved,
-      // 실패를 숨기지 않는다. 무엇이 안 올라갔는지 알아야 다시 올릴 수 있다.
-      failed_files: failed,
-      message: failed.length
-        ? `접수됐습니다. 다만 파일 ${failed.length}개가 올라가지 않았습니다.`
-        : '접수됐습니다.',
+      message: '접수됐습니다.',
     },
     201
   )

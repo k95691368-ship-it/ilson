@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
-import FileList from '../components/FileList.jsx'
 import HotkeyHelp from '../components/HotkeyHelp.jsx'
 import SimilarNotice from '../components/SimilarNotice.jsx'
 import Thread from '../components/Thread.jsx'
@@ -445,15 +444,6 @@ export default function ReviewPage() {
                   부서 답을 기다리는 것
                   <span className="chip-count">{facets.waiting}</span>
                 </button>
-                <button
-                  type="button"
-                  className={`chip${query.onlyWithFiles ? ' on' : ''}`}
-                  onClick={() => setQ({ onlyWithFiles: !query.onlyWithFiles })}
-                  aria-pressed={query.onlyWithFiles}
-                >
-                  첨부가 있는 것
-                  <span className="chip-count">{facets.withFiles}</span>
-                </button>
               </div>
             </div>
 
@@ -879,14 +869,6 @@ function Detail({ id, onSaved, pool }) {
           </span>
         </div>
 
-        {data.files.length > 0 && (
-          <div style={{ marginTop: 14 }}>
-            <div className="card-note" style={{ marginBottom: 6 }}>
-              부서가 함께 올린 파일 {data.files.length}개
-            </div>
-            <FileList applicationId={a.id} files={data.files} compact />
-          </div>
-        )}
       </section>
 
       {/* 판정하기 전에 견준다. 판정한 뒤에 알려 주면 이미 두 번 검토한 것이다.
