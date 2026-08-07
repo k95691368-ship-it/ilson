@@ -147,6 +147,9 @@ export async function onRequestGet({ env, params, request }) {
           .first(),
       ])
 
+    // 한 번에 미룬 기록. review 행이 없는 보류는 여기에만 남아 있다.
+    const bulkHold = bulkHoldFrom(decisions.results)
+
     const refuseReason = review?.refuse_code
       ? REFUSE_REASONS.find((r) => r.code === review.refuse_code)
       : null
@@ -162,23 +165,28 @@ export async function onRequestGet({ env, params, request }) {
       },
       {
         stage: '검토',
-        status: review ? '완료' : app.status === '접수' ? '대기' : '진행중',
-        at: review?.decided_at ?? null,
+        // 한 번에 미룬 건은 review 행이 없다. 그래서 여기가 통째로
+        // "담당자가 아직 열람하지 않았습니다"로 남아 있었다 — 실제로는
+        // 열람하고 미룬 것인데, 부서는 아무도 안 봤다고 읽는다.
+        status: review || bulkHold ? '완료' : app.status === '접수' ? '대기' : '진행중',
+        at: review?.decided_at ?? bulkHold?.at ?? null,
         summary: review
           ? review.verdict === '반려'
             ? `반려했습니다 — ${refuseReason?.label ?? '범위 밖'}`
             : review.verdict === '보류'
               ? '보류했습니다'
               : `수용했습니다 (임팩트 ${review.impact_score} / 난이도 ${review.difficulty_score})`
-          : '담당자가 아직 열람하지 않았습니다.',
-        detail: review
-          ? {
-              판정_이유: review.verdict_reason || null,
-              대안: review.refuse_alternative || null,
-              다시_볼_조건:
-                review.hold_until_condition || bulkHoldFrom(decisions.results)?.condition || null,
-            }
-          : null,
+          : bulkHold
+            ? '여러 건을 함께 보면서 보류로 미뤘습니다. 점수는 아직 안 매겼습니다.'
+            : '담당자가 아직 열람하지 않았습니다.',
+        detail:
+          review || bulkHold
+            ? {
+                판정_이유: review?.verdict_reason || null,
+                대안: review?.refuse_alternative || null,
+                다시_볼_조건: review?.hold_until_condition || bulkHold?.condition || null,
+              }
+            : null,
       },
       {
         stage: '협의안',
@@ -284,7 +292,6 @@ export async function onRequestGet({ env, params, request }) {
     // 보류는 두 길로 들어온다. 한 건씩 판정한 것과 접수함에서 한 번에 미룬 것.
     // review 만 보면 한 번에 미룬 건은 부서에게 아무 말도 못 한다 — 담당자가
     // "언제 다시 보겠다"를 **의무로** 적었는데 그게 부서에게 안 갔다.
-    const bulkHold = bulkHoldFrom(decisions.results)
     const heldWhy = review?.hold_until_condition || bulkHold?.condition || null
     if ((review?.verdict === '보류' || app.status === '보류') && heldWhy) {
       needs.push({ code: 'hold_condition', body: heldWhy })
