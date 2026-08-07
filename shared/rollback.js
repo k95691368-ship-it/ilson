@@ -16,6 +16,27 @@
 
 export const ROLLBACK_KIND = 'handover'
 
+// 고쳐서 다시 올린 기록.
+//
+// 되돌리는 길은 있는데 다시 올리는 길이 없었다. 정확히는 있었는데 아무도
+// 몰랐다 — 넘기기 폼이 저장될 때 rolled_back_at 을 조용히 지웠고 그 버튼
+// 이름이 "고치기"였다. 그게 두 방향으로 나빴다. 다시 올리려는 사람은 그
+// 방법을 모르고, 메모 한 줄만 고치려던 사람은 자기도 모르게 부서에게 다시
+// 열어 준다.
+export const RESTORE_KIND = '다시올림'
+
+// 다시 올릴 때 무엇을 받아야 하는가.
+//
+// "고쳤습니다" 한 마디로 다시 열면 부서는 안 쓴다. 한 번 틀린 숫자를 낸
+// 도구이므로, 무엇이 달라졌는지를 알아야 다시 손을 댄다.
+export function validateRestore({ fixed } = {}) {
+  const errors = {}
+  if (String(fixed ?? '').trim().length < 5) {
+    errors.fixed = '무엇을 고치셨는지 적어주세요. 부서가 이걸 보고 다시 씁니다.'
+  }
+  return errors
+}
+
 // 내린 지 얼마나 됐으면 담당자를 짚어야 하는가.
 //
 // 내려 두고 잊는 것이 최악이다. 부서는 "고쳐 주겠지" 하고 기다리는데
@@ -71,16 +92,7 @@ export function rollbackWhatNow(s) {
   return base
 }
 
-// 담당자에게 뭐라고 말할 것인가.
-//
-// 내려 두고 잊으면 부서는 영영 기다린다. 그리고 그 도구는 넘긴 목록에서도
-// 빠져서 담당자 화면 어디에도 안 보인다.
-export function rollbackNudge(list) {
-  const stale = (list ?? []).filter((x) => x?.stale)
-  if (stale.length === 0) return null
-  return {
-    n: stale.length,
-    title: `내려 둔 채 ${STALE_DAYS}일이 지난 도구 ${stale.length}개`,
-    why: '내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보입니다. 그동안 그 부서는 원래 하던 방식으로 일하고 있습니다.',
-  }
-}
+// rollbackNudge() 가 여기 있었다. 담당자에게 "내려 둔 채 잊은 도구"를
+// 알리는 함수인데, shared/todo.js 가 같은 규칙을 따로 구현해 두고 그쪽만
+// 화면에 걸려 있었다. 두 벌이 있으면 한쪽만 고치는 날 두 화면이 다른
+// 숫자를 말한다. 쓰이는 쪽을 남기고 이쪽을 지운다.

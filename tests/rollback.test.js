@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   rollbackState,
   rollbackHeadline,
   rollbackWhatNow,
-  rollbackNudge,
   STALE_DAYS,
+  RESTORE_KIND,
+  validateRestore,
 } from '../shared/rollback.js'
+import { buildTodo } from '../shared/todo.js'
 
 // 담당자가 도구를 내리면 조회 화면에는 "문제가 있어 잠시 내렸습니다" 한 줄이
 // 떴다. 왜 내렸는지는 rollback_reason 칸에 저장되는데 화면으로 안 갔고,
@@ -84,21 +89,72 @@ describe('부서에게 뭐라고 말하는가', () => {
 })
 
 describe('담당자에게 뭐라고 말하는가', () => {
-  it('오래 내려간 것이 없으면 아무 말도 안 한다', () => {
-    expect(rollbackNudge([])).toBeNull()
-    expect(rollbackNudge()).toBeNull()
-    expect(rollbackNudge([{ stale: false }])).toBeNull()
+  it('내려 둔 채 잊은 도구를 첫 화면이 짚는다', () => {
+    // 여기 rollbackNudge() 를 시험하던 자리가 있었다. 그 함수는 아무
+    // 화면도 안 불렀고, shared/todo.js 가 같은 규칙을 따로 구현해서
+    // 그쪽만 걸려 있었다. 두 벌이 있으면 한쪽만 고치는 날 두 화면이
+    // 다른 숫자를 말한다. 쓰이는 쪽을 남기고 지웠다.
+    const items = buildTodo({ tools: { summary: { downStale: 2 } } })
+    const x = items.find((i) => i.key === 'tool_down_stale')
+    expect(x).toBeTruthy()
+    expect(x.why).toContain('원래 하던 방식으로')
+  })
+})
+
+// 다시 올리는 자리가 없었다.
+//
+// 되돌리는 길은 있는데 다시 올리는 길이 없었다. 정확히는 있었는데 아무도
+// 몰랐다 — 넘기기 폼이 저장될 때 rolled_back_at 을 조용히 NULL 로 지웠고,
+// 그 버튼 이름이 "고치기"였다.
+//
+// 그게 두 방향으로 나빴다. 다시 올리려는 사람은 그 방법을 모르고,
+// **메모 한 줄만 고치려던 사람은 자기도 모르게 부서에게 다시 열어 준다.**
+// 일부러 내려 둔 도구가 저장 한 번에 살아난다.
+describe('고쳐서 다시 올리기', () => {
+  const ROOT = fileURLToPath(new URL('..', import.meta.url))
+  const deploy = readFileSync(
+    join(ROOT, 'functions', 'api', 'applications', '[id]', 'deploy.js'),
+    'utf8'
+  )
+
+  it('저장만 했는데 조용히 다시 올라가지 않는다', () => {
+    // ON CONFLICT 절에서 지우면 어느 저장이든 부활시킨다.
+    const upsert = deploy.slice(deploy.indexOf('ON CONFLICT'), deploy.indexOf('.bind('))
+    expect(upsert).not.toContain('rolled_back_at = NULL')
+    expect(upsert).not.toContain('rollback_reason = NULL')
   })
 
-  it('있으면 왜 안 보이는지를 이유로 댄다', () => {
-    // 내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보인다.
-    const n = rollbackNudge([{ stale: true }, { stale: true }, { stale: false }])
-    expect(n.n).toBe(2)
-    expect(n.why).toContain('넘긴 목록에서도 빠져서')
-    expect(n.why).toContain('원래 하던 방식으로 일하고 있습니다')
+  it('지우는 곳은 다시 올리기 한 군데뿐이다', () => {
+    const hits = deploy.split('rolled_back_at = NULL').length - 1
+    expect(hits).toBe(1)
+    const at = deploy.indexOf('rolled_back_at = NULL')
+    // 그 자리가 restore 분기 안이어야 한다.
+    expect(deploy.slice(0, at)).toContain("body.kind === 'restore'")
   })
 
-  it('사흘을 선으로 둔다', () => {
-    expect(STALE_DAYS).toBe(3)
+  it('무엇을 고쳤는지 안 적으면 막는다', () => {
+    // "고쳤습니다" 한 마디로 다시 열면 부서는 안 쓴다. 한 번 틀린 숫자를
+    // 낸 도구이기 때문이다.
+    expect(validateRestore({ fixed: '' }).fixed).toBeTruthy()
+    expect(validateRestore({}).fixed).toBeTruthy()
+    expect(validateRestore({ fixed: '고침' }).fixed).toBeTruthy()
+    expect(validateRestore({ fixed: '합계 행을 걸러내도록 고쳤습니다' })).toEqual({})
+  })
+
+  it('내려가 있지 않은 것을 다시 올리지 않는다', () => {
+    // 그러면 아무 일도 안 일어나는데 "다시 올렸습니다"가 뜬다.
+    expect(deploy).toContain('지금 내려가 있지 않습니다')
+  })
+
+  it('화면에 그 버튼이 있다', () => {
+    // 서버만 만들고 화면에 안 다는 일이 이 저장소에서 되풀이됐다.
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'DeployPage.jsx'), 'utf8')
+    expect(page).toContain('고쳐서 다시 올리기')
+    expect(page).toContain("kind: 'restore'")
+  })
+
+  it('기록에 남길 종류 이름이 한 벌이다', () => {
+    expect(RESTORE_KIND).toBe('다시올림')
+    expect(deploy).toContain('RESTORE_KIND')
   })
 })

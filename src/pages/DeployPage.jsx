@@ -175,10 +175,30 @@ function Deploy({ id }) {
         </section>
       )}
 
+      {/* 내려 둔 도구. 여기가 막다른 길이었다 — 왜 내렸는지는 적혀 있는데
+          다시 올릴 자리가 없었다. 그동안 그 부서는 원래 하던 방식으로 일한다.
+          되돌리기 옆에 다시 올리기가 없으면, 담당자는 되돌리기를 안 누르게
+          된다. 되돌릴 수 없는 것처럼 보이기 때문이다. */}
       {h?.rolled_back_at && (
         <div className="notice notice-danger">
           <div className="notice-title">{ago(h.rolled_back_at)} 되돌렸습니다</div>
           <p>{h.rollback_reason}</p>
+          <p className="card-note">
+            그동안 {h.handed_to_dept}는 이 일을 원래 하던 방식으로 하고 있습니다.
+          </p>
+          <button
+            type="button"
+            className="btn-primary btn-sm"
+            onClick={() => {
+              // 무엇을 고쳤는지 받는다. "고쳤습니다" 한 마디로 다시 열면
+              // 부서는 안 쓴다 — 한 번 틀린 숫자를 낸 도구이기 때문이다.
+              const fixed = window.prompt('무엇을 고치셨습니까? 부서가 이걸 보고 다시 씁니다.')
+              if (!fixed) return
+              send({ kind: 'restore', fixed }, '다시 올렸습니다.')
+            }}
+          >
+            고쳐서 다시 올리기
+          </button>
         </div>
       )}
 

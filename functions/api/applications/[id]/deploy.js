@@ -8,6 +8,7 @@ import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
 import { slugify, newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { ACCEPT_PROXY_KIND } from '../../../../shared/accept.js'
+import { RESTORE_KIND, validateRestore } from '../../../../shared/rollback.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -134,8 +135,6 @@ export async function onRequestPost({ env, params, request }) {
            daily_limit = excluded.daily_limit,
            max_file_mb = excluded.max_file_mb,
            note = excluded.note,
-           rolled_back_at = NULL,
-           rollback_reason = NULL,
            updated_at = datetime('now')`
       )
         .bind(
@@ -226,6 +225,57 @@ export async function onRequestPost({ env, params, request }) {
         linkId: app.id,
       }).catch(() => {})
       return jsonResponse({ ok: true })
+    }
+
+    // 고쳐서 다시 올리기.
+    //
+    // 여태 이 자리가 없었다. 되돌리는 길은 있는데 다시 올리는 길이 없었다.
+    // 정확히는 있었는데 아무도 몰랐다 — 위의 넘기기 폼이 저장될 때
+    // rolled_back_at 을 조용히 NULL 로 지웠고, 그 버튼 이름이 "고치기"였다.
+    //
+    // 그게 두 방향으로 나빴다. 다시 올리려는 사람은 그 방법을 모르고,
+    // 메모 한 줄만 고치려던 사람은 **자기도 모르게 부서에게 다시 열어 준다.**
+    // 일부러 내려 둔 도구가 저장 한 번에 살아난다.
+    //
+    // 이제 지우는 것은 여기서만 한다. 그리고 무엇을 고쳤는지 받는다 —
+    // 부서는 그 도구를 못 믿게 된 채로 기다리고 있었으므로, 다시 열렸다는
+    // 말만으로는 안 쓴다.
+    if (body.kind === 'restore') {
+      const errors = validateRestore({ fixed: body.fixed })
+      if (Object.keys(errors).length > 0) return failFields(errors)
+      const before = await env.DB.prepare(
+        'SELECT rolled_back_at, rollback_reason FROM handover WHERE application_id = ?'
+      )
+        .bind(app.id)
+        .first()
+      if (!before?.rolled_back_at) {
+        return jsonError('이 도구는 지금 내려가 있지 않습니다. 화면을 새로 열어 보세요.', 409)
+      }
+
+      await env.DB.prepare(
+        `UPDATE handover
+            SET rolled_back_at = NULL, rollback_reason = NULL, updated_at = datetime('now')
+          WHERE application_id = ?`
+      )
+        .bind(app.id)
+        .run()
+
+      await logDecision(env, {
+        applicationId: app.id,
+        stage: '배포',
+        title: '고쳐서 다시 올렸다',
+        // 내린 이유를 같이 남긴다. 이 두 줄이 붙어 있어야 나중에 "무엇이
+        // 문제였고 무엇을 고쳤나"가 한눈에 읽힌다.
+        what: t(body.fixed),
+        why: `${before.rollback_reason ?? '이유 없이 내렸던 것'} — 이것을 고쳤습니다.`,
+        linkKind: RESTORE_KIND,
+        linkId: app.id,
+      }).catch(() => {})
+
+      return jsonResponse({
+        ok: true,
+        message: '다시 올렸습니다. 부서 도구 화면에 무엇을 고쳤는지 함께 뜹니다.',
+      })
     }
 
     // 사람이 검토함을 보고 처리한 시간 기록.
