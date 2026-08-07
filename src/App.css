@@ -6029,3 +6029,161 @@ kbd {
   font-weight: 600;
   white-space: nowrap;
 }
+
+/* 기술 구현 보러가기 — 여덟 단계 밖에 있는 자리라 목차와 다르게 보인다. */
+.built-link {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding-inline: 10px;
+}
+.built-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.built-tab {
+  flex: 1 1 240px;
+  text-align: left;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.built-tab.on {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+.built-tab .card-note {
+  display: block;
+  margin-top: 3px;
+  font-weight: 400;
+}
+.built-lead h2 {
+  margin: 0 0 9px;
+  font-size: 17px;
+  line-height: 1.6;
+}
+.built-lead p {
+  margin: 0;
+  line-height: 1.9;
+}
+.built-body {
+  margin: 0;
+  line-height: 1.95;
+  font-size: 13.5px;
+}
+/* 왜 그렇게 했는지. 무엇을 했는지보다 이쪽이 읽을 값어치가 있다. */
+.built-why {
+  margin-top: 9px;
+  padding: 11px 13px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+.built-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.built-stages > li {
+  display: flex;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.built-stage-n {
+  flex: 0 0 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+}
+.built-stages p,
+.built-point p {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.9;
+}
+.built-points {
+  display: grid;
+  gap: 11px;
+}
+.built-point {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--success);
+  border-radius: var(--radius-sm);
+}
+.built-facts {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.built-facts > li {
+  display: grid;
+  gap: 2px;
+}
+.built-stack {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 7px 16px;
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.85;
+}
+.built-stack dt {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.built-stack dd {
+  margin: 0;
+}
+.built-llm {
+  border-color: var(--accent);
+}
+.built-llm-half + .built-llm-half {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+.built-how {
+  margin: 9px 0 0;
+  padding-left: 18px;
+  font-size: 13.5px;
+  line-height: 1.95;
+  display: grid;
+  gap: 6px;
+}
+.built-cta {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+.built-cta p {
+  margin: 0 0 11px;
+  line-height: 1.85;
+}
+@media (max-width: 560px) {
+  .built-stack {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .built-stack dd {
+    margin-bottom: 9px;
+  }
+}

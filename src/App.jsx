@@ -24,6 +24,7 @@ const WeeklyPage = lazy(() => import('./pages/WeeklyPage.jsx'))
 const CodesPage = lazy(() => import('./pages/CodesPage.jsx'))
 const StallPage = lazy(() => import('./pages/StallPage.jsx'))
 const PriorityPage = lazy(() => import('./pages/PriorityPage.jsx'))
+const BuiltPage = lazy(() => import('./pages/BuiltPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // 목차와 꼬리말 없이 여는 화면들.
@@ -109,6 +110,14 @@ export default function App() {
             >
               기록
             </NavLink>
+            {/* 이 사이트를 처음 보는 사람이 "무엇을 만든 건가"를 물을 자리.
+                여덟 단계 어디에도 안 들어가므로 목차가 아니라 여기 둔다. */}
+            <NavLink
+              to="/built"
+              className={({ isActive }) => `topbar-link built-link${isActive ? ' active' : ''}`}
+            >
+              기술 구현 보러가기
+            </NavLink>
             <ThemeToggle />
           </div>
         </header>
@@ -138,6 +147,7 @@ export default function App() {
             <Route path="/codes" element={<CodesPage />} />
             <Route path="/stall" element={<StallPage />} />
             <Route path="/priority" element={<PriorityPage />} />
+            <Route path="/built" element={<BuiltPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>
