@@ -6337,3 +6337,24 @@ kbd {
   opacity: 0.65;
   font-variant-numeric: tabular-nums;
 }
+
+/* 부서가 적어 준 "무엇이 안 맞는지".
+   배지만 보이고 이 글이 안 오던 자리다. 눈에 띄어야 하지만 되돌림
+   알림과 같은 빨강은 아니다 — 내린 것이 아니라 부서가 말해 준 것이다. */
+.tool-rejected {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 10px 0 0;
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--warning, var(--line));
+  background: var(--warning-bg, var(--surface));
+  font-size: 13px;
+}
+
+.tool-rejected-body {
+  color: var(--text-h);
+  line-height: 1.6;
+  white-space: pre-wrap;
+}

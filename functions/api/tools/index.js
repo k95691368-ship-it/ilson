@@ -17,6 +17,7 @@ import { jsonResponse, failUnexpected } from '../../_lib/http.js'
 import { UNCLEAR_KIND, UNCLEAR_FIXED_KIND } from '../../../shared/unclear.js'
 import { rollbackState } from '../../../shared/rollback.js'
 import { ACCEPT_KIND, REJECT_KIND } from '../../../shared/accept.js'
+import { toReports, trustLevel, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
 
 // 최근 며칠을 "요즘"으로 볼 것인가. 주 1회 도는 도구가 많아서 이레로 잡는다.
 // 사흘로 잡으면 정상인 도구가 전부 "안 쓰임"으로 찍힌다.
@@ -128,18 +129,52 @@ export async function onRequestGet({ env }) {
     // 쓰고 있다 — 못 쓴다고 **말까지 해 준** 상태로.
     //
     // 거절한 뒤에 다시 받았다고 하면 그것이 최신이라 안 센다.
+    // what 을 안 뽑고 있었다. 그래서 담당자 화면에는 "부서가 못 쓰겠다고
+    // 함" 배지 한 줄만 떴다. 그런데 첫 화면 할 일 목록은 그 배지를 가리키며
+    // **"무엇이 안 맞는지 보기"**라고 약속한다. 눌러서 간 자리에 그 "무엇"이
+    // 없었다. 부서는 시킨 대로 이유까지 적어 줬는데, 그 글이 부서용 도구
+    // 화면 안에만 있어서 담당자는 그 주소를 직접 열어야 볼 수 있었다.
     const { results: acceptRows } = await env.DB.prepare(
-      `SELECT application_id, link_kind, created_at FROM decision_log
+      `SELECT application_id, link_kind, title, what, created_at FROM decision_log
        WHERE link_kind IN (?, ?) ORDER BY created_at`
     )
       .bind(ACCEPT_KIND, REJECT_KIND)
       .all()
+    // append-only 로그다. 마지막 것이 지금 상태다 — 거절한 뒤에 다시
+    // 받았다고 하면 그것이 최신이다.
     const lastAccept = new Map()
-    for (const r of acceptRows) lastAccept.set(r.application_id, r.link_kind)
-    const rejectedIds = new Set(
-      [...lastAccept.entries()].filter(([, k]) => k === REJECT_KIND).map(([id]) => id)
+    for (const r of acceptRows) lastAccept.set(r.application_id, r)
+    for (const it of items) {
+      const last = lastAccept.get(it.application_id)
+      it.rejected = last?.link_kind === REJECT_KIND
+      it.rejectedWhy = it.rejected ? (last.what ?? null) : null
+      it.rejectedBy = it.rejected ? (last.title ?? null) : null
+      it.rejectedAt = it.rejected ? (last.created_at ?? null) : null
+    }
+
+    // ② 도는 것과 맞는 것은 다르다.
+    //
+    // health 는 실행 횟수와 실패 횟수로만 정해진다. 그래서 "숫자가 안
+    // 맞습니다" 신고가 세 건 쌓여 있어도 그 도구 카드는 초록 "돌고 있음"
+    // 이었다. 실행은 성공하고 결과만 틀리는 것이 정확히 제일 위험한
+    // 상태인데, 화면은 그때 가장 안심시켜 주고 있었다.
+    //
+    // shared/report.js 의 trustLevel() 이 이 판단을 이미 갖고 있었다.
+    // 부르는 곳이 시험밖에 없었을 뿐이다.
+    const { results: reportRows } = await env.DB.prepare(
+      `SELECT id, application_id, link_kind, link_id, title, what, why, created_at
+       FROM decision_log WHERE link_kind IN (?, ?) ORDER BY created_at`
     )
-    for (const it of items) it.rejected = rejectedIds.has(it.application_id)
+      .bind(REPORT_KIND, REPORT_FIX)
+      .all()
+    const byApp = new Map()
+    for (const r of reportRows) {
+      if (!byApp.has(r.application_id)) byApp.set(r.application_id, [])
+      byApp.get(r.application_id).push(r)
+    }
+    for (const it of items) {
+      it.trust = trustLevel(toReports(byApp.get(it.application_id) ?? []))
+    }
 
     const summary = {
       total: items.length,
@@ -159,6 +194,10 @@ export async function onRequestGet({ env }) {
       down: items.filter((i) => i.rolled_back_at).length,
       // 부서가 못 쓰겠다고 한 채로 남아 있는 것.
       rejected: items.filter((i) => i.rejected).length,
+      // 돌고는 있는데 결과를 믿을 수 없는 것. 이게 제일 위험한 상태다 —
+      // 실행이 성공하니까 어떤 실패 지표에도 안 잡힌다.
+      untrusted: items.filter((i) => i.trust?.level === '결과를 믿을 수 없음').length,
+      uncomfortable: items.filter((i) => i.trust?.level === '불편하다는 신고 있음').length,
       totalRuns: items.reduce((s, i) => s + i.runs, 0),
       totalFailed: items.reduce((s, i) => s + i.failedRuns, 0),
       totalRows: items.reduce((s, i) => s + i.rowsOut, 0),

@@ -110,6 +110,18 @@ export default function ToolsPage() {
               <article key={t.application_id} className={`tool-card ${healthClass(t.health)}`}>
                 <div className="tool-card-head">
                   <span className={`badge ${healthTone(t.health)}`}>{t.health}</span>
+                  {/* 도는 것과 맞는 것은 다르다.
+                      health 는 실행 횟수와 실패 횟수로만 정해진다. 그래서
+                      "숫자가 안 맞습니다" 신고가 세 건 쌓여 있어도 이 카드는
+                      초록 "돌고 있음"이었다. 실행은 성공하고 결과만 틀리는
+                      것이 제일 위험한 상태인데, 화면은 그때 가장 안심시켜
+                      주고 있었다. */}
+                  {t.trust?.level === '결과를 믿을 수 없음' && (
+                    <span className="badge badge-danger">결과를 믿을 수 없음 {t.trust.urgent}</span>
+                  )}
+                  {t.trust?.level === '불편하다는 신고 있음' && (
+                    <span className="badge badge-warning">불편하다는 신고 {t.trust.open}</span>
+                  )}
                   {t.rolled_back_at && <span className="badge badge-danger">되돌림</span>}
                   {/* 부서가 "못 쓰겠습니다"를 누른 것.
                       이 사이트가 "안 맞으면 안 맞는다고 눌러주셔도 됩니다"라고
@@ -208,6 +220,23 @@ export default function ToolsPage() {
                 {t.rolled_back_at && (
                   <p className="tool-rollback">
                     {dateTimeLabel(t.rolled_back_at)}에 내렸습니다 — {t.rollback_reason}
+                  </p>
+                )}
+
+                {/* 부서가 적어 준 "무엇이 안 맞는지".
+                    여태 배지 한 줄만 왔다. 그런데 첫 화면 할 일 목록은 그
+                    배지를 가리키며 "무엇이 안 맞는지 보기"라고 약속한다.
+                    눌러서 온 자리에 그 "무엇"이 없었다. 부서는 시킨 대로
+                    적어 줬는데, 그 글이 부서용 도구 화면 안에만 있어서
+                    담당자는 그 주소를 직접 열어야 볼 수 있었다. */}
+                {t.rejected && t.rejectedWhy && (
+                  <p className="tool-rejected">
+                    <strong>못 쓰겠다고 하신 이유</strong>
+                    <span className="tool-rejected-body">{t.rejectedWhy}</span>
+                    <span className="card-note">
+                      {t.rejectedBy}
+                      {t.rejectedAt && ` · ${ago(t.rejectedAt)}`}
+                    </span>
                   </p>
                 )}
 

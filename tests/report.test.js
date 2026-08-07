@@ -1,4 +1,7 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import {
   validateReport,
   toReports,
@@ -174,5 +177,86 @@ describe('이 도구를 지금 믿을 수 있나', () => {
     const rs = toReports([report('r1', 'hard_to_use', '2026-07-21 09:00:00')])
     expect(trustLevel(rs).level).toBe('불편하다는 신고 있음')
     expect(trustLevel(rs).urgent).toBe(0)
+  })
+})
+
+// 도는 것과 맞는 것은 다르다.
+//
+// 도구 카드의 health 는 실행 횟수와 실패 횟수로만 정해진다. 그래서
+// "숫자가 안 맞습니다" 신고가 세 건 쌓여 있어도 그 카드는 초록 "돌고 있음"
+// 이었다. **실행은 성공하고 결과만 틀리는 것이 제일 위험한 상태인데,
+// 화면은 그때 가장 안심시켜 주고 있었다.**
+//
+// trustLevel() 은 이 판단을 처음부터 갖고 있었다. 부르는 곳이 이 시험
+// 파일밖에 없었을 뿐이다. 계산해 놓고 아무도 안 쓰는 것은 없는 것과 같다.
+describe('믿을 수 있는지를 화면이 실제로 쓰는가', () => {
+  const ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+  it('서버가 도구마다 trust 를 붙여 보낸다', () => {
+    const src = readFileSync(join(ROOT, 'functions', 'api', 'tools', 'index.js'), 'utf8')
+    expect(src).toContain('trustLevel')
+    expect(src).toMatch(/it\.trust\s*=/)
+    // 신고와 처리 기록을 둘 다 읽어야 "아직 안 풀린 신고"를 셀 수 있다.
+    expect(src).toContain('REPORT_KIND')
+    expect(src).toContain('REPORT_FIX')
+  })
+
+  it('화면이 그 값을 실제로 그린다', () => {
+    // 서버만 만들고 화면에 안 다는 일이 이 저장소에서 되풀이됐다.
+    const src = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+    expect(src).toContain('결과를 믿을 수 없음')
+    expect(src).toContain('불편하다는 신고')
+  })
+
+  it('화면이 쓰는 낱말이 계산이 내놓는 낱말과 같다', () => {
+    // 한쪽만 고치면 배지가 영영 안 뜬다. 예외도 안 나고 화면도 안 깨진다.
+    const urgent = trustLevel([
+      { open: true, urgent: true },
+      { open: true, urgent: false },
+    ])
+    expect(urgent.level).toBe('결과를 믿을 수 없음')
+    expect(urgent.urgent).toBe(1)
+    expect(urgent.open).toBe(2)
+
+    const mild = trustLevel([{ open: true, urgent: false }])
+    expect(mild.level).toBe('불편하다는 신고 있음')
+
+    const clean = trustLevel([{ open: false, urgent: true }])
+    expect(clean.level).toBe('이상 없음')
+
+    const src = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+    expect(src).toContain(urgent.level)
+  })
+})
+
+// 부서가 적어 준 "무엇이 안 맞는지"가 담당자에게 안 왔다.
+//
+// 거절 쿼리가 what 을 안 뽑아서 items[].rejected 는 불리언이었고, 화면은
+// 배지 한 줄만 그렸다. 그런데 첫 화면 할 일 목록은 그 배지를 가리키며
+// **"무엇이 안 맞는지 보기"**라고 약속한다. 눌러서 간 자리에 그 "무엇"이
+// 없었다. 부서는 시킨 대로 적어 줬는데 그 글이 부서용 도구 화면 안에만
+// 있어서, 담당자는 그 주소를 직접 열어야 볼 수 있었다.
+describe('못 쓰겠다는 이유가 담당자에게 오는가', () => {
+  const ROOT = fileURLToPath(new URL('..', import.meta.url))
+
+  it('서버가 이유를 함께 뽑는다', () => {
+    const src = readFileSync(join(ROOT, 'functions', 'api', 'tools', 'index.js'), 'utf8')
+    // 불리언만 주면 화면이 보여 줄 것이 없다.
+    expect(src).toMatch(/it\.rejectedWhy\s*=/)
+    expect(src).toContain('title, what')
+  })
+
+  it('화면이 그 글을 그린다', () => {
+    const src = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+    expect(src).toContain('rejectedWhy')
+    expect(src).toContain('못 쓰겠다고 하신 이유')
+  })
+
+  it('할 일 목록의 약속과 화면이 맞는다', () => {
+    const todo = readFileSync(join(ROOT, 'shared', 'todo.js'), 'utf8')
+    // 이 문구가 약속이다. 바뀌면 화면도 같이 봐야 한다.
+    expect(todo).toContain('무엇이 안 맞는지 보기')
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+    expect(page).toContain('rejectedWhy')
   })
 })
