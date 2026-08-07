@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import HotkeyHelp from '../components/HotkeyHelp.jsx'
 import SimilarNotice from '../components/SimilarNotice.jsx'
@@ -57,6 +57,8 @@ const EMPTY_FORM = {
 export default function ReviewPage() {
   const { data, error, reload } = useApi('/applications')
   const toast = useToast()
+  const [params] = useSearchParams()
+  const wanted = params.get('id')
   const [selectedId, setSelectedId] = useState(null)
   const [seeding, setSeeding] = useState(false)
   // 되돌릴 수 없는 일이라 한 번 더 묻는다. 확인 창을 띄우지 않고 버튼
@@ -109,10 +111,19 @@ export default function ReviewPage() {
   // 처음 열었을 때 맨 위를 고른다. 정렬 기본값이 '묵은 순'이라 그것은
   // 아직 판정 안 한 것 중 가장 오래 앉아 있는 것이다. 담당자가 실제로
   // 다음에 볼 것이 그것이다.
+  //
+  // 다만 할 일 목록이 어느 건인지 실어 보냈으면 그것부터 연다. 여태
+  // "다른 부서가 손든 신청서 3건"을 눌러도 늘 맨 위 건 앞에 떨어졌다 —
+  // 손든 건이 목록 아래쪽에 있으면 담당자는 하나씩 눌러 찾아야 했다.
+  // 서버는 어느 건인지 이미 알고 있었는데(/joins 가 applicationIds 를
+  // 준다) 아무도 안 읽었다.
   useEffect(() => {
     if (selectedId || visible.length === 0) return
-    setSelectedId(visible[0].id)
-  }, [visible, selectedId])
+    // 주소로 온 건이 지금 목록에 없으면(다른 조건으로 걸러졌으면) 맨 위로
+    // 떨어진다. 빈 화면을 보여 주는 것보다 낫다.
+    const found = wanted && visible.find((i) => i.id === wanted)
+    setSelectedId(found ? found.id : visible[0].id)
+  }, [visible, selectedId, wanted])
 
   // 조건을 걸어서 지금 열어 둔 신청서가 목록에서 빠진 경우.
   //

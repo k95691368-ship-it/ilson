@@ -28,6 +28,24 @@ function item(o) {
 //
 // 각 화면이 이미 세어 둔 숫자를 받아 쓴다. 여기서 다시 세지 않는다 —
 // 두 군데서 세면 두 숫자가 달라지고, 그러면 둘 다 못 믿는다.
+// 눌렀을 때 **그 신청서 앞에** 떨어지게 한다.
+//
+// 여태 목적지가 화면 주소뿐이었다. "부서가 합격 기준에 이의를 단 신청서
+// 3건 → 이의 보기"를 누르면 협의안 화면이 열리는데, 그 화면은 수용된 것
+// 중 **첫 번째**를 골라 놓는다. 이의가 달린 건이 목록 아래쪽에 있으면
+// 담당자는 칩을 하나씩 눌러 찾아야 한다.
+//
+// 그러면 할 일 목록이 "여기 볼 것이 있습니다"까지만 말하고 "어디를
+// 보세요"는 안 말하는 셈이다. 서버는 이미 어느 신청서인지 알고 있었다 —
+// /joins 와 /signoffs 가 applicationIds 를 내려보내는데 아무도 안 읽었다.
+//
+// 여러 건이면 첫 건으로 보낸다. 그 건을 처리하면 목록이 줄고 다음 건이
+// 첫 건이 된다.
+function at(path, ids) {
+  const first = (ids ?? []).find((x) => x)
+  return first ? `${path}?id=${encodeURIComponent(first)}` : path
+}
+
 export function buildTodo({ overview, reports, codes, tools, stalls, joins, signoffs } = {}) {
   const out = []
 
@@ -179,7 +197,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'rejoined',
         title: `다른 부서가 손든 신청서 ${rejoined}건`,
         why: '판정하실 때는 한 부서 일이었습니다. 여러 부서가 걸린 일이면 순서가 달라집니다.',
-        to: '/review',
+        to: at('/review', joins?.applicationIds),
         cta: '우선순위 다시 보기',
       })
     )
@@ -198,7 +216,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'join_not_in_agreement',
         title: `손든 부서 사정이 협의안에 안 들어온 신청서 ${notFiled}건`,
         why: '지금 합의하시는 그 기준을, 손든 부서는 다 만들어진 뒤에 처음 봅니다. 그때 아니라고 해도 되돌리기엔 늦습니다.',
-        to: '/agreement',
+        to: at('/agreement', joins?.applicationIds),
         cta: '협의안 열기',
       })
     )
@@ -220,7 +238,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'open_objections',
         title: `부서가 합격 기준에 이의를 단 신청서 ${objections}건`,
         why: '이의는 담당자만 푸실 수 있습니다. 안 풀면 그 기준으로 낸 통과에 계속 단서가 붙고, 그 부서는 다음부터 확인을 안 해줍니다.',
-        to: '/agreement',
+        to: at('/agreement', signoffs?.applicationIds),
         cta: '이의 보기',
       })
     )

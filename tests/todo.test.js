@@ -1,4 +1,9 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 import { buildTodo, todoSummary, URGENCY, NOTHING_CHECKED } from '../shared/todo.js'
 
 // 담당자가 아침에 앉으면 여섯 화면을 돌아다녀야 오늘 뭘 할지 안다. 그러면
@@ -387,5 +392,67 @@ describe('같은 것을 두 번 세지 않는다', () => {
   it('답이 더 많아도 음수가 안 된다', () => {
     const items = buildTodo({ overview: { counts: { stale: 1 }, answered: 3 } })
     expect(items.some((i) => i.key === 'stale_applications')).toBe(false)
+  })
+})
+
+// 눌러도 엉뚱한 건 앞에 떨어졌다.
+//
+// "부서가 합격 기준에 이의를 단 신청서 3건 → 이의 보기"를 누르면 협의안
+// 화면이 열리는데, 그 화면은 수용된 것 중 **첫 번째**를 골라 놓는다.
+// 이의가 달린 건이 목록 아래쪽에 있으면 담당자는 칩을 하나씩 눌러 찾아야
+// 했다. 할 일 목록이 "여기 볼 것이 있습니다"까지만 말하고 "어디를 보세요"는
+// 안 말한 셈이다.
+//
+// 서버는 어느 신청서인지 이미 알고 있었다. /joins 와 /signoffs 가
+// applicationIds 를 내려보내는데 아무도 안 읽었다.
+describe('할 일이 어느 건인지까지 알려주는가', () => {
+  it('이의가 달린 그 건으로 보낸다', () => {
+    const items = buildTodo({
+      signoffs: { summary: { applications: 2 }, applicationIds: ['app_b', 'app_c'] },
+    })
+    const x = items.find((i) => i.key === 'open_objections')
+    expect(x.to).toBe('/agreement?id=app_b')
+  })
+
+  it('손든 건도 그 건으로 보낸다', () => {
+    const items = buildTodo({
+      joins: { summary: { needsRepriority: 1, notInAgreement: 1 }, applicationIds: ['app_z'] },
+    })
+    expect(items.find((i) => i.key === 'rejoined').to).toBe('/review?id=app_z')
+    expect(items.find((i) => i.key === 'join_not_in_agreement').to).toBe('/agreement?id=app_z')
+  })
+
+  it('id 를 못 받으면 화면만 연다', () => {
+    // 옛 배포가 잠깐 섞여 있을 때 "?id=undefined" 로 보내면 그 화면은
+    // 아무것도 못 고르고 빈 채로 남는다.
+    const items = buildTodo({ signoffs: { summary: { applications: 1 } } })
+    expect(items.find((i) => i.key === 'open_objections').to).toBe('/agreement')
+
+    const empty = buildTodo({
+      signoffs: { summary: { applications: 1 }, applicationIds: [] },
+    })
+    expect(empty.find((i) => i.key === 'open_objections').to).toBe('/agreement')
+
+    const nully = buildTodo({
+      signoffs: { summary: { applications: 1 }, applicationIds: [null, 'app_d'] },
+    })
+    expect(nully.find((i) => i.key === 'open_objections').to).toBe('/agreement?id=app_d')
+  })
+
+  it('주소에 넣을 수 없는 글자를 그대로 안 붙인다', () => {
+    const items = buildTodo({
+      signoffs: { summary: { applications: 1 }, applicationIds: ['a b&c'] },
+    })
+    expect(items.find((i) => i.key === 'open_objections').to).toBe('/agreement?id=a%20b%26c')
+  })
+
+  it('받는 화면이 그 값을 실제로 읽는다', () => {
+    // 보내기만 하고 받는 쪽이 안 읽으면 아무것도 안 바뀐다. 이 저장소에서
+    // 되풀이된 모양이다.
+    for (const f of ['AgreementPage.jsx', 'ReviewPage.jsx']) {
+      const src = readFileSync(join(ROOT, 'src', 'pages', f), 'utf8')
+      expect(src, f).toContain('useSearchParams')
+      expect(src, f).toMatch(/params\.get\('id'\)/)
+    }
   })
 })

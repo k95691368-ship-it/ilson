@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import Stopwatch from '../components/Stopwatch.jsx'
@@ -20,6 +21,7 @@ import {
 
 export default function AgreementPage() {
   const { data: list } = useApi('/applications')
+  const [params] = useSearchParams()
   const [selectedId, setSelectedId] = useState(null)
 
   // 협의는 수용된 신청서에만 한다. 아직 판정하지 않은 것을 협의하면
@@ -29,9 +31,19 @@ export default function AgreementPage() {
     [list]
   )
 
+  // 할 일 목록이 "이의 보기"로 보낼 때 어느 건인지까지 실어 보낸다.
+  // 이게 없으면 늘 첫 건 앞에 떨어지고, 담당자는 칩을 하나씩 눌러 찾아야
+  // 한다. 그러면 할 일 목록이 "여기 볼 것이 있습니다"까지만 말하고
+  // "어디를 보세요"는 안 말하는 셈이 된다.
+  const wanted = params.get('id')
+
   useEffect(() => {
-    if (!selectedId && accepted.length > 0) setSelectedId(accepted[0].id)
-  }, [accepted, selectedId])
+    if (selectedId || accepted.length === 0) return
+    // 주소로 온 건이 목록에 있으면 그것부터. 없으면(이미 처리했거나 상태가
+    // 바뀌었으면) 첫 건으로 떨어진다 — 빈 화면을 보여 주는 것보다 낫다.
+    const found = wanted && accepted.find((a) => a.id === wanted)
+    setSelectedId(found ? found.id : accepted[0].id)
+  }, [accepted, selectedId, wanted])
 
   return (
     <div className="stack">
