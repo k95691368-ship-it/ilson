@@ -197,7 +197,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'rejoined',
         title: `다른 부서가 손든 신청서 ${rejoined}건`,
         why: '판정하실 때는 한 부서 일이었습니다. 여러 부서가 걸린 일이면 순서가 달라집니다.',
-        to: at('/review', joins?.applicationIds),
+        to: at('/review', joins?.summary?.repriorityIds ?? joins?.applicationIds),
         cta: '우선순위 다시 보기',
       })
     )
@@ -216,7 +216,11 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'join_not_in_agreement',
         title: `손든 부서 사정이 협의안에 안 들어온 신청서 ${notFiled}건`,
         why: '지금 합의하시는 그 기준을, 손든 부서는 다 만들어진 뒤에 처음 봅니다. 그때 아니라고 해도 되돌리기엔 늦습니다.',
-        to: at('/agreement', joins?.applicationIds),
+        // repriorityIds 가 아니라 notInAgreementIds 다. 두 항목이 세는
+        // 신청서가 다르다 — 위는 아직 판정 전이고 이건 협의 중인 건이다.
+        // applicationIds(=repriorityIds)를 그대로 쓰면 문제가 없는 건 앞으로
+        // 데려간다. 조용히 틀리는 쪽이라 눌러 보기 전엔 아무도 모른다.
+        to: at('/agreement', joins?.summary?.notInAgreementIds),
         cta: '협의안 열기',
       })
     )

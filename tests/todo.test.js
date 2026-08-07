@@ -416,10 +416,29 @@ describe('할 일이 어느 건인지까지 알려주는가', () => {
 
   it('손든 건도 그 건으로 보낸다', () => {
     const items = buildTodo({
-      joins: { summary: { needsRepriority: 1, notInAgreement: 1 }, applicationIds: ['app_z'] },
+      joins: {
+        summary: {
+          needsRepriority: 1,
+          notInAgreement: 1,
+          repriorityIds: ['app_z'],
+          notInAgreementIds: ['app_y'],
+        },
+        applicationIds: ['app_z'],
+      },
     })
     expect(items.find((i) => i.key === 'rejoined').to).toBe('/review?id=app_z')
-    expect(items.find((i) => i.key === 'join_not_in_agreement').to).toBe('/agreement?id=app_z')
+    // 두 항목이 세는 신청서가 다르다. 위는 아직 판정 전이고 이건 협의
+    // 중인 건이다. 같은 목록을 쓰면 문제가 없는 건 앞으로 데려간다 —
+    // 조용히 틀리는 쪽이라 눌러 보기 전엔 아무도 모른다.
+    expect(items.find((i) => i.key === 'join_not_in_agreement').to).toBe('/agreement?id=app_y')
+  })
+
+  it('두 목록이 서버가 주는 이름과 같다', () => {
+    // 이름이 갈라지면 조용히 빈 값이 되어 링크가 그냥 화면만 연다.
+    // 목록을 만드는 곳은 shared/join.js 다. 라우트는 그것을 그대로 싣는다.
+    const src = readFileSync(join(ROOT, 'shared', 'join.js'), 'utf8')
+    expect(src).toContain('repriorityIds')
+    expect(src).toContain('notInAgreementIds')
   })
 
   it('id 를 못 받으면 화면만 연다', () => {
