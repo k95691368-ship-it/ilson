@@ -262,7 +262,6 @@ export async function onRequestGet({ env }) {
       quarantineTotal,
       quarantineBuild: buildQuarantine,
       quarantineLive: liveQuarantineRows,
-      quarantineLiveTools: liveQuarantine?.tools ?? 0,
       failedChecks: failedChecks.results,
       unresolvedChallenges: openChallenges,
       idleTools: idle,

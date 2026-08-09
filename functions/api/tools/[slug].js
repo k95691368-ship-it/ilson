@@ -180,7 +180,6 @@ export async function onRequestGet({ env, params, request }) {
       title: h.title,
       handedTo: { dept: h.handed_to_dept, person: h.handed_to_person },
       handedAt: h.handed_at,
-      acceptedAt: h.accepted_at,
       limits: {
         dailyLimit: h.daily_limit,
         remainingToday: remaining,

@@ -99,7 +99,7 @@ export async function onRequestDelete({ env, request }) {
       .all()
 
     if (targets.length === 0) {
-      return jsonResponse({ ok: true, removed: 0, decisionsRemoved: 0, message: '지울 시연 신청서가 없습니다.' })
+      return jsonResponse({ ok: true, removed: 0, message: '지울 시연 신청서가 없습니다.' })
     }
 
     const ids = targets.map((t) => t.id)
@@ -107,7 +107,7 @@ export async function onRequestDelete({ env, request }) {
 
     // 한 묶음으로 돌린다. 따로 돌리다 중간에 끊기면 신청서는 사라졌는데
     // 결정 기록만 남은 상태가 되고, 그건 지금 고치려는 그 상태다.
-    const [decisions] = await env.DB.batch([
+    await env.DB.batch([
       env.DB.prepare(`DELETE FROM decision_log WHERE application_id IN (${holes})`).bind(...ids),
       env.DB.prepare(`DELETE FROM application WHERE id IN (${holes})`).bind(...ids),
     ])
@@ -115,8 +115,6 @@ export async function onRequestDelete({ env, request }) {
     return jsonResponse({
       ok: true,
       removed: targets.length,
-      decisionsRemoved: decisions?.meta?.changes ?? 0,
-      tickets: targets.map((t) => t.ticket_no),
       message: `시연 신청서 ${targets.length}건과 거기 딸린 결정 기록을 지웠습니다.`,
     })
   } catch (err) {

@@ -50,7 +50,6 @@ export async function onRequestGet({ env }) {
                 SUM(rework_seconds) AS rework_seconds,
                 AVG(duration_ms) AS avg_ms,
                 MAX(used_at) AS last_use,
-                MIN(used_at) AS first_use,
                 SUM(CASE WHEN used_at >= datetime('now', ?) THEN 1 ELSE 0 END) AS recent_runs
          FROM tool_use GROUP BY application_id`
       )
@@ -92,7 +91,6 @@ export async function onRequestGet({ env }) {
         quarantined: u?.quarantined ?? 0,
         avgMs: u?.avg_ms ?? null,
         lastUse: u?.last_use ?? null,
-        firstUse: u?.first_use ?? null,
         // 자동화 뒤에도 드는 사람 시간. 이걸 빼지 않으면 절감이 부풀려진다.
         reviewSeconds: u?.review_seconds ?? 0,
         reworkSeconds: u?.rework_seconds ?? 0,
@@ -185,8 +183,10 @@ export async function onRequestGet({ env }) {
       unclear: openUnclear,
       running: items.filter((i) => i.health === '돌고 있음').length,
       idle: items.filter((i) => i.health === '안 쓰임').length,
-      quiet: items.filter((i) => i.health === '뜸해짐').length,
-      failing: items.filter((i) => i.health === '실패 있음').length,
+      // quiet('뜸해짐')·failing('실패 있음') 을 여기서도 세고 있었다. 화면은
+      // 그 둘을 한 번도 안 읽는다 — 도구마다 붙는 health 배지를 그대로
+      // 보여 주기 때문이다. 아무도 안 읽는 숫자가 응답에 쌓일수록, 읽는
+      // 사람은 무엇이 실제로 쓰이는 값인지 알 수 없게 된다.
       rolledBack: items.filter((i) => i.health === '내림').length,
       unconfirmed: items.filter((i) => !i.accepted_at && !i.rolled_back_at).length,
       noManual: items.filter((i) => !i.manual_published_at && !i.rolled_back_at).length,
@@ -201,10 +201,8 @@ export async function onRequestGet({ env }) {
       // 돌고는 있는데 결과를 믿을 수 없는 것. 이게 제일 위험한 상태다 —
       // 실행이 성공하니까 어떤 실패 지표에도 안 잡힌다.
       untrusted: items.filter((i) => i.trust?.level === '결과를 믿을 수 없음').length,
-      uncomfortable: items.filter((i) => i.trust?.level === '불편하다는 신고 있음').length,
       totalRuns: items.reduce((s, i) => s + i.runs, 0),
       totalFailed: items.reduce((s, i) => s + i.failedRuns, 0),
-      totalRows: items.reduce((s, i) => s + i.rowsOut, 0),
       recentDays: RECENT_DAYS,
 
       // 세는 것으로 끝내지 않고 **어느 것인지**까지 준다.

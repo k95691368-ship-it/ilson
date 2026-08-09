@@ -77,7 +77,6 @@ export async function onRequestGet({ env, params, request }) {
         files: safeParse(r.files_json, []),
         totals: safeParse(r.totals_json, null),
       })),
-      latestRunId: latest?.id ?? null,
       rows,
       quarantine,
       aliases,

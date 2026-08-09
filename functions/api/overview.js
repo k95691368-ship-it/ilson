@@ -25,7 +25,6 @@ export async function onRequestGet({ env }) {
       handovers,
       uses,
       decisions,
-      baselines,
       refuseNoAlt,
       deptSaid,
       betaOpen,
@@ -82,9 +81,8 @@ export async function onRequestGet({ env }) {
          ORDER BY d.created_at DESC LIMIT 8`
       ).all(),
 
-      env.DB.prepare(
-        'SELECT application_id, median_seconds, sample_n FROM baseline'
-      ).all(),
+      // 기준선 표를 통째로 읽어 개수만 세고 버리던 쿼리가 여기 있었다.
+      // 첫 화면을 열 때마다 돌았고, 그 숫자를 그리는 화면은 없었다. 지운다.
 
       // 대안 없이 반려한 것. /honesty가 세는 것과 같은 조건으로 센다 —
       // 두 화면이 서로 다른 말을 하면 둘 다 못 믿는다.
@@ -378,13 +376,11 @@ export async function onRequestGet({ env }) {
         // 칸으로 넘어갔다. 적어 둔 쪽이 옳으니 안내가 이 수를 보게 한다.
         awaitingAccept: handovers.results.filter((h) => !h.rolled_back_at && !h.accepted_at).length,
         totalRuns: uses?.n ?? 0,
-        rowsProcessed: uses?.rows_total ?? 0,
         lastUsed: uses?.last ?? null,
         list: handovers.results
           .filter((h) => !h.rolled_back_at)
           .map((h) => ({ slug: h.slug, title: h.title, dept: h.dept })),
       },
-      baselines: baselines.results.length,
       recentDecisions: decisions.results,
       // 결정 기록 화면과 같은 규칙, 같은 범위(전체)를 본다.
       unrequestedCount: unrequestedAll?.n ?? 0,

@@ -97,7 +97,6 @@ export async function onRequestPost({ env, params, request }) {
     return jsonResponse({
       ok: true,
       id,
-      openCount: open.length + 1,
       message: '물어보신 것을 담당자에게 전했습니다. 답이 오면 이 화면에 뜹니다.',
     })
   } catch (err) {

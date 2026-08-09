@@ -57,7 +57,6 @@ export async function onRequestGet({ env }) {
         open: all.filter((r) => r.open).length,
         urgent: all.filter((r) => r.open && r.urgent).length,
         fixed: all.filter((r) => !r.open).length,
-        toolsAffected: tools.length,
         toolsUntrusted: tools.filter((t) => t.urgent > 0).length,
       },
     })

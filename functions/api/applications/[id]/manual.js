@@ -53,7 +53,8 @@ export async function onRequestGet({ env, params }) {
       faq: faq.results,
       unusedFeedback: feedback.results,
       stakeholders: stakeholders.results,
-      lastBeta: lastBeta ?? null,
+      // 마지막 베타 회차를 통째로 내려보냈었다. 화면이 읽는 것은 바로
+      // 아래 betaPassed 하나다.
       // 코드에서 뽑은 부분. 저장하지 않으므로 절대 낡지 않는다.
       auto: autoSections(),
       // 베타를 통과하지 않았으면 아직 넘길 단계가 아니다.

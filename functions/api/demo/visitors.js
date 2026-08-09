@@ -98,15 +98,9 @@ export async function onRequestGet({ env }) {
       // 말지를 이 숫자로 정한다.
       touched,
       total: all.length,
-      // 무엇을 지우는지 화면이 그대로 읽을 수 있게 여기서 문장으로 준다.
-      note:
-        rows.length === 0
-          ? '시험 삼아 낸 신청서는 없습니다.'
-          : `${rows.length}건입니다. 낸 뒤로 판정도 되묻기도 없었던 것들만 셉니다 — 한 줄이라도 기록이 달린 것은 안 셉니다.`,
-      touchedNote:
-        touched === 0
-          ? null
-          : `판정·되묻기까지 해 보신 신청서가 ${touched}건 있습니다. 이건 위 단추로 안 지워집니다.`,
+      // note·touchedNote 로 안내 문장까지 여기서 만들어 보냈었다. 화면은 그
+      // 문장을 안 읽는다 — shared/tryit.js 에 적힌 것을 쓴다. 같은 말을 두
+      // 군데 두면 한쪽만 고치는 날 서로 다른 말을 하게 된다.
     })
   } catch (err) {
     return jsonError(`세지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
@@ -138,7 +132,6 @@ export async function onRequestDelete({ env, request }) {
       return jsonResponse({
         ok: true,
         removed: ids.length,
-        tickets: rows.map((r) => r.ticket_no),
         message: `시험 삼아 낸 신청서 ${ids.length}건을 지웠습니다.`,
       })
     }
@@ -194,7 +187,6 @@ export async function onRequestDelete({ env, request }) {
     return jsonResponse({
       ok: true,
       removed: ids.length,
-      tickets: rows.map((r) => r.ticket_no),
       left: left.length,
       message:
         left.length === 0

@@ -66,7 +66,6 @@ export async function onRequestGet({ env, params }) {
       stats: {
         runs: stats?.runs ?? 0,
         failures: stats?.failures ?? 0,
-        rowsTotal: stats?.rows_total ?? 0,
         quarantineTotal: stats?.quarantine_total ?? 0,
         avgMs: stats?.avg_ms ?? null,
         lastUsed: stats?.last_used ?? null,

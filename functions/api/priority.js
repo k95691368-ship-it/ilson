@@ -105,8 +105,8 @@ export async function onRequestGet({ env }) {
       picked: state.picked,
       line: state.line,
       summary: {
-        onBoard: board.items.length,
-        offBoard: board.off.length,
+        // onBoard·offBoard 를 함께 세고 있었다. 화면은 판 위의 카드를 직접
+        // 그리므로 그 둘을 한 번도 안 읽는다.
         picked: state.picked.length,
       },
     })

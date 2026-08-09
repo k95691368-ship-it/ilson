@@ -32,9 +32,9 @@ export async function onRequestGet({ env }) {
 
     return jsonResponse({
       summary: {
-        openObjections: open.length,
+        // 이의 건수와 해소 건수도 함께 냈었다. 첫 화면 할 일 목록이 읽는
+        // 것은 신청서 수 하나뿐이다 — 담당자가 열어 볼 것이 신청서라서다.
         applications: apps.size,
-        resolvedTotal: resolved.size,
       },
       applicationIds: [...apps],
     })
