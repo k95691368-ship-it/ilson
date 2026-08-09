@@ -85,16 +85,28 @@ describe('걷어낸 기능의 표를 남겨 두지 않는다', () => {
   const files = readdirSync(join(ROOT, 'migrations')).filter((f) => f.endsWith('.sql')).sort()
   const sql = files.map((f) => readFileSync(join(ROOT, 'migrations', f), 'utf8')).join('\n')
 
+  // 첫 둘은 걷어낸 기능(첨부·AI 초안)의 표, 나머지 넷은 이 사이트에 아예
+  // 없는 로그인 시스템의 표다. 접수번호 하나가 열쇠라 계정도 세션도 안
+  // 만드는데, 데이터베이스는 계정이 있는 것처럼 생겨 있었다.
+  const GONE = [
+    'application_file',
+    'application_ai_draft',
+    'notifications',
+    'audit_log',
+    'sessions',
+    'users',
+  ]
+
   it('내리는 마이그레이션이 있다', () => {
-    expect(sql).toContain('DROP TABLE IF EXISTS application_file')
-    expect(sql).toContain('DROP TABLE IF EXISTS application_ai_draft')
+    for (const t of GONE) expect(sql, t).toContain(`DROP TABLE IF EXISTS ${t}`)
   })
 
   it('내린 뒤에 다시 만들지 않는다', () => {
     // 만들고 내리고 또 만들면 배포마다 달라진다.
-    const order = (needle) => files.findIndex((f) => readFileSync(join(ROOT, 'migrations', f), 'utf8').includes(needle))
-    for (const t of ['application_file', 'application_ai_draft']) {
-      expect(order(`DROP TABLE IF EXISTS ${t}`)).toBeGreaterThan(order(`CREATE TABLE ${t} `))
+    const order = (needle) =>
+      files.findIndex((f) => readFileSync(join(ROOT, 'migrations', f), 'utf8').includes(needle))
+    for (const t of GONE) {
+      expect(order(`DROP TABLE IF EXISTS ${t}`), t).toBeGreaterThan(order(`CREATE TABLE ${t} `))
     }
   })
 
@@ -111,7 +123,11 @@ describe('걷어낸 기능의 표를 남겨 두지 않는다', () => {
     walk(join(ROOT, 'src'))
     walk(join(ROOT, 'shared'))
     const all = code.join('\n')
-    expect(all).not.toContain('application_file')
-    expect(all).not.toContain('application_ai_draft')
+    // 표 이름으로 SQL 을 쓰는 자리가 남아 있으면 그 라우트는 터진다.
+    for (const t of GONE) {
+      expect(all.includes(`FROM ${t}`), t).toBe(false)
+      expect(all.includes(`INTO ${t}`), t).toBe(false)
+      expect(all.includes(`UPDATE ${t}`), t).toBe(false)
+    }
   })
 })
