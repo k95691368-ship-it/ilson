@@ -340,7 +340,11 @@ function Ready() {
   const { data, error } = useApi('/health')
   if (error || !data) return null
 
-  const labels = { db: '데이터베이스(D1) 연결', schema: '표 구조 적용', r2: '파일 보관소(R2) 연결' }
+  // R2(파일 보관소) 확인도 이 목록에 있었다. 첨부 기능을 걷어낼 때 서버는
+  // 그 확인을 지웠는데 목록만 남아서, **"파일 보관소(R2) 연결 — 모두 확인됨"
+  // 이 라이브에 떠 있었다.** 있지도 않은 것을 확인했다고 말한 것이다.
+  // 하필 이 화면이 그러면 여기 적힌 나머지도 다 못 믿게 된다.
+  const labels = { db: '데이터베이스(D1) 연결', schema: '표 구조 적용' }
 
   if (data.ready) {
     return (

@@ -9,7 +9,32 @@
 import { jsonResponse } from '../_lib/http.js'
 
 // 이 표들이 있으면 스키마가 적용된 것으로 본다.
-const CORE_TABLES = ['users', 'sessions', 'rate_limit_hits', 'audit_log', 'decision_log', 'notifications']
+//
+// 여기 users·sessions·audit_log·notifications 가 적혀 있었다. **이 사이트에는
+// 로그인이 없다.** 접수번호 하나가 열쇠이고 계정도 세션도 안 만든다. 앞
+// 저장소에서 공용 부품을 가져올 때 딸려 온 표들이고, 이 제품의 코드는 그
+// 넷을 한 줄도 안 읽고 안 쓴다.
+//
+// 그런데 준비됐는지를 그 넷으로 판정하고 있었다. 그러면 두 방향으로 틀린다 —
+// 그 표 없이 새로 배포하면 멀쩡히 도는 배포를 "덜 준비됐습니다"라고 신고하고,
+// 반대로 여덟 단계에 실제로 쓰는 표가 통째로 빠져 있어도 "준비된 상태입니다"
+// 라고 답한다. 확인한다는 말만 있고 확인하는 것은 딴것이었다.
+//
+// 한 건을 여덟 단계로 굴리는 데 반드시 있어야 하는 표로 바꾼다.
+const CORE_TABLES = [
+  'application',
+  'review',
+  'decision_log',
+  'acceptance_criterion',
+  'baseline',
+  'build_run',
+  'beta_round',
+  'manual',
+  'handover',
+  'tool_use',
+  'outcome',
+  'rate_limit_hits',
+]
 
 export async function onRequestGet({ env }) {
   const checks = { db: false, schema: false }
