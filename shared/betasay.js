@@ -64,6 +64,14 @@ export function validateBetaSay({ by, kind, body } = {}) {
 //
 // 부서 쪽 화면이라 담당자 화면과 다른 것을 센다. 담당자는 "몇 건 남았나"를
 // 보지만, 부서는 **내가 낸 것이 읽혔나**를 본다.
+// 시험판 의견도 결정 기록에 남긴다.
+//
+// 부서가 하는 일 열대여섯 가지 중 이것만 기록에 안 남고 있었다.
+// beta_feedback 표에만 들어가서, 결정 기록 화면이 "부서가 직접 누른 것"을
+// 셀 때 이건 세어지지 않았다. 시험판을 써 보고 걸리는 것을 적는 일은
+// 부서가 하는 일 중 손이 제일 많이 가는 축인데 그게 안 잡혔다.
+export const BETA_SAY_KIND = '시험판의견'
+
 export function betaSayState({ round, says } = {}) {
   const list = says ?? []
   const open = list.filter((s) => !s.resolved_at)

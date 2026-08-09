@@ -11,7 +11,8 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
-import { validateBetaSay, betaSayState } from '../../../../shared/betasay.js'
+import { validateBetaSay, betaSayState, BETA_SAY_KIND } from '../../../../shared/betasay.js'
+import { logDecision } from '../../../_lib/decisions.js'
 
 async function load(env, ticket) {
   const app = await env.DB.prepare(
@@ -76,21 +77,36 @@ export async function onRequestPost({ env, request, params }) {
     return failFields(errors, '적어 주신 내용을 확인해주세요.')
   }
 
+  const by = String(body.by).trim().slice(0, 60)
+  const said = String(body.body).trim().slice(0, 1000)
+
   try {
     await env.DB.prepare(
       `INSERT INTO beta_feedback (id, application_id, round_id, dept, person_label, body, kind)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(
-        newId('bfb'),
-        loaded.app.id,
-        loaded.round.id,
-        loaded.app.dept,
-        String(body.by).trim().slice(0, 60),
-        String(body.body).trim().slice(0, 1000),
-        body.kind
-      )
+      .bind(newId('bfb'), loaded.app.id, loaded.round.id, loaded.app.dept, by, said, body.kind)
       .run()
+
+    // 결정 기록에도 남긴다.
+    //
+    // 여기만 안 남기고 있었다. 부서가 하는 일 열대여섯 가지 중 이것만
+    // beta_feedback 표에서 끝났다. 그래서 결정 기록 화면이 "부서가 직접
+    // 누른 것 N건"을 셀 때 시험판 의견은 한 건도 안 세어졌다.
+    //
+    // 시험판을 써 보고 걸리는 것을 적는 일은 부서가 하는 일 중 손이 제일
+    // 많이 가는 축이다. 그게 안 잡히면 이 화면이 하려는 말 — 이 기록은
+    // 혼자 만든 것이 아니다 — 이 실제보다 약하게 보인다.
+    await logDecision(env, {
+      applicationId: loaded.app.id,
+      stage: '베타테스트',
+      actor: 'human',
+      title: by,
+      what: said,
+      why: `${loaded.app.dept}에서 시험판을 써 보고 적어 주셨습니다. 기계 채점은 "쓰기 불편하다"를 채점하지 못합니다.`,
+      linkKind: BETA_SAY_KIND,
+      linkId: loaded.round.id,
+    }).catch(() => {})
 
     const after = await load(env, loaded.app.ticket_no)
     return jsonResponse({
