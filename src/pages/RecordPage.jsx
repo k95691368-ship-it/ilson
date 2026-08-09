@@ -17,6 +17,16 @@ import { dateTimeLabel, duration, krw, num } from '../lib/format.js'
 // 것을 안 보이게 하면 여덟 단계를 다 밟은 것처럼 보이기 때문이다.
 export default function RecordPage() {
   const { id } = useParams()
+  // 어디로 돌아갈 것인가.
+  //
+  // 돌아가는 길이 담당자 접수함 하나뿐이었다. 부서가 자기 기록을 보러
+  // 왔다가 나가려고 누르면 남의 일터로 떨어진다.
+  //
+  // 접수번호로 열었으면 부서 쪽에서 온 것이다 — 담당자는 목록에서 내부
+  // id 로 연다. 그 차이로 가른다.
+  const fromDept = /^AX-[A-Z0-9]{3}-[A-Z0-9]{3}$/.test(String(id ?? '').toUpperCase())
+  const backTo = fromDept ? `/track?no=${encodeURIComponent(String(id).toUpperCase())}` : '/review'
+  const backLabel = fromDept ? '내 신청서 진행 상황' : '검토 화면'
   const [rec, setRec] = useState(null)
   const [error, setError] = useState('')
 
@@ -48,8 +58,8 @@ export default function RecordPage() {
     return (
       <div className="record-shell">
         <div className="notice notice-danger">{error}</div>
-        <Link to="/review" className="btn-ghost">
-          검토 화면으로
+        <Link to={backTo} className="btn-ghost">
+          {backLabel}으로
         </Link>
       </div>
     )
@@ -62,8 +72,8 @@ export default function RecordPage() {
   return (
     <div className="record-shell">
       <div className="record-actions no-print">
-        <Link to="/review" className="btn-ghost btn-sm">
-          ← 검토 화면
+        <Link to={backTo} className="btn-ghost btn-sm">
+          ← {backLabel}
         </Link>
         <span className="spacer" />
         <button type="button" className="btn-ghost btn-sm" onClick={download}>

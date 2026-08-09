@@ -163,3 +163,40 @@ describe('죽은 화면 파일이 남아 있지 않은가', () => {
     expect(unused).toEqual([])
   })
 })
+
+// 부서가 자기 기록을 못 가져갔다.
+//
+// 인쇄 문서(/record/:id)는 담당자 화면 여덟 곳에서 열리는데 부서 화면에서는
+// 한 곳도 없었다. 신청서를 낸 쪽이, 여덟 단계를 다 겪은 쪽이, 자기 건의
+// 기록을 문서로 못 받아 갔다.
+//
+// 부서장에게 "우리가 낸 것이 이렇게 처리됐습니다"를 보여 줄 때 조회 화면
+// 주소를 보내면 상대는 접수번호부터 물어야 한다. 문서는 그대로 붙여 넣으면
+// 된다.
+describe('부서도 자기 기록을 문서로 받는가', () => {
+  const track = readFileSync(join(ROOT, 'src', 'pages', 'TrackPage.jsx'), 'utf8')
+
+  it('조회 화면에 문서로 가는 자리가 있다', () => {
+    expect(track).toContain('/record/${data.ticket}')
+    expect(track).toContain('기록을 문서 한 장으로 보기')
+  })
+
+  it('접수번호로 문서가 열린다', () => {
+    // 부서는 내부 id 를 모른다. 접수번호로 안 열리면 이 링크는 늘 404다.
+    const route = readFileSync(
+      join(ROOT, 'functions', 'api', 'applications', '[id]', 'record.js'),
+      'utf8'
+    )
+    expect(route).toContain('id = ? OR ticket_no = ?')
+  })
+
+  it('돌아가는 길이 온 쪽으로 간다', () => {
+    // 돌아가기가 담당자 접수함 하나뿐이었다. 부서가 나가려고 누르면 남의
+    // 일터로 떨어진다.
+    const rec = readFileSync(join(ROOT, 'src', 'pages', 'RecordPage.jsx'), 'utf8')
+    expect(rec).toContain('const fromDept =')
+    expect(rec).toContain('/track?no=')
+    // 담당자 쪽 길도 남아 있어야 한다.
+    expect(rec).toContain("'/review'")
+  })
+})

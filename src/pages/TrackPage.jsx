@@ -184,6 +184,24 @@ function Result({ data, as, onChanged }) {
             ` — 끝난 것 ${data.stageProgress.done}, 남은 것 ${data.stageProgress.total - data.stageProgress.done}`}
           {a.annual_hours != null && ` · 연 ${num(a.annual_hours, 0)}시간이 드는 일로 접수됐습니다`}
         </p>
+
+        {/* 기록을 문서 한 장으로 받아 가는 자리.
+            이 문서는 담당자 화면 여덟 곳에서 열리는데 부서 화면에서는 한
+            곳도 없었다. 신청서를 낸 쪽이, 여덟 단계를 다 겪은 쪽이, 자기
+            건의 기록을 못 가져갔다.
+            부서장에게 "우리가 낸 것이 이렇게 처리됐습니다"를 보여 줄 때
+            이 화면 주소를 보내면 상대는 접수번호부터 물어야 한다. 문서는
+            그대로 붙여 넣으면 된다.
+            새 위험은 없다 — 접수번호를 아는 사람만 여기 올 수 있고, 문서도
+            같은 번호로 열린다. */}
+        <div className="row" style={{ marginTop: 10 }}>
+          <Link to={`/record/${data.ticket}`} className="btn-ghost btn-sm">
+            기록을 문서 한 장으로 보기
+          </Link>
+          <span className="card-note">
+            여덟 단계에서 있었던 일이 한 문서로 이어집니다. 인쇄하거나 그대로 붙여 넣으실 수 있습니다.
+          </span>
+        </div>
       </section>
 
       {/* 다른 신청서와 같은 건으로 묶였으면 그것부터. 모르면 이미 만들고
