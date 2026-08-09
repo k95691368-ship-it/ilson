@@ -24,6 +24,13 @@ const STAGE_ORDER = [
 
 export { STAGE_ORDER }
 
+// 원 단위. 문서는 메일에 붙여 넣는 것이라 기호를 안 쓰고 한글로 적는다.
+function krw(n) {
+  const v = Number(n)
+  if (!Number.isFinite(v)) return '—'
+  return `${Math.round(v).toLocaleString('ko-KR')}원`
+}
+
 function line(label, value) {
   if (value == null || value === '') return null
   return `${label}: ${value}`
@@ -83,6 +90,8 @@ export function dossierText(record) {
     uses = [],
     outcome,
     challenges = [],
+    money,
+    moneyLabel,
     decisions = [],
     done = {},
     generatedAt,
@@ -286,6 +295,37 @@ export function dossierText(record) {
   out.push(
     outcome
       ? block('[8] 성과 — 기준선과 대조', [
+          // **얼마나 줄었는지**를 맨 앞에 적는다.
+          //
+          // 여태 이 칸에는 만든 공수와 자기 반박만 있었다. 여덟 단계가
+          // 만들어 내는 숫자가 그 여덟 단계를 편 문서에 없었던 것이다.
+          // 아래에 "이 금액은 보수적 추정치로 부릅니다"라는 줄이 있는데,
+          // 정작 그 금액이 안 적혀 있었다.
+          //
+          // 화면과 **같은 함수**가 낸 값을 그대로 쓴다. 두 벌로 만들면
+          // 종이와 화면이 다른 금액을 말하는 날이 오고, 그날 둘 다 못 믿는다.
+          money
+            ? [
+                line(
+                  '지금까지 줄인 시간',
+                  `${money.runCount}번 돌려서 ${Math.round(money.savedSeconds / 60)}분 (검수·재작업 뺀 값)`
+                ),
+                line('순절감', `${krw(money.netKrw)} — 만든 공수와 운영비를 뺀 값`),
+                money.annual
+                  ? line(
+                      '연 환산',
+                      `${money.annual.hours}시간 · ${krw(money.annual.grossKrw)}` +
+                        (money.annual.firstYearKrw !== money.annual.grossKrw
+                          ? ` (첫 해는 만든 공수를 빼고 ${krw(money.annual.firstYearKrw)})`
+                          : '')
+                    )
+                  : null,
+                moneyLabel ? line('이 금액을 뭐라고 부르나', moneyLabel.label) : null,
+                money.annual?.note ? `  ${money.annual.note}` : null,
+              ]
+                .filter(Boolean)
+                .join('\n')
+            : null,
           line('만든 공수', `${outcome.dev_hours}시간 (${outcome.amortize_months}개월 상각)`),
           line('운영 비용', `${outcome.ops_cost_krw}원`),
           line(

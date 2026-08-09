@@ -12,7 +12,7 @@
 // 인쇄하거나 텍스트로 내려받는다.
 
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
-import { computeOutcome, buildChallenges } from '../../../../shared/outcome.js'
+import { computeOutcome, buildChallenges, annualize, labelForOutcome } from '../../../../shared/outcome.js'
 import { OUTCOME_KIND } from '../../../../shared/accept.js'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
@@ -79,6 +79,17 @@ export async function onRequestGet({ env, params }) {
 
     // 살아 있는 반박을 성과 화면과 **같은 함수**로 만든다. 저장된 해소분은
     // 그대로 지킨다.
+    // 문서에 실을 금액. 성과 화면과 **같은 함수**로 낸다.
+    //
+    // 여태 이 라우트는 computeOutcome 을 부르고도 그 결과를 반박 만드는 데만
+    // 쓰고 버렸다. 그래서 인쇄 문서의 성과 칸에 만든 공수와 반박은 있는데
+    // **정작 얼마나 줄었는지가 없었다.** 여덟 단계가 만들어 내는 숫자가
+    // 그 여덟 단계를 편 문서에 안 실린 것이다.
+    //
+    // 따로 계산하지 않는다. 두 벌로 만들면 화면과 종이가 다른 금액을 말하는
+    // 날이 오고, 그날 둘 다 못 믿게 된다.
+    let money = null
+    let moneyLabel = null
     let liveChallenges = challenges.results
     if (baseline && uses.results.length > 0) {
       let deptFelt = null
@@ -107,6 +118,16 @@ export async function onRequestGet({ env, params }) {
               baselineAgeDays: daysSince(baseline?.sealed_at),
               deptFelt,
             })
+      if (computed.status !== '산정불가') {
+        money = {
+          ...computed,
+          annual: annualize(computed, baseline?.frequency ?? app.current_frequency, {
+            devKrw: computed.devKrw ?? 0,
+            opsCostKrw: outcome?.ops_cost_krw ?? 0,
+          }),
+        }
+      }
+
       const byCode = new Map(challenges.results.map((c) => [c.rule_code, c]))
       liveChallenges = shouldHave.map((c) => {
         const saved = byCode.get(c.code)
@@ -118,6 +139,13 @@ export async function onRequestGet({ env, params }) {
           resolution: saved?.resolution ?? null,
         }
       })
+    }
+
+    // 금액에 붙일 딱지. 미해소 반박 수에 따라 '보수적 추정'으로 내려간다.
+    // 화면이 쓰는 것과 같은 함수다.
+    if (money) {
+      const unresolved = liveChallenges.filter((c) => !c.resolved_at).length
+      moneyLabel = labelForOutcome(money, unresolved)
     }
 
     // 회차별 기준 판정. 회차가 없으면 한 번도 안 돌린 것이고, 그것도 기록이다.
@@ -180,6 +208,8 @@ export async function onRequestGet({ env, params }) {
       // 통째로 사라진다.** 이 저장소가 파는 것이 기록인데 가장 불리한
       // 대목만 빠지는 셈이다.
       challenges: liveChallenges,
+      money,
+      moneyLabel,
       decisions: decisions.results,
       done,
       // 이 문서를 언제 뽑았는지. 인쇄물에는 이게 있어야 나중에 어느 시점의
