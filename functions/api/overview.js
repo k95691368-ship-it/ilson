@@ -63,7 +63,7 @@ export async function onRequestGet({ env }) {
 
       env.DB.prepare(
         `SELECT h.application_id, h.handed_at, h.accepted_at, h.rolled_back_at, h.slug,
-                a.created_at AS applied_at, a.title, a.dept
+                a.created_at AS applied_at, a.title, a.dept, a.ticket_no
          FROM handover h JOIN application a ON a.id = h.application_id`
       ).all(),
 
@@ -263,7 +263,14 @@ export async function onRequestGet({ env }) {
       .map((h) => {
         const from = new Date(`${h.applied_at.replace(' ', 'T')}Z`).getTime()
         const to = new Date(`${h.handed_at.replace(' ', 'T')}Z`).getTime()
-        return { title: h.title, dept: h.dept, days: Math.max(0, (to - from) / 86400000) }
+        // 접수번호를 함께 준다. 화면이 "이건 왜 21일이나 걸렸지"를 눌러
+        // 그 기록으로 갈 수 있어야 숫자가 이야기가 된다.
+        return {
+          ticket_no: h.ticket_no,
+          title: h.title,
+          dept: h.dept,
+          days: Math.max(0, (to - from) / 86400000),
+        }
       })
       .sort((a, b) => a.days - b.days)
 
@@ -329,6 +336,15 @@ export async function onRequestGet({ env }) {
       byDept: Object.entries(byDept)
         .map(([dept, v]) => ({ dept, ...v }))
         .sort((a, b) => b.total - a.total),
+      // 접수부터 인수인계까지.
+      //
+      // 여태 화면은 중앙값 하나만 그렸다. fastest·slowest 는 여기서 계산해
+      // 내려보내는데 읽는 곳이 없었다. 중앙값만 보이면 **폭이 안 보인다** —
+      // 셋 다 열흘쯤 걸린 것과, 사흘짜리 하나에 스무날짜리 하나가 섞여 중앙이
+      // 열흘인 것은 완전히 다른 이야기인데 화면에서는 같은 숫자다.
+      //
+      // 이 사이트는 다른 자리에서 "못 한 것을 숨기지 않는다"고 말한다.
+      // 오래 걸린 건을 가려 놓고 그 말을 할 수는 없다.
       lead: {
         medianDays: medianLead == null ? null : Math.round(medianLead * 10) / 10,
         fastest: leadDays[0] ?? null,

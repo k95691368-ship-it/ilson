@@ -109,7 +109,7 @@ export async function onRequestGet({ env }) {
     // 첫 화면 할 일 목록에 올리려고 여기서 센다. 사용법서 화면을 열어야만
     // 보이면 담당자는 못 본다 — 다 쓴 뒤로 그 화면을 안 열기 때문이다.
     const { results: unclearRows } = await env.DB.prepare(
-      `SELECT id, link_kind, link_id FROM decision_log
+      `SELECT id, application_id, link_kind, link_id FROM decision_log
        WHERE link_kind IN (?, ?)`
     )
       .bind(UNCLEAR_KIND, UNCLEAR_FIXED_KIND)
@@ -117,9 +117,13 @@ export async function onRequestGet({ env }) {
     const fixedFlagIds = new Set(
       unclearRows.filter((r) => r.link_kind === UNCLEAR_FIXED_KIND).map((r) => r.link_id)
     )
-    const openUnclear = unclearRows.filter(
+    const openUnclearRows = unclearRows.filter(
       (r) => r.link_kind === UNCLEAR_KIND && !fixedFlagIds.has(r.id)
-    ).length
+    )
+    const openUnclear = openUnclearRows.length
+    // 어느 신청서의 사용법서인지까지 모은다. 세는 것으로 끝내면 담당자가
+    // 사용법서 화면에 와서 칩을 하나씩 눌러 찾아야 한다.
+    const unclearIds = [...new Set(openUnclearRows.map((r) => r.application_id))]
 
     // 부서가 "못 쓰겠습니다"를 누른 것.
     //
@@ -220,6 +224,7 @@ export async function onRequestGet({ env }) {
       downStaleIds: items
         .filter((i) => rollbackState({ handover: i }).stale)
         .map((i) => i.application_id),
+      unclearIds,
       noManualIds: items
         .filter((i) => !i.manual_published_at && !i.rolled_back_at)
         .map((i) => i.application_id),

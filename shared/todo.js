@@ -404,7 +404,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'unclear_manual',
         title: `사용법서에서 모르겠다고 짚힌 곳 ${unclear}곳`,
         why: '읽는 분이 막힌 자리입니다. 안 고치면 그 자리에서 다음 분도 막히고, 그때마다 전화가 옵니다.',
-        to: '/manual',
+        to: at('/manual', tools?.summary?.unclearIds),
         cta: '어디가 막히는지 보기',
       })
     )
@@ -418,7 +418,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'no_manual',
         title: `사용법서 없이 넘긴 도구 ${noManual}개`,
         why: '넘긴 사람이 자리를 비우면 아무도 못 씁니다.',
-        to: '/manual',
+        to: at('/manual', tools?.summary?.noManualIds),
         cta: '사용법서 쓰기',
       })
     )

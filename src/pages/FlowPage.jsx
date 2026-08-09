@@ -617,6 +617,15 @@ function Overview({ data }) {
         />
       </section>
 
+      {/* 중앙값만 보이면 폭이 안 보인다.
+          셋 다 열흘쯤 걸린 것과, 사흘짜리 하나에 스무날짜리 하나가 섞여
+          중앙이 열흘인 것은 완전히 다른 이야기인데 화면에서는 같은 숫자다.
+          서버는 최단·최장을 이미 계산해 내려보내는데 읽는 곳이 없었다.
+
+          이 사이트는 다른 자리에서 "못 한 것을 숨기지 않는다"고 말한다.
+          오래 걸린 건을 가려 놓고 그 말을 할 수는 없다. */}
+      {data.lead.count > 1 && data.lead.fastest && data.lead.slowest && <LeadSpread lead={data.lead} />}
+
       <div className="grid-side">
         <section className="card">
           <div className="card-head">
@@ -782,5 +791,43 @@ function Tile({ label, value, note, tone }) {
       </div>
       <div className="stat-note">{note}</div>
     </div>
+  )
+}
+
+// 가장 빨랐던 것과 가장 오래 걸린 것.
+//
+// 숫자만 놓으면 "그래서 뭐" 로 끝난다. 어느 건이었는지까지 붙이고 그 기록으로
+// 갈 수 있게 해야 "이건 왜 스무날이나 걸렸지"를 눌러 볼 수 있다.
+function LeadSpread({ lead }) {
+  const days = (n) => `${Math.round(n * 10) / 10}일`
+  return (
+    <section className="card lead-spread">
+      <div className="card-head">
+        <span className="card-title">가장 빨랐던 것과 가장 오래 걸린 것</span>
+        <span className="card-note">접수한 날부터 부서에 넘긴 날까지</span>
+      </div>
+      <div className="lead-spread-row">
+        <div className="lead-spread-one">
+          <span className="badge badge-success">가장 빠름 {days(lead.fastest.days)}</span>
+          <Link to={`/record/${lead.fastest.ticket_no}`} className="lead-spread-title">
+            {lead.fastest.dept} · {lead.fastest.title}
+          </Link>
+        </div>
+        <div className="lead-spread-one">
+          <span className="badge badge-warning">가장 오래 {days(lead.slowest.days)}</span>
+          <Link to={`/record/${lead.slowest.ticket_no}`} className="lead-spread-title">
+            {lead.slowest.dept} · {lead.slowest.title}
+          </Link>
+        </div>
+      </div>
+      {/* 폭이 크면 그 사실을 말한다. 중앙값 하나로 뭉개면 "대체로 열흘"이
+          되는데, 실제로 스무날 기다린 부서가 있으면 그건 사실이 아니다. */}
+      {lead.slowest.days >= lead.fastest.days * 3 && lead.slowest.days - lead.fastest.days >= 3 && (
+        <p className="card-note">
+          가장 오래 걸린 것이 가장 빠른 것의 {Math.floor(lead.slowest.days / Math.max(1, lead.fastest.days))}배가
+          넘습니다. 중앙값 하나로는 이 차이가 안 보입니다.
+        </p>
+      )}
+    </section>
   )
 }

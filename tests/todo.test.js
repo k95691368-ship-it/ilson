@@ -534,3 +534,89 @@ describe('도구 할 일이 어느 카드인지 알려주는가', () => {
     expect(page).toContain('할 일에서 짚어 드린 도구입니다')
   })
 })
+
+describe('사용법서 할 일도 어느 건인지 알려주는가', () => {
+  it('막힌 자리와 없는 사용법서가 서로 다른 목록을 쓴다', () => {
+    // 한 목록을 돌려쓰면 "막힌 곳 보기"를 눌렀는데 아무도 안 짚은 사용법서
+    // 앞에 떨어진다. 화면은 열리니 눌러 보기 전엔 모른다.
+    const items = buildTodo({
+      tools: {
+        summary: {
+          unclear: 1,
+          unclearIds: ['app_stuck'],
+          noManual: 1,
+          noManualIds: ['app_none'],
+        },
+      },
+    })
+    expect(items.find((i) => i.key === 'unclear_manual').to).toBe('/manual?id=app_stuck')
+    expect(items.find((i) => i.key === 'no_manual').to).toBe('/manual?id=app_none')
+  })
+
+  it('받는 화면이 그 값을 읽는다', () => {
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ManualPage.jsx'), 'utf8')
+    expect(page).toContain('useSearchParams')
+    expect(page).toMatch(/params\.get\('id'\)/)
+  })
+})
+
+// 중앙값만 보이면 폭이 안 보인다.
+//
+// 셋 다 열흘쯤 걸린 것과, 사흘짜리 하나에 스무날짜리 하나가 섞여 중앙이
+// 열흘인 것은 완전히 다른 이야기인데 화면에서는 같은 숫자다. 서버는
+// 최단·최장을 계산해 내려보내는데 읽는 곳이 없었다.
+describe('접수부터 넘기기까지의 폭', () => {
+  it('서버가 어느 건이었는지까지 준다', () => {
+    // 숫자만 놓으면 "그래서 뭐"로 끝난다. 그 기록으로 갈 수 있어야
+    // "이건 왜 스무날이나 걸렸지"를 눌러 볼 수 있다.
+    const src = readFileSync(join(ROOT, 'functions', 'api', 'overview.js'), 'utf8')
+    expect(src).toContain('ticket_no: h.ticket_no')
+    expect(src).toContain('a.ticket_no')
+  })
+
+  it('화면이 최단·최장을 그린다', () => {
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
+    expect(page).toContain('lead.fastest')
+    expect(page).toContain('lead.slowest')
+    expect(page).toContain('가장 빨랐던 것과 가장 오래 걸린 것')
+  })
+
+  it('한 건뿐이면 폭을 말하지 않는다', () => {
+    // 최단과 최장이 같은 건이면 두 번 적는 것이 된다.
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
+    expect(page).toContain('data.lead.count > 1')
+  })
+})
+
+// 사용법서로 보내는 할 일도 어느 건인지 짚어 준다.
+//
+// 그 화면은 늘 첫 건을 골라 놓는다. "막힌 자리를 보세요"를 눌러 왔는데
+// 막힌 것과 상관없는 건이 열려 있으면, 담당자는 칩을 하나씩 눌러 찾는다.
+describe('사용법서 할 일이 어느 건인지 알려주는가', () => {
+  it('항목마다 자기 목록을 쓴다', () => {
+    const items = buildTodo({
+      tools: {
+        summary: {
+          unclear: 2,
+          unclearIds: ['app_u1'],
+          noManual: 1,
+          noManualIds: ['app_m1'],
+        },
+      },
+    })
+    expect(items.find((i) => i.key === 'unclear_manual').to).toBe('/manual?id=app_u1')
+    expect(items.find((i) => i.key === 'no_manual').to).toBe('/manual?id=app_m1')
+  })
+
+  it('목록이 없으면 화면만 연다', () => {
+    const items = buildTodo({ tools: { summary: { noManual: 1 } } })
+    expect(items.find((i) => i.key === 'no_manual').to).toBe('/manual')
+  })
+
+  it('받는 화면이 그 값을 읽는다', () => {
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ManualPage.jsx'), 'utf8')
+    expect(page).toMatch(/params\.get\('id'\)/)
+    // 주소로 온 건이 목록에 없으면 빈 화면 대신 첫 건으로 떨어져야 한다.
+    expect(page).toContain('targets[0].id')
+  })
+})
