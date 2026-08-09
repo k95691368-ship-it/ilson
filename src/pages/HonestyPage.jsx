@@ -195,7 +195,7 @@ export default function HonestyPage() {
         </section>
       )}
 
-      {data.quarantine.length > 0 && (
+      {(data.quarantine.length > 0 || data.quarantineLive > 0) && (
         <section className="card">
           <div className="card-head">
             <span className="card-title">
@@ -207,6 +207,20 @@ export default function HonestyPage() {
             처리 못 한 줄을 조용히 빼고 합계를 내면 숫자는 예뻐지지만 그 합계는 틀린 것입니다. 왜
             못 읽었는지까지 남겨 두고, 사람이 보고 고칠 수 있게 합니다.
           </p>
+          {/* 이유별로 나눌 수 있는 것은 만드는 중에 시운전한 것뿐이다.
+              넘긴 뒤 실제 실행은 브라우저에서 돌고 서버에는 개수만 남는다.
+              여태 이 화면은 시운전 것만 세서, 부서가 매주 겪는 줄이 0으로
+              보였다 — 가장 정직해야 할 화면이 가장 적게 세고 있었다.
+              모르는 것은 모른다고 적는다. */}
+          {data.quarantineLive > 0 && (
+            <p className="card-note" style={{ marginBottom: 11 }}>
+              이 가운데 <strong>{num(data.quarantineLive)}줄</strong>은 넘긴 뒤 부서가 실제로
+              돌리면서 밀려난 것입니다. 그쪽은 브라우저에서 도는 것이라 서버에 개수만 남아,
+              아래 이유별 표에는 안 들어갑니다 — 왜 밀렸는지는 도구 화면의 검토함에서 보셔야
+              합니다.
+            </p>
+          )}
+
           <ul className="honest-bars">
             {data.quarantine.map((q) => (
               <li key={q.reason}>
@@ -216,7 +230,10 @@ export default function HonestyPage() {
                   <strong>{num(q.n)}줄</strong>
                 </div>
                 <div className="honest-bar">
-                  <span style={{ width: `${(q.n / data.quarantineTotal) * 100}%` }} />
+                  {/* 막대 길이는 **이유별로 나눌 수 있는 것** 안에서 견준다.
+                      전체(실행 격리 포함)로 나누면 막대가 다 짧아져서 어느
+                      이유가 큰지가 안 보인다. */}
+                  <span style={{ width: `${(q.n / Math.max(1, data.quarantineBuild)) * 100}%` }} />
                 </div>
               </li>
             ))}

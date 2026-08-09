@@ -72,7 +72,7 @@ const UNPROVEN = [
 
 export async function onRequestGet({ env }) {
   try {
-    const [refused, held, stuck, quarantine, failedChecks, unresolved, unusedTools, noBaseline] =
+    const [refused, held, stuck, quarantine, liveQuarantine, failedChecks, unresolved, unusedTools, noBaseline] =
       await Promise.all([
         // 내가 못 하겠다고 한 것. 대안을 같이 줬는지까지 본다 —
         // 대안 없는 반려는 그냥 거절이다.
@@ -114,9 +114,26 @@ export async function onRequestGet({ env }) {
 
         // 도구가 처리하지 못하고 밀어 둔 줄. 버린 것이 아니라 격리한 것이라
         // 여기서 셀 수 있다.
+        //
+        // 다만 이 표에는 **만드는 중에 시운전한 것**만 들어 있다. 넘긴 뒤
+        // 부서가 실제로 돌린 것은 tool_use 에 개수만 남는다 — 아래에서
+        // 따로 센다.
         env.DB.prepare(
           `SELECT reason, COUNT(*) AS n FROM build_quarantine GROUP BY reason ORDER BY n DESC`
         ).all(),
+
+        // 넘긴 뒤 실제 실행에서 밀려난 줄.
+        //
+        // 이 화면은 못 한 것을 모아 보여 주는 자리인데, 여태 시운전 것만
+        // 세고 있었다. 부서가 매주 돌리면서 밀어 둔 줄이 훨씬 많을 수 있는데
+        // 그게 0으로 보였다. **가장 정직해야 할 화면이 가장 적게 세고 있었다.**
+        //
+        // 이유별로는 못 나눈다. 실제 실행은 브라우저에서 돌고 서버에는
+        // 개수만 남기 때문이다. 모르는 것은 모른다고 적는다.
+        env.DB.prepare(
+          `SELECT COALESCE(SUM(u.quarantined), 0) AS n, COUNT(DISTINCT u.application_id) AS tools
+           FROM tool_use u`
+        ).first(),
 
         // 합격 기준 중 통과 못 한 것.
         env.DB.prepare(
@@ -183,7 +200,11 @@ export async function onRequestGet({ env }) {
         ).all(),
       ])
 
-    const quarantineTotal = quarantine.results.reduce((s, q) => s + q.n, 0)
+    const buildQuarantine = quarantine.results.reduce((s, q) => s + q.n, 0)
+    const liveQuarantineRows = liveQuarantine?.n ?? 0
+    // 화면 맨 위 숫자는 **둘을 합친 것**이다. 시운전 것만 세면 부서가 매주
+    // 겪는 것이 안 보인다.
+    const quarantineTotal = buildQuarantine + liveQuarantineRows
     const idle = unusedTools.results.filter((t) => t.runs === 0)
 
     // 성과 화면과 **같은 함수**로 살아 있는 반박을 만든 뒤, 이미 해소한
@@ -239,6 +260,9 @@ export async function onRequestGet({ env }) {
       stuck: stuck.results,
       quarantine: quarantine.results,
       quarantineTotal,
+      quarantineBuild: buildQuarantine,
+      quarantineLive: liveQuarantineRows,
+      quarantineLiveTools: liveQuarantine?.tools ?? 0,
       failedChecks: failedChecks.results,
       unresolvedChallenges: openChallenges,
       idleTools: idle,
@@ -248,6 +272,8 @@ export async function onRequestGet({ env }) {
         held: held.results.length,
         stuck: stuck.results.length,
         quarantine: quarantineTotal,
+        quarantineBuild: buildQuarantine,
+        quarantineLive: liveQuarantineRows,
         failedChecks: failedChecks.results.length,
         unresolvedChallenges: openChallenges.length,
         idleTools: idle.length,

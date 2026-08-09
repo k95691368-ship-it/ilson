@@ -297,3 +297,43 @@ describe('접수에서 넘기기까지 걸린 폭', () => {
     expect(page).toContain('data.lead.count > 1')
   })
 })
+
+// 가장 정직해야 할 화면이 가장 적게 세고 있었다.
+//
+// 못 한 것 화면의 "처리 못 하고 밀어 둔 줄"은 build_quarantine 만 셌다.
+// 그 표에는 **만드는 중에 시운전한 것**만 들어 있다. 넘긴 뒤 부서가 매주
+// 돌리면서 밀어 둔 줄은 tool_use 에 개수로 남는데 안 셌다.
+//
+// 그래서 도구가 실제로 돌수록 화면은 오히려 깨끗해 보였다. 이 화면의 존재
+// 이유가 정확히 그 반대다.
+describe('밀어 둔 줄을 전부 세는가', () => {
+  const ROOT3 = fileURLToPath(new URL('..', import.meta.url))
+  const src = readFileSync(join(ROOT3, 'functions', 'api', 'honesty.js'), 'utf8')
+
+  it('시운전과 실제 실행을 둘 다 센다', () => {
+    expect(src).toContain('FROM build_quarantine')
+    expect(src).toContain('SUM(u.quarantined)')
+    expect(src).toContain('const quarantineTotal = buildQuarantine + liveQuarantineRows')
+  })
+
+  it('둘을 갈라서도 내려보낸다', () => {
+    // 화면이 "이 중 N줄은 실제 실행에서"를 말하려면 갈라진 값이 필요하다.
+    expect(src).toContain('quarantineBuild')
+    expect(src).toContain('quarantineLive')
+  })
+
+  it('화면이 그 차이를 밝힌다', () => {
+    // 이유별로 못 나누는 것을 감추면, 표의 합과 위 숫자가 달라서 읽는 사람이
+    // 둘 다 못 믿는다. 모르는 것은 모른다고 적는다.
+    const page = readFileSync(join(ROOT3, 'src', 'pages', 'HonestyPage.jsx'), 'utf8')
+    expect(page).toContain('data.quarantineLive')
+    expect(page).toContain('서버에 개수만 남아')
+  })
+
+  it('막대는 나눌 수 있는 것 안에서 견준다', () => {
+    // 전체로 나누면 막대가 다 짧아져서 어느 이유가 큰지가 안 보인다.
+    const page = readFileSync(join(ROOT3, 'src', 'pages', 'HonestyPage.jsx'), 'utf8')
+    expect(page).toContain('data.quarantineBuild')
+    expect(page).not.toContain('/ data.quarantineTotal) * 100')
+  })
+})
