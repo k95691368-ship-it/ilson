@@ -6490,3 +6490,23 @@ kbd {
   padding-top: 9px;
   border-top: 1px solid var(--line);
 }
+
+/* 부서가 알려 준 숫자에 담당자가 준 답.
+   답이 오기 전에는 "기다리는 중"이 보이게 한다 — 비워 두면 안 읽힌 것으로
+   보이고, 부서는 다음부터 토를 안 단다. */
+.dconf-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 9px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.dconf-answer.waiting {
+  border-style: dashed;
+}

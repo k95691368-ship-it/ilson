@@ -1388,6 +1388,29 @@ function OutcomeCheck({ ticket, onDone }) {
             : `실제로는 한 번에 ${num(state.deptFelt, 0)}분쯤 걸린다고 하셨습니다. 성과 화면에 그대로 적어 두었습니다.`}
         </p>
       )}
+
+      {/* 알려 주신 것에 담당자가 답했는가.
+          부서가 다른 숫자를 말하면 그건 성과 화면에 반박으로 올라가고,
+          담당자가 그걸 풀면서 무엇을 확인했는지 적는다. 그 글이 부서에게
+          가는 길이 없었다.
+          부서 입장에서는 "우리는 55분쯤 걸립니다"라고 애써 알려 줬는데
+          아무 답이 없는 것이다. 그러면 다음부터는 그냥 넘긴다 — 남의 숫자에
+          토를 다는 일은 원래 부담스러워서, 한 번 무시당하면 두 번 안 한다. */}
+      {done && state.deptFelt != null && (
+        <div className={`dconf-answer${state.answer ? '' : ' waiting'}`}>
+          {state.answer ? (
+            <>
+              <strong>담당자 답 · {ago(state.answeredAt)}</strong>
+              <span>{state.answer}</span>
+            </>
+          ) : (
+            <span className="card-note">
+              알려주신 숫자는 성과 화면에 반박으로 올라가 있습니다. 담당자가 확인하면 그 내용이 여기
+              뜹니다 — 그때까지 이 성과 금액은 확정으로 쓰지 않습니다.
+            </span>
+          )}
+        </div>
+      )}
       {msg && <p className="dconf-msg">{msg}</p>}
 
       {!done && (

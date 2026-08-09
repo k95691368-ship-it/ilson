@@ -434,3 +434,50 @@ describe('신고한 부서가 그 뒤를 보는가', () => {
     expect(page).toContain('{data.reports?.length > 0 &&')
   })
 })
+
+// 부서가 성과 숫자에 토를 달면 그 답이 돌아오는가.
+//
+// 부서가 "우리는 55분쯤 걸립니다"라고 다른 숫자를 말하면, 그건 성과 화면에
+// 반박으로 올라가고 담당자가 그걸 풀면서 무엇을 확인했는지 적는다.
+// 그 글이 부서에게 가는 길이 없었다.
+//
+// 부서 입장에서는 애써 알려 줬는데 아무 답이 없는 것이다. 그러면 다음부터는
+// 그냥 넘긴다 — 남의 숫자에 토를 다는 일은 원래 부담스러워서, 한 번
+// 무시당하면 두 번 하지 않는다.
+describe('성과에 토를 단 부서가 답을 받는가', () => {
+  const ROOT6 = fileURLToPath(new URL('..', import.meta.url))
+  const route = readFileSync(
+    join(ROOT6, 'functions', 'api', 'track', '[ticket]', 'outcome.js'),
+    'utf8'
+  )
+  const page = readFileSync(join(ROOT6, 'src', 'pages', 'TrackPage.jsx'), 'utf8')
+
+  it('담당자가 푼 반박을 부서 쪽으로 내려보낸다', () => {
+    expect(route).toContain("rule_code = 'dept_disagrees'")
+    expect(route).toContain('resolved_at IS NOT NULL')
+    expect(route).toContain('answer: answered?.resolution')
+  })
+
+  it('불러온 값을 실제로 돌려준다', () => {
+    // load 에서 뽑아 놓고 return 에 안 넣으면 화면은 영영 못 받는다.
+    // 린트가 "선언만 하고 안 쓴다"고 잡아 줬다.
+    expect(route).toContain('records: rows, answered }')
+  })
+
+  it('화면이 그 답을 그린다', () => {
+    expect(page).toContain('state.answer')
+    expect(page).toContain('담당자 답')
+  })
+
+  it('아직 답이 없으면 그렇다고 말한다', () => {
+    // 조용히 비워 두면 안 읽힌 것으로 보인다.
+    expect(page).toContain('담당자가 확인하면 그 내용이 여기')
+    expect(page).toContain('확정으로 쓰지 않습니다')
+  })
+
+  it('맞다고 한 부서에는 이 자리를 안 만든다', () => {
+    // 토를 안 단 사람에게 "답을 기다리는 중"이 뜨면 무슨 답을 기다리는지
+    // 모른다.
+    expect(page).toContain('state.deptFelt != null && (')
+  })
+})

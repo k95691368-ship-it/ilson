@@ -21,7 +21,7 @@ async function load(env, ticket) {
     .first()
   if (!app) return null
 
-  const [baseline, saved, uses, records] = await Promise.all([
+  const [baseline, saved, uses, records, answered] = await Promise.all([
     env.DB.prepare('SELECT median_seconds, people, sample_n FROM baseline WHERE application_id = ?')
       .bind(app.id)
       .first(),
@@ -40,6 +40,23 @@ async function load(env, ticket) {
     )
       .bind(app.id, OUTCOME_KIND, OUTCOME_PROXY_KIND)
       .all(),
+
+    // 부서가 "체감은 다릅니다"라고 한 것에 담당자가 답했는가.
+    //
+    // 부서가 다른 숫자를 말하면 그건 성과 화면에 반박으로 올라가고,
+    // 담당자가 그걸 풀면서 무엇을 확인했는지 적는다. 그 글이 부서에게
+    // 가는 길이 없었다.
+    //
+    // 부서 입장에서는 이렇게 된다. "우리는 55분쯤 걸립니다"라고 애써
+    // 알려 줬는데 아무 답이 없다. 그러면 다음부터는 그냥 넘긴다 — 남의
+    // 숫자에 토를 다는 일은 원래 부담스러운 일이라, 한 번 무시당하면
+    // 두 번 하지 않는다.
+    env.DB.prepare(
+      `SELECT resolution, resolved_at FROM outcome_challenge
+       WHERE application_id = ? AND rule_code = 'dept_disagrees' AND resolved_at IS NOT NULL`
+    )
+      .bind(app.id)
+      .first(),
   ])
 
   const rows = records.results.map((r) => {
@@ -52,10 +69,10 @@ async function load(env, ticket) {
     return { id: r.id, kind: r.link_kind, by: r.title, what: r.what, felt, at: r.created_at }
   })
 
-  return { app, baseline, saved, runs: uses?.n ?? 0, records: rows }
+  return { app, baseline, saved, runs: uses?.n ?? 0, records: rows, answered }
 }
 
-function stateOf({ baseline, saved, runs, records }) {
+function stateOf({ baseline, saved, runs, records, answered }) {
   // **마지막 것**을 본다. 처음 것이 아니다.
   //
   // 기록은 시간순으로 오고 find 는 첫 번째를 집는다. 그래서 부서가 체감을
@@ -84,6 +101,10 @@ function stateOf({ baseline, saved, runs, records }) {
     runs,
     deptFelt: direct?.felt ?? null,
     comment: direct?.what ?? saved?.dept_comment ?? null,
+    // 알려 주신 것에 담당자가 답했는가. 답이 없으면 그 사실도 말한다 —
+    // 조용히 비워 두면 안 읽힌 것으로 보인다.
+    answer: answered?.resolution ?? null,
+    answeredAt: answered?.resolved_at ?? null,
   }
 }
 
