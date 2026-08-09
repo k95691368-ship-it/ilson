@@ -302,26 +302,41 @@ export async function gradeAll({ criteria, files, aliases = {}, truth, period })
     }
   }
 
-  const machine = graded.filter((g) => g.kind === 'rule')
-  const passed = machine.filter((g) => g.verdict === '통과')
-  const failed = machine.filter((g) => g.verdict === '실패')
-  const safetyFailed = failed.filter((g) => g.is_required_safety === 1 || g.is_required_safety === true)
-
   return {
     graded,
-    summary: {
-      total: graded.length,
-      machineChecked: machine.length,
-      passed: passed.length,
-      failed: failed.length,
-      humanNeeded: graded.filter((g) => g.kind === 'human').length,
-      safetyFailed: safetyFailed.length,
-      // 필수 안전 기준이 하나라도 깨지면 통과가 아니다. 다른 점수가 아무리
-      // 좋아도 마찬가지다.
-      overall: failed.length === 0 ? '통과' : safetyFailed.length > 0 ? '차단' : '조건부',
-      durationMs: Date.now() - started,
-    },
+    summary: { ...tally(graded), durationMs: Date.now() - started },
     rowsOut: result.rows.length,
     quarantined: result.quarantine.length,
+  }
+}
+
+// 채점 결과 하나하나에서 합격 여부를 센다.
+//
+// 이 계산이 브라우저에만 있었다. 서버는 채점 결과 배열을 받아 놓고도 합격
+// 여부만은 브라우저가 보낸 값을 그대로 적었다. 그래서 필수 안전 기준이 전부
+// 실패인 채점을 "통과"라고 보내면 통과로 적혔고, 첫 화면의 단계도 넘어갔다.
+// 라이브에서 실제로 그렇게 됐다.
+//
+// 이 사이트가 "그게 게이트입니다"라고 적어 둔 자리라서, 판정은 받는 쪽에서
+// 다시 한다. 두 군데서 따로 세면 언젠가 갈라지므로 세는 함수는 이 하나다.
+export function tally(list) {
+  const graded = Array.isArray(list) ? list : []
+  const machine = graded.filter((g) => g?.kind === 'rule')
+  const passed = machine.filter((g) => g.verdict === '통과')
+  const failed = machine.filter((g) => g.verdict === '실패')
+  const safetyFailed = failed.filter(
+    (g) => g.is_required_safety === 1 || g.is_required_safety === true
+  )
+
+  return {
+    total: graded.length,
+    machineChecked: machine.length,
+    passed: passed.length,
+    failed: failed.length,
+    humanNeeded: graded.filter((g) => g?.kind === 'human').length,
+    safetyFailed: safetyFailed.length,
+    // 필수 안전 기준이 하나라도 깨지면 통과가 아니다. 다른 점수가 아무리
+    // 좋아도 마찬가지다.
+    overall: failed.length === 0 ? '통과' : safetyFailed.length > 0 ? '차단' : '조건부',
   }
 }

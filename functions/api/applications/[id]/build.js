@@ -13,6 +13,14 @@ import { logDecision } from '../../../_lib/decisions.js'
 // D1은 한 번에 보낼 수 있는 문장 수에 한계가 있다. 500줄씩 끊어 보낸다.
 const CHUNK = 500
 
+// 이 칸이 비면 저장 자체가 안 된다(스키마가 NOT NULL). 사람 말로 짚어 준다.
+const ROW_REQUIRED = [
+  ['date', '날짜'],
+  ['iso_week', '주차'],
+  ['sku', '상품코드'],
+  ['channel', '채널'],
+]
+
 async function findApplication(env, id) {
   return env.DB.prepare(
     'SELECT id, ticket_no, dept, title, status FROM application WHERE id = ? OR ticket_no = ?'
@@ -131,6 +139,30 @@ export async function onRequestPost({ env, params, request }) {
     return jsonError('저장할 결과가 없습니다.', 400)
   }
 
+  // 줄을 넣기 전에 먼저 본다.
+  //
+  // 이 칸들이 비면 D1이 거절한다. 그런데 머리글은 이미 들어간 뒤라서 "2줄
+  // 처리함"이라고 적힌 실행이 남고 정작 줄은 0개다. 화면은 그 머리글을 읽어
+  // 처리 건수를 말하고, 숫자를 눌러 원본으로 되짚으려 하면 아무것도 없다.
+  // 이 앱이 내내 하는 약속이 그 되짚기라서 이건 빈 표가 아니라 거짓말이다.
+  const missing = []
+  for (const [i, r] of rows.entries()) {
+    for (const [key, label] of ROW_REQUIRED) {
+      if (r?.[key] == null || r[key] === '') missing.push(`${i + 1}번째 줄의 ${label}`)
+    }
+  }
+  for (const [i, q] of quarantine.entries()) {
+    if (q?.reason == null || q.reason === '') missing.push(`${i + 1}번째 밀린 줄의 사유`)
+  }
+  if (missing.length > 0) {
+    return failFields(
+      missing.slice(0, 5),
+      '비어 있는 칸이 있어 아무것도 저장하지 않았습니다. 반만 저장하면 처리했다고 적힌 채 되짚을 줄이 없는 기록이 남습니다.'
+    )
+  }
+
+  const runId = newId('run')
+
   try {
     const seq =
       ((
@@ -138,8 +170,6 @@ export async function onRequestPost({ env, params, request }) {
           .bind(app.id)
           .first()
       )?.n ?? 0) + 1
-
-    const runId = newId('run')
 
     await env.DB.prepare(
       `INSERT INTO build_run
@@ -256,6 +286,18 @@ export async function onRequestPost({ env, params, request }) {
 
     return jsonResponse({ ok: true, run_id: runId, seq }, 201)
   } catch (err) {
+    // 머리글은 들어갔는데 줄에서 엎어지면 "N줄 처리함"이라고 적힌 채 되짚을
+    // 줄이 하나도 없는 실행이 남는다. 화면은 그 머리글을 읽으니 처리 건수는
+    // 멀쩡해 보이고, 눌러 봐야 빈다 — 실제로 라이브에서 그런 실행이 하나
+    // 생겼다. 못 끝냈으면 흔적을 거둔다. 실패는 화면에 남지 기록에 남지 않는다.
+    for (const table of ['build_row', 'build_quarantine', 'build_run']) {
+      await env.DB.prepare(
+        `DELETE FROM ${table} WHERE ${table === 'build_run' ? 'id' : 'run_id'} = ?`
+      )
+        .bind(runId)
+        .run()
+        .catch(() => {})
+    }
     return jsonError(`제작 기록을 저장하지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
   }
 }

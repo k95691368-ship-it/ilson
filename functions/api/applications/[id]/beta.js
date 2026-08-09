@@ -2,10 +2,14 @@
 //
 // 채점은 브라우저에서 돈다(shared/grade.js). 여기는 그 결과를 회차로 남기고,
 // 현업 담당자가 실제로 써 보고 한 말을 모으는 자리다.
+//
+// 다만 **합격이냐 아니냐는 여기서 다시 센다.** 채점하는 일과 합격을 선언하는
+// 일은 다르다. 앞엣것은 브라우저가 해도 되지만 뒤엣것은 게이트라서 안 된다.
 
 import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { tally } from '../../../../shared/grade.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import { signoffState } from '../../../../shared/signoff.js'
 
@@ -136,8 +140,23 @@ export async function onRequestPost({ env, params, request }) {
   if (body.kind !== 'round') return jsonError('무엇을 저장할지 알 수 없습니다.', 400)
 
   const graded = Array.isArray(body.graded) ? body.graded : []
-  const s = body.summary ?? {}
   if (graded.length === 0) return jsonError('채점 결과가 없습니다.', 400)
+
+  // 합격 여부는 받는 쪽에서 다시 센다.
+  //
+  // 여기가 이 사이트가 "그게 게이트입니다"라고 적어 둔 자리다. 그런데 서버는
+  // 채점 결과를 한 줄씩 다 받아 놓고도 합격 여부만은 보내온 값을 그대로
+  // 적었다. 필수 안전 기준이 전부 실패인 채점에 "통과"만 붙여 보내면 통과로
+  // 적혔고 다음 단계로 넘어갔다. 라이브에서 확인한 일이다.
+  //
+  // 채점하는 함수와 같은 것으로 센다(shared/grade.js 의 tally). 두 군데서 따로
+  // 세면 화면과 기록이 다른 말을 한다.
+  const s = { ...(body.summary ?? {}), ...tally(graded) }
+
+  // 보내온 판정과 다르면 그 사실도 남긴다. 조용히 덮으면 화면에는 통과가
+  // 떠 있는데 기록만 차단인 상태가 되어 둘 다 못 믿게 된다.
+  const claimed = body.summary?.overall
+  const overruled = claimed && claimed !== s.overall ? claimed : null
 
   try {
     const seq =
@@ -212,6 +231,20 @@ export async function onRequestPost({ env, params, request }) {
       }).catch(() => {})
     }
 
+    // 보내온 판정을 서버가 뒤집었으면 그것도 결정이다. 조용히 덮으면 화면에는
+    // 통과가 떠 있는데 기록에는 차단이 남고, 나중에 둘 다 못 믿게 된다.
+    if (overruled) {
+      await logDecision(env, {
+        applicationId: app.id,
+        stage: '베타테스트',
+        title: `${seq}차 채점의 합격 판정을 다시 셌다`,
+        what: `보내온 판정은 "${overruled}"였는데 채점 결과로 다시 세니 "${s.overall}"이다. 기록에는 다시 센 쪽을 적는다.`,
+        why: '합격 선언은 이 사이트가 게이트라고 적어 둔 자리다. 통과하겠다는 쪽이 통과 여부까지 정하면 그것은 게이트가 아니다.',
+        linkKind: 'beta_round',
+        linkId: roundId,
+      }).catch(() => {})
+    }
+
     if (s.overall === '통과') {
       await env.DB.prepare(
         "UPDATE application SET status = '진행중', updated_at = datetime('now') WHERE id = ?"
@@ -221,7 +254,11 @@ export async function onRequestPost({ env, params, request }) {
         .catch(() => {})
     }
 
-    return jsonResponse({ ok: true, round_id: roundId, seq, overall: s.overall }, 201)
+    // overall 은 서버가 다시 센 값이다. 화면은 이것을 받아 쓴다.
+    return jsonResponse(
+      { ok: true, round_id: roundId, seq, overall: s.overall, summary: s, overruled },
+      201
+    )
   } catch (err) {
     return jsonError(`채점 결과를 저장하지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
   }
