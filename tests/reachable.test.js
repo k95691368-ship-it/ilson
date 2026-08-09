@@ -200,3 +200,33 @@ describe('부서도 자기 기록을 문서로 받는가', () => {
     expect(rec).toContain("'/review'")
   })
 })
+
+// 부서가 매주 여는 화면에 나가는 길이 하나도 없었다.
+//
+// /t/:slug 는 697줄짜리 화면인데 <Link> 가 한 개도 없었다. 부서는 넘겨받을
+// 때 이 주소 하나만 받고 그 뒤로 여기만 연다. 그래서 "우리가 낸 그 건이
+// 어떻게 됐더라"를 보려면 접수번호를 어딘가에서 다시 찾아야 했는데, 그
+// 번호는 몇 주 전 화면에 한 번 뜨고 만 것이다.
+//
+// 담당자 화면끼리는 링크가 촘촘한데 부서 쪽 제일 깊은 자리가 막혀 있었다.
+describe('부서 도구 화면에서 나갈 수 있는가', () => {
+  const page = readFileSync(join(ROOT, 'src', 'pages', 'ToolPage.jsx'), 'utf8')
+
+  it('신청서와 기록 문서로 가는 길이 있다', () => {
+    expect(page).toContain('이 도구가 나온 신청서 보기')
+    expect(page).toContain('/track?no=')
+    expect(page).toContain('/record/')
+  })
+
+  it('서버가 접수번호를 함께 준다', () => {
+    // 화면에 링크만 달고 값을 안 보내면 그 자리가 영영 안 뜬다.
+    const route = readFileSync(join(ROOT, 'functions', 'api', 'tools', '[slug].js'), 'utf8')
+    expect(route).toContain('a.ticket_no AS application_ticket')
+    expect(route).toContain('ticket: h.application_ticket')
+  })
+
+  it('접수번호가 없으면 링크를 안 건다', () => {
+    // 없는 데로 보내는 버튼보다 버튼이 없는 편이 낫다.
+    expect(page).toContain('{data.ticket && (')
+  })
+})

@@ -14,7 +14,8 @@ const DAY_SECONDS = 86400
 
 async function findHandover(env, slug) {
   return env.DB.prepare(
-    `SELECT h.*, a.title AS application_title, a.dept AS application_dept
+    `SELECT h.*, a.title AS application_title, a.dept AS application_dept,
+            a.ticket_no AS application_ticket
      FROM handover h JOIN application a ON a.id = h.application_id
      WHERE h.slug = ?`
   )
@@ -76,6 +77,13 @@ export async function onRequestGet({ env, params, request }) {
 
     return jsonResponse({
       slug: h.slug,
+      // 이 도구가 어느 신청서에서 나왔는지.
+      //
+      // 부서는 이 화면 주소 하나만 받는다. 여기서 나가는 길이 하나도
+      // 없어서, 자기 신청서가 어떻게 됐는지 보려면 접수번호를 어딘가에서
+      // 다시 찾아야 했다. 넘긴 뒤로 이 화면만 여는 사람에게는 그 번호가
+      // 기억에 없다.
+      ticket: h.application_ticket,
       title: h.title,
       handedTo: { dept: h.handed_to_dept, person: h.handed_to_person },
       handedAt: h.handed_at,

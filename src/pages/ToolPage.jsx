@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
 import { validateAccept, validateReject, proxyNote } from '../../shared/accept.js'
@@ -156,6 +156,24 @@ export default function ToolPage() {
         <h1>{data.title}</h1>
         {data.manual?.intro && <p className="page-sub">{data.manual.intro}</p>}
         <Unclear slug={slug} section="intro" notes={notes} reload={loadNotes} />
+
+        {/* 여기서 나가는 길이 하나도 없었다.
+            697줄짜리 화면에 링크가 한 개도 없다. 부서는 넘겨받을 때 이 주소
+            하나만 받고 매주 여기만 연다. 그래서 "우리가 낸 그 건이 어떻게
+            됐더라"를 보려면 접수번호를 어딘가에서 다시 찾아야 했는데,
+            그 번호는 몇 주 전 화면에 한 번 뜨고 만 것이다.
+            도구가 나온 신청서로 돌아가는 길을 낸다. */}
+        {data.ticket && (
+          <div className="row" style={{ marginTop: 10 }}>
+            <Link to={`/track?no=${encodeURIComponent(data.ticket)}`} className="btn-ghost btn-sm">
+              이 도구가 나온 신청서 보기
+            </Link>
+            <Link to={`/record/${encodeURIComponent(data.ticket)}`} className="btn-ghost btn-sm">
+              여덟 단계 기록 문서
+            </Link>
+            <span className="card-note mono">{data.ticket}</span>
+          </div>
+        )}
       </header>
 
       {data.manual?.when_to_run && (
