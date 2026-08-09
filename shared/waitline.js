@@ -20,6 +20,49 @@ const RUNNING = ['진행중']
 // 아직 안 끝난 것. 끝난 것은 앞을 막지 않는다.
 const CLOSED = ['완료', '반려']
 
+// "그래서 언제쯤 됩니까"에 지금까지의 기록으로 답한다.
+//
+// 부서가 제일 먼저 묻는 것이 이것이다. 여태 이 화면은 순서만 말했다 —
+// "앞에 1건 있습니다"까지. 그건 몇째냐는 답이지 언제냐는 답이 아니다.
+//
+// 날짜를 약속하지 않는다. 대신 **지금까지 실제로 걸린 날수**를 보여 준다.
+// 첫 화면이 이미 그 값을 세고 있다(접수부터 인수인계까지 중앙값). 같은
+// 값을 쓴다 — 두 화면이 다른 날수를 말하면 둘 다 못 믿는다.
+//
+// 표본이 적으면 적다고 말한다. 한 건 넘겨 놓고 "보통 9일 걸립니다"라고
+// 하면 그건 통계가 아니라 우연이다.
+export function leadGuess(lead) {
+  const n = Number(lead?.count) || 0
+  // Number(null) 은 0이고 0은 유한하다. 그대로 두면 값이 없을 때 "0일
+  // 걸렸습니다"가 된다 — 부서는 그걸 "바로 됩니다"로 읽는다.
+  // 이 저장소에서 같은 함정에 다섯 번째다. 숫자로 바꾸기 **전에** 없는
+  // 값부터 걸러 낸다.
+  const raw = lead?.medianDays
+  const days = raw == null || raw === '' ? NaN : Number(raw)
+  if (n === 0 || !Number.isFinite(days)) {
+    return {
+      show: true,
+      text: '아직 끝까지 간 것이 한 건도 없어서 얼마나 걸릴지 말씀드릴 수가 없습니다. 지어내지 않겠습니다.',
+      shaky: true,
+    }
+  }
+  const base = `지금까지 넘긴 ${n}건은 접수부터 부서에 넘기기까지 가운데값으로 ${days}일 걸렸습니다.`
+  if (n < 3) {
+    return {
+      show: true,
+      // 한두 건으로 낸 값은 다음 건에서 크게 달라진다. 그 사실을 숫자보다
+      // 먼저 읽히게 둔다.
+      text: `${base} 다만 ${n}건뿐이라 이 숫자는 다음 건에서 크게 달라질 수 있습니다 — 약속으로 받지 말아 주세요.`,
+      shaky: true,
+    }
+  }
+  return {
+    show: true,
+    text: `${base} 앞에 놓인 건이 있으면 그만큼 더 걸립니다.`,
+    shaky: false,
+  }
+}
+
 export function waitLine({ mine, picked, running } = {}) {
   const status = mine?.status ?? null
 

@@ -6510,3 +6510,25 @@ kbd {
 .dconf-answer.waiting {
   border-style: dashed;
 }
+
+/* "언제쯤 되나" — 지금까지 실제로 걸린 날수.
+   약속이 아니라 기록이라는 것이 읽히게, 표본이 적을 때는 테두리를 점선으로
+   둔다. 숫자를 크게 하지 않는다 — 크게 하면 약속처럼 보인다. */
+.waitline-lead {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.waitline-lead.shaky {
+  border-style: dashed;
+}
+
+.waitline-lead strong {
+  color: var(--text-h);
+  margin-right: 5px;
+}

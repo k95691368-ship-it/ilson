@@ -902,11 +902,16 @@ function ToolDown({ data }) {
 // 서랍에 넣어 둔 셈이다.
 function WaitLine({ ticket }) {
   const [state, setState] = useState(null)
+  // 서버가 같이 보내 주는 "언제쯤". 안 받아 두면 화면에 그릴 것이 없다.
+  const [lead, setLead] = useState(null)
 
   useEffect(() => {
     api
       .get(`/track/${encodeURIComponent(ticket)}/waitline`)
-      .then((r) => setState(r.state))
+      .then((r) => {
+        setState(r.state)
+        setLead(r.lead ?? null)
+      })
       .catch(() => {})
   }, [ticket])
 
@@ -968,6 +973,17 @@ function WaitLine({ ticket }) {
             ))}
           </ul>
         </div>
+      )}
+
+      {/* "그래서 언제쯤 됩니까"
+          부서가 제일 먼저 묻는 것이 이것인데 이 화면은 순서만 말했다.
+          "앞에 1건 있습니다"는 몇째냐는 답이지 언제냐는 답이 아니다.
+          날짜를 약속하지 않는다 — 지금까지 실제로 걸린 날수를 보여 준다.
+          첫 화면이 세는 것과 같은 값이다. */}
+      {lead?.show && (
+        <p className={`waitline-lead${lead.shaky ? ' shaky' : ''}`}>
+          <strong>언제쯤 되나</strong> {lead.text}
+        </p>
       )}
 
       <p className="card-note waitline-foot">

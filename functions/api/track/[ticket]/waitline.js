@@ -8,8 +8,19 @@
 // 아무것도 안 정했으면 "아직 안 정했습니다"가 정직한 답이다.
 
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { waitLine } from '../../../../shared/waitline.js'
+import { waitLine, leadGuess } from '../../../../shared/waitline.js'
 import { PICK_KIND, UNPICK_KIND } from '../../../../shared/priority.js'
+
+// 가운데값. 첫 화면(overview)이 쓰는 것과 같은 규칙이다 — 짝수면 가운데
+// 둘의 평균, 소수 첫째 자리까지.
+function medianLead(rows) {
+  const days = (rows ?? []).map((r) => Number(r.days)).filter((n) => Number.isFinite(n))
+  if (days.length === 0) return { count: 0, medianDays: null }
+  const mid = days.length % 2 === 1
+    ? days[(days.length - 1) / 2]
+    : (days[days.length / 2 - 1] + days[days.length / 2]) / 2
+  return { count: days.length, medianDays: Math.round(mid * 10) / 10 }
+}
 
 export async function onRequestGet({ env, params }) {
   try {
@@ -21,7 +32,7 @@ export async function onRequestGet({ env, params }) {
       .first()
     if (!mine) return jsonError('그 접수번호를 찾지 못했습니다.', 404)
 
-    const [picks, running] = await Promise.all([
+    const [picks, running, leads] = await Promise.all([
       // 먼저 하기로 정한 것과 그 이유. 취소는 자기 앞의 지정을 지운다.
       env.DB.prepare(
         `SELECT d.application_id, d.what, d.link_kind, d.created_at,
@@ -36,6 +47,21 @@ export async function onRequestGet({ env, params }) {
       // 이미 만들고 있는 것. 순서보다 앞에 있는 것은 사실 이쪽이다.
       env.DB.prepare(
         "SELECT id, ticket_no, dept, title FROM application WHERE status = '진행중'"
+      ).all(),
+
+      // 지금까지 접수부터 넘기기까지 실제로 며칠 걸렸나.
+      //
+      // 부서가 제일 먼저 묻는 것이 "언제쯤 됩니까"인데 이 화면은 순서만
+      // 말했다. 몇째냐는 답이지 언제냐는 답이 아니다.
+      //
+      // 날짜를 약속하지 않는다. 지금까지 실제로 걸린 날수를 보여 준다.
+      // 첫 화면이 세는 것과 같은 방식으로 센다 — 내린 것은 빼고, 접수한
+      // 날부터 넘긴 날까지.
+      env.DB.prepare(
+        `SELECT CAST((julianday(h.handed_at) - julianday(a.created_at)) AS REAL) AS days
+         FROM handover h JOIN application a ON a.id = h.application_id
+         WHERE h.rolled_back_at IS NULL
+         ORDER BY days`
       ).all(),
     ])
 
@@ -72,6 +98,8 @@ export async function onRequestGet({ env, params }) {
         picked,
         running: running.results,
       }),
+      // 언제쯤인가. 첫 화면과 같은 방식으로 낸 가운데값을 쓴다.
+      lead: leadGuess(medianLead(leads.results)),
     })
   } catch (err) {
     return jsonError(`차례를 계산하지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

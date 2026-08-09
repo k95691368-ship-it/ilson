@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import { waitLine, unrankedPressure, UNRANKED_LIMIT } from '../shared/waitline.js'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
+import { waitLine, unrankedPressure, UNRANKED_LIMIT, leadGuess } from '../shared/waitline.js'
 
 // 부서가 조회 화면을 여는 이유는 대개 하나다. 낸 지 2주가 됐는데 아무 소식이
 // 없어서다. "신청서 단계에 있습니다"는 이미 아는 것이고, 알고 싶은 것은
@@ -179,5 +184,63 @@ describe('부서에게 보이는 이유는 담당자가 적은 말이다', () =>
     })
     expect(s.aheadPicked[0].why).toBeNull()
     expect(s.phase).toBe('behind')
+  })
+})
+
+// "그래서 언제쯤 됩니까"
+//
+// 부서가 제일 먼저 묻는 것이 이것인데 이 화면은 순서만 말했다. "앞에 1건
+// 있습니다"는 몇째냐는 답이지 언제냐는 답이 아니다.
+//
+// 날짜를 약속하지 않는다. 지금까지 실제로 걸린 날수를 보여 준다.
+describe('언제쯤 되는지 답하는가', () => {
+  it('끝까지 간 것이 없으면 지어내지 않는다', () => {
+    // 여기서 아무 숫자나 적으면 그 화면은 그 뒤로 안 읽힌다.
+    const g = leadGuess({ count: 0, medianDays: null })
+    expect(g.text).toContain('지어내지 않겠습니다')
+    expect(g.shaky).toBe(true)
+  })
+
+  it('값이 깨져 있어도 지어내지 않는다', () => {
+    expect(leadGuess(null).shaky).toBe(true)
+    expect(leadGuess({ count: 3, medianDays: null }).shaky).toBe(true)
+  })
+
+  it('한두 건뿐이면 그 사실을 먼저 말한다', () => {
+    // 한 건 넘겨 놓고 "보통 9일 걸립니다"라고 하면 통계가 아니라 우연이다.
+    const g = leadGuess({ count: 2, medianDays: 9 })
+    expect(g.text).toContain('9일')
+    expect(g.text).toContain('크게 달라질 수 있습니다')
+    expect(g.shaky).toBe(true)
+  })
+
+  it('쌓이면 그대로 말한다', () => {
+    const g = leadGuess({ count: 5, medianDays: 12.5 })
+    expect(g.text).toContain('5건')
+    expect(g.text).toContain('12.5일')
+    expect(g.shaky).toBe(false)
+  })
+
+  it('앞에 놓인 것이 있으면 더 걸린다고 말한다', () => {
+    // 가운데값만 적으면 뒤에 선 부서가 그 날수를 자기 것으로 읽는다.
+    expect(leadGuess({ count: 5, medianDays: 12 }).text).toContain('앞에 놓인 건이 있으면')
+  })
+
+  it('화면이 그 값을 그린다', () => {
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'TrackPage.jsx'), 'utf8')
+    expect(page).toContain('lead?.show')
+    expect(page).toContain('언제쯤 되나')
+    // 서버가 보내 주는 것을 실제로 받아 둬야 한다.
+    expect(page).toContain('setLead(r.lead')
+  })
+
+  it('첫 화면과 같은 방식으로 센다', () => {
+    // 두 화면이 다른 날수를 말하면 둘 다 못 믿는다.
+    const route = readFileSync(
+      join(ROOT, 'functions', 'api', 'track', '[ticket]', 'waitline.js'),
+      'utf8'
+    )
+    expect(route).toContain('h.rolled_back_at IS NULL')
+    expect(route).toContain('julianday(h.handed_at) - julianday(a.created_at)')
   })
 })
