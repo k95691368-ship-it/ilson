@@ -375,6 +375,14 @@ describe('부서도 자기 도구의 성과를 보는가', () => {
     expect(page).toContain('payoff.reviewMinutes')
   })
 
+  it('반박 개수가 담당자 화면과 같아진다', () => {
+    // deptConfirmed 를 false 로 굳혀 뒀더니 부서 화면은 "확인 못 한 것
+    // 5가지", 담당자 화면은 4가지가 됐다. 같은 것을 두 화면이 다른 숫자로
+    // 말하면 읽는 사람은 둘 다 안 믿는다.
+    expect(route).toContain('deptConfirmed: Boolean(saved?.dept_confirmed_at)')
+    expect(route).toContain('dept_confirmed_at FROM outcome')
+  })
+
   it('기준선이 없으면 아무 숫자도 안 낸다', () => {
     // 잰 적이 없으면 견줄 바닥이 없다. 그때 0이라고 적으면 "안 줄었다"로
     // 읽히는데, 실제로는 모르는 것이다.

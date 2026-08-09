@@ -87,7 +87,7 @@ export async function onRequestGet({ env, params, request }) {
         .first(),
 
       env.DB.prepare(
-        'SELECT dev_hours, ops_cost_krw, amortize_months FROM outcome WHERE application_id = ?'
+        'SELECT dev_hours, ops_cost_krw, amortize_months, dept_confirmed_at FROM outcome WHERE application_id = ?'
       )
         .bind(h.application_id)
         .first(),
@@ -114,7 +114,11 @@ export async function onRequestGet({ env, params, request }) {
         const open = buildChallenges({
           outcome: computed,
           quarantineLeft: recent.results[0]?.quarantined ?? 0,
-          deptConfirmed: false,
+          // 실제 값을 넘긴다. false 로 굳혀 뒀더니 부서 화면은 "확인 못 한
+          // 것 5가지", 담당자 화면은 4가지가 됐다. 같은 것을 두 화면이
+          // 다른 숫자로 말하면 읽는 사람은 둘 다 안 믿는다 — 이 저장소가
+          // 계속 잡아 온 바로 그 모양을 내가 새로 만들 뻔했다.
+          deptConfirmed: Boolean(saved?.dept_confirmed_at),
         })
         payoff = {
           runs: computed.runCount,
