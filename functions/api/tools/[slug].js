@@ -9,6 +9,7 @@
 import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { checkRateLimit, remainingQuota } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
+import { computeOutcome, buildChallenges, labelForOutcome } from '../../../shared/outcome.js'
 
 const DAY_SECONDS = 86400
 
@@ -43,7 +44,7 @@ export async function onRequestGet({ env, params, request }) {
   const bucket = `tool:${h.slug}:${ip}`
 
   try {
-    const [remaining, manual, recent, aliases, nextFree] = await Promise.all([
+    const [remaining, manual, recent, aliases, nextFree, baseline, saved] = await Promise.all([
       remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS),
       env.DB.prepare(
         'SELECT title, intro, when_to_run, what_to_do_after, contact FROM manual WHERE application_id = ?'
@@ -73,7 +74,64 @@ export async function onRequestGet({ env, params, request }) {
       )
         .bind(DAY_SECONDS, bucket, DAY_SECONDS)
         .first(),
+
+      // 이 도구를 쓰기 전에 사람이 하면 얼마나 걸렸나.
+      //
+      // 부서는 매주 이 도구를 돌리면서도 그게 얼마나 줄여 줬는지를 못 봤다.
+      // 그 숫자는 담당자 화면에만 있었다. 정작 시간을 아낀 쪽은 부서인데,
+      // 자기가 뭘 얻었는지는 남의 화면에 있었던 것이다.
+      env.DB.prepare(
+        'SELECT median_seconds, sample_n, people, hourly_wage_krw FROM baseline WHERE application_id = ?'
+      )
+        .bind(h.application_id)
+        .first(),
+
+      env.DB.prepare(
+        'SELECT dev_hours, ops_cost_krw, amortize_months FROM outcome WHERE application_id = ?'
+      )
+        .bind(h.application_id)
+        .first(),
     ])
+
+    // 이 도구가 부서에게 무엇을 돌려줬나.
+    //
+    // 담당자 성과 화면과 **같은 함수**로 낸다. 두 벌로 계산하면 부서가 보는
+    // 숫자와 담당자가 보는 숫자가 갈라지고, 그날 둘 다 못 믿는다.
+    //
+    // 딱지도 같이 준다. 미해소 반박이 남아 있으면 '보수적 추정'이다.
+    // 숫자만 던져 놓으면 부서는 그걸 확정으로 읽고 위에 보고한다 —
+    // 담당자 화면은 같은 값을 잠정이라고 부르고 있는데.
+    let payoff = null
+    if (baseline && recent.results.length > 0) {
+      const computed = computeOutcome({
+        baseline,
+        runs: recent.results,
+        devHours: saved?.dev_hours ?? 0,
+        opsCostKrw: saved?.ops_cost_krw ?? 0,
+        amortizeMonths: saved?.amortize_months ?? 24,
+      })
+      if (computed.status !== '산정불가') {
+        const open = buildChallenges({
+          outcome: computed,
+          quarantineLeft: recent.results[0]?.quarantined ?? 0,
+          deptConfirmed: false,
+        })
+        payoff = {
+          runs: computed.runCount,
+          // 부서에게는 시간이 먼저다. 금액은 그다음이다 — 부서가 아낀 것은
+          // 자기 시간이고, 원 단위는 위에 보고할 때 쓰는 말이다.
+          savedMinutes: Math.round(computed.savedSeconds / 60),
+          savedKrw: computed.savedKrw,
+          perRunMinutes: Math.round(computed.savedSeconds / 60 / Math.max(1, computed.runCount)),
+          // 검수·재작업에 든 시간을 빼고 낸 값이라는 것을 밝힌다. 안 밝히면
+          // 부서는 "그만큼 안 줄었는데"라고 느끼고 이 숫자를 안 믿는다.
+          reviewMinutes: Math.round(computed.reviewSeconds / 60),
+          reworkMinutes: Math.round(computed.reworkSeconds / 60),
+          label: labelForOutcome(computed, open.length).label,
+          openChallenges: open.length,
+        }
+      }
+    }
 
     return jsonResponse({
       slug: h.slug,
@@ -96,6 +154,7 @@ export async function onRequestGet({ env, params, request }) {
         windowHours: DAY_SECONDS / 3600,
         nextFreeAt: remaining > 0 ? null : (nextFree?.next_free ?? null),
       },
+      payoff,
       manual: manual ?? null,
       note: h.note,
       recent: recent.results,

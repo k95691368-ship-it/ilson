@@ -337,3 +337,48 @@ describe('밀어 둔 줄을 전부 세는가', () => {
     expect(page).not.toContain('/ data.quarantineTotal) * 100')
   })
 })
+
+// 시간을 아낀 쪽은 부서인데, 자기가 뭘 얻었는지는 남의 화면에 있었다.
+//
+// 부서는 매주 도구를 돌리면서도 그게 얼마나 줄여 줬는지를 못 봤다. 그
+// 숫자는 담당자 성과 화면에만 있었다.
+describe('부서도 자기 도구의 성과를 보는가', () => {
+  const ROOT4 = fileURLToPath(new URL('..', import.meta.url))
+  const route = readFileSync(join(ROOT4, 'functions', 'api', 'tools', '[slug].js'), 'utf8')
+  const page = readFileSync(join(ROOT4, 'src', 'pages', 'ToolPage.jsx'), 'utf8')
+
+  it('담당자 화면과 같은 함수로 낸다', () => {
+    // 두 벌로 계산하면 부서가 보는 숫자와 담당자가 보는 숫자가 갈라진다.
+    expect(route).toContain('computeOutcome(')
+    expect(route).toContain('labelForOutcome(')
+  })
+
+  it('딱지를 함께 준다', () => {
+    // 숫자만 던지면 부서는 확정으로 읽고 위에 보고한다 — 담당자 화면은
+    // 같은 값을 잠정이라고 부르고 있는데.
+    expect(route).toContain('label: labelForOutcome')
+    expect(page).toContain('data.payoff.label')
+  })
+
+  it('시간을 먼저 보여 준다', () => {
+    // 부서가 아낀 것은 자기 시간이다. 원 단위는 위에 보고할 때 쓰는 말이다.
+    const i = page.indexOf('payoff.savedMinutes')
+    const j = page.indexOf('payoff.savedKrw')
+    expect(i).toBeGreaterThan(0)
+    expect(i).toBeLessThan(j)
+  })
+
+  it('무엇을 빼고 낸 값인지 밝힌다', () => {
+    // 안 밝히면 부서는 "그만큼 안 줄었는데"라고 느끼고 이 숫자를 안 믿는다.
+    // 실제로 겪은 사람이 제일 먼저 알아챈다.
+    expect(page).toContain('확인하신 시간')
+    expect(page).toContain('payoff.reviewMinutes')
+  })
+
+  it('기준선이 없으면 아무 숫자도 안 낸다', () => {
+    // 잰 적이 없으면 견줄 바닥이 없다. 그때 0이라고 적으면 "안 줄었다"로
+    // 읽히는데, 실제로는 모르는 것이다.
+    expect(route).toContain('if (baseline && recent.results.length > 0)')
+    expect(page).toContain('{data.payoff && (')
+  })
+})

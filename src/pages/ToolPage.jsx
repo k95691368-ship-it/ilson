@@ -176,6 +176,46 @@ export default function ToolPage() {
         )}
       </header>
 
+      {/* 이 도구가 부서에게 돌려준 것.
+          부서는 매주 이걸 돌리면서도 그게 얼마나 줄여 줬는지를 못 봤다.
+          그 숫자는 담당자 화면에만 있었다 — 정작 시간을 아낀 쪽은 부서인데
+          자기가 뭘 얻었는지는 남의 화면에 있었던 것이다.
+          시간을 먼저 적는다. 부서가 아낀 것은 자기 시간이고, 원 단위는
+          위에 보고할 때 쓰는 말이다. */}
+      {data.payoff && (
+        <section className="card payoff">
+          <div className="card-head">
+            <span className="card-title">이 도구가 지금까지 아껴 드린 것</span>
+            <span className="card-note">{data.payoff.runs}번 돌린 기록으로 계산했습니다</span>
+          </div>
+          <div className="payoff-row">
+            <div>
+              <span className="payoff-value">{num(data.payoff.savedMinutes)}분</span>
+              <span className="card-note">
+                한 번에 {num(data.payoff.perRunMinutes)}분씩
+              </span>
+            </div>
+            <div>
+              <span className="payoff-value">{num(data.payoff.savedKrw)}원</span>
+              <span className="card-note">{data.payoff.label}</span>
+            </div>
+          </div>
+          {/* 검수·재작업에 든 시간을 빼고 낸 값이라는 것을 밝힌다.
+              안 밝히면 부서는 "그만큼 안 줄었는데"라고 느끼고 이 숫자를
+              안 믿는다. 실제로 겪은 사람이 제일 먼저 알아챈다. */}
+          <p className="card-note">
+            사람이 하던 시간에서 <strong>도구가 돈 시간과 그 뒤에 확인하신 시간
+            {data.payoff.reworkMinutes > 0 && ', 다시 하신 시간'}</strong>을 빼고 낸 값입니다
+            {data.payoff.reviewMinutes > 0 &&
+              ` — 확인에 ${num(data.payoff.reviewMinutes)}분`}
+            {data.payoff.reworkMinutes > 0 && `, 다시 하는 데 ${num(data.payoff.reworkMinutes)}분`}
+            {(data.payoff.reviewMinutes > 0 || data.payoff.reworkMinutes > 0) && ' 쓰셨습니다'}.
+            {data.payoff.openChallenges > 0 &&
+              ` 아직 확인 못 한 것이 ${data.payoff.openChallenges}가지 있어 '${data.payoff.label}'으로 부릅니다.`}
+          </p>
+        </section>
+      )}
+
       {data.manual?.when_to_run && (
         <div className="notice notice-info">
           <div className="notice-title">언제 돌리나요</div>

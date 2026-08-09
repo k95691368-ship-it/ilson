@@ -6412,3 +6412,34 @@ kbd {
 .lead-spread-title:hover {
   text-decoration: underline;
 }
+
+/* 이 도구가 부서에게 돌려준 것.
+   부서 화면에서 제일 위쪽에 오므로 숫자를 크게 두되, 그 아래 단서 문장이
+   같은 무게로 읽히게 한다 — 숫자만 크고 조건이 작으면 조건은 안 읽힌다. */
+.payoff-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 640px) {
+  .payoff-row {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+}
+
+.payoff-row > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.payoff-value {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--text-h);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
