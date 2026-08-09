@@ -62,7 +62,21 @@ export default function ToolsPage() {
       ) : (
         <>
           <section className="stat-row">
-            <Tile label="넘긴 도구" value={num(s.total)} note={`돌고 있는 것 ${s.running}개`} />
+            {/* 서버가 세어 놓고 아무도 안 읽던 값을 여기 세운다.
+                신고 건수와 다른 말을 한다 — 한 도구에 신고 세 건이 붙은 것과
+                도구 세 개가 각각 망가진 것은 전혀 다른 상황인데, "안 고친
+                신고 3건"만 보면 구분이 안 된다. 부서 셋이 각자 못 믿고 있는
+                쪽이 훨씬 급하다. */}
+            <Tile
+              label="넘긴 도구"
+              value={num(s.total)}
+              note={
+                (reports?.summary.toolsUntrusted ?? 0) > 0
+                  ? `그중 ${reports.summary.toolsUntrusted}개는 지금 결과를 믿을 수 없습니다`
+                  : `돌고 있는 것 ${s.running}개`
+              }
+              tone={(reports?.summary.toolsUntrusted ?? 0) > 0 ? 'warn' : undefined}
+            />
             <Tile
               label="넘긴 뒤 실행"
               value={num(s.totalRuns)}

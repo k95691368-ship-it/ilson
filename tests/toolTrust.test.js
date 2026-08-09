@@ -111,3 +111,30 @@ describe('그 판단이 부서 화면까지 간다', () => {
     expect(page.indexOf('data.trust?.urgent > 0')).toBeLessThan(page.indexOf('<ReportForm'))
   })
 })
+
+// 서버가 세어 놓고 아무도 안 읽던 값.
+//
+// /api/reports 는 toolsAffected·toolsUntrusted 를 내려보내는데 어느 화면도
+// 안 읽었다. 신고 건수와는 다른 말을 하는 값이다 — 한 도구에 신고 세 건이
+// 붙은 것과 도구 세 개가 각각 망가진 것은 전혀 다른 상황인데, "안 고친
+// 신고 3건"만 보면 구분이 안 된다. 부서 셋이 각자 자기 도구를 못 믿고
+// 있는 쪽이 훨씬 급하다.
+describe('망가진 도구가 몇 개인지', () => {
+  const route = readFileSync(join(ROOT, 'functions', 'api', 'reports.js'), 'utf8')
+  const page = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+
+  it('서버가 도구 단위로도 센다', () => {
+    expect(route).toContain('toolsUntrusted:')
+  })
+
+  it('화면이 그 값을 읽는다', () => {
+    expect(page).toContain('reports?.summary.toolsUntrusted')
+    expect(page).toContain('결과를 믿을 수 없습니다')
+  })
+
+  it('없을 때 0으로 굳지 않는다', () => {
+    // 아직 안 받아 온 사이에 null 이 오면 Number(null) 이 0이 되어
+    // "이상 없음"으로 보인다. ?? 로 걸러야 한다.
+    expect(page).toContain('reports?.summary.toolsUntrusted ?? 0')
+  })
+})
