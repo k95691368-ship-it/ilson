@@ -1,12 +1,10 @@
 import { describe, it, expect } from 'vitest'
-import {
-  pickPrimary,
-  alreadyMerged,
-  mergeNotice,
-  holdCondition,
-  validateMerge,
-  MERGE_KIND,
-} from '../shared/merge.js'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { pickPrimary, holdCondition } from '../shared/merge.js'
+
+const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 // 판정만 하고 아무 일도 안 일어나면, 담당자는 끝났다고 생각하고 부서는
 // 아무 소식이 없다고 생각한다. 둘 다 상대가 뭘 하고 있는 줄 안다.
@@ -88,62 +86,40 @@ describe('어느 쪽을 남기는가', () => {
   })
 })
 
-describe('이미 묶인 것', () => {
-  const decisions = [
-    { link_kind: MERGE_KIND, application_id: 'b', link_id: 'a' },
-    { link_kind: '질문', application_id: 'c', link_id: 'c' },
-  ]
-
-  it('이미 묶였으면 알아본다', () => {
-    expect(alreadyMerged(decisions, 'b')).toBe(true)
-  })
-
-  it('다른 신청서가 묶인 것은 이 신청서와 상관없다', () => {
-    expect(alreadyMerged(decisions, 'c')).toBe(false)
-    expect(alreadyMerged(decisions, 'a')).toBe(false)
-  })
-
-  it('빈 입력에도 터지지 않는다', () => {
-    expect(alreadyMerged([], 'b')).toBe(false)
-    expect(alreadyMerged(undefined, 'b')).toBe(false)
-  })
-})
+// alreadyMerged·mergeNotice·validateMerge 세 함수를 여기서 확인했었다.
+// 셋 다 어디서도 안 불렸다 —
+//
+//   · mergeNotice 가 만드는 문장은 부서 조회 화면(TrackPage)이 자기 안에
+//     똑같이 적어 두고 쓴다. 같은 말이 두 군데 있었다.
+//   · validateMerge 가 정한 "근거 없이 묶지 마라"는 규칙은 묶는 라우트
+//     (functions/api/compare.js)가 자기 안에서 직접 본다.
+//   · alreadyMerged 는 부르는 데가 아예 없었다.
+//
+// 안 쓰이는 사본을 남겨 두면 다음 사람이 그쪽을 고치고 화면은 안 바뀐다.
+// 지웠고, 실제로 지키고 있는 자리를 아래에서 확인한다.
 
 describe('부서에게 뭐라고 말하는가', () => {
   const primary = app('a', 'AX-AAA-001', '2026-07-20 09:00:00', '진행중', '재무')
-  const merged = app('b', 'AX-BBB-002', '2026-07-28 09:00:00')
 
-  it('어느 신청서로 묶였는지 알려 준다', () => {
-    const n = mergeNotice(primary, merged)
-    expect(n.headline).toContain('AX-AAA-001')
-    expect(n.where).toBe('AX-AAA-001')
-  })
-
-  it('버린 것이 아니라는 것을 분명히 한다', () => {
-    // "중복입니다"로 끝내면 부서는 자기 신청서가 버려진 줄 안다.
-    const n = mergeNotice(primary, merged)
-    expect(n.why).toContain('안 하는 것이 아닙니다')
-    expect(n.body).toContain('함께 처리')
-  })
-
-  it('보류 사유도 같은 말로 적는다', () => {
+  it('보류 사유를 그 신청서 번호로 적는다', () => {
     // 화면마다 다른 말로 적으면 부서가 다른 일인 줄 안다.
     expect(holdCondition(primary)).toContain('AX-AAA-001')
     expect(holdCondition(primary)).toContain('배포되면')
   })
+
+  it('버린 것이 아니라는 말이 부서 화면에 실제로 있다', () => {
+    // "중복입니다"로 끝내면 부서는 자기 신청서가 버려진 줄 안다.
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'TrackPage.jsx'), 'utf8')
+    expect(page).toContain('안 하는 것이 아닙니다')
+    expect(page).toContain('함께 처리합니다')
+  })
 })
 
 describe('묶을 때 받는 것', () => {
-  it('제대로 적었으면 통과한다', () => {
-    expect(validateMerge({ why: '둘 다 다섯 채널 정산서를 합치는 일입니다', author: 'AX 담당자' })).toEqual({})
-  })
-
-  it('근거 없이 묶지 못한다', () => {
-    // 부서가 "이거 왜 묶였냐"고 물으면 답해야 하는 자리다.
-    expect(validateMerge({ why: '중복', author: 'AX 담당자' }).why).toBeTruthy()
-  })
-
-  it('누가 판정하는지 받아 둔다', () => {
-    expect(validateMerge({ why: '같은 병목입니다 확인했습니다', author: '' }).author).toBeTruthy()
+  it('근거 없이 묶는 것을 라우트가 막는다', () => {
+    // 규칙을 두 군데 두지 않는다. 지키는 쪽이 여기다.
+    const route = readFileSync(join(ROOT, 'functions', 'api', 'compare.js'), 'utf8')
+    expect(route).toContain('reason.length < 5')
+    expect(route).toContain('왜 그렇게 판정했는지')
   })
 })

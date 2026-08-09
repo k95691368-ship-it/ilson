@@ -100,14 +100,6 @@ export function waitingOnStaff(thread) {
 //
 // 접수함에서 "답을 기다리는 중"과 "내가 볼 차례"를 갈라야 한다. 부서 답을
 // 기다리는 건을 내 할 일로 세면 접수함이 늘 밀려 있는 것처럼 보인다.
-export function whoseTurn(thread) {
-  // 부서가 물은 것이 있으면 그게 먼저다. 담당자가 물어 놓고 부서 답을
-  // 기다리는 중이어도, 부서 질문이 와 있으면 공은 담당자에게 있다.
-  if (waitingOnStaff(thread).length > 0) return '담당자'
-  if (waitingOnDept(thread).length > 0) return '부서'
-  return '담당자'
-}
-
 // 되묻는 말이 쓸 만한지.
 export function validateAsk({ question, why, author }) {
   const fields = {}
@@ -139,19 +131,6 @@ export function validateAnswer({ answer, author }) {
 }
 
 // 접수함에 적을 한 줄.
-export function turnLabel(thread) {
-  // 부서가 물어 온 것을 먼저 적는다. 담당자가 봐야 움직이는 쪽이다.
-  const mine = waitingOnStaff(thread)
-  if (mine.length > 0) {
-    return mine.length === 1 ? '부서가 물어봤습니다' : `부서가 물어봤습니다 (${mine.length}건)`
-  }
-  const theirs = waitingOnDept(thread)
-  if (theirs.length === 0) return null
-  return theirs.length === 1
-    ? '부서 답을 기다리는 중'
-    : `부서 답을 기다리는 중 (${theirs.length}건)`
-}
-
 // 부서가 물을 때도 무엇을 묻는지는 적어야 한다. 다만 "이걸 알아야 무엇을
 // 정할 수 있는지"는 안 받는다 — 그건 판정하는 사람의 말이다. 부서에게
 // 그걸 적으라고 하면 물어보려다 만다.

@@ -13,7 +13,6 @@ import {
   DEEP_NOTE,
   deepLabel,
   isEmptySite,
-  tryStep,
   resetLabel,
   visitorLabel,
 } from '../shared/tryit.js'
@@ -28,6 +27,11 @@ import { validateReview, MIN_REASON } from '../shared/review.js'
 // 그런데 그 사실을 아무 데도 안 적어 뒀다. 화면이 전부 "담당자가 자기 일을
 // 하는 중"으로 쓰여 있어서 보러 온 사람은 읽기만 하고 나간다. 할 수 있게
 // 만들어 놓고 할 수 있다고 말을 안 한 것이다.
+
+// tryStep() 은 TRY_STEPS 에서 한 칸을 찾아 주기만 하는 별명이었다. 화면은
+// TRY_STEPS 를 통째로 돌리므로 그 함수를 안 쓴다. 여기서 확인하는 것은
+// 칸에 적힌 글이고 그건 그대로 살아 있으니, 찾는 일만 이 파일에서 한다.
+const stepOf = (key) => TRY_STEPS.find((s) => s.key === key) ?? null
 
 describe('무엇을 해볼 수 있는지', () => {
   it('한 번 누르면 결과가 보이는 것부터 놓는다', () => {
@@ -48,19 +52,19 @@ describe('무엇을 해볼 수 있는지', () => {
 
   it('판정 안내가 근거를 받는다는 것을 미리 말한다', () => {
     // 눌러 봤더니 서버가 막으면 고장인 줄 안다.
-    expect(tryStep('review').note).toContain('근거를 20자')
-    expect(tryStep('review').note).toContain('대안')
+    expect(stepOf('review').note).toContain('근거를 20자')
+    expect(stepOf('review').note).toContain('대안')
   })
 
   it('못 한 것을 보는 자리도 넣는다', () => {
     // 잘된 것만 보여주면 나머지도 못 믿는다.
-    expect(tryStep('honesty')).toBeTruthy()
-    expect(tryStep('honesty').to).toBe('/honesty')
+    expect(stepOf('honesty')).toBeTruthy()
+    expect(stepOf('honesty').to).toBe('/honesty')
   })
 
   it('모르는 것은 없다고 답한다', () => {
-    expect(tryStep('없는것')).toBeNull()
-    expect(tryStep()).toBeNull()
+    expect(stepOf('없는것')).toBeNull()
+    expect(stepOf()).toBeNull()
   })
 })
 
@@ -151,11 +155,11 @@ describe('시험 삼아 낸 것을 치울 때', () => {
 // 여기서 둘이 다시 갈라지지 않게 묶어 둔다.
 describe('초대문이 서버와 같은 말을 하는가', () => {
   it('초대문이 말한 글자 수가 서버가 요구하는 것과 같다', () => {
-    expect(tryStep('review').note).toContain(`${MIN_REASON}자`)
+    expect(stepOf('review').note).toContain(`${MIN_REASON}자`)
   })
 
   it('반려에 대안을 받는다는 것도 서버가 실제로 막는다', () => {
-    expect(tryStep('review').note).toContain('대안')
+    expect(stepOf('review').note).toContain('대안')
     const bad = validateReview({
       impact_score: 3,
       difficulty_score: 3,
@@ -219,13 +223,13 @@ describe('초대문이 서버와 같은 말을 하는가', () => {
 describe('넘기기 전에 무엇을 막는다고 말했나', () => {
   it('시험판 안내가 "기계 채점만으로는 통과가 아니다"라고 말한다', () => {
     // 이 문장이 참이려면 사람 의견을 받는 자리가 있어야 하고, 실제로 있다.
-    expect(tryStep('tool').note).toContain('검토함')
+    expect(stepOf('tool').note).toContain('검토함')
   })
 
   it('못 한 것을 보는 자리가 데이터에서 나온다고 말한다', () => {
     // "잘 보이려고 손댈 수 없다"는 주장은 손으로 적은 목록이면 거짓이 된다.
-    expect(tryStep('honesty').note).toContain('데이터에서 만들어지므로')
-    expect(tryStep('honesty').note).toContain('손댈 수 없습니다')
+    expect(stepOf('honesty').note).toContain('데이터에서 만들어지므로')
+    expect(stepOf('honesty').note).toContain('손댈 수 없습니다')
   })
 })
 

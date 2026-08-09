@@ -59,10 +59,6 @@ export const TRY_TERMS = [
   '어지르셔도 됩니다. 아래 단추로 시연 신청서를 처음 상태로 되돌릴 수 있습니다.',
 ]
 
-export function tryStep(key) {
-  return TRY_STEPS.find((s) => s.key === key) ?? null
-}
-
 // 되돌리기가 무엇을 하는지.
 //
 // "초기화"라고만 적으면 무엇이 지워지는지 모른 채 누른다. 부서가 직접 낸

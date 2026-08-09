@@ -2,8 +2,6 @@ import { describe, it, expect } from 'vitest'
 import {
   toThread,
   openQuestions,
-  whoseTurn,
-  turnLabel,
   validateAsk,
   validateAnswer,
   ASK_KIND,
@@ -116,29 +114,13 @@ describe('아직 답 못 받은 질문', () => {
   })
 })
 
-describe('지금 누구 차례인가', () => {
-  it('답을 기다리면 부서 차례다', () => {
-    // 부서 답을 기다리는 건을 내 할 일로 세면 접수함이 늘 밀려 있는
-    // 것처럼 보인다.
-    expect(whoseTurn(toThread([ask('q1', '2026-07-26 09:00:00')]))).toBe('부서')
-  })
-
-  it('답을 다 받았으면 담당자 차례다', () => {
-    const t = toThread([ask('q1', '2026-07-26 09:00:00'), answer('a1', '2026-07-26 10:00:00', 'q1')])
-    expect(whoseTurn(t)).toBe('담당자')
-  })
-
-  it('주고받은 것이 없으면 담당자 차례다', () => {
-    expect(whoseTurn([])).toBe('담당자')
-  })
-
-  it('접수함에 적을 한 줄을 준다', () => {
-    expect(turnLabel(toThread([ask('q1', '2026-07-26 09:00:00')]))).toBe('부서 답을 기다리는 중')
-    const two = toThread([ask('q1', '2026-07-26 09:00:00'), ask('q2', '2026-07-26 09:05:00')])
-    expect(turnLabel(two)).toContain('2건')
-    expect(turnLabel([])).toBeNull()
-  })
-})
+// 여기서 '지금 누구 차례인가'를 확인했었다. whoseTurn·turnLabel 두 함수가
+// 그 답을 냈는데, **화면도 서버도 그 둘을 한 번도 안 불렀다.** 접수함은
+// src/lib/inbox.js 가 미리 세어 둔 칸(waiting_answers)으로 같은 판단을 한다.
+//
+// 같은 규칙이 두 벌 있으면 한쪽만 고치는 날이 오고, 그날 두 화면이 다른
+// 말을 한다. 안 쓰이는 쪽을 지웠다. 확인하려던 뜻은 아래 '두 방향이 서로
+// 안 섞인다'에서 살아 있는 waitingOnStaff·waitingOnDept 로 그대로 본다.
 
 describe('되묻는 말이 쓸 만한지', () => {
   const good = {
@@ -246,8 +228,9 @@ describe('부서가 먼저 묻는다', () => {
       { id: 'a1', link_kind: ASK_KIND, title: 'AX 담당자', what: '채널이 몇 개입니까', why: '판정에 걸립니다', created_at: '2026-01-01' },
       deptAsk('q1', '2026-01-03'),
     ]
-    expect(whoseTurn(toThread(rows))).toBe('담당자')
-    expect(turnLabel(toThread(rows))).toBe('부서가 물어봤습니다')
+    // 부서가 물어 온 것이 있으면 공은 담당자 쪽에 있다. 담당자가 물어 놓고
+    // 부서 답을 기다리는 중이어도 마찬가지다 — 부서 질문이 먼저다.
+    expect(waitingOnStaff(toThread(rows))).toHaveLength(1)
   })
 
   it('부서 질문이 없으면 예전 그대로다', () => {
@@ -255,8 +238,8 @@ describe('부서가 먼저 묻는다', () => {
     const rows = [
       { id: 'a1', link_kind: ASK_KIND, title: 'AX 담당자', what: '채널이 몇 개입니까', why: '판정에 걸립니다', created_at: '2026-01-01' },
     ]
-    expect(whoseTurn(toThread(rows))).toBe('부서')
-    expect(turnLabel(toThread(rows))).toBe('부서 답을 기다리는 중')
+    expect(waitingOnStaff(toThread(rows))).toHaveLength(0)
+    expect(waitingOnDept(toThread(rows))).toHaveLength(1)
   })
 
   it('부서에게 "왜 묻는지"까지 적으라고 하지 않는다', () => {

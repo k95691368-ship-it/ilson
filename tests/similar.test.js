@@ -1,11 +1,16 @@
 import { describe, it, expect } from 'vitest'
 import {
-  tokenize,
+  tokenParts,
   similarity,
   findSimilar,
   reasonText,
   SIMILAR_THRESHOLD,
 } from '../shared/similar.js'
+
+// tokenize() 는 tokenParts(text).all 을 돌려주기만 하는 별명이었다. 화면도
+// 서버도 안 쓰고 이 시험만 불렀다. 확인하려는 동작은 그대로 살아 있으니
+// 살아 있는 쪽으로 다시 건다.
+const partsOf = (t) => tokenParts(t).all
 
 // 이 판정이 헐거우면 아무 신청서나 서로 비슷하다고 떠서 아무도 안 읽고,
 // 빡빡하면 진짜 중복을 놓친다. 둘 다 여기서 못 박는다.
@@ -45,35 +50,35 @@ const 전혀_다른_건 = {
 describe('낱말 뽑기', () => {
   it('조사를 떼어 낸다', () => {
     // "정산서를"과 "정산서가"가 같은 낱말이 되어야 겹친다.
-    expect(tokenize('정산서를')).toEqual(tokenize('정산서가'))
+    expect(partsOf('정산서를')).toEqual(partsOf('정산서가'))
   })
 
   it('한글은 두 글자 조각으로도 쪼갠다', () => {
     // "정산서"와 "정산 내역"이 서로 걸리려면 이게 있어야 한다.
-    const t = tokenize('정산서')
+    const t = partsOf('정산서')
     expect(t.has('정산')).toBe(true)
     expect(t.has('산서')).toBe(true)
   })
 
   it('어디에나 나오는 말은 버린다', () => {
-    const t = tokenize('합니다 있습니다 업무 담당자')
+    const t = partsOf('합니다 있습니다 업무 담당자')
     expect(t.has('합니다')).toBe(false)
     expect(t.has('업무')).toBe(false)
     expect(t.has('담당자')).toBe(false)
   })
 
   it('한 글자는 버린다', () => {
-    expect(tokenize('이 그 저 수 것')).toEqual(new Set())
+    expect(partsOf('이 그 저 수 것')).toEqual(new Set())
   })
 
   it('문장부호와 대소문자를 무시한다', () => {
-    expect(tokenize('ERP, 자동화!')).toEqual(tokenize('erp 자동화'))
+    expect(partsOf('ERP, 자동화!')).toEqual(partsOf('erp 자동화'))
   })
 
   it('빈 값에도 터지지 않는다', () => {
-    expect(tokenize(null)).toEqual(new Set())
-    expect(tokenize('')).toEqual(new Set())
-    expect(tokenize(undefined)).toEqual(new Set())
+    expect(partsOf(null)).toEqual(new Set())
+    expect(partsOf('')).toEqual(new Set())
+    expect(partsOf(undefined)).toEqual(new Set())
   })
 })
 
@@ -125,7 +130,7 @@ describe('안 비슷한 것을 비슷하다고 하지 않는다', () => {
   it('껍데기를 떼고 나면 알맹이만 남는다', () => {
     // "확인합니다"가 확인·인합·합니·니다 네 조각을 만들면, 그중 합니·니다는
     // 모든 신청서에 다 들어 있는 껍데기다. 어미를 떼서 알맹이만 남긴다.
-    const t = tokenize('확인합니다')
+    const t = partsOf('확인합니다')
     expect(t.has('확인')).toBe(true)
     expect(t.has('합니')).toBe(false)
     expect(t.has('니다')).toBe(false)

@@ -64,10 +64,6 @@ export const RESOLUTION = {
 }
 
 // 부서가 알려줘서 풀 수 있는 것만.
-export function isTeachable(reason) {
-  return RESOLUTION[reason]?.kind === 'teach'
-}
-
 export function resolutionFor(reason) {
   return (
     RESOLUTION[reason] ?? {

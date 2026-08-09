@@ -57,41 +57,8 @@ export function pickPrimary(a, b) {
   return { primary: aFirst ? a : b, merged: aFirst ? b : a, blocked: null }
 }
 
-// 이미 묶여 있는 것을 또 묶지 않는다.
-export function alreadyMerged(decisions, applicationId) {
-  return (decisions ?? []).some(
-    (d) => d.link_kind === MERGE_KIND && d.application_id === applicationId
-  )
-}
-
-// 부서 화면에 그대로 뜰 문장.
-//
-// "중복입니다"로 끝내면 부서는 자기 신청서가 버려진 줄 안다. 버린 것이
-// 아니라 그쪽에서 함께 처리된다는 것, 그리고 어디를 보면 되는지를 말해야 한다.
-export function mergeNotice(primary, mergedInto) {
-  return {
-    headline: `${primary.ticket_no} 와 같은 건으로 묶었습니다`,
-    body: `내주신 것과 같은 병목을 ${primary.dept}에서 먼저 냈습니다(${primary.ticket_no}). 두 번 만들지 않으려고 그쪽에서 함께 처리합니다.`,
-    // 버린 것이 아니라는 것을 분명히 한다.
-    why: '따로 만들지 않을 뿐이지 안 하는 것이 아닙니다. 그쪽이 다 되면 바로 쓰실 수 있습니다.',
-    where: primary.ticket_no,
-    mergedTicket: mergedInto?.ticket_no ?? null,
-  }
-}
-
 export function holdCondition(primary) {
   return `${primary.ticket_no}과 같은 건입니다. 그쪽이 배포되면 함께 쓰실 수 있습니다.`
-}
-
-export function validateMerge({ why, author }) {
-  const fields = {}
-  // 근거 없이 묶으면 나중에 "이거 왜 묶였지"에 답할 수 없다. 부서가
-  // 물어보면 답해야 하는 자리다.
-  if (String(why ?? '').trim().length < 5) {
-    fields.why = '왜 같은 건이라고 보셨는지 적어주세요.'
-  }
-  if (!String(author ?? '').trim()) fields.author = '누가 판정하시는지 적어주세요.'
-  return fields
 }
 
 

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  isTeachable,
   resolutionFor,
   groupQuarantine,
   validateTeach,
@@ -25,12 +24,12 @@ const q = (reason, extra = {}) => ({
 
 describe('알려주면 풀리는 것과 아닌 것을 가른다', () => {
   it('모르는 상품코드는 알려주면 풀린다', () => {
-    expect(isTeachable('unknown_sku')).toBe(true)
+    expect(resolutionFor('unknown_sku').kind).toBe('teach')
   })
 
   it('정산 기간 밖은 밀려나는 것이 맞다', () => {
     // 이번 달 정산에 넣으면 지난달 숫자가 이번 달에 섞인다.
-    expect(isTeachable('out_of_period')).toBe(false)
+    expect(resolutionFor('out_of_period').kind).not.toBe('teach')
     expect(resolutionFor('out_of_period').kind).toBe('expected')
   })
 

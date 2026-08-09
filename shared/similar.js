@@ -130,10 +130,6 @@ export function tokenParts(text) {
   return { all, words }
 }
 
-export function tokenize(text) {
-  return tokenParts(text).all
-}
-
 // 낱말마다 무게를 다르게 준다.
 //
 // 껍데기를 아무리 떼어 내도 "매주"·"확인"처럼 뜻은 있는데 모든 신청서에
