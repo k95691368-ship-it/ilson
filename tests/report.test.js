@@ -407,7 +407,9 @@ describe('신고한 부서가 그 뒤를 보는가', () => {
   const page = readFileSync(join(ROOT5, 'src', 'pages', 'ToolPage.jsx'), 'utf8')
 
   it('부서 화면이 자기 신고를 받는다', () => {
-    expect(route).toContain('reports: toReports(reportRows.results)')
+    // 같은 쿼리로 다시올림 기록까지 뽑게 되면서 거르는 줄이 붙었다. 문장을
+    // 통째로 맞춰 보면 그때마다 깨지므로 어디서 뽑는지만 확인한다.
+    expect(route).toMatch(/reports: toReports\(reportRows\.results/)
     // 처리 기록도 같이 읽어야 고쳤는지 알 수 있다.
     expect(route).toContain('REPORT_KIND, REPORT_FIX')
   })

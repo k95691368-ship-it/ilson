@@ -37,6 +37,32 @@ export function validateRestore({ fixed } = {}) {
   return errors
 }
 
+// 다시 올라온 도구가 부서에게 할 말.
+//
+// 복구 라우트는 "다시 올렸습니다. 부서 도구 화면에 무엇을 고쳤는지 함께
+// 뜹니다"라고 답한다. 그런데 도구 화면이 그 기록을 안 읽어서 아무것도 안
+// 떴다. 라이브에서 되돌렸다 올려 보고 알았다.
+//
+// 부서 쪽에서 보면 이렇다. 틀린 숫자를 낸 도구를 겪었고, 며칠 못 썼고,
+// 어느 날 그냥 다시 열려 있다. 무엇이 달라졌는지는 아무 데도 없다. 그러면
+// 안 쓴다 — 원래 하던 손 작업으로 돌아가고, 그 사실을 아무도 모른다.
+//
+// 몇 번째인지도 같이 말한다. 두 번 세 번 내려간 도구라면 부서가 그것까지
+// 알고 판단할 일이다. 감추면 다음번에 더 크게 잃는다.
+export function lastRestore(rows) {
+  const list = (Array.isArray(rows) ? rows : []).filter((r) => r?.link_kind === RESTORE_KIND)
+  // 마지막 것을 쓴다. find() 로 첫 줄을 잡으면 예전에 고친 내용이 뜬다.
+  const last = list.at(-1)
+  if (!last) return null
+  return {
+    count: list.length,
+    // 담당자가 적은 그대로. 다듬으면 부서가 읽는 것과 기록이 달라진다.
+    fixed: last.what ?? null,
+    why: last.why ?? null,
+    at: last.created_at ?? null,
+  }
+}
+
 // 내린 지 얼마나 됐으면 담당자를 짚어야 하는가.
 //
 // 내려 두고 잊는 것이 최악이다. 부서는 "고쳐 주겠지" 하고 기다리는데

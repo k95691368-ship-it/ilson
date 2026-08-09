@@ -11,6 +11,7 @@ import { checkRateLimit, remainingQuota } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { computeOutcome, buildChallenges, labelForOutcome } from '../../../shared/outcome.js'
 import { toReports, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
+import { RESTORE_KIND, lastRestore } from '../../../shared/rollback.js'
 
 const DAY_SECONDS = 86400
 
@@ -103,13 +104,19 @@ export async function onRequestGet({ env, params, request }) {
       // 보이기 때문이다. 그 뒤로는 숫자가 틀려도 그냥 손으로 고쳐 쓴다 —
       // 그리고 그 사실을 아무도 모른다. 넘긴 뒤 들어오는 신고가 이 사이트에서
       // 가장 값진 기록인데, 그 길을 스스로 막아 둔 셈이다.
+      //
+      // 다시올림도 같이 뽑는다. 도구를 내렸다가 고쳐서 다시 올리면 서버가
+      // "부서 도구 화면에 무엇을 고쳤는지 함께 뜹니다"라고 답하는데, 정작
+      // 이 화면은 그 기록을 안 읽어서 아무것도 안 떴다. 부서는 도구가 틀린
+      // 것을 겪고 못 믿게 된 채 기다리다가, 어느 날 그냥 다시 열린 것만
+      // 본다. 그러면 안 쓴다.
       env.DB.prepare(
         `SELECT id, link_kind, link_id, title, what, why, created_at
          FROM decision_log
-         WHERE application_id = ? AND link_kind IN (?, ?)
+         WHERE application_id = ? AND link_kind IN (?, ?, ?)
          ORDER BY created_at`
       )
-        .bind(h.application_id, REPORT_KIND, REPORT_FIX)
+        .bind(h.application_id, REPORT_KIND, REPORT_FIX, RESTORE_KIND)
         .all(),
     ])
 
@@ -180,7 +187,10 @@ export async function onRequestGet({ env, params, request }) {
       },
       payoff,
       // 부서가 낸 신고와 그 처리. 담당자 화면과 **같은 함수**로 만든다.
-      reports: toReports(reportRows.results),
+      // 다시올림은 신고가 아니므로 빼고 넘긴다.
+      reports: toReports(reportRows.results.filter((r) => r.link_kind !== RESTORE_KIND)),
+      // 내려갔다가 고쳐서 다시 올라온 적이 있는가.
+      restored: lastRestore(reportRows.results),
       manual: manual ?? null,
       note: h.note,
       recent: recent.results,
