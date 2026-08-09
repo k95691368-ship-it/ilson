@@ -152,3 +152,51 @@ describe('부서 목록은 한 벌만', () => {
     expect(isDept(null)).toBe(false)
   })
 })
+
+// 안내를 따라가면 영영 2단계에 머물렀다.
+//
+// 협의안 칸이 "합격 기준을 적습니다"라고만 적혀 있었다. 그런데 이 단계를
+// 넘기는 조건은 **기준선 봉인**이다(overview 가 baseline 행으로 센다).
+// 그래서 시키는 대로 합격 기준을 적어도 안내가 그대로 있고, 두 번 세 번
+// 적어도 그대로다. 라이브에서 실제로 그랬다.
+//
+// 게다가 봉인은 협의안 화면에서 하는데 그 설명이 제작 칸에 있었다.
+// 시키는 대로 제작 화면에 가면 봉인할 자리가 없다.
+describe('안내가 실제로 다음 칸으로 데려가는가', () => {
+  const step = (key) => TOUR_STEPS.find((s) => s.key === key)
+
+  it('협의안 칸이 봉인을 말한다', () => {
+    // 이 단계를 넘기는 것이 봉인이므로, 글도 봉인을 시켜야 한다.
+    const s = step('agreement')
+    expect(s.what).toContain('세 번')
+    expect(s.what).toContain('봉인')
+    // 합격 기준만 적어서는 안 넘어간다는 것도 미리 말한다.
+    expect(s.need).toContain('합격 기준만 적어서는')
+  })
+
+  it('봉인을 협의안 화면에서 하라고 한다', () => {
+    // 서버가 baseline 을 쓰는 라우트는 agreement 하나뿐이다.
+    expect(step('agreement').where).toBe('/agreement')
+    const src = readFileSync(
+      join(ROOT, 'functions', 'api', 'applications', '[id]', 'agreement.js'),
+      'utf8'
+    )
+    expect(src).toContain('INSERT INTO baseline')
+  })
+
+  it('제작 칸은 봉인이 아니라 돌리는 일을 말한다', () => {
+    const s = step('build')
+    expect(s.what).not.toContain('봉인')
+    expect(s.what).toContain('올리면')
+  })
+
+  it('넘어가는 조건과 글이 같은 것을 가리킨다', () => {
+    // 조건은 누적값 agreed(=baseline 개수)를 본다. 글이 다른 일을 시키면
+    // 따라 한 사람은 안내가 고장 난 줄 안다.
+    const s = step('agreement')
+    expect(s.at({ total: 1, reviewed: 1, agreed: 0 })).toBe(true)
+    expect(s.at({ total: 1, reviewed: 1, agreed: 1 })).toBe(false)
+    // 봉인하면 그다음 칸으로 넘어간다.
+    expect(nextStep({ byStage: { 협의안: 1 } }).key).toBe('build')
+  })
+})
