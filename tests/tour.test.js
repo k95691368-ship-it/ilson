@@ -83,6 +83,43 @@ describe('다음에 할 것 한 가지', () => {
     expect(s.key).toBe('record')
   })
 
+  it('넘기기만 하고 부서가 안 받았으면 다음 칸으로 안 넘어간다', () => {
+    // 배포 칸에 이렇게 적혀 있다 — "부서가 받았다고 눌러야 넘긴 것으로
+    // 칩니다. 그 전까지는 넘긴 것이 아닙니다." 그런데 라이브에서 주소만
+    // 만들었더니 안내가 곧장 "얼마나 줄었는지 세기"로 넘어갔다. 적어 둔
+    // 말과 실제 조건이 다르면 둘 중 하나는 거짓말이고, 여기서는 적어 둔
+    // 쪽이 옳다.
+    const ov = { byStage: { 배포: 1 }, tools: { awaitingAccept: 1 } }
+    expect(nextStep(ov).key).toBe('deploy')
+    // 이미 한 일을 또 하라고는 안 한다.
+    expect(nextStep(ov).label).toContain('기다리는 중')
+    expect(nextStep(ov).what).toContain('주소는 넘겼습니다')
+  })
+
+  it('부서가 받으면 그때 성과로 넘어간다', () => {
+    expect(nextStep({ byStage: { 배포: 1 }, tools: { awaitingAccept: 0 } }).key).toBe('result')
+  })
+
+  it('기다리는 건이 없으면 문구를 안 바꾼다', () => {
+    // 이 검사가 헛돌지 않는지 본다. 늘 바꾸면 넘기라는 말이 사라진다.
+    const s = nextStep({ byStage: { 사용법서: 1 }, tools: { awaitingAccept: 0 } })
+    expect(s.key).toBe('deploy')
+    expect(s.label).toBe('부서에 넘기기')
+  })
+
+  it('서버가 그 수를 안 보내도 터지지 않는다', () => {
+    expect(nextStep({ byStage: { 배포: 1 } }).key).toBe('result')
+    expect(nextStep({ byStage: { 배포: 1 }, tools: { awaitingAccept: null } }).key).toBe('result')
+  })
+
+  it('서버가 실제로 그 수를 내려보낸다', () => {
+    // 화면이 읽는 이름과 서버가 적는 이름이 어긋나면 늘 0이 되고, 조건은
+    // 조용히 예전대로 돌아간다.
+    const src = readFileSync(join(ROOT, 'functions', 'api', 'overview.js'), 'utf8')
+    expect(src).toContain('awaitingAccept:')
+    expect(src).toContain('!h.rolled_back_at && !h.accepted_at')
+  })
+
   it('칸마다 무엇이 필요한지를 미리 말한다', () => {
     // 눌러 봤다가 서버가 막으면 고장인 줄 안다.
     for (const step of [...TOUR_STEPS, TOUR_DONE]) {

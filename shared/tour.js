@@ -84,12 +84,25 @@ const STEPS = [
   {
     key: 'deploy',
     stage: '배포',
-    at: (s) => s.documented > 0 && s.handed === 0,
+    // 넘기기만 해서는 안 끝난다. 아래 shows 에 그렇게 적어 놓고 정작 넘기는
+    // 순간 다음 칸으로 넘어갔었다 — 라이브에서 주소만 만들었는데 안내가
+    // "얼마나 줄었는지 세기"로 바뀌었다. 적어 둔 쪽이 옳으니 조건을 맞춘다.
+    at: (s) => s.documented > 0 && (s.handed === 0 || s.awaitingAccept > 0),
     label: '부서에 넘기기',
     what: '주소를 만들어 넘깁니다.',
     need: '합격 기준을 통과하고 사용법서가 확정돼야만 넘어갑니다. 둘 중 하나라도 안 되면 막힙니다.',
     shows: '부서가 받았다고 눌러야 넘긴 것으로 칩니다. 그 전까지는 넘긴 것이 아닙니다.',
     where: '/deploy',
+    // 주소는 넘겼는데 부서가 아직 안 누른 상태. 같은 칸이지만 할 일이 다르다.
+    // "넘기기"라고 계속 떠 있으면 이미 한 일을 또 하라는 말이 된다.
+    instead: (s) =>
+      s.handed > 0 &&
+      s.awaitingAccept > 0 && {
+        label: '부서가 받았다고 누르기를 기다리는 중',
+        what: '주소는 넘겼습니다. 이제 부서가 그 도구 화면에서 "받았습니다"를 눌러야 합니다.',
+        need: '넘겼다는 말을 넘긴 쪽 말만 듣고 적지 않습니다. 받은 쪽이 눌러야 적습니다.',
+        shows: '아직이면 도구 주소를 부서에 다시 알려 주세요. 주소는 이 화면에 있습니다.',
+      },
   },
   {
     key: 'result',
@@ -146,10 +159,20 @@ export function passedCounts(byStage = {}) {
 // 자리가 아니다 — 그때는 "예시 넣기"가 맞는 말이다.
 export function nextStep(overview) {
   if (!overview?.byStage) return null
-  const s = passedCounts(overview.byStage)
+  // 단계 개수만으로는 모르는 것이 하나 있다 — 넘기긴 했는데 부서가 아직
+  // 안 받은 것. 신청서는 배포 단계에 있지만 배포가 끝난 것은 아니다.
+  const awaiting = overview.tools?.awaitingAccept
+  const s = {
+    ...passedCounts(overview.byStage),
+    awaitingAccept: awaiting == null || awaiting === '' ? 0 : Number(awaiting) || 0,
+  }
   if (s.total === 0) return null
   const step = STEPS.find((x) => x.at(s))
-  if (step) return { ...step, remaining: STEPS.length - STEPS.indexOf(step) }
+  if (step) {
+    // 같은 칸인데 할 일이 달라진 경우 문구만 바꿔 끼운다.
+    const swap = step.instead?.(s)
+    return { ...step, ...(swap || {}), remaining: STEPS.length - STEPS.indexOf(step) }
+  }
   // 전부 지났다.
   return { ...DONE, remaining: 0 }
 }
