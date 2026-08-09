@@ -620,3 +620,55 @@ describe('사용법서 할 일이 어느 건인지 알려주는가', () => {
     expect(page).toContain('targets[0].id')
   })
 })
+
+// 검토 화면으로 보내는 할 일 셋도 어느 건인지 짚어 준다.
+//
+// 셋 다 특정 신청서 한 건을 가리키는 것들이다 — 부서가 물어 온 것, 되물은
+// 것에 답이 온 것, 보류 조건이 풀렸다고 알려 온 것. 그런데 화면 주소만
+// 보내고 있었다. 검토 화면은 목록의 첫 건을 골라 놓으므로, 담당자는 늘
+// 엉뚱한 건 앞에 떨어져서 칩을 하나씩 눌러 찾아야 했다.
+describe('검토 할 일이 어느 건인지 알려주는가', () => {
+  it('항목마다 자기 목록을 쓴다', () => {
+    // 한 목록을 돌려쓰면 문제없는 건 앞으로 데려간다. 화면은 열리고 칩도
+    // 그려지니 눌러 보기 전엔 아무도 모른다.
+    const items = buildTodo({
+      overview: {
+        counts: { total: 9, stale: 0 },
+        deptAsked: 1,
+        deptAskedIds: ['app_ask'],
+        answered: 1,
+        answeredIds: ['app_ans'],
+        holdLiftWaiting: 1,
+        holdLiftedIds: ['app_lift'],
+      },
+    })
+    expect(items.find((i) => i.key === 'dept_asked').to).toBe('/review?id=app_ask')
+    expect(items.find((i) => i.key === 'answered_ready').to).toBe('/review?id=app_ans')
+    expect(items.find((i) => i.key === 'hold_lifted').to).toBe('/review?id=app_lift')
+  })
+
+  it('목록이 없으면 화면만 연다', () => {
+    const items = buildTodo({ overview: { counts: { total: 1 }, deptAsked: 1 } })
+    expect(items.find((i) => i.key === 'dept_asked').to).toBe('/review')
+  })
+
+  it('세는 것과 짚는 것이 같은 자리에서 나온다', () => {
+    // 따로 뽑으면 "3건"이라 해 놓고 두 개만 짚어 준다.
+    const src = readFileSync(join(ROOT, 'functions', 'api', 'overview.js'), 'utf8')
+    expect(src).toContain('answered: answeredWaiting.results.length')
+    expect(src).toContain('answeredIds: answeredWaiting.results.map')
+    expect(src).toContain('deptAsked: deptAsked.results.length')
+    expect(src).toContain('deptAskedIds: deptAsked.results.map')
+    // 보류 해제는 자바스크립트 쪽에서 세는데, 세는 그 반복문에서 같이 모은다.
+    const block = src.slice(src.indexOf('let holdLiftWaiting'), src.indexOf('// 하기로 해 놓고'))
+    expect(block).toContain('holdLiftWaiting += 1')
+    expect(block).toContain('holdLiftedIds.push')
+  })
+
+  it('받는 화면이 그 값을 읽는다', () => {
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ReviewPage.jsx'), 'utf8')
+    expect(page).toMatch(/params\.get\('id'\)/)
+    // 주소로 온 건이 지금 보이는 목록에 없으면 첫 건으로 떨어진다.
+    expect(page).toContain('visible[0].id')
+  })
+})

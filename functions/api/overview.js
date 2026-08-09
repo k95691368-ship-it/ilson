@@ -141,7 +141,7 @@ export async function onRequestGet({ env }) {
       // 담당자는 막혀서 되물었던 건인데, 풀린 것을 배지가 없어진 것으로
       // 알아채야 했다.
       env.DB.prepare(
-        `SELECT COUNT(*) AS n FROM application a
+        `SELECT a.id AS application_id FROM application a
          WHERE a.status IN ('접수', '검토중')
            AND EXISTS (
              SELECT 1 FROM decision_log ans
@@ -156,7 +156,7 @@ export async function onRequestGet({ env }) {
                    WHERE a2.link_kind = '답변' AND a2.link_id = q2.id
                 )
            )`
-      ).first(),
+      ).all(),
 
       // 부서가 먼저 물어 온 것 중 아직 답 안 한 것.
       //
@@ -164,13 +164,13 @@ export async function onRequestGet({ env }) {
       // 것 말고는 아무것도 못 한다. 담당자가 첫 화면에서 못 보면 그냥 잊힌다.
       // 물을 자리만 만들고 답할 자리를 안 만들면 물을 데가 없던 것보다 나쁘다.
       env.DB.prepare(
-        `SELECT COUNT(*) AS n FROM decision_log q
+        `SELECT DISTINCT q.application_id FROM decision_log q
          WHERE q.link_kind = '부서질문'
            AND NOT EXISTS (
              SELECT 1 FROM decision_log r
               WHERE r.link_kind = '담당자답' AND r.link_id = q.id
            )`
-      ).first(),
+      ).all(),
 
       // 요청받지 않았는데 먼저 꺼낸 것 — **전체**를 센다.
       //
@@ -192,9 +192,18 @@ export async function onRequestGet({ env }) {
       if (r.link_kind === HOLD_LIFT_CANCEL_KIND) liftOpen.delete(r.application_id)
       else liftOpen.set(r.application_id, r)
     }
+    // 세는 것으로 끝내지 않고 **어느 건인지**까지 모은다.
+    //
+    // 할 일 목록이 "N건"만 알려 주면, 담당자는 검토 화면에 와서 칩을 하나씩
+    // 눌러 그 건을 찾아야 한다. 못 찾으면 그 목록을 다음부터 안 읽는다.
+    // 세는 자리에서 같이 모아야 "3건"이라 해 놓고 두 개만 짚는 일이 없다.
     let holdLiftWaiting = 0
+    const holdLiftedIds = []
     for (const r of liftOpen.values()) {
-      if (!r.judged_at || String(r.judged_at) <= String(r.created_at)) holdLiftWaiting += 1
+      if (!r.judged_at || String(r.judged_at) <= String(r.created_at)) {
+        holdLiftWaiting += 1
+        holdLiftedIds.push(r.application_id)
+      }
     }
 
     // 하기로 해 놓고 아직 시작 안 한 것이 여럿인데 순서를 안 정한 상태.
@@ -313,6 +322,7 @@ export async function onRequestGet({ env }) {
       betaUnanswered: betaOpen?.n ?? 0,
       // 보류 조건이 풀렸다고 알려 왔는데 아직 다시 판정 안 한 것.
       holdLiftWaiting,
+      holdLiftedIds,
       // 이 숫자가 무엇 위에 서 있는가. 시연용으로 심은 것이 몇 건인지를
       // 첫 화면이 스스로 말해야 한다 — 지금은 /review 한 군데에만 적혀 있다.
       provenance: provenanceOf(items),
@@ -320,9 +330,13 @@ export async function onRequestGet({ env }) {
       //
       // 부서가 시간을 써서 답해 줬다. 그걸 놓치면 부서는 "답해 봐야
       // 소용없다"를 배운다.
-      answered: answeredWaiting?.n ?? 0,
+      // 세는 것과 **어느 건인지**를 같은 자리에서 낸다. 따로 뽑으면
+      // "3건"이라 해 놓고 두 개만 짚어 주게 된다.
+      answered: answeredWaiting.results.length,
+      answeredIds: answeredWaiting.results.map((r) => r.application_id),
       // 부서가 물어 놓고 답을 기다리는 것.
-      deptAsked: deptAsked?.n ?? 0,
+      deptAsked: deptAsked.results.length,
+      deptAskedIds: deptAsked.results.map((r) => r.application_id),
       // 하기로 해 놓고 순서를 안 정한 채 기다리는 것.
       waitingToStart,
       unranked: rankPressure.over ? waitingToStart : 0,

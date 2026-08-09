@@ -270,7 +270,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'dept_asked',
         title: `부서가 물어 놓고 답을 기다리는 것 ${deptAsked}건`,
         why: '부서에는 재촉할 길이 없습니다. 이 화면에서 못 보시면 그냥 잊힙니다. 짧게라도 답하면 그 자리에서 부서 화면에 뜹니다.',
-        to: '/review',
+        to: at('/review', overview?.deptAskedIds),
         cta: '무엇을 물었는지 보기',
       })
     )
@@ -284,7 +284,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'answered_ready',
         title: `되물은 것에 답이 온 신청서 ${answered}건`,
         why: '막고 있던 것이 없어졌습니다. 이제 판정하실 수 있습니다 — 부서는 답해 놓고 기다리고 있습니다.',
-        to: '/review',
+        to: at('/review', overview?.answeredIds),
         cta: '판정하기',
       })
     )
@@ -324,7 +324,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'hold_lifted',
         title: `보류 조건이 풀렸다고 알려 온 것 ${lifted}건`,
         why: '조건이 풀린 것은 부서만 압니다. 알려 왔는데 다시 판정하지 않으면, 그 부서는 다음부터 알리지 않습니다.',
-        to: '/review',
+        to: at('/review', overview?.holdLiftedIds),
         cta: '다시 판정하기',
       })
     )
