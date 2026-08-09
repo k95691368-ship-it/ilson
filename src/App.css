@@ -6443,3 +6443,50 @@ kbd {
   font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
+
+/* 부서가 알려 준 것과 그 뒤에 일어난 일.
+   안 고친 것이 위로 오도록 서버가 정렬해서 보낸다. 여기서는 그 순서를
+   흐트러뜨리지 않고, 아직 처리 중인 것만 눈에 걸리게 한다. */
+.myreports {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.myreports > li {
+  padding: 11px 13px;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.myreports > li.open {
+  border-color: var(--warning, var(--line));
+}
+
+.myreports-body {
+  margin: 6px 0 0;
+  color: var(--text-h);
+  font-size: 13.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.myreports-fix {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.myreports-open {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+}

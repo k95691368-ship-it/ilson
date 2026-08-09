@@ -390,3 +390,47 @@ describe('부서도 자기 도구의 성과를 보는가', () => {
     expect(page).toContain('{data.payoff && (')
   })
 })
+
+// 신고 왕복이 한쪽만 열려 있었다.
+//
+// 부서가 "이 결과 이상합니다"를 누르면 서버는 "담당자가 먼저 봅니다"라고
+// 답한다. 그리고 거기서 끝이었다. 자기가 낸 것도, 고쳐졌는지도, 무엇을
+// 고쳤는지도 다시 못 봤다.
+//
+// 그러면 부서는 한 번 신고하고 만다. 아무 일도 안 일어나는 것처럼 보이기
+// 때문이다. 그 뒤로는 숫자가 틀려도 그냥 손으로 고쳐 쓰고, 그 사실을
+// 아무도 모른다. 넘긴 뒤 들어오는 신고가 이 사이트에서 가장 값진 기록인데
+// 그 길을 스스로 막아 둔 셈이었다.
+describe('신고한 부서가 그 뒤를 보는가', () => {
+  const ROOT5 = fileURLToPath(new URL('..', import.meta.url))
+  const route = readFileSync(join(ROOT5, 'functions', 'api', 'tools', '[slug].js'), 'utf8')
+  const page = readFileSync(join(ROOT5, 'src', 'pages', 'ToolPage.jsx'), 'utf8')
+
+  it('부서 화면이 자기 신고를 받는다', () => {
+    expect(route).toContain('reports: toReports(reportRows.results)')
+    // 처리 기록도 같이 읽어야 고쳤는지 알 수 있다.
+    expect(route).toContain('REPORT_KIND, REPORT_FIX')
+  })
+
+  it('담당자 화면과 같은 함수로 만든다', () => {
+    // 두 벌로 만들면 "고쳤다"의 뜻이 갈라진다.
+    expect(route).toContain('toReports(')
+    const staff = readFileSync(join(ROOT5, 'functions', 'api', 'reports.js'), 'utf8')
+    expect(staff).toContain('toReports(')
+  })
+
+  it('무엇을 고쳤는지까지 보여 준다', () => {
+    // "처리 완료" 한 줄로는 같은 일이 또 나는지 부서가 판단할 수 없다.
+    expect(page).toContain('고쳤습니다')
+    expect(page).toContain('r.fix.how')
+  })
+
+  it('아직 안 고친 것은 그렇다고 말한다', () => {
+    // 조용히 비워 두면 신고가 사라진 것으로 읽힌다.
+    expect(page).toContain('담당자 할 일 목록에 올라가 있습니다')
+  })
+
+  it('신고가 없으면 빈 칸을 안 만든다', () => {
+    expect(page).toContain('{data.reports?.length > 0 &&')
+  })
+})

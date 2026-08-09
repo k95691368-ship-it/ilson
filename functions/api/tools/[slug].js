@@ -10,6 +10,7 @@ import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { checkRateLimit, remainingQuota } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { computeOutcome, buildChallenges, labelForOutcome } from '../../../shared/outcome.js'
+import { toReports, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
 
 const DAY_SECONDS = 86400
 
@@ -44,7 +45,7 @@ export async function onRequestGet({ env, params, request }) {
   const bucket = `tool:${h.slug}:${ip}`
 
   try {
-    const [remaining, manual, recent, aliases, nextFree, baseline, saved] = await Promise.all([
+    const [remaining, manual, recent, aliases, nextFree, baseline, saved, reportRows] = await Promise.all([
       remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS),
       env.DB.prepare(
         'SELECT title, intro, when_to_run, what_to_do_after, contact FROM manual WHERE application_id = ?'
@@ -91,6 +92,25 @@ export async function onRequestGet({ env, params, request }) {
       )
         .bind(h.application_id)
         .first(),
+
+      // 이 부서가 낸 신고와 그 처리.
+      //
+      // 부서가 "이 결과 이상합니다"를 누르면 서버는 "담당자가 먼저 봅니다"
+      // 라고 답한다. 그리고 거기서 끝이었다. 자기가 낸 것도, 고쳐졌는지도,
+      // 무엇을 고쳤는지도 다시 못 봤다.
+      //
+      // 그러면 부서는 한 번 신고하고 만다. 아무 일도 안 일어나는 것처럼
+      // 보이기 때문이다. 그 뒤로는 숫자가 틀려도 그냥 손으로 고쳐 쓴다 —
+      // 그리고 그 사실을 아무도 모른다. 넘긴 뒤 들어오는 신고가 이 사이트에서
+      // 가장 값진 기록인데, 그 길을 스스로 막아 둔 셈이다.
+      env.DB.prepare(
+        `SELECT id, link_kind, link_id, title, what, why, created_at
+         FROM decision_log
+         WHERE application_id = ? AND link_kind IN (?, ?)
+         ORDER BY created_at`
+      )
+        .bind(h.application_id, REPORT_KIND, REPORT_FIX)
+        .all(),
     ])
 
     // 이 도구가 부서에게 무엇을 돌려줬나.
@@ -159,6 +179,8 @@ export async function onRequestGet({ env, params, request }) {
         nextFreeAt: remaining > 0 ? null : (nextFree?.next_free ?? null),
       },
       payoff,
+      // 부서가 낸 신고와 그 처리. 담당자 화면과 **같은 함수**로 만든다.
+      reports: toReports(reportRows.results),
       manual: manual ?? null,
       note: h.note,
       recent: recent.results,

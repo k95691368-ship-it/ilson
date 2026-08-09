@@ -431,7 +431,62 @@ export default function ToolPage() {
           만들 때 놓친 것은 만든 사람이 못 찾는다 — 매일 그 일을 하는
           사람만 찾는다. */}
       <ReportForm slug={slug} />
+
+      {/* 앞서 알려 주신 것이 어떻게 됐는지.
+          부서가 신고를 누르면 서버는 "담당자가 먼저 봅니다"라고 답하고
+          거기서 끝이었다. 자기가 낸 것도, 고쳐졌는지도, 무엇을 고쳤는지도
+          다시 못 봤다.
+          그러면 부서는 한 번 신고하고 만다. 아무 일도 안 일어나는 것처럼
+          보이기 때문이다. 그 뒤로는 숫자가 틀려도 그냥 손으로 고쳐 쓰고,
+          그 사실을 아무도 모른다. */}
+      {data.reports?.length > 0 && <MyReports reports={data.reports} />}
     </div>
+  )
+}
+
+// 이 부서가 알려 준 것과 그 뒤에 일어난 일.
+function MyReports({ reports }) {
+  const open = reports.filter((r) => r.open)
+  return (
+    <section className="card">
+      <div className="card-head">
+        <span className="card-title">알려 주신 것 {reports.length}건</span>
+        {open.length > 0 ? (
+          <span className="badge badge-warning">아직 {open.length}건 처리 중</span>
+        ) : (
+          <span className="badge badge-success">전부 고쳤습니다</span>
+        )}
+      </div>
+      <ul className="myreports">
+        {reports.map((r) => (
+          <li key={r.id} className={r.open ? 'open' : ''}>
+            <div className="row">
+              <span className={`badge ${r.urgent ? 'badge-danger' : 'badge-neutral'}`}>
+                {r.label}
+              </span>
+              <span className="spacer" />
+              <span className="card-note">
+                {r.reporter} · {ago(r.at)}
+              </span>
+            </div>
+            <p className="myreports-body">{r.body}</p>
+            {/* 고쳤으면 무엇을 고쳤는지까지 적는다. "처리 완료" 한 줄로는
+                같은 일이 또 나는지 부서가 판단할 수 없다. */}
+            {r.fix ? (
+              <div className="myreports-fix">
+                <strong>고쳤습니다 · {ago(r.fix.at)}</strong>
+                <span>{r.fix.how}</span>
+                {r.fix.why && <span className="card-note">{r.fix.why}</span>}
+              </div>
+            ) : (
+              <div className="myreports-open card-note">
+                담당자 할 일 목록에 올라가 있습니다. 고치면 이 자리에 무엇을 고쳤는지 뜹니다.
+              </div>
+            )}
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 
