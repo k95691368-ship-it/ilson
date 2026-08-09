@@ -6532,3 +6532,20 @@ kbd {
   color: var(--text-h);
   margin-right: 5px;
 }
+
+/* 돌리기 전에 읽어야 하는 신고.
+   맨 아래 목록에만 있으면 월요일 아침에 정산 돌리러 온 사람은 못 본다. */
+.trust-open {
+  list-style: none;
+  margin: 8px 0 10px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.trust-open > li {
+  padding-left: 11px;
+  border-left: 2px solid currentColor;
+  line-height: 1.55;
+}

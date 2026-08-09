@@ -176,6 +176,47 @@ export default function ToolPage() {
         )}
       </header>
 
+      {/* 지금 이 도구를 믿을 수 있나.
+          신고를 받으면 서버가 "결과를 믿을 수 없는 종류라 이 도구에 표시가
+          붙습니다"라고 답한다. 그 표시가 담당자 목록에만 붙고 정작 이 화면에는
+          없었다. 월요일 아침에 정산을 돌리러 온 사람은 지난주에 옆자리가
+          "12,400원 많게 나온다"를 신고해 둔 것을 모른 채 돌리고, 틀린 줄
+          아는 숫자를 재무 폴더에 올린다.
+          도는 것과 맞는 것은 다르다. 그러니 돌리기 전에 말한다. */}
+      {data.trust?.urgent > 0 && (
+        <div className="notice notice-danger">
+          <div className="notice-title">
+            지금 이 도구의 결과를 그대로 쓰시면 안 됩니다 — 숫자가 안 맞는다는 신고 {data.trust.urgent}건이
+            아직 안 고쳐졌습니다
+          </div>
+          <ul className="trust-open">
+            {data.reports
+              .filter((r) => r.open && r.urgent)
+              .map((r) => (
+                <li key={r.id}>
+                  <strong>{r.label}</strong> — {r.body}
+                  <span className="card-note"> · {r.reporter}, {ago(r.at)}</span>
+                </li>
+              ))}
+          </ul>
+          <p className="card-note">
+            돌리실 수는 있습니다. 다만 나온 숫자를 위에 보고하기 전에 이 대목만 손으로 확인해
+            주세요. 고쳐지면 아래 &lsquo;알려 주신 것&rsquo;에 무엇을 고쳤는지 함께 뜹니다.
+          </p>
+        </div>
+      )}
+
+      {/* 불편하다는 신고만 있으면 숫자는 믿어도 된다. 같은 색으로 겁주면
+          정작 숫자가 틀렸을 때 안 읽힌다. */}
+      {data.trust?.urgent === 0 && data.trust?.open > 0 && (
+        <div className="notice notice-warn">
+          <div className="notice-title">
+            쓰기 불편하다는 신고 {data.trust.open}건이 아직 처리 중입니다
+          </div>
+          <p className="card-note">숫자가 틀린다는 신고는 아닙니다. 결과는 그대로 쓰셔도 됩니다.</p>
+        </div>
+      )}
+
       {/* 내려갔다가 고쳐서 다시 올라온 도구.
           서버는 복구할 때 "부서 도구 화면에 무엇을 고쳤는지 함께 뜹니다"라고
           답해 놓고, 이 화면은 그 기록을 안 읽었다. 부서 쪽에서 보면 틀린

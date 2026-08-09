@@ -10,7 +10,7 @@ import { jsonResponse, jsonError } from '../../_lib/http.js'
 import { checkRateLimit, remainingQuota } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { computeOutcome, buildChallenges, labelForOutcome } from '../../../shared/outcome.js'
-import { toReports, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
+import { toReports, trustLevel, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
 import { RESTORE_KIND, lastRestore } from '../../../shared/rollback.js'
 
 const DAY_SECONDS = 86400
@@ -128,6 +128,10 @@ export async function onRequestGet({ env, params, request }) {
     // 딱지도 같이 준다. 미해소 반박이 남아 있으면 '보수적 추정'이다.
     // 숫자만 던져 놓으면 부서는 그걸 확정으로 읽고 위에 보고한다 —
     // 담당자 화면은 같은 값을 잠정이라고 부르고 있는데.
+    // 신고와 그 처리. 아래에서 두 번 쓴다 — 목록으로도, 믿을 수 있나
+    // 판단으로도. 두 번 만들면 한쪽만 걸러 놓는 날이 온다.
+    const reports = toReports(reportRows.results.filter((r) => r.link_kind !== RESTORE_KIND))
+
     let payoff = null
     if (baseline && recent.results.length > 0) {
       const computed = computeOutcome({
@@ -188,7 +192,21 @@ export async function onRequestGet({ env, params, request }) {
       payoff,
       // 부서가 낸 신고와 그 처리. 담당자 화면과 **같은 함수**로 만든다.
       // 다시올림은 신고가 아니므로 빼고 넘긴다.
-      reports: toReports(reportRows.results.filter((r) => r.link_kind !== RESTORE_KIND)),
+      reports,
+      // 이 도구를 지금 믿을 수 있나.
+      //
+      // 신고를 받으면 서버가 이렇게 답한다 — "결과를 믿을 수 없는 종류라
+      // **이 도구에 표시가 붙습니다.**" 그 표시가 담당자용 목록(/tools)에만
+      // 붙었다. 정작 그 도구를 매주 여는 부서 화면에는 없었다.
+      //
+      // 부서 쪽에서 보면 이렇다. 월요일 아침에 정산을 돌리러 이 화면을
+      // 연다. 지난주에 옆자리가 "반품 있는 주에 12,400원 많게 나온다"를
+      // 신고해 뒀고 아직 안 고쳐졌다. 그런데 화면 위쪽은 절감 시간과
+      // 사용법뿐이고, 그 신고는 한참 아래에 있다. 그대로 돌려서 틀린 줄
+      // 아는 숫자를 재무 폴더에 올린다.
+      //
+      // 도는 것과 맞는 것은 다르다. 담당자 목록과 **같은 함수**로 낸다.
+      trust: trustLevel(reports),
       // 내려갔다가 고쳐서 다시 올라온 적이 있는가.
       restored: lastRestore(reportRows.results),
       manual: manual ?? null,

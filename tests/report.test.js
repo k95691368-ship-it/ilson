@@ -407,9 +407,12 @@ describe('신고한 부서가 그 뒤를 보는가', () => {
   const page = readFileSync(join(ROOT5, 'src', 'pages', 'ToolPage.jsx'), 'utf8')
 
   it('부서 화면이 자기 신고를 받는다', () => {
-    // 같은 쿼리로 다시올림 기록까지 뽑게 되면서 거르는 줄이 붙었다. 문장을
-    // 통째로 맞춰 보면 그때마다 깨지므로 어디서 뽑는지만 확인한다.
-    expect(route).toMatch(/reports: toReports\(reportRows\.results/)
+    // 이 줄은 두 번 모양이 바뀌었다. 다시올림 기록을 같은 쿼리로 뽑게
+    // 되면서 거르는 줄이 붙었고, 믿을 수 있나 판단에도 같은 목록을 쓰게
+    // 되면서 변수로 빠졌다. 문장을 통째로 맞춰 보면 그때마다 깨지므로
+    // **뜻만** 확인한다 — 뽑은 줄로 목록을 만들어 응답에 넣는가.
+    expect(route).toMatch(/toReports\(reportRows\.results/)
+    expect(route).toMatch(/^\s*reports,?$/m)
     // 처리 기록도 같이 읽어야 고쳤는지 알 수 있다.
     expect(route).toContain('REPORT_KIND, REPORT_FIX')
   })
