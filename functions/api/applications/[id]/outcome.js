@@ -185,6 +185,34 @@ export async function onRequestPost({ env, params, request }) {
     // 다만 대신 눌렀다고 적는다 — 부서가 직접 누르는 자리는
     // functions/api/track/[ticket]/outcome.js 다.
     if (body.kind === 'dept_confirm') {
+      // 확인할 숫자가 있어야 확인이다.
+      //
+      // 부서가 직접 누르는 쪽(track/[ticket]/outcome.js)은 이미 실행 기록과
+      // 기준선이 둘 다 있어야 버튼을 내준다. 이쪽에는 그 조건이 없었다.
+      // 성과 화면도 산정불가면 확인 자리를 안 그리지만, 서버가 안 막으니
+      // **한 번도 안 돌린 도구가 "부서가 성과를 확인함"으로 기록되고 신청서가
+      // 성과 단계로 넘어갔다.** 라이브에서 그렇게 됐다. 이 사이트가 하지
+      // 않겠다고 적어 둔 것이 바로 이것이다.
+      const [runs, baseline] = await Promise.all([
+        // 부서 쪽 화면이 세는 것과 같은 문장이다. 다르게 세면 한쪽에서는
+        // 누를 수 있고 다른 쪽에서는 못 누르는 일이 생긴다.
+        env.DB.prepare('SELECT COUNT(*) AS n FROM tool_use WHERE application_id = ?')
+          .bind(app.id)
+          .first(),
+        // baseline 은 application_id 가 기본키다. id 컬럼은 없다.
+        env.DB.prepare('SELECT application_id FROM baseline WHERE application_id = ?')
+          .bind(app.id)
+          .first(),
+      ])
+      const blockers = []
+      if (!baseline) blockers.push('기준선이 봉인돼 있지 않습니다. 견줄 값이 없습니다.')
+      if ((runs?.n ?? 0) === 0) {
+        blockers.push('도구가 아직 한 번도 안 돌았습니다. 쓰이기 전에는 줄어든 것이 없습니다.')
+      }
+      if (blockers.length > 0) {
+        return jsonResponse({ error: '아직 확인할 숫자가 없습니다.', blockers }, 400)
+      }
+
       await env.DB.prepare(
         `INSERT INTO outcome (application_id, dept_confirmed_at, dept_confirmed_by, dept_comment)
          VALUES (?, datetime('now'), ?, ?)
