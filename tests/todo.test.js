@@ -672,3 +672,64 @@ describe('검토 할 일이 어느 건인지 알려주는가', () => {
     expect(page).toContain('visible[0].id')
   })
 })
+
+// 남은 할 일 링크 셋도 어느 건인지 짚어 준다.
+//
+// 성과에 이의가 달린 것, 시험판 의견에 답을 안 한 것, 받았다는 확인이 없는
+// 도구 — 셋 다 특정 건을 가리키는데 화면 주소만 보내고 있었다.
+describe('나머지 할 일도 어느 건인지 알려주는가', () => {
+  it('항목마다 자기 목록을 쓴다', () => {
+    const items = buildTodo({
+      overview: {
+        counts: { total: 5 },
+        deptDisagrees: 1,
+        deptDisagreesIds: ['app_dis'],
+        betaUnanswered: 1,
+        betaUnansweredIds: ['app_beta'],
+      },
+      tools: { summary: { unconfirmed: 1, unconfirmedIds: ['app_unc'] } },
+    })
+    expect(items.find((i) => i.key === 'dept_disagrees').to).toBe('/result?id=app_dis')
+    expect(items.find((i) => i.key === 'beta_unanswered').to).toBe('/beta?id=app_beta')
+    expect(items.find((i) => i.key === 'unconfirmed_handover').to).toBe('/tools?id=app_unc')
+  })
+
+  it('목록 전체를 뜻하는 것은 그대로 둔다', () => {
+    // 순서를 정하는 일, 막힌 곳을 훑는 일은 한 건을 짚는 것이 아니다.
+    // 억지로 첫 건을 골라 주면 오히려 나머지를 못 보게 된다.
+    const src = readFileSync(join(ROOT, 'shared', 'todo.js'), 'utf8')
+    expect(src).toContain("to: '/priority'")
+    expect(src).toContain("to: '/stall'")
+    expect(src).toContain("to: '/codes'")
+  })
+
+  it('받는 화면 셋이 그 값을 읽는다', () => {
+    for (const f of ['ResultPage.jsx', 'BetaPage.jsx', 'ToolsPage.jsx']) {
+      const page = readFileSync(join(ROOT, 'src', 'pages', f), 'utf8')
+      expect(page, f).toMatch(/params\.get\('id'\)/)
+    }
+  })
+})
+
+// 아무도 안 읽는 쿼리를 신청서 열 때마다 돌리고 있었다.
+describe('죽은 쿼리를 안 돌리는가', () => {
+  it('siblings 를 더 안 뽑는다', () => {
+    // "같은 부서이거나 접수 상태인 것 최근 12건"을 뽑아 내려보냈는데 검토
+    // 화면은 한 번도 안 읽었다. 대신 이미 받아 둔 목록에 findSimilar 를
+    // 돌린다 — 글의 겹침으로 점수를 매기니 부서만 같고 상관없는 건을
+    // 안 올린다. 그쪽이 낫다.
+    const src = readFileSync(
+      join(ROOT, 'functions', 'api', 'applications', '[id]', 'index.js'),
+      'utf8'
+    )
+    expect(src).not.toMatch(/siblings:/)
+    expect(src).not.toMatch(/const \[review, decisions, siblings\]/)
+  })
+
+  it('쓰는 쪽은 그대로 있다', () => {
+    // 지운 것을 대신하던 길이 실제로 살아 있어야 한다. 둘 다 없어지면
+    // 담당자는 중복 신청을 못 알아챈다.
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ReviewPage.jsx'), 'utf8')
+    expect(page).toContain('findSimilar')
+  })
+})

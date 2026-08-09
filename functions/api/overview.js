@@ -107,8 +107,8 @@ export async function onRequestGet({ env }) {
 
       // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
       env.DB.prepare(
-        `SELECT COUNT(*) AS n FROM beta_feedback WHERE resolved_at IS NULL`
-      ).first(),
+        `SELECT DISTINCT application_id FROM beta_feedback WHERE resolved_at IS NULL`
+      ).all(),
 
       // 보류해 둔 것의 조건이 풀렸다고 부서가 알려 온 것.
       //
@@ -318,8 +318,10 @@ export async function onRequestGet({ env }) {
       // 부서가 "그 숫자는 체감과 다릅니다"라고 한 건. 이게 살아 있는 동안
       // 그 금액은 보수적 추정으로 내려가 있다.
       deptDisagrees: disagreed.size,
+      deptDisagreesIds: [...disagreed],
       // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
-      betaUnanswered: betaOpen?.n ?? 0,
+      betaUnanswered: betaOpen.results.length,
+      betaUnansweredIds: betaOpen.results.map((r) => r.application_id),
       // 보류 조건이 풀렸다고 알려 왔는데 아직 다시 판정 안 한 것.
       holdLiftWaiting,
       holdLiftedIds,

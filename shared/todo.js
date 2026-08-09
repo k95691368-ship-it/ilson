@@ -78,7 +78,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'dept_disagrees',
         title: `부서가 "그렇게 안 걸린다"고 한 성과 ${disagreed}건`,
         why: '저희가 잰 값 위에서 절감액을 계산했는데 부서는 다르다고 했습니다. 다시 재기 전까지 그 금액은 보수적 추정입니다.',
-        to: '/result',
+        to: at('/result', overview?.deptDisagreesIds),
         cta: '얼마나 다른지 보기',
       })
     )
@@ -342,7 +342,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'beta_unanswered',
         title: `시험판 써 보고 적어 주신 것 ${betaOpen}건에 아직 답을 안 하셨습니다`,
         why: '부서가 자기 시간을 써서 적어 준 것입니다. 답이 없으면 다음 시험판에는 아무도 안 적어 줍니다.',
-        to: '/beta',
+        to: at('/beta', overview?.betaUnansweredIds),
         cta: '읽고 답하기',
       })
     )
@@ -371,7 +371,7 @@ export function buildTodo({ overview, reports, codes, tools, stalls, joins, sign
         key: 'unconfirmed_handover',
         title: `받았다는 확인이 없는 도구 ${unconfirmed}개`,
         why: '넘겼다고 받은 것이 아닙니다. 확인이 없으면 나중에 "그런 거 받은 적 없다"가 됩니다.',
-        to: '/tools',
+        to: at('/tools', tools?.summary?.unconfirmedIds),
         cta: '확인 요청하기',
       })
     )

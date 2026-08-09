@@ -19,7 +19,13 @@ export async function onRequestGet({ env, params }) {
 
     if (!application) return jsonError('그런 신청서가 없습니다.', 404)
 
-    const [review, decisions, siblings] = await Promise.all([
+    // siblings 를 여기서 함께 뽑았었다. "같은 부서이거나 접수 상태인 것
+    // 최근 12건"인데, 검토 화면은 그걸 한 번도 안 읽었다. 대신 이미 받아 둔
+    // 목록 전체에 shared/similar.js 의 findSimilar 를 돌린다 — 글의 겹침으로
+    // 점수를 매기니 부서만 같고 상관없는 건을 안 올린다. 그쪽이 낫다.
+    //
+    // 아무도 안 읽는 쿼리를 신청서 열 때마다 돌리고 있었다. 지운다.
+    const [review, decisions] = await Promise.all([
       env.DB.prepare(`SELECT * FROM review WHERE application_id = ?`)
         .bind(application.id)
         .first(),
@@ -41,16 +47,6 @@ export async function onRequestGet({ env, params }) {
         .bind(application.id)
         .all(),
 
-      // 같은 부서의 다른 신청서. 검토할 때 "이거 아까 그거랑 같은 거 아닌가"를
-      // 담당자가 직접 확인할 수 있어야 한다.
-      env.DB.prepare(
-        `SELECT a.id, a.ticket_no, a.title, a.dept, a.status
-         FROM application a
-         WHERE a.id <> ? AND (a.dept = ? OR a.status = '접수')
-         ORDER BY a.created_at DESC LIMIT 12`
-      )
-        .bind(application.id, application.dept)
-        .all(),
     ])
 
     return jsonResponse({
@@ -60,7 +56,6 @@ export async function onRequestGet({ env, params }) {
       },
       review: review ?? null,
       decisions: decisions.results,
-      siblings: siblings.results,
     })
   } catch (err) {
     return jsonError(`신청서를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

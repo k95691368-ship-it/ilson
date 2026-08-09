@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -7,6 +8,10 @@ import { krw, num, duration, ago } from '../lib/format.js'
 
 export default function ResultPage() {
   const { data: list } = useApi('/applications')
+  // 할 일이 "어느 건이요"까지 실어 보낸다. 없으면 늘 첫 건 앞에 떨어지고,
+  // 담당자는 칩을 하나씩 눌러 그 건을 찾아야 한다.
+  const [params] = useSearchParams()
+  const wanted = params.get('id')
   const [selectedId, setSelectedId] = useState(null)
 
   const targets = useMemo(
@@ -15,8 +20,12 @@ export default function ResultPage() {
   )
 
   useEffect(() => {
-    if (!selectedId && targets.length > 0) setSelectedId(targets[0].id)
-  }, [targets, selectedId])
+    if (selectedId || targets.length === 0) return
+    // 주소로 온 건이 목록에 없으면(이미 처리했거나 상태가 바뀌었으면)
+    // 첫 건으로 떨어진다 — 빈 화면을 보여 주는 것보다 낫다.
+    const found = wanted && targets.find((a) => a.id === wanted)
+    setSelectedId(found ? found.id : targets[0].id)
+  }, [targets, selectedId, wanted])
 
   return (
     <div className="stack">

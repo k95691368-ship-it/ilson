@@ -134,11 +134,18 @@ describe('shared/todo.js 가 가리키는 곳', () => {
     // 할 일 목록의 to: 는 담당자가 실제로 누르는 자리다. 없는 주소를 가리키면
     // 눌러도 "찾을 수 없는 화면"이 뜬다 — 할 일은 남아 있는데 갈 데가 없다.
     const todo = readFileSync(join(ROOT, 'shared', 'todo.js'), 'utf8')
-    const targets = [...todo.matchAll(/to:\s*'([^']+)'/g)]
-      .map((m) => m[1])
+    // 두 가지 모양이 있다 — 화면만 여는 `to: '/x'` 와, 어느 건인지까지
+    // 짚어 주는 `to: at('/x', ids)`. 앞엣것만 읽으면 짚어 주도록 고친 항목이
+    // 검사에서 조용히 빠진다. 실제로 그랬다 — 링크를 고칠수록 검사가 보는
+    // 것이 줄었다.
+    const targets = [
+      ...[...todo.matchAll(/to:\s*'([^']+)'/g)].map((m) => m[1]),
+      ...[...todo.matchAll(/to:\s*at\('([^']+)'/g)].map((m) => m[1]),
+    ]
       .map((t) => t.split('?')[0])
       .filter((t) => t.startsWith('/'))
-    expect(targets.length).toBeGreaterThan(5)
+    // 항목이 스무 개 남짓이다. 열 개도 못 읽으면 정규식이 어긋난 것이다.
+    expect(targets.length).toBeGreaterThan(15)
     const all = routes()
     const bad = [...new Set(targets)].filter(
       (t) => !all.includes(t) && !all.some((r) => r.includes(':') && t.startsWith(r.split(':')[0]))

@@ -225,6 +225,9 @@ export async function onRequestGet({ env }) {
         .filter((i) => rollbackState({ handover: i }).stale)
         .map((i) => i.application_id),
       unclearIds,
+      unconfirmedIds: items
+        .filter((i) => !i.accepted_at && !i.rolled_back_at)
+        .map((i) => i.application_id),
       noManualIds: items
         .filter((i) => !i.manual_published_at && !i.rolled_back_at)
         .map((i) => i.application_id),
