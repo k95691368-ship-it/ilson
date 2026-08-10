@@ -17,7 +17,9 @@
 .app-main {
   flex: 1;
   width: 100%;
-  max-width: 1180px;
+  /* 1180px 이었다. 이 사이트는 대부분 읽는 화면인데 그 폭에 글을 채우면
+     한 줄이 너무 길어서 눈이 다음 줄 첫 글자를 못 찾는다. */
+  max-width: 1060px;
   margin: 0 auto;
   padding: 34px 22px 96px;
 }
@@ -54,7 +56,7 @@
   align-items: baseline;
   gap: 9px;
   font-weight: 800;
-  font-size: 17px;
+  font-size: 18px;
   letter-spacing: -0.03em;
   color: var(--text-h);
   text-decoration: none;
@@ -72,13 +74,13 @@
   border-radius: 9px;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 800;
   transform: translateY(3px);
 }
 
 .topbar-brand-sub {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
   letter-spacing: -0.01em;
@@ -100,7 +102,7 @@
   gap: 6px;
   padding: 7px 11px;
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text);
   text-decoration: none;
@@ -111,24 +113,12 @@
 /* 목차가 여덟 개다. 번호가 있어야 "몇 번째 단계인지"가 즉시 읽히고,
    순서가 있는 과정이라는 것이 이름만 늘어놓는 것보다 잘 전달된다. */
 .topbar-link-no {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 17px;
-  height: 17px;
-  flex: none;
-  border-radius: 5px;
-  background: var(--surface);
   color: var(--text-muted);
-  font-size: 10.5px;
-  font-weight: 800;
-}
-.topbar-link:hover .topbar-link-no {
-  background: var(--bg);
+  font-size: 12.5px;
+  font-weight: 700;
 }
 .topbar-link.active .topbar-link-no {
-  background: var(--accent);
-  color: var(--on-accent);
+  color: var(--accent);
 }
 .topbar-link:hover {
   background: var(--surface);
@@ -145,6 +135,14 @@
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 제목 옆 부제는 1200px 아래부터 숨긴다. 첫 화면 큰 제목 아래에 같은
+   말이 이미 있어서, 목차 줄에서까지 자리를 차지할 이유가 없다. */
+@media (max-width: 1200px) {
+  .topbar-brand-sub {
+    display: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -171,12 +169,12 @@
   border-top: 1px solid var(--border);
   background: var(--social-bg);
   padding: 36px 22px 24px;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-muted);
 }
 
 .footer-grid {
-  max-width: 1180px;
+  max-width: 1060px;
   margin: 0 auto;
   display: grid;
   /* 네 번째 칸(가로로 훑어보기)이 늘어나면서 앞의 글이 눌리지 않게 한다. */
@@ -215,7 +213,7 @@
   margin-left: -8px;
   border-radius: 8px;
   color: var(--text-h);
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   text-decoration: none;
   transition: background 0.14s ease;
@@ -227,14 +225,14 @@
 }
 
 .footer-link-note {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 400;
   color: var(--text-muted);
   line-height: 1.35;
 }
 
 .footer-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
   margin-bottom: 7px;
@@ -253,7 +251,7 @@
   justify-content: space-between;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 .footer-link {
@@ -268,7 +266,7 @@
 
 .page-eyebrow {
   display: inline-block;
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 700;
   letter-spacing: 0.02em;
   color: var(--accent);
@@ -277,7 +275,7 @@
 
 .page-sub {
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 16px;
   /* 74ch 였다. 한글은 글자 폭이 넓어 같은 ch 라도 훨씬 길게 간다. */
   max-width: 62ch;
   line-height: 1.7;
@@ -316,14 +314,14 @@ p.card-note,
 }
 
 .card-title {
-  font-size: 16.5px;
+  font-size: 17.5px;
   font-weight: 700;
   color: var(--text-h);
   letter-spacing: -0.016em;
 }
 
 .card-note {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-muted);
 }
 
@@ -411,7 +409,7 @@ p.card-note,
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   letter-spacing: 0.01em;
   margin-bottom: 6px;
@@ -425,7 +423,7 @@ p.card-note,
 
 .item-body {
   color: var(--text-h);
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.55;
 }
 
@@ -433,7 +431,7 @@ p.card-note,
   margin-top: 7px;
   padding-left: 10px;
   border-left: 2px solid var(--border);
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-muted);
   font-style: normal;
 }
@@ -468,7 +466,7 @@ p.card-note,
   border-radius: 14px;
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 21px;
+  font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.03em;
 }
@@ -493,19 +491,19 @@ p.card-note,
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
 .stage-owner-label {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--text-muted);
   letter-spacing: 0;
 }
 
 .stage-nav-link {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-muted);
   padding: 5px 11px;
@@ -528,7 +526,7 @@ p.card-note,
   padding: 20px 22px;
 }
 .planned-title {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 700;
   color: var(--text-muted);
   margin-bottom: 12px;
@@ -545,7 +543,7 @@ p.card-note,
 .planned-list li {
   position: relative;
   padding-left: 20px;
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.6;
   color: var(--text);
 }
@@ -599,7 +597,7 @@ p.card-note,
   border-radius: 10px;
   background: var(--accent-bg);
   color: var(--accent);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 800;
 }
 
@@ -611,18 +609,18 @@ p.card-note,
   gap: 2px;
 }
 .flow-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 700;
   color: var(--text-h);
   letter-spacing: -0.018em;
 }
 .flow-owner {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--accent);
 }
 .flow-summary {
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--text-muted);
   margin-top: 3px;
@@ -631,7 +629,7 @@ p.card-note,
 .flow-go {
   flex: none;
   color: var(--text-muted);
-  font-size: 18px;
+  font-size: 19px;
   align-self: center;
 }
 
@@ -645,7 +643,7 @@ p.card-note,
 
 .field-label {
   display: block;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
   margin-bottom: 6px;
@@ -656,7 +654,7 @@ p.card-note,
 /* 도움말은 라벨 옆에 둔다. 입력칸 아래에 두면 다 적은 뒤에야 읽게 된다. */
 .field-hint {
   margin-left: 8px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-muted);
 }
@@ -686,13 +684,13 @@ p.card-note,
   min-height: 0;
 }
 .field-error {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--danger-text);
 }
 .field-count {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
   font-variant-numeric: tabular-nums;
 }
@@ -732,7 +730,7 @@ p.card-note,
 }
 .peek-name {
   color: var(--text-h);
-  font-size: 13.5px;
+  font-size: 15px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -740,13 +738,13 @@ p.card-note,
 }
 .peek-note {
   margin: 8px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.55;
   color: var(--warning-text);
 }
 .peek-meta {
   margin-top: 8px;
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 .peek-table {
@@ -756,7 +754,7 @@ p.card-note,
 }
 .peek-table .data-table {
   min-width: 0;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .peek-table .data-table th,
 .peek-table .data-table td {
@@ -789,14 +787,14 @@ p.card-note,
   font-weight: 800;
 }
 .receipt-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--text-h);
   letter-spacing: -0.02em;
   margin-bottom: 4px;
 }
 .receipt-body {
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.65;
   color: var(--text-h);
   margin: 0 0 4px;
@@ -824,7 +822,7 @@ p.card-note,
   margin-bottom: 6px;
 }
 .app-item-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
   line-height: 1.45;
@@ -902,7 +900,7 @@ p.card-note,
 }
 .review-list-title {
   display: block;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
   line-height: 1.45;
@@ -910,7 +908,7 @@ p.card-note,
 }
 .review-list-meta {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 
@@ -937,7 +935,7 @@ p.card-note,
   border-radius: var(--radius-sm);
   background: var(--warning-bg);
   border: 1px solid var(--warning-border);
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
   display: flex;
   flex-direction: column;
@@ -946,14 +944,14 @@ p.card-note,
 .cost-note {
   color: var(--warning-text);
   font-weight: 600;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 .feasible-box {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
 }
 .feasible-box.yes {
@@ -996,7 +994,7 @@ p.card-note,
   border-color: var(--accent-border);
 }
 .score-num {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 800;
   color: var(--text-h);
 }
@@ -1004,7 +1002,7 @@ p.card-note,
   color: var(--accent);
 }
 .score-label {
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 600;
   color: var(--text-muted);
   line-height: 1.3;
@@ -1029,7 +1027,7 @@ p.card-note,
   border-radius: var(--radius-sm);
   border: 1.5px solid var(--border);
   background: var(--surface);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 .verdict-btn:hover:not(:disabled) {
@@ -1071,13 +1069,13 @@ p.card-note,
 }
 .decision-why {
   margin-top: 7px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.6;
   color: var(--text);
 }
 .decision-why strong {
   color: var(--text-muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   display: block;
   margin-bottom: 1px;
@@ -1111,7 +1109,7 @@ p.card-note,
   max-height: 220px;
   overflow-y: auto;
   white-space: pre-wrap;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text);
 }
@@ -1120,7 +1118,7 @@ p.card-note,
 .conflict-pair {
   display: grid;
   gap: 6px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-h);
   line-height: 1.55;
 }
@@ -1133,7 +1131,7 @@ p.card-note,
   border-radius: 5px;
   background: var(--surface);
   border: 1px solid var(--border);
-  font-size: 11px;
+  font-size: 12.5px;
   font-weight: 800;
   margin-right: 5px;
 }
@@ -1155,7 +1153,7 @@ p.card-note,
 .criterion-pick strong {
   display: block;
   color: var(--text-h);
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.5;
   margin-bottom: 3px;
 }
@@ -1213,7 +1211,7 @@ p.card-note,
   gap: 3px;
 }
 .sample-card strong {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
   line-height: 1.4;
 }
@@ -1239,7 +1237,7 @@ p.card-note,
 }
 .teach-info strong {
   color: var(--text-h);
-  font-size: 14px;
+  font-size: 15px;
 }
 .teach-row select {
   min-width: 200px;
@@ -1268,7 +1266,7 @@ p.card-note,
 .lineage-source strong {
   display: block;
   color: var(--text-h);
-  font-size: 13.5px;
+  font-size: 15px;
   word-break: break-all;
 }
 
@@ -1300,14 +1298,14 @@ p.card-note,
 }
 .lineage-step {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   margin-bottom: 2px;
 }
 .lineage-value {
   display: block;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
   line-height: 1.5;
   word-break: break-all;
@@ -1339,7 +1337,7 @@ p.card-note,
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 800;
   flex: none;
 }
@@ -1361,7 +1359,7 @@ p.card-note,
   margin-top: 7px;
   padding-top: 7px;
   border-top: 1px dashed var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.6;
   color: var(--text);
 }
@@ -1385,7 +1383,7 @@ p.card-note,
   margin-bottom: 4px;
 }
 .manual-doc h2 {
-  font-size: 18px;
+  font-size: 19px;
   margin: 28px 0 8px;
   padding-top: 14px;
   border-top: 1px solid var(--border);
@@ -1399,7 +1397,7 @@ p.card-note,
   color: var(--text);
 }
 .manual-intro {
-  font-size: 15.5px;
+  font-size: 16.5px;
   color: var(--text-h);
 }
 .manual-doc hr {
@@ -1503,7 +1501,7 @@ p.card-note,
   padding: 16px 18px;
 }
 .handed-to strong {
-  font-size: 16px;
+  font-size: 17px;
   color: var(--text-h);
   margin-right: 6px;
 }
@@ -1526,7 +1524,7 @@ p.card-note,
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 .tool-limits strong {
@@ -1539,7 +1537,7 @@ p.card-note,
   gap: 4px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-muted);
 }
 
@@ -1570,7 +1568,7 @@ p.card-note,
 
 .outcome-warn {
   margin-top: 8px;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--warning-text);
   font-weight: 600;
 }
@@ -1590,7 +1588,7 @@ p.card-note,
   gap: 12px;
   padding: 9px 13px;
   border-bottom: 1px solid var(--border);
-  font-size: 13.5px;
+  font-size: 15px;
 }
 .formula-row:last-child {
   border-bottom: none;
@@ -1599,7 +1597,7 @@ p.card-note,
   background: var(--surface);
   font-weight: 700;
   color: var(--text-h);
-  font-size: 15px;
+  font-size: 16px;
 }
 .formula-label {
   color: var(--text);
@@ -1628,7 +1626,7 @@ p.card-note,
 .track-input {
   flex: 1;
   min-width: 200px;
-  font-size: 20px;
+  font-size: 21px;
   letter-spacing: 0.12em;
   text-align: center;
   padding: 14px 16px;
@@ -1687,7 +1685,7 @@ p.card-note,
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 800;
   background: var(--surface);
   border: 2px solid var(--border);
@@ -1721,7 +1719,7 @@ p.card-note,
   align-items: center;
   gap: 7px;
   flex-wrap: wrap;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
   margin-bottom: 3px;
@@ -1731,7 +1729,7 @@ p.card-note,
   font-weight: 600;
 }
 .track-summary {
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
   color: var(--text);
 }
@@ -1745,7 +1743,7 @@ p.card-note,
   border-radius: var(--radius-sm);
   background: var(--bg);
   border: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 .track-foot {
@@ -1757,7 +1755,7 @@ p.card-note,
 /* ===== 첫 화면 현황 ===== */
 .flow-count {
   margin-left: 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 700;
   color: var(--accent);
   background: var(--accent-bg);
@@ -1778,7 +1776,7 @@ p.card-note,
   grid-template-columns: 72px minmax(0, 1fr) 34px;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .stage-bar-label {
   color: var(--text);
@@ -1817,7 +1815,7 @@ p.card-note,
   display: flex;
   flex-direction: column;
   gap: 5px;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .refuse-mix li {
   display: flex;
@@ -1847,14 +1845,14 @@ p.card-note,
 .filter-label {
   flex: none;
   width: 38px;
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
   color: var(--text-muted);
 }
 
 .chip-count {
   margin-left: 5px;
-  font-size: 10.5px;
+  font-size: 12px;
   font-weight: 800;
   opacity: 0.7;
 }
@@ -1883,7 +1881,7 @@ p.card-note,
 }
 
 .stat-label {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-muted);
   margin-bottom: 4px;
@@ -1902,7 +1900,7 @@ p.card-note,
 }
 
 .stat-note {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-muted);
   margin-top: 3px;
 }
@@ -1925,7 +1923,7 @@ p.card-note,
 
 .data-table {
   width: 100%;
-  font-size: 13.5px;
+  font-size: 15px;
   min-width: 560px;
 }
 
@@ -1941,7 +1939,7 @@ p.card-note,
   background: var(--surface);
   color: var(--text-muted);
   font-weight: 700;
-  font-size: 12.5px;
+  font-size: 14px;
   position: sticky;
   top: 0;
   z-index: 1;
@@ -1965,12 +1963,12 @@ p.card-note,
   text-align: right;
   font-variant-numeric: tabular-nums;
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 .mono {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 
 /* ===== 칩 ===== */
@@ -1986,7 +1984,7 @@ p.card-note,
   border: 1px solid var(--border);
   background: var(--surface);
   color: var(--text);
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 .chip:hover:not(:disabled) {
@@ -2009,7 +2007,7 @@ p.card-note,
 .disclose > summary {
   cursor: pointer;
   padding: 9px 13px;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-muted);
   list-style: none;
@@ -2031,7 +2029,7 @@ p.card-note,
 }
 .disclose-body {
   padding: 4px 14px 14px;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text);
 }
 
@@ -2039,7 +2037,7 @@ p.card-note,
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 5px 14px;
-  font-size: 13.5px;
+  font-size: 15px;
 }
 .kv dt {
   color: var(--text-muted);
@@ -2055,7 +2053,7 @@ p.card-note,
 .notice {
   border-radius: var(--radius-sm);
   padding: 12px 15px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
   border: 1px solid transparent;
 }
@@ -2101,14 +2099,14 @@ p.card-note,
   border-color: var(--success);
 }
 .verdict-head {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 800;
   letter-spacing: -0.02em;
   color: var(--text-h);
   margin-bottom: 6px;
 }
 .verdict-body {
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.6;
   color: var(--text-h);
 }
@@ -2122,13 +2120,13 @@ p.card-note,
   border-radius: var(--radius);
 }
 .empty-title {
-  font-size: 15.5px;
+  font-size: 16.5px;
   font-weight: 700;
   color: var(--text-h);
   margin-bottom: 4px;
 }
 .empty-sub {
-  font-size: 13.5px;
+  font-size: 15px;
 }
 
 /* ===== 토스트 ===== */
@@ -2159,7 +2157,7 @@ p.card-note,
   color: var(--toast-text);
   border: 1px solid var(--toast-border);
   box-shadow: var(--shadow);
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   animation: toast-in 0.18s ease;
 }
@@ -2247,13 +2245,13 @@ p.card-note,
   flex-wrap: wrap;
 }
 .file-icon {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-dim);
   flex-shrink: 0;
 }
 .file-name {
   font-weight: 600;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-h);
   /* 정산서 파일명은 길다. 줄바꿈되더라도 버튼을 밀어내지 않게 한다. */
   word-break: break-all;
@@ -2277,7 +2275,7 @@ p.card-note,
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .file-preview .data-table {
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .file-preview .data-table th,
 .file-preview .data-table td {
@@ -2315,7 +2313,7 @@ p.card-note,
   display: flex;
   gap: 7px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-dim);
   margin-bottom: 8px;
 }
@@ -2332,7 +2330,7 @@ p.card-note,
   margin-bottom: 9px;
 }
 .record-pip {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   padding: 4px 9px;
   border-radius: var(--radius-full);
@@ -2347,7 +2345,7 @@ p.card-note,
 }
 .record-progress-note {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-dim);
   line-height: 1.65;
 }
@@ -2362,7 +2360,7 @@ p.card-note,
   align-items: baseline;
   gap: 9px;
   flex-wrap: wrap;
-  font-size: 17px;
+  font-size: 18px;
   margin: 0 0 12px;
   padding-bottom: 8px;
   border-bottom: 1px solid var(--border);
@@ -2378,11 +2376,11 @@ p.card-note,
   border-radius: var(--radius-full);
   background: var(--accent);
   color: var(--on-accent);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 .record-subtitle {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 400;
   color: var(--text-dim);
 }
@@ -2395,7 +2393,7 @@ p.card-note,
 }
 .record-empty {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-dim);
   font-style: italic;
 }
@@ -2404,12 +2402,12 @@ p.card-note,
   margin: 18px 0 0;
 }
 .record-sub h3 {
-  font-size: 14px;
+  font-size: 15px;
   margin: 0 0 5px;
   color: var(--text-h);
 }
 .record-aside {
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-dim);
   line-height: 1.6;
 }
@@ -2418,7 +2416,7 @@ p.record-aside {
 }
 
 .record-kv dt {
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .record-list {
   list-style: none;
@@ -2427,7 +2425,7 @@ p.record-aside {
   display: flex;
   flex-direction: column;
   gap: 11px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.7;
 }
 .record-list.tight {
@@ -2452,23 +2450,23 @@ p.record-aside {
   padding: 6px 11px;
   border-left: 2px solid var(--border);
   color: var(--text-dim);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .record-seal {
   margin: 0 0 5px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .record-faq > div {
   margin-bottom: 11px;
 }
 .record-faq dt {
   font-weight: 700;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-h);
 }
 .record-faq dd {
   margin: 3px 0 0;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text);
   line-height: 1.7;
 }
@@ -2480,7 +2478,7 @@ p.record-aside {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.7;
 }
 .record-decisions > li {
@@ -2499,7 +2497,7 @@ p.record-aside {
 }
 .record-why {
   margin-top: 5px;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-dim);
 }
 .record-why strong {
@@ -2515,7 +2513,7 @@ p.record-aside {
 }
 .verdict-mark {
   font-weight: 700;
-  font-size: 15px;
+  font-size: 16px;
   padding: 4px 13px;
   border-radius: var(--radius-full);
   border: 1px solid var(--border);
@@ -2537,7 +2535,7 @@ p.record-aside {
   margin-top: 34px;
   padding-top: 16px;
   border-top: 1px solid var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   color: var(--text-dim);
   line-height: 1.7;
 }
@@ -2630,7 +2628,7 @@ p.record-aside {
   border: 1px solid var(--warning-border);
   background: var(--warning-bg);
   border-radius: var(--radius-sm);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.65;
   color: var(--text);
   display: flex;
@@ -2648,7 +2646,7 @@ p.record-aside {
   gap: 8px;
 }
 .review-list-empty .empty-sub {
-  font-size: 12px;
+  font-size: 13.5px;
 }
 
 /* 칩이 0건이면 눌러도 빈 화면만 나온다. 누르기 전에 알 수 있게 죽여 둔다. */
@@ -2676,7 +2674,7 @@ p.record-aside {
   margin-bottom: 12px;
 }
 .track-actions-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -2696,12 +2694,12 @@ p.record-aside {
 }
 .track-action-headline {
   font-weight: 700;
-  font-size: 14.5px;
+  font-size: 15.5px;
   color: var(--text-h);
   margin-bottom: 4px;
 }
 .track-action-body {
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.7;
   color: var(--text);
 }
@@ -2710,7 +2708,7 @@ p.record-aside {
   margin-top: 6px;
   padding-left: 9px;
   border-left: 2px solid var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.65;
   color: var(--text-dim);
 }
@@ -2745,13 +2743,13 @@ p.record-aside {
 }
 .notice-headline {
   font-weight: 700;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-h);
   line-height: 1.5;
 }
 .notice-body {
   margin-top: 3px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
   color: var(--text-dim);
 }
@@ -2781,7 +2779,7 @@ p.record-aside {
   margin-bottom: 12px;
 }
 .owed-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -2808,13 +2806,13 @@ p.record-aside {
 }
 .owed-what {
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-h);
   line-height: 1.55;
 }
 .owed-why {
   margin-top: 3px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text-dim);
 }
@@ -2850,7 +2848,7 @@ p.record-aside {
   display: flex;
   flex-direction: column;
   gap: 13px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.7;
 }
 .dept-apps > li,
@@ -2888,7 +2886,7 @@ p.record-aside {
   margin-top: 7px;
   padding-left: 9px;
   border-left: 2px solid var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-dim);
 }
 .dept-reqs > li.rejected {
@@ -2906,7 +2904,7 @@ p.record-aside {
   color: var(--text-h);
 }
 .conflict-vs {
-  font-size: 11px;
+  font-size: 12.5px;
   color: var(--text-muted);
   letter-spacing: 0.06em;
 }
@@ -2921,7 +2919,7 @@ kbd {
   border-radius: 5px;
   background: var(--surface);
   font-family: var(--font-mono, ui-monospace, monospace);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   line-height: 1.5;
   color: var(--text-h);
@@ -2965,7 +2963,7 @@ kbd {
 }
 .hotkey-list dd {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.6;
   color: var(--text);
 }
@@ -2994,7 +2992,7 @@ kbd {
   margin: 0;
   padding: 8px 12px 10px;
   border-top: 1px solid var(--border);
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--text-dim);
 }
@@ -3027,7 +3025,7 @@ kbd {
   margin-bottom: 8px;
 }
 .tool-card-title {
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1.45;
   margin: 0 0 3px;
   color: var(--text-h);
@@ -3049,13 +3047,13 @@ kbd {
   border-top: 1px solid var(--border);
 }
 .tool-stats dt {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 1px;
 }
 .tool-stats dd {
   margin: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
   line-height: 1.5;
@@ -3069,7 +3067,7 @@ kbd {
   padding: 10px 11px;
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text);
 }
@@ -3079,7 +3077,7 @@ kbd {
   border-left: 2px solid var(--danger-border);
   background: var(--danger-bg);
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.65;
 }
 .tool-card-foot {
@@ -3127,13 +3125,13 @@ kbd {
   margin-bottom: 6px;
 }
 .similar-title {
-  font-size: 14.5px;
+  font-size: 15.5px;
   font-weight: 700;
   color: var(--text-h);
 }
 .similar-lead {
   margin: 0 0 11px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--text-dim);
 }
@@ -3160,14 +3158,14 @@ kbd {
 }
 .similar-item-title {
   font-weight: 600;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-h);
   line-height: 1.5;
 }
 /* 왜 비슷한지. 이 줄이 없으면 아무도 이 경고를 안 믿는다. */
 .similar-why {
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.6;
   color: var(--text-dim);
 }
@@ -3203,13 +3201,13 @@ kbd {
   margin-bottom: 7px;
 }
 .similar-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
 .similar-lead {
   margin: 0 0 12px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -3235,7 +3233,7 @@ kbd {
   margin-bottom: 6px;
 }
 .similar-item-title {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
   line-height: 1.5;
@@ -3243,7 +3241,7 @@ kbd {
 /* 왜 비슷하다고 봤는지. 이 줄이 없으면 아무도 이 경고를 안 믿는다. */
 .similar-why {
   margin-top: 5px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.6;
   color: var(--text-muted);
 }
@@ -3275,13 +3273,13 @@ kbd {
 }
 .unproven h3 {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: 15px;
   color: var(--text-h);
   line-height: 1.5;
 }
 .unproven-body {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.8;
   color: var(--text);
 }
@@ -3291,7 +3289,7 @@ kbd {
   margin: 9px 0 0;
   padding-top: 9px;
   border-top: 1px dashed var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.8;
   color: var(--text-muted);
 }
@@ -3327,7 +3325,7 @@ kbd {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   background: var(--card);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .honest-alt strong {
@@ -3346,7 +3344,7 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 9px;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .honest-bar {
   margin-top: 4px;
@@ -3386,7 +3384,7 @@ kbd {
   border-top: 2px solid var(--accent);
 }
 .cmp-head-title {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.5;
   margin: 0 0 3px;
   color: var(--text-h);
@@ -3398,7 +3396,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
   color: var(--text);
 }
@@ -3423,7 +3421,7 @@ kbd {
   display: inline-block;
   padding: 2px 7px;
   border-radius: 4px;
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.6;
   border: 1px solid transparent;
 }
@@ -3464,7 +3462,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
@@ -3472,7 +3470,7 @@ kbd {
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   gap: 8px;
   align-items: center;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -3495,13 +3493,13 @@ kbd {
   margin-bottom: 5px;
 }
 .draft-restore-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
 .draft-restore-body {
   margin: 0 0 11px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -3547,7 +3545,7 @@ kbd {
   margin-bottom: 6px;
 }
 .thread-body {
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.75;
   color: var(--text-h);
   white-space: pre-wrap;
@@ -3556,7 +3554,7 @@ kbd {
   margin-top: 7px;
   padding-top: 7px;
   border-top: 1px dashed var(--border);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
   color: var(--text-muted);
 }
@@ -3611,14 +3609,14 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-h);
 }
 .report-kind-detail {
   display: block;
   margin-top: 3px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.6;
   color: var(--text-muted);
 }
@@ -3630,7 +3628,7 @@ kbd {
   background: var(--accent-bg);
 }
 .report-done-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
   margin-bottom: 4px;
@@ -3666,7 +3664,7 @@ kbd {
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: var(--card);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .report-fix strong {
@@ -3685,13 +3683,13 @@ kbd {
 }
 .weekly-line-label {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
 .weekly-line p {
   margin: 0;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.7;
   font-weight: 600;
   color: var(--text-h);
@@ -3722,7 +3720,7 @@ kbd {
   margin-bottom: 9px;
 }
 .weekly-when {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -3732,7 +3730,7 @@ kbd {
   align-items: center;
   gap: 9px;
   margin-bottom: 5px;
-  font-size: 12px;
+  font-size: 13.5px;
 }
 .weekly-key {
   color: var(--text-muted);
@@ -3768,7 +3766,7 @@ kbd {
   margin-top: 8px;
   padding-top: 8px;
   border-top: 1px dashed var(--border);
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text);
 }
 /* 표본이 적어 말할 수 없다는 안내는 흐리게. 숫자와 같은 무게로 보이면
@@ -3812,13 +3810,13 @@ kbd {
   margin-bottom: 6px;
 }
 .teach-group-title {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--text-h);
 }
 .teach-group-body {
   margin: 3px 0 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -3854,7 +3852,7 @@ kbd {
 }
 .teach-rows > summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-muted);
 }
 .teach-rows ul {
@@ -3868,7 +3866,7 @@ kbd {
 .teach-raw {
   display: block;
   font-family: var(--mono, monospace);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text);
   margin-top: 1px;
 }
@@ -3899,7 +3897,7 @@ kbd {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
-  font-size: 14px;
+  font-size: 15px;
 }
 .code-ext {
   font-weight: 700;
@@ -3925,7 +3923,7 @@ kbd {
 }
 .code-history > summary {
   cursor: pointer;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-muted);
 }
 .code-history ul {
@@ -3935,7 +3933,7 @@ kbd {
   display: flex;
   flex-direction: column;
   gap: 7px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 
@@ -3950,12 +3948,12 @@ kbd {
   border: 1px solid var(--warning-border);
   background: var(--warning-bg);
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 .tool-quota-warn strong {
   display: block;
-  font-size: 13.5px;
+  font-size: 15px;
   color: var(--text-h);
   margin-bottom: 3px;
 }
@@ -3980,13 +3978,13 @@ kbd {
 }
 .merged-notice h3 {
   margin: 0 0 6px;
-  font-size: 16px;
+  font-size: 17px;
   color: var(--text-h);
   line-height: 1.45;
 }
 .merged-notice p {
   margin: 0 0 7px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -3994,7 +3992,7 @@ kbd {
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: var(--card);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .merged-why strong {
   color: var(--text-h);
@@ -4019,7 +4017,7 @@ kbd {
 }
 .merge-opt strong {
   display: block;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
   margin-bottom: 3px;
 }
@@ -4054,7 +4052,7 @@ kbd {
   margin-top: 3px;
 }
 .run-file {
-  font-size: 11.5px;
+  font-size: 12.5px;
   padding: 2px 7px;
   border-radius: 4px;
   background: var(--card);
@@ -4066,7 +4064,7 @@ kbd {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   background: var(--card);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text);
   border-left: 3px solid var(--warning-border);
@@ -4094,7 +4092,7 @@ kbd {
   margin-bottom: 10px;
 }
 .todo-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -4129,14 +4127,14 @@ kbd {
   flex-wrap: wrap;
 }
 .todo-item-title {
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
   line-height: 1.5;
 }
 .todo-why {
   margin: 5px 0 9px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   max-width: 70ch;
   color: var(--text-muted);
@@ -4186,7 +4184,7 @@ kbd {
   border: 1px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--accent-bg);
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .bulk-why {
   line-height: 1.75;
@@ -4214,14 +4212,14 @@ kbd {
 }
 .stall-line-label {
   display: block;
-  font-size: 11px;
+  font-size: 12.5px;
   letter-spacing: 0.04em;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
 .stall-line p {
   margin: 0;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.75;
   color: var(--text-h);
 }
@@ -4259,7 +4257,7 @@ kbd {
   flex-wrap: wrap;
 }
 .stall-days {
-  font-size: 19px;
+  font-size: 20px;
   font-weight: 700;
   color: var(--text-h);
   font-variant-numeric: tabular-nums;
@@ -4268,7 +4266,7 @@ kbd {
   color: var(--danger);
 }
 .stall-days-unit {
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--text-muted);
   margin-left: 1px;
@@ -4279,7 +4277,7 @@ kbd {
   gap: 7px;
 }
 .stall-stage {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -4292,13 +4290,13 @@ kbd {
   flex-wrap: wrap;
 }
 .stall-title {
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
 }
 .stall-stuck {
   margin: 7px 0 0;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
   color: var(--text);
 }
@@ -4316,7 +4314,7 @@ kbd {
   margin: 0;
   flex: 1;
   min-width: 220px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -4339,7 +4337,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 /* 표본이 모자란 줄은 흐리게. 숫자와 같은 무게로 보이면 없는 값을 있는
    값처럼 읽는다. */
@@ -4387,7 +4385,7 @@ kbd {
   align-items: baseline;
   gap: 9px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 /* ===== 이 배포가 살아 있는가 ===== */
@@ -4404,7 +4402,7 @@ kbd {
   padding: 0;
   display: grid;
   gap: 4px;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 /* ===== 시연 신청서 지우기 ===== */
@@ -4426,7 +4424,7 @@ kbd {
 }
 .demo-wipe-text strong {
   display: block;
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
   margin-bottom: 4px;
 }
@@ -4466,11 +4464,11 @@ kbd {
 }
 .retry h3 {
   margin: 0 0 7px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .retry p {
   margin: 0 0 9px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 .retry-from-reviewer {
@@ -4481,7 +4479,7 @@ kbd {
 }
 .retry-from-reviewer strong {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
   margin-bottom: 3px;
 }
@@ -4500,7 +4498,7 @@ kbd {
   gap: 4px;
 }
 .retry-form label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -4536,11 +4534,11 @@ kbd {
 }
 .signoff h3 {
   margin: 0 0 7px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .signoff-why {
   margin: 0 0 10px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
   color: var(--text);
 }
@@ -4550,7 +4548,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success-text);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .signoff-list {
   list-style: none;
@@ -4573,7 +4571,7 @@ kbd {
   align-items: baseline;
   gap: 8px;
   flex-wrap: wrap;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
   color: var(--text-h);
 }
@@ -4581,7 +4579,7 @@ kbd {
   margin: 7px 0 0;
   padding-top: 7px;
   border-top: 1px dashed var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .signoff-objected-note strong {
@@ -4602,7 +4600,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 12.5px;
+  font-size: 14px;
   cursor: pointer;
 }
 .signoff-pick input[type='radio'] {
@@ -4629,7 +4627,7 @@ kbd {
   max-width: 320px;
 }
 .signoff-form label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -4639,7 +4637,7 @@ kbd {
   margin: 9px 0 0;
   padding-top: 9px;
   border-top: 1px dashed var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--warning-text);
 }
@@ -4661,13 +4659,13 @@ kbd {
   border-color: var(--border);
 }
 .objection-crit {
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-muted);
   margin-bottom: 5px;
 }
 .objection-body {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--text-h);
 }
@@ -4676,7 +4674,7 @@ kbd {
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: var(--accent-bg);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 .objection-answer > strong {
@@ -4694,7 +4692,7 @@ kbd {
   display: flex;
   align-items: center;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: 14px;
   cursor: pointer;
 }
 .objection-form input[type='radio'] {
@@ -4707,7 +4705,7 @@ kbd {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   background: var(--accent-bg);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .signoff-answer > strong {
@@ -4728,7 +4726,7 @@ kbd {
   background: none;
   border: none;
   padding: 0;
-  font-size: 12px;
+  font-size: 13.5px;
   color: var(--text-muted);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -4742,7 +4740,7 @@ kbd {
   margin: 0 0 6px;
   padding: 8px 10px;
   border-radius: var(--radius-sm);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .unclear-open {
@@ -4768,7 +4766,7 @@ kbd {
   gap: 4px;
 }
 .unclear-form label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -4800,7 +4798,7 @@ kbd {
   margin-bottom: 7px;
 }
 .unclear-sec strong {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
 }
 .unclear-flags {
@@ -4821,7 +4819,7 @@ kbd {
 }
 .unclear-said {
   margin: 0 0 3px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
   color: var(--text-h);
 }
@@ -4831,7 +4829,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success-text);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .unclear-fixed > strong {
@@ -4861,7 +4859,7 @@ kbd {
   gap: 3px;
 }
 .faq-drafts-head strong {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
 }
 .faq-draft {
@@ -4879,14 +4877,14 @@ kbd {
 }
 .faq-draft-q {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   line-height: 1.7;
   color: var(--text-h);
 }
 .faq-draft-a {
   margin: 0 0 9px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -4896,7 +4894,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--warning-bg);
   color: var(--warning-text);
-  font-size: 12px;
+  font-size: 13.5px;
   line-height: 1.7;
 }
 .faq-draft-form {
@@ -4908,7 +4906,7 @@ kbd {
   gap: 4px;
 }
 .faq-draft-form label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -4930,7 +4928,7 @@ kbd {
   gap: 2px;
 }
 .annual-split strong {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-h);
   font-variant-numeric: tabular-nums;
 }
@@ -4947,7 +4945,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--accent-bg);
   color: var(--text-h);
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   text-align: left;
@@ -4969,7 +4967,7 @@ kbd {
   gap: 4px;
 }
 .join-form label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -4988,7 +4986,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success-text);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 
@@ -5012,7 +5010,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--warning-bg);
   color: var(--warning-text);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
 }
 .joined-list {
@@ -5035,12 +5033,12 @@ kbd {
   flex-wrap: wrap;
 }
 .joined-top strong {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
 }
 .joined-story {
   margin: 5px 0 8px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -5067,7 +5065,7 @@ kbd {
   background: var(--surface);
   display: grid;
   gap: 3px;
-  font-size: 12.5px;
+  font-size: 14px;
 }
 .signoff-depts > li {
   color: var(--text-muted);
@@ -5103,7 +5101,7 @@ kbd {
   gap: 4px;
 }
 .seal-row > label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -5127,7 +5125,7 @@ kbd {
   gap: 8px;
 }
 .who-ran label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
   white-space: nowrap;
@@ -5154,7 +5152,7 @@ kbd {
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 .refuse-why > strong,
@@ -5164,7 +5162,7 @@ kbd {
   margin-bottom: 3px;
   color: var(--text-muted);
   font-weight: 600;
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 .refuse-suggest {
   padding: 10px 11px;
@@ -5173,7 +5171,7 @@ kbd {
 }
 .refuse-suggest p {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--text-h);
 }
@@ -5190,7 +5188,7 @@ kbd {
 }
 .refuse-dept p {
   margin: 0 0 6px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 
@@ -5211,7 +5209,7 @@ kbd {
   gap: 3px;
 }
 .pending-joins-head strong {
-  font-size: 13px;
+  font-size: 14.5px;
   color: var(--text-h);
 }
 .pending-join {
@@ -5230,7 +5228,7 @@ kbd {
 }
 .pending-join-said {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--text-h);
 }
@@ -5266,18 +5264,18 @@ kbd {
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
 }
 .as-dept-said > strong {
   display: block;
   margin-bottom: 3px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--text-muted);
 }
 .as-dept-gone {
   margin: 0;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.75;
   color: var(--warning-text);
 }
@@ -5289,7 +5287,7 @@ kbd {
   margin-top: 6px;
   padding: 7px 10px;
   border-left: 2px solid var(--border);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.7;
   color: var(--text-muted);
 }
@@ -5320,11 +5318,11 @@ kbd {
   stroke-dasharray: 4 4;
 }
 .board-q {
-  font-size: 10px;
+  font-size: 11.5px;
   fill: var(--text-muted);
 }
 .board-axis {
-  font-size: 11px;
+  font-size: 12.5px;
   fill: var(--text-muted);
 }
 .board-dot circle {
@@ -5364,7 +5362,7 @@ kbd {
 }
 .board-list-title {
   display: block;
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   color: var(--text-h);
   margin-bottom: 7px;
@@ -5380,7 +5378,7 @@ kbd {
 }
 .board-notes p {
   margin: 0;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text);
 }
@@ -5403,7 +5401,7 @@ kbd {
   border-left: 3px solid var(--accent);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 
@@ -5426,7 +5424,7 @@ kbd {
   gap: 4px;
 }
 .pick-form label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -5437,7 +5435,7 @@ kbd {
   padding: 0;
   display: grid;
   gap: 7px;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .offboard-list > li {
   display: flex;
@@ -5476,7 +5474,7 @@ kbd {
   gap: 3px;
 }
 .accept-head strong {
-  font-size: 15px;
+  font-size: 16px;
   color: var(--text-h);
 }
 .accept-proxy {
@@ -5484,7 +5482,7 @@ kbd {
   padding: 9px 11px;
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 .accept-name {
@@ -5493,7 +5491,7 @@ kbd {
   max-width: 260px;
 }
 .accept-name > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -5508,7 +5506,7 @@ kbd {
   gap: 4px;
 }
 .accept-reject label > span {
-  font-size: 12.5px;
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
 }
@@ -5518,7 +5516,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success-text);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 /* 부서가 직접 확인하는 자리 — 시험판 의견, 성과 확인.
@@ -5544,12 +5542,12 @@ kbd {
 }
 .dconf h3 {
   margin: 0 0 7px;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
 }
 .dconf-why {
   margin: 0 0 8px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 .dconf-msg {
@@ -5558,7 +5556,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success-text);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 .dconf-proxy,
@@ -5568,7 +5566,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 .dconf-proxy {
@@ -5582,7 +5580,7 @@ kbd {
 .dconf-form label {
   display: grid;
   gap: 5px;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .dconf-form label > span {
   font-weight: 600;
@@ -5599,7 +5597,7 @@ kbd {
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .dconf-form textarea {
   resize: vertical;
@@ -5620,7 +5618,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 13px;
+  font-size: 14.5px;
   cursor: pointer;
 }
 .dconf-pick label.on {
@@ -5653,7 +5651,7 @@ kbd {
   margin-bottom: 6px;
 }
 .betasay-body {
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
   white-space: pre-wrap;
 }
@@ -5663,7 +5661,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--success-bg);
   color: var(--success-text);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 
@@ -5684,7 +5682,7 @@ kbd {
   border-left: 3px solid var(--warning);
   border-radius: var(--radius-sm);
   background: var(--surface-2, var(--surface));
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 
@@ -5705,7 +5703,7 @@ kbd {
 }
 .waitline h3 {
   margin: 0 0 7px;
-  font-size: 15px;
+  font-size: 16px;
 }
 .waitline-why {
   margin: 0 0 10px;
@@ -5713,7 +5711,7 @@ kbd {
   border-left: 3px solid var(--success);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 .waitline-block {
@@ -5733,7 +5731,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .waitline-dept,
 .waitline-title {
@@ -5768,7 +5766,7 @@ kbd {
   flex-wrap: wrap;
 }
 .provenance-line {
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 .provenance-detail {
@@ -5778,7 +5776,7 @@ kbd {
   margin: 11px 0 0;
   padding-top: 11px;
   border-top: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 .provenance-detail dt {
@@ -5805,7 +5803,7 @@ kbd {
   border: 1px solid var(--success);
   border-radius: var(--radius);
   background: var(--surface);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 /* 부서가 하나도 안 눌렀으면 그것부터 눈에 띄어야 한다. */
@@ -5827,7 +5825,7 @@ kbd {
 }
 .response-line {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: 15px;
   line-height: 1.8;
   font-weight: 600;
 }
@@ -5864,13 +5862,13 @@ kbd {
   flex-wrap: wrap;
 }
 .response-label {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
 }
 .response-why,
 .response-proxy {
   margin-top: 5px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   color: var(--text-muted, inherit);
   opacity: 0.85;
@@ -5900,7 +5898,7 @@ kbd {
   flex-wrap: wrap;
 }
 .pending-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
 }
 .pending-why {
@@ -5931,12 +5929,12 @@ kbd {
   width: 100%;
 }
 .pending-what {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 600;
   line-height: 1.6;
 }
 .pending-text {
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.8;
   opacity: 0.9;
 }
@@ -5956,7 +5954,7 @@ kbd {
 }
 .tooldown h3 {
   margin: 0 0 8px;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.6;
 }
 .tooldown-reason {
@@ -5965,7 +5963,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--surface);
   border: 1px solid var(--border);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.8;
 }
 
@@ -5985,11 +5983,11 @@ kbd {
   flex-wrap: wrap;
 }
 .tryit-title {
-  font-size: 14px;
+  font-size: 15px;
 }
 .tryit-sub {
   margin: 6px 0 0;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 .tryit-list {
@@ -6007,25 +6005,25 @@ kbd {
   background: var(--surface);
 }
 .tryit-label {
-  font-size: 13px;
+  font-size: 14.5px;
   font-weight: 700;
 }
 .tryit-what {
   margin-top: 4px;
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.7;
 }
 /* 이 사이트가 무엇을 요구하는지가 여기서 드러난다. 흐리게 두지 않는다. */
 .tryit-note {
   margin-top: 5px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
   opacity: 0.85;
 }
 .tryit-terms {
   margin: 12px 0 0;
   padding-left: 18px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.85;
 }
 .tryit-reset {
@@ -6039,7 +6037,7 @@ kbd {
 }
 .tryit-reset-text {
   flex: 1 1 260px;
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.75;
 }
 
@@ -6059,7 +6057,7 @@ kbd {
   flex-wrap: wrap;
 }
 .returned-line {
-  font-size: 15px;
+  font-size: 16px;
 }
 .returned-note {
   margin: 7px 0 0;
@@ -6080,7 +6078,7 @@ kbd {
   padding: 9px 11px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 /* 아직 확인 못 받은 것. 성과로 안 세지만 숨기지도 않는다. */
 .returned-list.pending-confirm > li {
@@ -6116,7 +6114,7 @@ kbd {
   background: var(--surface);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -6132,7 +6130,7 @@ kbd {
 }
 .built-lead h2 {
   margin: 0 0 9px;
-  font-size: 17px;
+  font-size: 18px;
   line-height: 1.6;
 }
 .built-lead p {
@@ -6142,7 +6140,7 @@ kbd {
 .built-body {
   margin: 0;
   line-height: 1.95;
-  font-size: 13.5px;
+  font-size: 15px;
 }
 /* 왜 그렇게 했는지. 무엇을 했는지보다 이쪽이 읽을 값어치가 있다. */
 .built-why {
@@ -6174,13 +6172,13 @@ kbd {
   border-radius: 50%;
   background: var(--accent-bg);
   color: var(--accent);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 700;
 }
 .built-stages p,
 .built-point p {
   margin: 4px 0 0;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.9;
 }
 .built-points {
@@ -6210,7 +6208,7 @@ kbd {
   grid-template-columns: max-content 1fr;
   gap: 7px 16px;
   margin: 0;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.85;
 }
 .built-stack dt {
@@ -6231,7 +6229,7 @@ kbd {
 .built-how {
   margin: 9px 0 0;
   padding-left: 18px;
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.95;
   display: grid;
   gap: 6px;
@@ -6313,7 +6311,7 @@ kbd {
 }
 
 .nextstep-title {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text-h);
 }
@@ -6339,14 +6337,14 @@ kbd {
 .nextstep-what {
   margin: 0 0 5px;
   color: var(--text-h);
-  font-size: 13.5px;
+  font-size: 15px;
 }
 
 .nextstep-need,
 .nextstep-shows {
   margin: 0 0 5px;
   color: var(--text-muted);
-  font-size: 12.5px;
+  font-size: 14px;
   line-height: 1.55;
 }
 
@@ -6373,7 +6371,7 @@ kbd {
   border-radius: var(--radius);
   border: 1px solid var(--warning, var(--line));
   background: var(--warning-bg, var(--surface));
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 .tool-rejected-body {
@@ -6398,7 +6396,7 @@ kbd {
   border-radius: 999px;
   background: var(--accent-bg);
   color: var(--accent);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
 }
 
@@ -6426,7 +6424,7 @@ kbd {
 
 .lead-spread-title {
   color: var(--text-h);
-  font-size: 13.5px;
+  font-size: 15px;
   font-weight: 600;
   text-decoration: none;
   line-height: 1.5;
@@ -6493,7 +6491,7 @@ kbd {
 .myreports-body {
   margin: 6px 0 0;
   color: var(--text-h);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.6;
   white-space: pre-wrap;
 }
@@ -6505,7 +6503,7 @@ kbd {
   margin-top: 9px;
   padding-top: 9px;
   border-top: 1px solid var(--line);
-  font-size: 13px;
+  font-size: 14.5px;
 }
 
 .myreports-open {
@@ -6526,7 +6524,7 @@ kbd {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--bg);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.6;
 }
 
@@ -6543,7 +6541,7 @@ kbd {
   border-radius: var(--radius);
   border: 1px solid var(--line);
   background: var(--bg);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.65;
 }
 

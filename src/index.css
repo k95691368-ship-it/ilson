@@ -70,7 +70,9 @@
   --heading: var(--sans);
   --mono: ui-monospace, 'Cascadia Mono', Consolas, 'D2Coding', monospace;
 
-  font: 17px/150% var(--sans);
+  /* 150% 였다. 한글은 글자에 빈 곳이 적어서 같은 줄간격이라도 라틴
+     문자보다 빽빽하게 보인다. */
+  font: 17px/165% var(--sans);
   letter-spacing: -0.01em;
   color: var(--text);
   background: var(--bg);
@@ -80,7 +82,7 @@
   -moz-osx-font-smoothing: grayscale;
 
   @media (max-width: 1024px) {
-    font-size: 15.5px;
+    font-size: 16.5px;
   }
 }
 
@@ -204,7 +206,7 @@ body {
   border-radius: var(--radius-full);
   background: var(--surface);
   color: var(--text-h);
-  font-size: 16px;
+  font-size: 17px;
   line-height: 1;
 }
 .theme-toggle:hover:not(:disabled) {
@@ -230,21 +232,21 @@ h1 {
   }
 }
 h2 {
-  font-size: 22px;
+  font-size: 23px;
   line-height: 1.25;
   letter-spacing: -0.024em;
   margin: 0 0 8px;
   @media (max-width: 1024px) {
-    font-size: 19px;
+    font-size: 20px;
   }
 }
 h3 {
-  font-size: 16.5px;
+  font-size: 17.5px;
   letter-spacing: -0.016em;
   margin: 0 0 4px;
 }
 h4 {
-  font-size: 14.5px;
+  font-size: 15.5px;
   letter-spacing: -0.012em;
   margin: 0 0 4px;
   color: var(--text-muted);
@@ -265,7 +267,7 @@ a:hover {
 
 code {
   font-family: var(--mono);
-  font-size: 13.5px;
+  font-size: 15px;
   line-height: 1.35;
   padding: 2px 6px;
   border-radius: 4px;
@@ -275,7 +277,7 @@ code {
 
 pre {
   font-family: var(--mono);
-  font-size: 13px;
+  font-size: 14.5px;
   line-height: 1.55;
   margin: 0;
   padding: 14px 16px;
@@ -366,7 +368,7 @@ a.btn-danger {
 }
 .btn-sm {
   padding: 6px 13px;
-  font-size: 13px;
+  font-size: 14.5px;
 }
 .btn-block {
   width: 100%;
@@ -416,7 +418,7 @@ input[type='radio'] {
   gap: 4px;
   padding: 3px 9px;
   border-radius: var(--radius-full);
-  font-size: 12px;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1.45;
   border: 1px solid transparent;
