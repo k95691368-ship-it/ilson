@@ -20,6 +20,12 @@ import viteConfig from './vite.config.js'
 export default mergeConfig(
   viteConfig,
   defineConfig({
+    // 화면을 실제로 그려 보는 시험(tests/pageRender.test.jsx)을 넣으면서
+    // 걸렸다. vitest 는 노드 쪽 변환에서 esbuild 를 쓰는데 그때 JSX 를
+    // 옛 방식(React.createElement)으로 바꾼다. src/ 의 화면 파일은 React 를
+    // import 하지 않으므로 그리는 순간 "React is not defined" 가 난다.
+    // 코드가 멀쩡한데 시험만 빨간 불이 되는 종류라 여기서 맞춰 둔다.
+    esbuild: { jsx: 'automatic' },
     test: {
       testTimeout: 30000,
       hookTimeout: 30000,

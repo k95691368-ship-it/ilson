@@ -42,6 +42,16 @@ export default function ToolPage() {
     loadNotes()
   }, [loadNotes])
 
+  // data 를 이 아래에서 선언해 놓고, 바로 위 useEffect 의 의존성 배열에서
+  // 먼저 읽고 있었다. 의존성 배열은 **렌더 도중에** 평가되므로 선언 전
+  // 접근이 되어 ReferenceError 가 나고, /t/:slug 화면 전체가 안 열렸다.
+  //
+  // 부서가 이 사이트에서 받는 주소가 딱 이것 하나다. 담당자 화면은 멀쩡하고
+  // API 도 200 이라, 담당자 쪽에서는 아무 이상이 없어 보인다. 이 저장소가
+  // 서버에서 한 번 겪은 사고(선언 전 참조로 라우트가 통째로 503)와 같은
+  // 모양이 화면에서 난 것이다.
+  const { data, error, loading, reload } = useApi(`/tools/${slug}`)
+
   // 이 브라우저에서 이 도구를 돌린 사람. 한 번 적으면 다음부터 안 묻는다.
   useEffect(() => {
     if (whoRan) return
@@ -53,7 +63,7 @@ export default function ToolPage() {
     }
     setWhoRan(saved || data?.handedTo?.person || '')
   }, [slug, data, whoRan])
-  const { data, error, loading, reload } = useApi(`/tools/${slug}`)
+
   const toast = useToast()
   const [result, setResult] = useState(null)
   const [running, setRunning] = useState(false)
