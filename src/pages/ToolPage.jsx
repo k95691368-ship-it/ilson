@@ -206,43 +206,12 @@ export default function ToolPage() {
         </div>
       )}
 
-      {/* 불편하다는 신고만 있으면 숫자는 믿어도 된다. 같은 색으로 겁주면
-          정작 숫자가 틀렸을 때 안 읽힌다. */}
-      {data.trust?.urgent === 0 && data.trust?.open > 0 && (
-        <div className="notice notice-warn">
-          <div className="notice-title">
-            쓰기 불편하다는 신고 {data.trust.open}건이 아직 처리 중입니다
-          </div>
-          <p className="card-note">숫자가 틀린다는 신고는 아닙니다. 결과는 그대로 쓰셔도 됩니다.</p>
-        </div>
-      )}
-
-      {/* 내려갔다가 고쳐서 다시 올라온 도구.
-          서버는 복구할 때 "부서 도구 화면에 무엇을 고쳤는지 함께 뜹니다"라고
-          답해 놓고, 이 화면은 그 기록을 안 읽었다. 부서 쪽에서 보면 틀린
-          숫자를 낸 도구를 겪었고 며칠 못 썼고 어느 날 그냥 다시 열려 있다.
-          무엇이 달라졌는지 모르면 안 쓴다 — 손으로 하던 방식으로 돌아가고
-          그 사실을 아무도 모른다. */}
-      {data.restored && (
-        <div className="notice notice-info">
-          <div className="notice-title">
-            이 도구는 한 번 내려갔다가 고쳐서 다시 올렸습니다
-            {data.restored.count > 1 && ` (지금까지 ${data.restored.count}번)`}
-          </div>
-          <p>
-            <strong>고친 것</strong> — {data.restored.fixed}
-          </p>
-          {data.restored.why && (
-            <p className="card-note">
-              <strong>내렸던 이유</strong> — {data.restored.why}
-            </p>
-          )}
-          <p className="card-note">
-            다시 열렸다는 말만 드리면 못 미더우실 것 같아 무엇이 달라졌는지 함께 적습니다. 그래도
-            숫자가 이상하면 아래 &lsquo;이 결과 이상합니다&rsquo;로 알려주세요.
-          </p>
-        </div>
-      )}
+      {/* 급하지 않은 두 가지 — "쓰기 불편하다는 신고"와 "고쳐서 다시 올렸다" —
+          가 여기 있었다. 그래서 파일을 올리러 온 사람이 도구에 닿기까지
+          덩어리를 넷이나 지나야 했다.
+          둘 다 이 도구의 이력이지 지금 막아야 할 것이 아니라서 아래
+          '이 도구가 걸어온 일'로 내렸다. 위에는 숫자가 틀린다는 신고만
+          남긴다 — 그것만이 돌리기 전에 반드시 읽어야 하는 것이다. */}
 
       {/* 이 도구가 부서에게 돌려준 것.
           부서는 매주 이걸 돌리면서도 그게 얼마나 줄여 줬는지를 못 봤다.
@@ -493,6 +462,50 @@ export default function ToolPage() {
           보여만 주고 고칠 길이 없으면 그 줄만 따로 손으로 처리하게 된다. */}
       {result?.quarantine?.length > 0 && (
         <TeachQuarantine slug={slug} quarantine={result.quarantine} onTaught={reload} />
+      )}
+
+      {/* 이 도구가 걸어온 일.
+          화면 맨 위에 있던 것을 여기로 내렸다. 둘 다 알아야 하는 것은
+          맞지만 지금 막아야 할 것은 아니라서, 파일을 올리러 온 사람이
+          도구에 닿기 전에 지나야 할 덩어리를 넷에서 하나로 줄였다. */}
+      {(data.restored || (data.trust?.urgent === 0 && data.trust?.open > 0)) && (
+        <section className="card">
+          <div className="card-head">
+            <span className="card-title">이 도구가 걸어온 일</span>
+            <span className="card-note">숨기지 않고 적어 둡니다</span>
+          </div>
+
+          {data.restored && (
+            <>
+              <p>
+                <strong>
+                  한 번 내려갔다가 고쳐서 다시 올렸습니다
+                  {data.restored.count > 1 && ` (지금까지 ${data.restored.count}번)`}
+                </strong>
+              </p>
+              <p className="card-note">
+                <strong>고친 것</strong> — {data.restored.fixed}
+              </p>
+              {data.restored.why && (
+                <p className="card-note">
+                  <strong>내렸던 이유</strong> — {data.restored.why}
+                </p>
+              )}
+              <p className="card-note">
+                다시 열렸다는 말만 드리면 못 미더우실 것 같아 무엇이 달라졌는지 함께 적습니다.
+              </p>
+            </>
+          )}
+
+          {/* 불편하다는 신고만 있으면 숫자는 믿어도 된다. 위쪽 빨간 칸과
+              같은 색으로 겁주면 정작 숫자가 틀렸을 때 안 읽힌다. */}
+          {data.trust?.urgent === 0 && data.trust?.open > 0 && (
+            <p className="card-note" style={{ marginTop: data.restored ? 14 : 0 }}>
+              <strong>쓰기 불편하다는 신고 {data.trust.open}건이 아직 처리 중입니다.</strong> 숫자가
+              틀린다는 신고는 아닙니다 — 결과는 그대로 쓰셔도 됩니다.
+            </p>
+          )}
+        </section>
       )}
 
       {/* 넘긴 뒤 들어온 신고가 이 사이트에서 가장 값진 기록이다.

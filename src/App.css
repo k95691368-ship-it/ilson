@@ -19,7 +19,7 @@
   width: 100%;
   max-width: 1180px;
   margin: 0 auto;
-  padding: 26px 22px 72px;
+  padding: 34px 22px 96px;
 }
 
 .app-main-bare {
@@ -263,7 +263,7 @@
 
 /* ===== 페이지 머리 ===== */
 .page-head {
-  margin-bottom: 22px;
+  margin-bottom: 34px;
 }
 
 .page-eyebrow {
@@ -278,8 +278,17 @@
 .page-sub {
   color: var(--text-muted);
   font-size: 15px;
-  max-width: 74ch;
-  line-height: 1.6;
+  /* 74ch 였다. 한글은 글자 폭이 넓어 같은 ch 라도 훨씬 길게 간다. */
+  max-width: 62ch;
+  line-height: 1.7;
+}
+
+/* 카드 안의 설명글도 같은 이유로 묶어 준다. card-note 는 머리글 옆
+   배지처럼도 쓰이므로 문단으로 쓰인 것만 좁힌다. */
+p.card-note,
+.card > .card-note {
+  max-width: 68ch;
+  line-height: 1.7;
 }
 
 /* ===== 카드 ===== */
@@ -287,7 +296,7 @@
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  padding: 18px 20px;
+  padding: 22px 24px;
 }
 
 .card-flat {
@@ -303,7 +312,7 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 12px;
+  margin-bottom: 15px;
 }
 
 .card-title {
@@ -345,7 +354,9 @@
 .stack {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  /* 14px 이었다. 카드가 여덟아홉 개 쌓이는 화면에서 그 간격은 덩어리
+     사이와 덩어리 안이 같아 보여서, 화면 전체가 한 덩어리로 읽혔다. */
+  gap: 22px;
 }
 .stack-sm {
   display: flex;
@@ -556,7 +567,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .flow-card {
@@ -4070,7 +4081,7 @@ kbd {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
-  padding: 16px 17px 14px;
+  padding: 20px 22px 18px;
 }
 .todo-clear {
   border-style: dashed;
@@ -4126,8 +4137,20 @@ kbd {
 .todo-why {
   margin: 5px 0 9px;
   font-size: 12.5px;
-  line-height: 1.7;
+  line-height: 1.75;
+  max-width: 70ch;
   color: var(--text-muted);
+}
+
+/* 화면이 두 부분이라는 것을 여백으로 말한다.
+   위쪽은 "지금 무엇을 할까"(초대 · 다음 한 가지 · 할 일 · 숫자),
+   아래쪽은 "이 사이트가 무엇인가"(여덟 단계 · 부서 · 넘긴 도구 · 설명).
+   간격이 전부 같으면 아홉 덩어리가 한 줄로 보이고, 그러면 어디서 끊어
+   읽을지를 읽는 사람이 정해야 한다. 선 하나와 여백으로 대신 정해 준다. */
+.band-break {
+  margin-top: 18px;
+  padding-top: 30px;
+  border-top: 1px solid var(--border);
 }
 
 /* ===== 여러 건 한 번에 ===== */

@@ -61,19 +61,28 @@ export default function FlowPage() {
           나간다. 할 수 있게 만들어 놓고 할 수 있다고 말을 안 한 것이다. */}
       <TryIt provenance={data?.provenance} counts={data?.counts} />
 
+      {/* 예시를 넣은 다음 무엇을 눌러야 하는가.
+          "예시 세 건 넣기"를 놨더니, 눌러 보면 접수함에 세
+          건이 들어오고 거기서 끝이었다. 나머지 일곱 단계는 비어 있는데
+          무엇을 해야 채워지는지가 아무 데도 없었다. 한 칸씩 밀어 준다.
+
+          이 칸이 할 일 목록과 숫자판 **아래**에 있었다. 처음 온 사람이
+          맨 위에서 만나는 것이 열일곱 종짜리 할 일 목록과 숫자 격자였고,
+          정작 "다음에 이거 하나만 누르세요"는 그 밑에 깔려 있었다.
+          읽는 순서를 가벼운 것부터로 바꾼다 — 눌러도 된다 → 다음 한 가지
+          → 밀린 것 전부 → 숫자. */}
+      {data && <NextStep overview={data} />}
+
       {data && data.counts.total > 0 && (
         <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} signoffs={signoffs} />
       )}
 
       {data && data.counts.total > 0 && <Overview data={data} />}
 
-      {/* 예시를 넣은 다음 무엇을 눌러야 하는가.
-          "예시 세 건 넣기"를 놨더니, 눌러 보면 접수함에 세
-          건이 들어오고 거기서 끝이었다. 나머지 일곱 단계는 비어 있는데
-          무엇을 해야 채워지는지가 아무 데도 없었다. 한 칸씩 밀어 준다. */}
-      {data && <NextStep overview={data} />}
-
-      <div className="row-between" style={{ marginTop: 4 }}>
+      {/* 여기서부터 화면의 성격이 바뀐다. 위는 "지금 무엇을 할까",
+          아래는 "이 사이트가 무엇인가"다. 간격이 전부 같으면 아홉 덩어리가
+          한 줄로 보여서 어디서 끊어 읽을지를 읽는 사람이 정해야 했다. */}
+      <div className="row-between band-break">
         <h2 style={{ margin: 0 }}>여덟 단계</h2>
         <div className="row">
           {/* 넘긴 도구 화면은 아래 '부서에 넘긴 도구' 칸으로만 갈 수 있었는데,
