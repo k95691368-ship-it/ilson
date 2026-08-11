@@ -386,7 +386,9 @@ describe('부서도 자기 도구의 성과를 보는가', () => {
   it('기준선이 없으면 아무 숫자도 안 낸다', () => {
     // 잰 적이 없으면 견줄 바닥이 없다. 그때 0이라고 적으면 "안 줄었다"로
     // 읽히는데, 실제로는 모르는 것이다.
-    expect(route).toContain('if (baseline && recent.results.length > 0)')
+    // 조건이 recent(최근 40번)에서 totals(전수)로 바뀌었다. 최근 40번으로
+    // 계산하면 41번 넘게 돌린 도구의 절감이 부서 화면에서만 멈춘다.
+    expect(route).toContain("if (baseline && (totals?.n ?? 0) > 0)")
     expect(page).toContain('{data.payoff && (')
   })
 })

@@ -12,16 +12,10 @@
 // 반성문이 아니다. 반려가 늘면 여기 숫자가 늘고, 격리가 줄면 여기 숫자가 준다.
 
 import { jsonResponse, failUnexpected } from '../_lib/http.js'
-import { computeOutcome, buildChallenges, runsFromTotals } from '../../shared/outcome.js'
+import { computeOutcome, liveChallenges, runsFromTotals, daysSince } from '../../shared/outcome.js'
 import { OUTCOME_KIND } from '../../shared/accept.js'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
-function daysSince(sqlTime) {
-  if (!sqlTime) return 0
-  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
-  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
-}
-
 // 데이터로 증명할 수 없는 것들.
 //
 // 이것만은 손으로 적는다. 데이터에서 뽑을 수 없는 종류의 한계이기 때문이다.
@@ -230,15 +224,17 @@ export async function onRequestGet({ env }) {
         amortizeMonths: r.amortize_months ?? 24,
       })
       if (computed.status === '산정불가') continue
-      const done = new Set(String(r.resolved_codes ?? '').split(',').filter(Boolean))
-      for (const c of buildChallenges({
+      // 세는 자리를 shared/outcome.js 한 곳으로 모았다. 네 화면이 각자
+      // 세다가 서로 다른 개수를 말했다.
+      const { open } = liveChallenges({
         outcome: computed,
         quarantineLeft: r.quarantine_left ?? 0,
         deptConfirmed: Boolean(r.dept_confirmed_at),
         baselineAgeDays: daysSince(r.sealed_at),
         deptFelt,
-      })) {
-        if (done.has(c.code)) continue
+        resolvedCodes: r.resolved_codes,
+      })
+      for (const c of open) {
         openChallenges.push({ rule_code: c.code, title: c.title, body: c.body, ticket_no: r.ticket_no })
       }
     }

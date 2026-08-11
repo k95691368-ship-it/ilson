@@ -12,7 +12,7 @@ import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { annualHours } from '../../_lib/applications.js'
 import { sortPending } from '../../../shared/pending.js'
 import { returnedFor } from '../../../shared/returned.js'
-import { computeOutcome, buildChallenges, runsFromTotals } from '../../../shared/outcome.js'
+import { computeOutcome, liveChallenges, runsFromTotals, daysSince } from '../../../shared/outcome.js'
 import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
@@ -20,12 +20,6 @@ import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
 const STALE_HOURS = 24
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
-function daysSince(sqlTime) {
-  if (!sqlTime) return 0
-  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
-  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
-}
-
 export async function onRequestGet({ env, params }) {
   const dept = decodeURIComponent(params.dept ?? '').trim()
   if (!dept) return jsonError('부서를 알려주세요.', 400)
@@ -202,8 +196,11 @@ export async function onRequestGet({ env, params }) {
                   -- 읽을 때 계산한다 — 그래서 여기서 미해소를 세면 영원히
                   -- 0이다. 실제로 그렇게 짰다가 성과 화면은 '보수적 추정'인데
                   -- 부서 화면은 '반박 없음'이라고 말했다.
-                  (SELECT COUNT(*) FROM outcome_challenge c
-                    WHERE c.application_id = a.id AND c.resolved_at IS NOT NULL) AS resolved_challenges
+                  -- 해소한 반박을 **개수**로 세고 있었다. 아래에서 살아 있는
+                  -- 개수에서 그 수를 빼는데, 규칙에서 이미 빠진 반박이 해소
+                  -- 목록에 들어 있으면 그만큼 또 빠진다. 코드로 가져와 걸러낸다.
+                  (SELECT GROUP_CONCAT(c.rule_code) FROM outcome_challenge c
+                    WHERE c.application_id = a.id AND c.resolved_at IS NOT NULL) AS resolved_codes
            FROM application a
            JOIN baseline b ON b.application_id = a.id
            LEFT JOIN outcome o ON o.application_id = a.id
@@ -395,20 +392,17 @@ export async function onRequestGet({ env, params }) {
             opsCostKrw: r.ops_cost_krw ?? 0,
             amortizeMonths: r.amortize_months ?? 24,
           })
-          const live =
-            outcome.status === '산정불가'
-              ? []
-              : buildChallenges({
-                  outcome,
-                  quarantineLeft: r.quarantine_left ?? 0,
-                  deptConfirmed: Boolean(r.dept_confirmed_at),
-                  baselineAgeDays: daysSince(r.sealed_at),
-                  deptFelt,
-                })
-          return {
-            ...r,
-            open_challenges: Math.max(0, live.length - (Number(r.resolved_challenges) || 0)),
-          }
+          // 세는 자리를 shared/outcome.js 한 곳으로 모았다. 여기서 따로
+          // 세다가 뺄셈으로 어긋났다.
+          const { openCount } = liveChallenges({
+            outcome,
+            quarantineLeft: r.quarantine_left ?? 0,
+            deptConfirmed: Boolean(r.dept_confirmed_at),
+            baselineAgeDays: daysSince(r.sealed_at),
+            deptFelt,
+            resolvedCodes: r.resolved_codes,
+          })
+          return { ...r, open_challenges: openCount }
         })
       ),
     })

@@ -12,16 +12,16 @@
 // 인쇄하거나 텍스트로 내려받는다.
 
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
-import { computeOutcome, buildChallenges, annualize, labelForOutcome } from '../../../../shared/outcome.js'
+import {
+  computeOutcome,
+  annualize,
+  labelForOutcome,
+  liveChallenges,
+  daysSince,
+} from '../../../../shared/outcome.js'
 import { OUTCOME_KIND } from '../../../../shared/accept.js'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
-function daysSince(sqlTime) {
-  if (!sqlTime) return 0
-  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
-  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
-}
-
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)
 
 export async function onRequestGet({ env, params }) {
@@ -90,7 +90,7 @@ export async function onRequestGet({ env, params }) {
     // 날이 오고, 그날 둘 다 못 믿게 된다.
     let money = null
     let moneyLabel = null
-    let liveChallenges = challenges.results
+    let challengeRows = challenges.results
     if (baseline && uses.results.length > 0) {
       let deptFelt = null
       const said = decisions.results
@@ -108,16 +108,14 @@ export async function onRequestGet({ env, params }) {
         opsCostKrw: outcome?.ops_cost_krw ?? 0,
         amortizeMonths: outcome?.amortize_months ?? 24,
       })
-      const shouldHave =
-        computed.status === '산정불가'
-          ? []
-          : buildChallenges({
-              outcome: computed,
-              quarantineLeft: uses.results.at(-1)?.quarantined ?? 0,
-              deptConfirmed: Boolean(outcome?.dept_confirmed_at),
-              baselineAgeDays: daysSince(baseline?.sealed_at),
-              deptFelt,
-            })
+      // 세는 자리를 shared/outcome.js 한 곳으로 모았다.
+      const { all: shouldHave } = liveChallenges({
+        outcome: computed,
+        quarantineLeft: uses.results.at(-1)?.quarantined ?? 0,
+        deptConfirmed: Boolean(outcome?.dept_confirmed_at),
+        baselineAgeDays: daysSince(baseline?.sealed_at),
+        deptFelt,
+      })
       if (computed.status !== '산정불가') {
         money = {
           ...computed,
@@ -129,7 +127,7 @@ export async function onRequestGet({ env, params }) {
       }
 
       const byCode = new Map(challenges.results.map((c) => [c.rule_code, c]))
-      liveChallenges = shouldHave.map((c) => {
+      challengeRows = shouldHave.map((c) => {
         const saved = byCode.get(c.code)
         return {
           rule_code: c.code,
@@ -144,7 +142,7 @@ export async function onRequestGet({ env, params }) {
     // 금액에 붙일 딱지. 미해소 반박 수에 따라 '보수적 추정'으로 내려간다.
     // 화면이 쓰는 것과 같은 함수다.
     if (money) {
-      const unresolved = liveChallenges.filter((c) => !c.resolved_at).length
+      const unresolved = challengeRows.filter((c) => !c.resolved_at).length
       moneyLabel = labelForOutcome(money, unresolved)
     }
 
@@ -207,7 +205,7 @@ export async function onRequestGet({ env, params }) {
       // 기록은 0건이었다. **평가하는 사람이 들고 가는 종이에서 자기 반박이
       // 통째로 사라진다.** 이 저장소가 파는 것이 기록인데 가장 불리한
       // 대목만 빠지는 셈이다.
-      challenges: liveChallenges,
+      challenges: challengeRows,
       money,
       moneyLabel,
       decisions: decisions.results,

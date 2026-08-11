@@ -11,9 +11,11 @@ import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import {
   computeOutcome,
-  buildChallenges,
   labelForOutcome,
   annualize,
+  liveChallenges,
+  daysSince,
+  deptFeltFrom,
 } from '../../../../shared/outcome.js'
 import { OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../../../shared/accept.js'
 
@@ -54,12 +56,6 @@ async function load(env, app) {
   }
 }
 
-function daysSince(sqlTime) {
-  if (!sqlTime) return 0
-  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
-  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
-}
-
 export async function onRequestGet({ env, params }) {
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
@@ -75,12 +71,7 @@ export async function onRequestGet({ env, params }) {
     )
       .bind(app.id, OUTCOME_KIND)
       .first()
-    let deptFelt = null
-    try {
-      deptFelt = JSON.parse(deptSaid?.alternatives)?.felt ?? null
-    } catch {
-      // 옛 기록에는 숫자가 없다.
-    }
+    const deptFelt = deptFeltFrom(deptSaid)
 
     const outcome = computeOutcome({
       baseline,
@@ -99,7 +90,8 @@ export async function onRequestGet({ env, params }) {
       // 물어봐 놓고 답이 계산에 아무 영향이 없으면 묻는 것 자체가 연기다.
       deptFelt,
     }
-    const shouldHave = outcome.status === '산정불가' ? [] : buildChallenges(context)
+    // 여기가 네 화면의 기준이었다. 이제 넷 다 이 함수를 쓴다.
+    const { all: shouldHave } = liveChallenges(context)
 
     // 저장된 반박과 지금 규칙이 만들어 낸 반박을 합친다.
     // 이미 해소한 것은 해소 상태를 지킨다.

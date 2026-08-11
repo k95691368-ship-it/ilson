@@ -299,6 +299,68 @@ export function buildChallenges(context) {
   }))
 }
 
+// 기준선을 봉인한 지 며칠 됐나.
+//
+// 이 함수가 라우트 네 곳에 똑같이 복사돼 있었다. 반박 규칙 하나가 이 값을
+// 보는데, 한 곳이라도 안 넘기면 그 화면에서만 반박이 하나 덜 뜬다.
+export function daysSince(sqlTime) {
+  if (!sqlTime) return 0
+  const t = new Date(`${String(sqlTime).replace(' ', 'T')}Z`).getTime()
+  if (!Number.isFinite(t)) return 0
+  return Math.max(0, Math.floor((Date.now() - t) / 86400000))
+}
+
+// 부서가 체감으로 말한 분. decision_log 의 alternatives 칸에 JSON 으로 있다.
+export function deptFeltFrom(row) {
+  try {
+    return JSON.parse(row?.alternatives)?.felt ?? null
+  } catch {
+    // 옛 기록에는 숫자가 없다.
+    return null
+  }
+}
+
+// 지금 살아 있는 반박이 몇 개인가.
+//
+// 이 계산이 네 군데에 따로 있었다 — 담당자 성과, 정직, 부서별, 부서 도구
+// 화면. 그리고 넷이 서로 달랐다.
+//
+//   · 부서 도구 화면은 buildChallenges 에 baselineAgeDays 와 deptFelt 를
+//     아예 안 넘겨서 규칙 둘이 영영 안 걸렸다.
+//   · 같은 화면이 해소한 반박을 빼지도 않아서, 담당자가 전부 해소해도
+//     부서에게는 영원히 '보수적 추정'이라고 적혔다.
+//   · 부서별 화면은 살아 있는 개수에서 해소한 개수를 **뺄셈**으로 셌다.
+//     규칙에서 이미 빠진 반박이 해소 목록에 있으면 그만큼 또 빠진다.
+//
+// 같은 것을 네 벌로 두면 규칙이 하나 늘 때마다 세 곳이 뒤처진다. 실제로
+// 그렇게 갈렸다. 세는 자리를 하나로 모은다.
+//
+// resolvedCodes 는 배열이든 GROUP_CONCAT 으로 이어 붙인 문자열이든 받는다 —
+// 라우트마다 뽑는 방식이 달라서, 여기서 맞춰 주지 않으면 또 갈린다.
+export function liveChallenges(context = {}) {
+  const { resolvedCodes, ...ruleContext } = context
+
+  // 셀 숫자가 없으면 반박도 없다.
+  //
+  // 산정불가는 물론이고 outcome 이 아예 없을 때도 여기서 멈춘다. 규칙들이
+  // outcome 의 칸을 바로 읽기 때문에, 안 막으면 터진다 — 그리고 이제 이
+  // 함수 하나에 네 라우트가 매달려 있으므로 여기서 터지면 네 화면이 같이
+  // 죽는다. 모아 놓은 자리는 그만큼 튼튼해야 한다.
+  if (!ruleContext.outcome || ruleContext.outcome.status === '산정불가') {
+    return { all: [], open: [], openCount: 0 }
+  }
+
+  const done = new Set(
+    (Array.isArray(resolvedCodes) ? resolvedCodes : String(resolvedCodes ?? '').split(','))
+      .map((c) => String(c ?? '').trim())
+      .filter(Boolean)
+  )
+
+  const all = buildChallenges(ruleContext)
+  const open = all.filter((c) => !done.has(c.code))
+  return { all, open, openCount: open.length }
+}
+
 // 해소하지 못한 반박이 있으면 금액을 '보수적 추정'으로 낮춰 부른다.
 // 숫자를 바꾸지는 않는다 — 부르는 이름만 바꾼다. 숫자를 몰래 깎으면
 // 그것도 정직하지 않다.

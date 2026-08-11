@@ -58,25 +58,40 @@ describe('살아 있는 반박을 저장된 표에서 세지 않는가', () => {
   })
 
   it('반박을 보여주는 라우트는 계산 함수를 쓴다', () => {
-    // 표만 읽고 buildChallenges 를 안 부르면, 해소한 것만 보여주게 된다.
+    // 표만 읽고 규칙을 안 돌리면, 해소한 것만 보여주게 된다.
     const shows = ['functions/api/honesty.js', 'functions/api/applications/[id]/record.js']
     for (const rel of shows) {
       const src = readFileSync(join(ROOT, rel), 'utf8')
-      expect(src.includes('buildChallenges')).toBe(true)
+      expect(src, rel).toMatch(/liveChallenges|buildChallenges/)
     }
   })
 
   it('성과 화면과 같은 함수를 쓴다', () => {
     // 네 곳이 각자 다른 셈법을 쓰면 한 사이트가 같은 숫자를 두고 다른
-    // 말을 한다. 실제로 그랬다.
+    // 말을 한다. 실제로 그랬다 — 부서 도구 화면만 baselineAgeDays·deptFelt
+    // 를 안 넘겨 규칙 둘이 영영 안 걸렸고, 해소한 반박도 안 빼서 담당자가
+    // 전부 해소해도 부서에게는 영원히 '보수적 추정'이라고 적혔다. 부서별
+    // 화면은 개수 뺄셈으로 세어 두 번 빼기도 했다.
+    //
+    // 그래서 '규칙 돌리기 + 해소 걷어내기'를 shared/outcome.js 의
+    // liveChallenges 하나로 모았다.
     const users = []
     for (const file of files) {
       const src = readFileSync(file, 'utf8')
-      if (src.includes('buildChallenges')) {
+      if (src.includes('liveChallenges') || src.includes('buildChallenges')) {
         users.push(file.slice(ROOT.length).split('\\').join('/'))
       }
     }
-    // 성과·부서·인쇄·정직 넷 다 같은 함수를 부른다.
+    // 성과·부서·인쇄·정직·부서도구 다섯이 같은 함수를 부른다.
     expect(users.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('해소한 반박을 개수 뺄셈으로 세지 않는다', () => {
+    // live.length - resolvedCount 로 세면, 규칙에서 이미 빠진 반박이 해소
+    // 목록에 있을 때 그만큼 또 빠진다. 코드로 걸러야 한다.
+    for (const file of files) {
+      const src = readFileSync(file, 'utf8')
+      expect(src, file).not.toMatch(/live\.length\s*-\s*\(?Number\(/)
+    }
   })
 })
