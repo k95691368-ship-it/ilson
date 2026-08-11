@@ -745,11 +745,11 @@ function BulkBar({ count, ids, onClear, onDone }) {
                 {spec.detail} <strong>왜 한 번에 해도 되나</strong> {spec.why}
               </p>
               {spec.needsReason && (
-                <div className="field">
-                  <label className="field-label">
+                <label className="field">
+                  <span className="field-label">
                     {spec.reasonLabel}
                     <span className="field-required"> *</span>
-                  </label>
+                  </span>
                   <textarea
                     rows={2}
                     value={reason}
@@ -757,7 +757,7 @@ function BulkBar({ count, ids, onClear, onDone }) {
                     placeholder={spec.reasonPlaceholder}
                   />
                   {fieldErrors.reason && <div className="field-error">{fieldErrors.reason}</div>}
-                </div>
+                </label>
               )}
               <button
                 type="button"
@@ -942,9 +942,23 @@ function Detail({ id, onSaved, pool }) {
       <form className="card decided" onSubmit={save}>
         <div className="card-head">
           <span className="origin-label origin-human">◆ 내 판정</span>
-          {data.review && (
-            <span className="card-note">{ago(data.review.updated_at)} 저장됨 · 다시 판정할 수 있습니다</span>
-          )}
+          {/* 점수가 없는 판정이 있다. 접수함에서 여러 건을 한 번에 '보류로
+              미루기' 하면 review 행은 생기지만 점수 칸은 비어 있다.
+              그런데 여기서는 review 행만 있으면 무조건 "저장됨"이라고 적었고,
+              아래 슬라이더는 값이 없을 때 3에 가 있다. 그래서 담당자는
+              "임팩트 3점으로 저장돼 있구나"로 읽는다 — 매긴 적이 없는데.
+              부서 조회 화면은 같은 건을 두고 "점수는 아직 안 매겼습니다"라고
+              적는다. 두 화면이 또 다른 말을 하고 있었다. */}
+          {data.review &&
+            (data.review.impact_score == null || data.review.difficulty_score == null ? (
+              <span className="card-note">
+                {ago(data.review.updated_at)} 한 번에 미뤄 둔 건입니다 · 점수는 아직 안 매겼습니다
+              </span>
+            ) : (
+              <span className="card-note">
+                {ago(data.review.updated_at)} 저장됨 · 다시 판정할 수 있습니다
+              </span>
+            ))}
         </div>
 
         <ScoreField
@@ -980,10 +994,11 @@ function Detail({ id, onSaved, pool }) {
         </Field>
 
         <div className="field">
-          <label className="field-label">
+          <span className="field-label">
             판정<span className="field-required"> *</span>
-          </label>
-          <div className="verdict-row">
+          </span>
+          {/* 버튼 묶음이라 라벨로 감싸지 않는다. 묶음에 이름을 준다. */}
+          <div className="verdict-row" role="group" aria-label="판정">
             {VERDICTS.map((v) => (
               <button
                 key={v}
@@ -1118,12 +1133,13 @@ function ScoreField({ label, scale, value, onChange, error }) {
   const current = scale.find((s) => String(s.score) === String(value))
   return (
     <div className="field">
-      <label className="field-label">
+      <span className="field-label">
         {label}
         <span className="field-required"> *</span>
         {current && <span className="field-hint">{current.detail}</span>}
-      </label>
-      <div className="score-row">
+      </span>
+      {/* 점수도 버튼 묶음이다. 묶음 이름은 그 칸의 제목을 그대로 쓴다. */}
+      <div className="score-row" role="group" aria-label={label}>
         {scale.map((s) => (
           <button
             key={s.score}
@@ -1142,17 +1158,20 @@ function ScoreField({ label, scale, value, onChange, error }) {
   )
 }
 
+// 라벨이 글자만 감싸고 입력칸은 형제로 있어서 둘이 연결돼 있지 않았다.
+// 바깥을 label 로 바꿔 입력칸을 품게 한다(암묵적 연결). 안쪽 글자는 span
+// 으로 내린다 — 라벨 안에 라벨은 못 넣는다.
 function Field({ label, required, hint, error, children }) {
   return (
-    <div className={`field${error ? ' has-error' : ''}`}>
-      <label className="field-label">
+    <label className={`field${error ? ' has-error' : ''}`}>
+      <span className="field-label">
         {label}
         {required && <span className="field-required"> *</span>}
         {hint && <span className="field-hint">{hint}</span>}
-      </label>
+      </span>
       {children}
-      {error && <div className="field-error" style={{ marginTop: 5 }}>{error}</div>}
-    </div>
+      {error && <span className="field-error" style={{ marginTop: 5, display: 'block' }}>{error}</span>}
+    </label>
   )
 }
 

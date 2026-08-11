@@ -208,10 +208,10 @@ function Unmerge({ merged, onDone }) {
         </button>
       ) : (
         <form className="thread-form" onSubmit={send}>
-          <div className="field">
-            <label className="field-label">
+          <label className="field">
+            <span className="field-label">
               어느 상태로 되돌립니까<span className="field-required"> *</span>
-            </label>
+            </span>
             <select
               value={form.restoreTo}
               onChange={(e) => setForm((f) => ({ ...f, restoreTo: e.target.value }))}
@@ -226,11 +226,11 @@ function Unmerge({ merged, onDone }) {
               묶기 전 상태를 시스템이 알 수 없어 직접 고르셔야 합니다. 짐작으로 되돌리면 진행
               단계가 조용히 틀어집니다.
             </p>
-          </div>
-          <div className="field">
-            <label className="field-label">
+          </label>
+          <label className="field">
+            <span className="field-label">
               왜 푸십니까<span className="field-required"> *</span>
-            </label>
+            </span>
             <textarea
               rows={2}
               value={form.why}
@@ -239,7 +239,7 @@ function Unmerge({ merged, onDone }) {
             />
             {/* 부서에게 두 번째로 말이 바뀌는 것이라 이유가 남아야 한다. */}
             {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-          </div>
+          </label>
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
               {saving ? '푸는 중…' : '풀고 기록에 남기기'}
@@ -346,10 +346,12 @@ function Verdict({ a, b, verdicts, onSaved }) {
       </div>
 
       <div className="field">
-        <label className="field-label">
+        <span className="field-label">
           같은 건입니까<span className="field-required"> *</span>
-        </label>
-        <div className="verdict-row">
+        </span>
+        {/* 버튼 묶음이라 라벨로 감싸지 않는다 — 라벨은 컨트롤 하나에만
+            붙고, 감싸면 아무 데나 눌러도 첫 버튼이 눌린다. 묶음에 이름을 준다. */}
+        <div className="verdict-row" role="group" aria-label="같은 건입니까">
           {verdicts.map((v) => (
             <button
               key={v.verdict}
@@ -380,10 +382,10 @@ function Verdict({ a, b, verdicts, onSaved }) {
         </label>
       )}
 
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           왜 그렇게 보셨습니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <textarea
           rows={3}
           value={reason}
@@ -391,7 +393,7 @@ function Verdict({ a, b, verdicts, onSaved }) {
           placeholder="둘 다 다섯 채널 정산서를 엑셀로 합치는 일이다. 부서도 같고 주기도 같다. 적은 사람만 다르다."
         />
         {fieldErrors.reason && <div className="field-error">{fieldErrors.reason}</div>}
-      </div>
+      </label>
 
       <button type="submit" className="btn-primary" disabled={saving || !verdict}>
         {saving ? '남기는 중…' : '판정하고 기록에 남기기'}

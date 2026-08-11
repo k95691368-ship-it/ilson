@@ -246,8 +246,18 @@ export async function onRequestPost({ env, params, request }) {
     }
 
     if (s.overall === '통과') {
+      // 상태 조건이 없었다. 제작 라우트에는 있는데(build.js 의
+      // `AND status = '수용'`) 여기만 빠져 있었다.
+      //
+      // 그래서 이미 완료된 건을 다시 채점하면 — 도구를 내렸다 고쳐서
+      // 재시험하는 경우가 그렇다 — 상태가 '완료'에서 '진행중'으로
+      // 되돌아갔다. 첫 화면 단계 수가 바뀌고, 부서 조회 화면은 끝난 일을
+      // 아직 하는 중이라고 말하고, 성과까지 간 기록이 뒤로 물러난다.
+      //
+      // 앞으로 가는 것만 한다. 완료·반려·보류는 건드리지 않는다.
       await env.DB.prepare(
-        "UPDATE application SET status = '진행중', updated_at = datetime('now') WHERE id = ?"
+        `UPDATE application SET status = '진행중', updated_at = datetime('now')
+         WHERE id = ? AND status IN ('수용', '진행중')`
       )
         .bind(app.id)
         .run()

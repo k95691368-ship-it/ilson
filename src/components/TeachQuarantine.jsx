@@ -151,10 +151,10 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
 
       {open && (
         <form className="teach-form" onSubmit={send}>
-          <div className="field">
-            <label className="field-label">
+          <label className="field">
+            <span className="field-label">
               어느 상품입니까<span className="field-required"> *</span>
-            </label>
+            </span>
             {/* 직접 적게 하지 않고 고르게 한다. 없는 코드로 이어 두면 그 줄이
                 또 밀려나거나, 더 나쁘게는 엉뚱한 상품 매출로 잡힌다. */}
             <select
@@ -171,12 +171,12 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
             {fieldErrors.canonicalCode && (
               <div className="field-error">{fieldErrors.canonicalCode}</div>
             )}
-          </div>
+          </label>
 
-          <div className="field">
-            <label className="field-label">
+          <label className="field">
+            <span className="field-label">
               누가 알려주십니까<span className="field-required"> *</span>
-            </label>
+            </span>
             <input
               value={form.teacher}
               onChange={(e) => setForm((f) => ({ ...f, teacher: e.target.value }))}
@@ -184,7 +184,7 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
               maxLength={60}
             />
             {fieldErrors.teacher && <div className="field-error">{fieldErrors.teacher}</div>}
-          </div>
+          </label>
 
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>

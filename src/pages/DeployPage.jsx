@@ -374,15 +374,17 @@ function Deploy({ id }) {
   )
 }
 
+// 라벨이 글자만 감싸고 입력칸은 형제로 있어서 둘이 연결돼 있지 않았다.
+// 바깥을 label 로 바꿔 입력칸을 품게 한다(암묵적 연결).
 function Field({ label, hint, children }) {
   return (
-    <div className="field">
-      <label className="field-label">
+    <label className="field">
+      <span className="field-label">
         {label}
         {hint && <span className="field-hint">{hint}</span>}
-      </label>
+      </span>
       {children}
-    </div>
+    </label>
   )
 }
 

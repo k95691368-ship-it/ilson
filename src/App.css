@@ -644,7 +644,12 @@ p.card-note,
 }
 
 /* ===== 폼 ===== */
+/* div 였는데 label 로 바꿨다. 라벨이 글자만 감싸고 입력칸은 형제로 있어서
+   둘이 연결돼 있지 않았다 — 화면 낭독기에서는 이름 없는 칸이 되고, 라벨을
+   눌러도 입력칸에 초점이 안 갔다. label 로 감싸면 연결된다.
+   label 은 기본이 inline 이라 block 을 명시한다. */
 .field {
+  display: block;
   margin-bottom: 16px;
 }
 .field:last-child {

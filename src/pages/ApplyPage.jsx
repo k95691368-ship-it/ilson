@@ -421,24 +421,33 @@ export default function ApplyPage() {
   )
 }
 
+// 라벨과 입력칸이 연결돼 있지 않았다.
+//
+// <label> 이 글자만 감싸고 입력칸은 그 옆에 형제로 있었다. htmlFor 도 없다.
+// 그러면 화면 낭독기에서 이름 없는 칸이 되고, 라벨을 눌러도 입력칸에 초점이
+// 안 간다. 이 사이트는 부서 담당자에게 긴 글을 적어 달라고 하는 화면이
+// 여럿이라, 그 자리에서 걸리면 아예 안 적는다.
+//
+// 바깥을 label 로 바꿔 입력칸을 품게 한다(암묵적 연결). 안쪽 글자는 span
+// 으로 내린다 — 라벨 안에 라벨을 넣을 수는 없다.
 function Field({ label, required, hint, error, count, children }) {
   return (
-    <div className={`field${error ? ' has-error' : ''}`}>
-      <label className="field-label">
+    <label className={`field${error ? ' has-error' : ''}`}>
+      <span className="field-label">
         {label}
         {required && <span className="field-required"> *</span>}
         {hint && <span className="field-hint">{hint}</span>}
-      </label>
+      </span>
       {children}
-      <div className="field-foot">
+      <span className="field-foot">
         {error && <span className="field-error">{error}</span>}
         {count && (
           <span className="field-count">
             {count[0]}/{count[1]}
           </span>
         )}
-      </div>
-    </div>
+      </span>
+    </label>
   )
 }
 

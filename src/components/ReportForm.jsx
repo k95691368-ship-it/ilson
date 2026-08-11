@@ -97,11 +97,11 @@ export default function ReportForm({ slug }) {
       {/* 유형을 먼저 고르게 하면 그 유형에 필요한 것을 그 자리에서 물을 수 있다.
           자유롭게 적게만 하면 "이상해요" 한 줄이 오고, 담당자가 다시 물어야 한다. */}
       {kind && (
-        <div className="field" style={{ marginTop: 12 }}>
-          <label className="field-label">
+        <label className="field" style={{ marginTop: 12 }}>
+          <span className="field-label">
             {kind.ask}
             <span className="field-required"> *</span>
-          </label>
+          </span>
           <textarea
             rows={3}
             value={form.body}
@@ -109,13 +109,13 @@ export default function ReportForm({ slug }) {
             placeholder={placeholderFor(kind.code)}
           />
           {fieldErrors.body && <div className="field-error">{fieldErrors.body}</div>}
-        </div>
+        </label>
       )}
 
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           누가 겪으신 일입니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <input
           value={form.reporter}
           onChange={(e) => setForm((f) => ({ ...f, reporter: e.target.value }))}
@@ -123,7 +123,7 @@ export default function ReportForm({ slug }) {
           maxLength={60}
         />
         {fieldErrors.reporter && <div className="field-error">{fieldErrors.reporter}</div>}
-      </div>
+      </label>
 
       <button type="submit" className="btn-primary btn-sm" disabled={saving || !form.code}>
         {saving ? '보내는 중…' : '알리기'}

@@ -416,10 +416,10 @@ function ReportItem({ report, onFixed }) {
         </div>
       ) : open ? (
         <form className="thread-form" onSubmit={send}>
-          <div className="field">
-            <label className="field-label">
+          <label className="field">
+            <span className="field-label">
               무엇을 하셨습니까<span className="field-required"> *</span>
-            </label>
+            </span>
             <textarea
               rows={2}
               value={form.how}
@@ -427,11 +427,11 @@ function ReportItem({ report, onFixed }) {
               placeholder="할인액 컬럼 이름이 바뀐 것을 못 잡고 있었습니다. 컬럼이 사라지면 막도록 고쳤습니다."
             />
             {fieldErrors.how && <div className="field-error">{fieldErrors.how}</div>}
-          </div>
-          <div className="field">
-            <label className="field-label">
+          </label>
+          <label className="field">
+            <span className="field-label">
               왜 그랬던 것입니까<span className="field-required"> *</span>
-            </label>
+            </span>
             <textarea
               rows={2}
               value={form.why}
@@ -439,7 +439,7 @@ function ReportItem({ report, onFixed }) {
               placeholder="필수 컬럼이 아니어서 없어도 넘어가게 해 뒀습니다. 금액에 들어가는 컬럼은 없으면 막아야 합니다."
             />
             {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-          </div>
+          </label>
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
               {saving ? '남기는 중…' : '처리했다고 남기기'}

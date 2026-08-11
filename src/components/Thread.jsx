@@ -126,10 +126,10 @@ function AskForm({ applicationId, onSaved }) {
 
   return (
     <form className="thread-form" onSubmit={send}>
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           무엇이 궁금하십니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <textarea
           rows={2}
           value={form.question}
@@ -137,12 +137,12 @@ function AskForm({ applicationId, onSaved }) {
           placeholder="정산서를 받는 채널이 몇 개인지, 그리고 양식이 매달 바뀌는지 알려주실 수 있을까요?"
         />
         {fieldErrors.question && <div className="field-error">{fieldErrors.question}</div>}
-      </div>
+      </label>
 
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           이걸 알아야 무엇을 정할 수 있습니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <textarea
           rows={2}
           value={form.why}
@@ -152,7 +152,7 @@ function AskForm({ applicationId, onSaved }) {
         {/* 왜 묻는지를 안 적으면 부서는 "이걸 왜 물어보지" 하고 대충 답한다.
             판정에 무엇이 걸려 있는지 알면 답이 달라진다. */}
         {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-      </div>
+      </label>
 
       <div className="row">
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
@@ -196,10 +196,10 @@ function AnswerForm({ ticket, questionId, onSaved }) {
 
   return (
     <form className="thread-form" onSubmit={send}>
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           답<span className="field-required"> *</span>
-        </label>
+        </span>
         <textarea
           rows={2}
           value={form.answer}
@@ -207,12 +207,12 @@ function AnswerForm({ ticket, questionId, onSaved }) {
           placeholder="다섯 개입니다. 양식은 자사몰만 가끔 바뀌고 나머지는 그대로입니다."
         />
         {fieldErrors.answer && <div className="field-error">{fieldErrors.answer}</div>}
-      </div>
+      </label>
 
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           누가 답하십니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <input
           value={form.author}
           onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
@@ -220,7 +220,7 @@ function AnswerForm({ ticket, questionId, onSaved }) {
           maxLength={60}
         />
         {fieldErrors.author && <div className="field-error">{fieldErrors.author}</div>}
-      </div>
+      </label>
 
       <div className="row">
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
@@ -282,10 +282,10 @@ function DeptAskForm({ ticket, onSaved }) {
 
   return (
     <form className="thread-form" onSubmit={send}>
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           무엇이 궁금하십니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <textarea
           rows={2}
           value={form.question}
@@ -293,12 +293,12 @@ function DeptAskForm({ ticket, onSaved }) {
           placeholder="언제쯤 시작될지 알 수 있을까요? 이번 달 마감 전에 필요해서 그렇습니다."
         />
         {fieldErrors.question && <div className="field-error">{fieldErrors.question}</div>}
-      </div>
+      </label>
 
-      <div className="field">
-        <label className="field-label">
+      <label className="field">
+        <span className="field-label">
           누가 물으십니까<span className="field-required"> *</span>
-        </label>
+        </span>
         <input
           value={form.author}
           onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
@@ -311,7 +311,7 @@ function DeptAskForm({ ticket, onSaved }) {
           알아볼 수 있게 하는 것입니다.
         </div>
         {fieldErrors.author && <div className="field-error">{fieldErrors.author}</div>}
-      </div>
+      </label>
 
       <div className="row">
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>

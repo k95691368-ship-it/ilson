@@ -756,7 +756,14 @@ function ConflictCard({ c, send, toast }) {
         </>
       ) : (
         <div className="conditional-box" style={{ marginTop: 10 }}>
-          <div className="verdict-row" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          {/* 버튼 묶음이라 라벨로 감싸지 않는다 — 라벨은 컨트롤 하나에만
+              붙고, 감싸면 아무 데나 눌러도 첫 버튼이 눌린다. 묶음에 이름을 준다. */}
+          <div
+            className="verdict-row"
+            role="group"
+            aria-label="부딪히는 요구를 어떻게 판정합니까"
+            style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}
+          >
             {CONFLICT_VERDICTS.map((v) => (
               <button
                 key={v}
