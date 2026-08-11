@@ -297,10 +297,24 @@ function Build({ id }) {
                   </thead>
                   <tbody>
                     {data.rows.slice(0, 120).map((r) => (
+                      /* 줄을 눌러야 원본을 되짚는데, 누를 수 있다는 표시가
+                         커서 모양뿐이었고 키보드로는 아예 못 열었다. 이
+                         사이트가 내내 자랑하는 기능이 마우스 쓰는 사람만
+                         쓸 수 있었던 것이다.
+                         줄 전체를 누르는 편이 손이 덜 가니 그건 남기고,
+                         초점을 받아 엔터·스페이스로도 열리게 한다. */
                       <tr
                         key={r.id}
                         className={`clickable${selectedRow?.id === r.id ? ' selected' : ''}`}
+                        tabIndex={0}
+                        aria-label={`${r.date} ${r.channel} ${r.sku_name} — 이 줄이 어디서 왔는지 보기`}
                         onClick={() => setSelectedRow(r)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            setSelectedRow(r)
+                          }
+                        }}
                       >
                         <td>{r.date}</td>
                         <td>{r.channel}</td>

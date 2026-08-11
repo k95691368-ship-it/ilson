@@ -1965,6 +1965,15 @@ p.card-note,
 .data-table tbody tr.clickable:hover td {
   background: var(--accent-bg);
 }
+/* 누를 수 있다는 표시가 커서 모양뿐이었다. 마우스를 올리기 전에는 알 수가
+   없고, 키보드로 훑는 사람에게는 아무 단서도 없다. 초점을 또렷하게 준다. */
+.data-table tbody tr.clickable:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+.data-table tbody tr.clickable:focus-visible td {
+  background: var(--accent-bg);
+}
 .data-table tbody tr.selected td {
   background: var(--accent-bg);
 }

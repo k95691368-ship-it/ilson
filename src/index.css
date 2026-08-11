@@ -16,6 +16,9 @@
   --bg: #17171c;
   --surface: #23232a;
   --border: #33333d;
+  /* 버튼 테두리. --border 는 카드 경계용이라 옅다. 버튼은 눌러야 하는
+     것이므로 더 또렷해야 한다. */
+  --btn-line: #4a4a57;
   --code-bg: #23232a;
 
   --accent: #4d94ff;
@@ -97,6 +100,7 @@
   --bg: #ffffff;
   --surface: #f2f4f6;
   --border: #e5e8eb;
+  --btn-line: #c2c9d2;
   --code-bg: #f2f4f6;
 
   --accent: #0064ff;
@@ -296,7 +300,9 @@ button {
   font: inherit;
   font-weight: 600;
   cursor: pointer;
-  border: none;
+  /* border: none 이었다. 밝은 화면에서는 배경(#f2f4f6)이 흰 바탕과 거의
+     같아서, 버튼이 그냥 글씨로 보였다. 테두리를 준다. */
+  border: 1px solid var(--btn-line);
   border-radius: var(--radius-full);
   padding: 9px 18px;
   color: var(--text-h);
@@ -326,16 +332,25 @@ textarea:focus-visible {
   outline-offset: 2px;
 }
 
-.btn-primary {
+.btn-primary,
+a.btn-primary {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--on-accent);
   box-shadow: var(--shadow-sm);
+}
+a.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  color: var(--on-accent);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-hover);
 }
-.btn-danger {
+.btn-danger,
+a.btn-danger {
   background: var(--danger-bg);
+  border-color: var(--danger-border);
   color: var(--danger-text);
 }
 .btn-danger:hover:not(:disabled) {
@@ -353,18 +368,36 @@ a.btn-danger {
   align-items: center;
   font: inherit;
   font-weight: 600;
+  border: 1px solid var(--btn-line);
   border-radius: var(--radius-full);
   padding: 9px 18px;
   text-decoration: none;
   color: var(--text-h);
-  transition: background 0.15s ease;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+a.btn-ghost:hover {
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--accent);
+  text-decoration: none;
 }
 
 .btn-ghost {
+  /* 배경이 투명한데 테두리도 없었다. 그래서 밝은 화면에서는 굵은 글씨
+     한 줄로만 보였고, 누를 수 있는 것인지 알 수가 없었다. '접수함 열기'
+     같은 것이 전부 그랬다.
+     테두리를 남기고 배경만 비운다 — 채워진 버튼(주 동작)과 구분은 되되
+     누를 것이라는 것은 보이게. */
   background: transparent;
+  border-color: var(--btn-line);
 }
 .btn-ghost:hover:not(:disabled) {
   background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--accent);
 }
 .btn-sm {
   padding: 6px 13px;
