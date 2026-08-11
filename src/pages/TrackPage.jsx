@@ -51,11 +51,23 @@ export default function TrackPage() {
 
   // 주소에 번호가 붙어 있으면 바로 찾아 준다.
   // 담당자가 "여기 눌러 보세요" 하고 링크를 보낼 수 있다.
+  //
+  // 의존성이 [] 였다. 그래서 **처음 열 때 한 번만** 찾았다. 그런데 이 화면
+  // 안에는 다른 접수번호로 가는 링크가 여럿 있다 — 같은 건으로 묶였을 때
+  // "그 신청서가 어디까지 왔는지 보기", 재신청했을 때 새 번호. 그걸 누르면
+  // 주소만 바뀌고 화면은 앞 신청서 그대로였다.
+  //
+  // 부서 쪽에서 보면 눌렀는데 아무 일도 안 일어난 것이다. 실제로는 더
+  // 나쁜데, 주소창에는 새 번호가 떠 있으니 **지금 보고 있는 것이 그 번호인
+  // 줄 안다.** 남의 신청서를 자기 것으로 읽고, 그 화면에서 서명이나 확인을
+  // 누른다.
+  const askedNo = params.get('no')
   useEffect(() => {
-    const no = params.get('no')
-    if (no && !data && !loading) look(no)
+    if (askedNo) look(askedNo)
+    // look 은 렌더마다 새로 만들어지므로 의존성에 넣으면 끝없이 돈다.
+    // 번호가 바뀔 때만 다시 찾는 것이 맞다.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [askedNo])
 
   // 사람이 대시를 빼고 적거나 소문자로 적는 일이 흔하다. 알아서 맞춰 준다.
   function normalize(raw) {
