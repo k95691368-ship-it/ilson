@@ -166,29 +166,6 @@ export default function FlowPage() {
         </section>
       )}
 
-      <section className="card">
-        <div className="card-title">여기에 마법은 없습니다</div>
-        <p className="card-note" style={{ marginBottom: 12 }}>
-          파일을 읽고 합치고 검산하는 일은 전부 <strong>정해진 규칙</strong>이 합니다. 외부 서비스를
-          한 번도 부르지 않습니다. 같은 파일을 넣으면 언제나 같은 결과가 나오고, 어느 숫자든 눌러서
-          원본 파일의 몇 번째 줄에서 왔는지까지 되짚을 수 있습니다.
-        </p>
-        <div className="grid-2">
-          <div className="decided">
-            <span className="origin-label origin-human">◆ 사람이 정하는 것</span>
-            <div className="item-body">
-              무엇을 먼저 할지, 무엇을 반려할지, 부딪히는 요구 중 무엇을 택할지, 무엇을 통과로
-              볼지, 성과를 어떻게 셀지.
-            </div>
-          </div>
-          <div className="card-flat">
-            <span className="origin-label">◇ 규칙이 하는 것</span>
-            <div className="item-body">
-              파일 읽기, 컬럼 맞추기, 상품코드 통일, 통화 환산, 계산, 검산, 합격 기준 채점.
-            </div>
-          </div>
-        </div>
-      </section>
     </div>
   )
 }

@@ -152,14 +152,6 @@ export default function App() {
                 {STAGES.map((s) => `${s.no} ${s.label}`).join(' · ')}
               </p>
             </div>
-            <div className="footer-col">
-              <div className="footer-title">여기에 마법은 없습니다</div>
-              <p className="footer-text">
-                파일을 읽고 합치고 검산하는 일은 전부 <strong>정해진 규칙</strong>이 합니다.
-                같은 파일을 넣으면 언제나 같은 결과가 나오고, 어느 숫자든 눌러서 원본
-                파일의 몇 번째 줄에서 왔는지까지 되짚을 수 있습니다.
-              </p>
-            </div>
             {/* 여덟 단계를 세로로 내려가는 것이 아니라 **가로로 훑는** 화면들.
                 목차에 같이 걸어 뒀다가 뺐다 — 처음 온 사람에게 열네 칸을 한꺼번에
                 내밀면 어디부터 눌러야 할지 모른다.

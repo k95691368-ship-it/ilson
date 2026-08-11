@@ -837,6 +837,21 @@ function Detail({ id, onSaved, pool }) {
     }
   }
 
+  // 비슷한 신청서 찾기를 렌더 안에서 그냥 부르고 있었다.
+  //
+  // 이 함수는 접수함 전체(최대 200건)를 토큰으로 쪼개서 견준다. 그런데
+  // 판정 이유나 고려한 대안을 적는 동안 **글자 하나 칠 때마다** 그 계산이
+  // 통째로 다시 돌았다. 이 사이트가 담당자에게 가장 오래 쓰라고 만든 화면이
+  // 정확히 여기인데, 거기서 글자가 늦게 찍힌다.
+  //
+  // 훅이라 조기 반환보다 위에 둔다 — 아래에 두면 데이터가 없는 렌더에서
+  // 훅 개수가 달라져 화면이 통째로 깨진다. 이 저장소에서 실제로 그렇게
+  // 깨진 적이 있다.
+  const similarHits = useMemo(
+    () => (data?.application ? findSimilar(data.application, pool ?? [], { limit: 2 }) : []),
+    [data?.application, pool]
+  )
+
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
   if (error) return <div className="notice notice-danger">{error}</div>
   if (!data) return null
@@ -913,7 +928,7 @@ function Detail({ id, onSaved, pool }) {
           전에 이 병목이 몇 부서 것인지 알아야 한다. */}
       <Joined id={a.id} />
 
-      <SimilarNotice hits={findSimilar(a, pool ?? [], { limit: 2 })} tone="review" selfId={a.id} />
+      <SimilarNotice hits={similarHits} tone="review" selfId={a.id} />
 
       {/* 신청서만 보고 판정하기 어려우면 물어본다. 짐작으로 판정하거나
           보류로 미루는 것보다 낫다. */}

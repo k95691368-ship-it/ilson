@@ -7,6 +7,15 @@
    화면 어디에서든 이 두 가지가 눈으로 구분되어야 한다.
    ============================================================ */
 
+/* 본문·꼬리말이 같은 폭을 쓴다.
+   1180px 이었는데, 이 사이트는 대부분 읽는 화면이라 그 폭에 글을 채우면
+   한 줄이 너무 길어서 눈이 다음 줄 첫 글자를 못 찾는다. 1060px 으로 줄일
+   때 세 곳 중 꼬리말 아래줄 하나를 빠뜨려서, 넓은 창에서 구분선과 저작권
+   두 줄만 좌우로 삐져나왔다. 값을 한 곳에 둔다. */
+:root {
+  --page-max: 1060px;
+}
+
 /* ===== 셸 ===== */
 .app-shell {
   min-height: 100svh;
@@ -17,9 +26,7 @@
 .app-main {
   flex: 1;
   width: 100%;
-  /* 1180px 이었다. 이 사이트는 대부분 읽는 화면인데 그 폭에 글을 채우면
-     한 줄이 너무 길어서 눈이 다음 줄 첫 글자를 못 찾는다. */
-  max-width: 1060px;
+  max-width: var(--page-max);
   margin: 0 auto;
   padding: 34px 22px 96px;
 }
@@ -174,11 +181,14 @@
 }
 
 .footer-grid {
-  max-width: 1060px;
+  max-width: var(--page-max);
   margin: 0 auto;
   display: grid;
-  /* 네 번째 칸(가로로 훑어보기)이 늘어나면서 앞의 글이 눌리지 않게 한다. */
-  grid-template-columns: 1.3fr 0.9fr 1.1fr 0.9fr;
+  /* 네 칸이었다. '여기에 마법은 없습니다' 칸을 뺐다 — 스스로를 설명하는
+     글이었고, 거기 적힌 "어느 숫자든 눌러서 원본 줄까지 되짚을 수 있습니다"는
+     부서가 여는 도구 화면에서는 사실이 아니었다.
+     마지막 칸(가로로 훑어보기)이 늘어나면서 앞의 글이 눌리지 않게 한다. */
+  grid-template-columns: 1.3fr 1.1fr 0.9fr;
   gap: 32px;
 }
 
@@ -243,7 +253,7 @@
 }
 
 .footer-bottom {
-  max-width: 1180px;
+  max-width: var(--page-max);
   margin: 26px auto 0;
   padding-top: 16px;
   border-top: 1px solid var(--border);

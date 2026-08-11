@@ -222,6 +222,20 @@ export async function onRequestPost({ env, request }) {
     const later = String(a.created_at) >= String(b.created_at) ? a : b
     const earlier = later.id === a.id ? b : a
 
+    // 묶을 수 있는지를 **판정을 적기 전에** 본다.
+    //
+    // 전에는 판정을 먼저 기록하고 그다음에 묶기를 시도했다. 그래서 묶기가
+    // 409로 거절되면 — 예를 들어 둘 다 반려된 신청서라 묶을 것이 없을 때 —
+    // 화면에는 빨간 오류가 뜨는데 결정 기록에는 "같은 건입니다"가 이미
+    // 저장돼 있었다. 묶기 체크박스는 기본이 켜짐이라 실제로 밟기 쉬운 길이다.
+    //
+    // 담당자는 저장이 안 된 줄 알고 다시 누른다. 그때마다 판정만 하나씩
+    // 더 쌓인다. 기록은 이 사이트가 파는 것이라, 실패한 조작이 성공한
+    // 판정으로 남는 것이 제일 나쁘다.
+    const wantsMerge = verdict === '같은 건' && body.merge === true
+    const pick = wantsMerge ? pickPrimary(a, b) : null
+    if (pick?.blocked) return jsonError(pick.blocked, 409)
+
     const id = await logDecision(env, {
       applicationId: later.id,
       stage: '검토',
@@ -243,11 +257,7 @@ export async function onRequestPost({ env, request }) {
     // 묶겠다고 하면 실제로 상태를 바꾼다. 반려가 아니라 보류다 — 안 하는
     // 것이 아니라 그쪽에서 함께 하는 것이라서.
     let merged = null
-    if (verdict === '같은 건' && body.merge === true) {
-      const pick = pickPrimary(a, b)
-      if (pick.blocked) {
-        return jsonError(pick.blocked, 409)
-      }
+    if (pick) {
       await env.DB.batch([
         env.DB.prepare(
           `UPDATE application SET status = '보류', updated_at = datetime('now') WHERE id = ?`

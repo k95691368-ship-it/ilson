@@ -5,6 +5,7 @@ import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { krw, num, duration, ago } from '../lib/format.js'
+import { CHALLENGE_RULES } from '../../shared/outcome.js'
 
 export default function ResultPage() {
   const { data: list } = useApi('/applications')
@@ -336,8 +337,12 @@ function Challenges({ data, send, toast }) {
       </div>
 
       <p className="card-note" style={{ marginBottom: 12 }}>
-        스스로 반박합니다. 반박은 <strong>정해진 여덟 가지</strong>이고 해당되면 반드시 뜹니다.
-        매번 다르게 반박하면 그건 반박이 아니라 장식입니다.
+        {/* '여덟 가지'라고 손으로 적어 뒀는데 규칙은 열 개로 늘어 있었다.
+            화면 위에는 '전체 9개'가 찍히는데 바로 아래에서 여덟이라고 하니,
+            스스로의 정직함을 근거로 내세우는 화면에서 셀 수 있는 숫자가
+            어긋났다. 세는 자리에서 받아 온다. */}
+        스스로 반박합니다. 반박은 <strong>정해진 {CHALLENGE_RULES.length}가지</strong>이고 해당되면
+        반드시 뜹니다. 매번 다르게 반박하면 그건 반박이 아니라 장식입니다.
       </p>
 
       {data.challenges.length === 0 ? (

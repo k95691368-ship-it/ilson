@@ -64,6 +64,19 @@ export async function onRequestPost({ env, params, request }) {
          refuse_alternative = excluded.refuse_alternative,
          hold_until_condition = excluded.hold_until_condition,
          reviewer_label = excluded.reviewer_label,
+         -- 한 번에 미룰 때 세워 둔 표시를 지운다.
+         --
+         -- 접수함에서 여러 건을 '보류로 미루기'로 처리하면 bulk = 1 로,
+         -- 점수 없이 review 행이 생긴다. 나중에 부서가 조건이 풀렸다고
+         -- 알려 와 담당자가 이 화면에서 임팩트·난이도를 매겨 다시 저장해도
+         -- 여기서 bulk 를 안 건드리니 1로 남았다.
+         --
+         -- 그러면 부서 조회 화면이 "점수는 아직 안 매겼습니다"라고 적는다.
+         -- 담당자는 매겼는데 부서에게는 안 매긴 것으로 보인다.
+         --
+         -- 이 라우트는 한 건씩 판정하는 자리라 정의상 일괄이 아니다.
+         -- 일괄 쪽(bulk.js)이 필요하면 다시 1로 올린다.
+         bulk = 0,
          updated_at = datetime('now')`
     ).bind(
       application.id,
