@@ -1,0 +1,21 @@
+-- 신청서 한 줄마다 decision_log 를 통째로 훑던 것.
+--
+-- 접수함 목록(/applications)은 신청서마다 "아직 답 못 받은 질문"을 센다.
+-- 그 안쪽이 이렇게 생겼다 —
+--
+--   SELECT 1 FROM decision_log ans
+--    WHERE ans.link_kind = '답변' AND ans.link_id = q.id
+--
+-- link_kind 로도 link_id 로도 인덱스가 없어서, 질문 한 건마다 표를 처음부터
+-- 끝까지 훑는다. 접수함은 한 번에 200건까지 돌려주고, 그 목록을 여덟 화면이
+-- 각자 부른다.
+--
+-- 덧붙여 서명 판정도 link_kind 로 거른다. 걸린 부서가 전부 서명했는지
+-- 보려고 세 화면이 이 표를 읽는다.
+--
+-- 앞서 "decision_log 에 link_kind 인덱스가 없다"는 지적을 한 번 물렸다.
+-- 그때는 첫 화면의 쿼리 다섯 개를 실제로 재 봤더니 500줄에서 0.373ms →
+-- 0.184ms, 2,000줄에서 1.73ms → 1.09ms 로 사람이 못 느끼는 차이였다.
+-- 이번 것은 다르다. 저쪽은 표를 한 번 훑는 것이고 이쪽은 **줄마다** 훑는다.
+
+CREATE INDEX IF NOT EXISTS idx_decision_link ON decision_log(link_kind, link_id);

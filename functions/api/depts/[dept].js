@@ -15,6 +15,7 @@ import { returnedFor } from '../../../shared/returned.js'
 import { computeOutcome, liveChallenges, runsFromTotals, daysSince } from '../../../shared/outcome.js'
 import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
+import { fullySignedIds } from '../../_lib/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
 
 const STALE_HOURS = 24
@@ -217,13 +218,21 @@ export async function onRequestGet({ env, params }) {
     // 위의 owed 와 시점이 정반대다. 저건 내가 못 준 것이고 이건 부서가 아직
     // 안 준 것이다. **섞지 않는다** — 한 덩어리로 만들면 둘 다 자기 것이
     // 아닌 줄 알고 안 읽는다.
+    // 서명 줄이 하나라도 있으면 받은 것으로 세고 있었다. 다른 부서가
+    // 손들어 걸린 부서가 둘이 되면, 한 부서만 서명해도 이 건이 담당자의
+    // 남은 할 일에서 사라진다 — 정작 낸 부서는 아직 안 봤는데.
+    const signedAll = await fullySignedIds(
+      env,
+      (pendingRows.results ?? []).map((r) => ({ id: r.id, dept }))
+    )
+
     const pending = sortPending(
       (pendingRows.results ?? []).flatMap((r) => {
         const out = []
         const add = (code, since) => out.push({ code, ticket_no: r.ticket_no, title: r.title, since })
 
         // 기준이 전부 확정됐는데 아직 서명이 없다.
-        if (r.criteria_total > 0 && r.criteria_confirmed === r.criteria_total && !r.signed) {
+        if (r.criteria_total > 0 && r.criteria_confirmed === r.criteria_total && !signedAll.has(r.id)) {
           add('signoff', r.criteria_at)
         }
         // 넘겼는데 받았다는 확인이 없다. 대리로 눌러 둔 것은 부서 몫이

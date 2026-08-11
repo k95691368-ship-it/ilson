@@ -16,7 +16,7 @@ import {
   OUTCOME_KIND,
   OUTCOME_PROXY_KIND,
 } from '../../shared/accept.js'
-import { SIGNOFF_KIND } from '../../shared/signoff.js'
+import { fullySignedIds } from '../_lib/signoff.js'
 import { HOLD_LIFT_KIND } from '../../shared/holdlift.js'
 
 // 한 부탁이 몇 건에 걸렸고 몇 건이 답했는지 세는 SQL 한 쌍.
@@ -28,24 +28,19 @@ export async function onRequestGet({ env }) {
   try {
     const [signoff, accept, outcome, beta, hold] = await Promise.all([
       // ① 합격 기준을 봐 달라 — 기준이 전부 확정된 건에만 부탁한다.
+      //
+      // 여기서 SUM(signed > 0) 으로 셌었다. 서명 줄이 하나라도 있으면
+      // '답했음'이다. 그런데 다른 부서가 손들면 걸린 부서가 둘 이상이 되고,
+      // 그중 한 부서만 서명해도 이 건이 답한 것으로 세어져 응답률이 실제보다
+      // 높게 나왔다. 아래에서 부서 목록과 대조해 다시 센다.
       env.DB.prepare(
-        `SELECT
-           COUNT(*) AS asked,
-           SUM(CASE WHEN signed > 0 THEN 1 ELSE 0 END) AS answered,
-           0 AS proxied
-         FROM (
-           SELECT a.id,
-             (SELECT COUNT(*) FROM acceptance_criterion c WHERE c.application_id = a.id) AS total,
-             (SELECT COUNT(*) FROM acceptance_criterion c
-               WHERE c.application_id = a.id AND c.confirmed_at IS NOT NULL) AS confirmed,
-             (SELECT COUNT(*) FROM decision_log d
-               WHERE d.application_id = a.id AND d.link_kind = ?) AS signed
-           FROM application a
-         )
-         WHERE total > 0 AND confirmed = total`
-      )
-        .bind(SIGNOFF_KIND)
-        .first(),
+        `SELECT a.id, a.dept
+         FROM application a
+         WHERE (SELECT COUNT(*) FROM acceptance_criterion c WHERE c.application_id = a.id) > 0
+           AND (SELECT COUNT(*) FROM acceptance_criterion c
+                 WHERE c.application_id = a.id AND c.confirmed_at IS NOT NULL)
+             = (SELECT COUNT(*) FROM acceptance_criterion c WHERE c.application_id = a.id)`
+      ).all(),
 
       // ② 넘긴 것을 받았다고 눌러 달라 — 넘겼고 내리지 않은 건.
       env.DB.prepare(
@@ -111,8 +106,12 @@ export async function onRequestGet({ env }) {
         .first(),
     ])
 
+    // 걸린 부서가 전부 서명한 건만 '답했음'으로 센다.
+    const asked = signoff.results
+    const fully = await fullySignedIds(env, asked)
+
     const rows = [
-      { key: 'signoff', ...signoff },
+      { key: 'signoff', asked: asked.length, answered: fully.size, proxied: 0 },
       { key: 'accept', ...accept },
       { key: 'outcome', ...outcome },
       { key: 'beta', ...beta },

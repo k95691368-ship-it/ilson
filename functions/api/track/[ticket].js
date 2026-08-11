@@ -15,7 +15,7 @@ import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { annualHours } from '../../_lib/applications.js'
 import { REFUSE_REASONS } from '../../../shared/review.js'
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
-import { SIGNOFF_KIND } from '../../../shared/signoff.js'
+import { fullySignedIds } from '../../_lib/signoff.js'
 import { bulkHoldFrom } from '../../../shared/holdlift.js'
 
 // 기록이 다른 신청서를 가리키고 있으면 그 접수번호를 붙여 준다.
@@ -331,7 +331,13 @@ export async function onRequestGet({ env, params, request }) {
     // 그 기준을 부서는 한 번도 본 적이 없다.
     const criteriaTotal = criteria?.n ?? 0
     const criteriaConfirmed = criteria?.confirmed ?? 0
-    const signed = decisions.results.some((d) => d.link_kind === SIGNOFF_KIND)
+    // 서명 줄이 하나라도 있으면 받은 것으로 세고 있었다. 다른 부서가
+    // 손들어 걸린 부서가 둘이 되면, 그중 한 부서가 먼저 서명하는 순간
+    // 정작 낸 부서는 확인 안내를 더 이상 못 받는다. 그리고 5단계에서
+    // "합격 기준을 통과했습니다"가 나간다 — 서명 안 한 부서는 그 기준을
+    // 본 적이 없는데.
+    const fullySigned = await fullySignedIds(env, [{ id: app.id, dept: app.dept }])
+    const signed = fullySigned.has(app.id)
     if (criteriaTotal > 0 && criteriaConfirmed === criteriaTotal && !signed) {
       needs.push({ code: 'criteria_signoff', body: `${criteriaTotal}개 항목입니다.` })
     }

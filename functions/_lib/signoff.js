@@ -141,3 +141,84 @@ export async function requiredDeptsOf(env, applicationId, ownDept) {
 
   return [...new Set([ownDept, ...joined].filter(Boolean))]
 }
+
+// 걸린 부서가 **전부** 서명했는가. 신청서 여러 건을 한 번에 판정한다.
+//
+// 세 곳이 각자 "SIGNOFF_KIND 줄이 하나라도 있으면 서명 받은 것"으로 세고
+// 있었다 — 조회 화면의 '지금 해 주셔야 할 것', 부서 응답률, 부서별 화면의
+// 남은 할 일.
+//
+// 그런데 다른 부서가 손들면 걸린 부서가 둘 이상이 된다. 그중 한 부서가
+// 먼저 서명하는 순간 —
+//   · 정작 신청서를 낸 부서는 확인 안내를 더 이상 못 받고,
+//   · 응답률은 이 건을 '답했음'으로 세어 실제보다 높게 나오고,
+//   · 담당자의 남은 할 일에서도 사라진다.
+//
+// 그리고 5단계에서 "합격 기준을 통과했습니다"가 나간다. 서명 안 한 부서는
+// 그 기준을 본 적이 없는데.
+//
+// 판정 자체는 shared/signoff.js 가 이미 갖고 있다(signoffState 의
+// waitingDepts). 여기서는 여러 건을 한 번에 보기 위해 같은 규칙으로 센다.
+export async function fullySignedIds(env, apps) {
+  const list = (apps ?? []).filter((a) => a?.id)
+  if (list.length === 0) return new Set()
+
+  const holes = list.map(() => '?').join(',')
+  const ids = list.map((a) => a.id)
+
+  const [signs, joins] = await Promise.all([
+    env.DB.prepare(
+      `SELECT application_id, link_id AS dept FROM decision_log
+       WHERE link_kind = ? AND application_id IN (${holes})`
+    )
+      .bind(SIGNOFF_KIND, ...ids)
+      .all(),
+    env.DB.prepare(
+      `SELECT id, application_id, title, why, link_kind, link_id FROM decision_log
+       WHERE link_kind IN (?, ?) AND application_id IN (${holes})`
+    )
+      .bind(JOIN_KIND, UNJOIN_KIND, ...ids)
+      .all(),
+  ])
+
+  const signedBy = new Map()
+  for (const r of signs.results) {
+    if (!signedBy.has(r.application_id)) signedBy.set(r.application_id, new Set())
+    // 옛 기록에는 부서가 안 붙어 있다. 그때는 낸 부서가 한 것으로 본다.
+    signedBy.get(r.application_id).add(r.dept ?? null)
+  }
+
+  // 담당자가 "이건 다른 건입니다"로 푼 손은 뺀다. 풀었는데도 그 부서
+  // 서명을 기다리면 이 신청서는 영영 확인됨이 못 된다.
+  const released = new Set(
+    joins.results.filter((r) => r.link_kind === UNJOIN_KIND).map((r) => r.link_id)
+  )
+  const joinedBy = new Map()
+  for (const r of joins.results) {
+    if (r.link_kind !== JOIN_KIND || released.has(r.id)) continue
+    let dept = null
+    try {
+      dept = JSON.parse(r.why).dept
+    } catch {
+      // 옛 기록은 제목에만 부서가 들어 있다.
+      dept = String(r.title ?? '').split(' — ')[0]
+    }
+    if (!dept) continue
+    if (!joinedBy.has(r.application_id)) joinedBy.set(r.application_id, new Set())
+    joinedBy.get(r.application_id).add(dept)
+  }
+
+  const done = new Set()
+  for (const a of list) {
+    const need = new Set([a.dept, ...(joinedBy.get(a.id) ?? [])].filter(Boolean))
+    const got = signedBy.get(a.id) ?? new Set()
+    if (got.size === 0) continue
+    // 부서가 안 붙은 옛 서명 한 장은 낸 부서 것으로 본다.
+    if (got.has(null) && need.size <= 1) {
+      done.add(a.id)
+      continue
+    }
+    if ([...need].every((d) => got.has(d))) done.add(a.id)
+  }
+  return done
+}

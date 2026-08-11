@@ -34,12 +34,32 @@ export default function FlowPage() {
   // 화면마다 "여기 볼 것이 있습니다"를 자기 안에서만 말한다. 그래서
   // 담당자가 아침에 앉으면 여섯 화면을 돌아다녀야 오늘 뭘 할지 안다.
   // 그러면 안 돌아다닌다 — 늘 열던 한 화면만 열고 나머지는 쌓인다.
-  const { data: reports } = useApi('/reports')
-  const { data: codes } = useApi('/codes')
-  const { data: tools } = useApi('/tools')
-  const { data: stalls } = useApi('/stalls')
-  const { data: joins } = useApi('/joins')
-  const { data: signoffs } = useApi('/signoffs')
+  const { data: reports, error: reportsErr } = useApi('/reports')
+  const { data: codes, error: codesErr } = useApi('/codes')
+  const { data: tools, error: toolsErr } = useApi('/tools')
+  const { data: stalls, error: stallsErr } = useApi('/stalls')
+  const { data: joins, error: joinsErr } = useApi('/joins')
+  const { data: signoffs, error: signoffsErr } = useApi('/signoffs')
+
+  // 못 불러온 것을 '없는 것'으로 세지 않는다.
+  //
+  // 할 일 목록은 이 일곱 곳에서 재료를 모은다. 그중 하나가 503을 내면
+  // 그 갈래는 그냥 0건이 되고, 화면은 "지금 손볼 것이 없습니다 … 이
+  // 11가지를 보고 드리는 말씀입니다"라고 적는다. 결과를 믿을 수 없다는
+  // 신고가 세 건 그대로 있는 아침에도 그렇게 적는다.
+  //
+  // 담당자는 오늘 할 일이 없다고 읽고 그 화면들을 안 연다. 못 센 것을
+  // 안 센 것처럼 말하는 것이 이 사이트가 제일 하면 안 되는 일이다.
+  const missing = [
+    ['신고', reportsErr],
+    ['알려 준 코드', codesErr],
+    ['넘긴 도구', toolsErr],
+    ['막힌 곳', stallsErr],
+    ['손든 부서', joinsErr],
+    ['부서 서명', signoffsErr],
+  ]
+    .filter(([, err]) => err)
+    .map(([name]) => name)
 
   return (
     <div className="stack">
@@ -74,7 +94,16 @@ export default function FlowPage() {
       {data && <NextStep overview={data} />}
 
       {data && data.counts.total > 0 && (
-        <Todo overview={data} reports={reports} codes={codes} tools={tools} stalls={stalls} joins={joins} signoffs={signoffs} />
+        <Todo
+          overview={data}
+          reports={reports}
+          codes={codes}
+          tools={tools}
+          stalls={stalls}
+          joins={joins}
+          signoffs={signoffs}
+          missing={missing}
+        />
       )}
 
       {data && data.counts.total > 0 && <Overview data={data} />}
@@ -222,7 +251,7 @@ function NextStep({ overview }) {
 // 아무거나 다 올리지 않는다. 스무 개가 올라온 목록은 아무것도 안 올라온
 // 것과 같다. 그리고 순서가 틀리면 더 나쁘다 — 숫자가 틀리는 일보다
 // 사용법서 쓰는 일이 위에 있으면 그 목록은 쓸모가 없다.
-function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
+function Todo({ overview, reports, codes, tools, stalls, joins, signoffs, missing = [] }) {
   const items = buildTodo({ overview, reports, codes, tools, stalls, joins, signoffs })
   const s = todoSummary(items)
 
@@ -237,6 +266,7 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
         <p className="card-note">
           {NOTHING_CHECKED.join(' · ')} — 이 {NOTHING_CHECKED.length}가지를 보고 드리는 말씀입니다.
         </p>
+        {missing.length > 0 && <MissingNote missing={missing} />}
       </section>
     )
   }
@@ -249,6 +279,8 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
         {s.money > 0 && <span className="badge badge-danger">금액에 걸리는 것 {s.money}</span>}
         {s.waiting > 0 && <span className="badge badge-warning">사람이 기다리는 것 {s.waiting}</span>}
       </div>
+
+      {missing.length > 0 && <MissingNote missing={missing} />}
 
       <ol className="todo-list">
         {items.map((i) => (
@@ -268,6 +300,25 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs }) {
         ))}
       </ol>
     </section>
+  )
+}
+
+// 못 센 것을 밝힌다.
+//
+// 할 일 목록은 일곱 곳에서 재료를 모은다. 하나가 503을 내면 그 갈래는
+// 그냥 0건이 되고, 화면은 아무 일 없다는 얼굴을 한다. 세지 **못한** 것과
+// 셌더니 **없는** 것은 다른 말인데 화면이 그 둘을 같게 말했다.
+function MissingNote({ missing }) {
+  return (
+    <div className="notice notice-warn" style={{ marginTop: 12 }}>
+      <div className="notice-title">
+        이 중 {missing.length}가지는 지금 못 불러왔습니다 — {missing.join(' · ')}
+      </div>
+      <p className="card-note">
+        못 세었다는 뜻이지 없다는 뜻이 아닙니다. 잠시 뒤 새로고침해 보시고, 계속 이러면 해당
+        화면을 직접 열어 확인해 주세요.
+      </p>
+    </div>
   )
 }
 
