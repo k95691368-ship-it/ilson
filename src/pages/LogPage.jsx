@@ -83,7 +83,7 @@ export default function LogPage() {
         <p className={`log-sideline${data.sides?.dept === 0 ? ' none' : ''}`}>{data.sideLine}</p>
       )}
 
-      <section className="card">
+      <section className="card card-boxed">
         <div className="card-head">
           <span className="card-title">골라 보기</span>
           {(filters.stage || filters.dept || filters.actor || filters.side || filters.unrequested || filters.q) && (

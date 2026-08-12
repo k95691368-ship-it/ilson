@@ -364,7 +364,6 @@ function Result({ data, as, onChanged }) {
       <section className="card">
         <div className="card-head">
           <span className="card-title">진행 상황</span>
-          <span className="card-note">여덟 단계</span>
         </div>
         <ol className="track-timeline">
           {data.timeline.map((t) => (

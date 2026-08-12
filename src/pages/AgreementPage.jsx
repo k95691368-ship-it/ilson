@@ -144,7 +144,7 @@ function Stakeholders({ data, send, toast }) {
   const [form, setForm] = useState({ dept: '', role_label: '', person_label: '', wants: '' })
 
   return (
-    <section className="card">
+    <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">누가 이 일에 얽혀 있나</span>
         <span className="card-note">각자 원하는 것이 다르고, 그 차이가 충돌이 된다</span>
@@ -230,7 +230,7 @@ function Meetings({ data, send, toast }) {
   const [editing, setEditing] = useState(null)
 
   return (
-    <section className="card">
+    <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">회의록</span>
         <span className="card-note">여기 적힌 말만 요구의 근거가 된다</span>
@@ -326,7 +326,7 @@ function Requirements({ data, send, toast }) {
   }
 
   return (
-    <section className="card">
+    <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">회의에서 나온 것들</span>
         <span className="card-note">
@@ -612,7 +612,7 @@ function Conflicts({ data, send, toast }) {
   const usable = data.requirements.filter((r) => r.status !== '기각')
 
   return (
-    <section className="card">
+    <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">동시에 될 수 없는 것들</span>
         <span className="card-note">여기가 사람이 판단해야 하는 자리다</span>
@@ -1074,7 +1074,7 @@ function Objections({ id, toast }) {
   }
 
   return (
-    <section className="card">
+    <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">부서가 합격 기준을 본 결과</span>
         <span className={`badge ${state.binding ? 'badge-success' : 'badge-warning'}`}>

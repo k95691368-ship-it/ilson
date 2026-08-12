@@ -91,7 +91,6 @@ function Plain() {
       <section className="card">
         <div className="card-head">
           <span className="card-title">여덟 단계</span>
-          <span className="card-note">신청서 한 건이 지나가는 길</span>
         </div>
         <ol className="built-stages">
           {PLAIN.stages.map((s) => (

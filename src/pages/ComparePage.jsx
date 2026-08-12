@@ -95,7 +95,6 @@ export default function ComparePage() {
       <section className="card">
         <div className="card-head">
           <span className="card-title">값으로 적힌 것</span>
-          <span className="card-note">다른 칸에 표시가 붙습니다</span>
         </div>
         <div className="cmp-values">
           {data.values

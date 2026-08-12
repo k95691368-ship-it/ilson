@@ -300,7 +300,22 @@ p.card-note,
 }
 
 /* ===== 카드 ===== */
+/* 상자를 걷어낸다.
+   =========================================================
+   화면당 카드가 40개였다. 여백을 벌리고 글자를 키워도 빡빡한 이유가
+   그것이었다 — 사실 하나마다 테두리와 배경을 두른 상자가 하나씩 붙어서,
+   눈이 쉴 데 없이 마흔 번 경계를 넘는다.
+   상자는 "여기부터 저기까지가 한 덩어리"를 말하려고 쓰는 것인데, 마흔 개면
+   아무것도 안 말한다. 제목과 여백이 같은 일을 더 조용히 한다.
+   그래서 기본은 상자가 아니라 **구획**이다. 배경도 테두리도 없이 제목과
+   간격으로만 나눈다. 진짜로 테를 둘러야 하는 것 — 지금 조작할 것, 눌러야
+   하는 것 — 은 아래 .card-boxed 로 따로 표시한다. */
 .card {
+  padding: 0;
+}
+
+/* 테를 둘러야 하는 것만. 폼처럼 그 안에서 무언가를 하는 자리다. */
+.card-boxed {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -316,11 +331,18 @@ p.card-note,
 
 .card-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
-  margin-bottom: 15px;
+  /* 상자가 없어졌으니 제목 아래가 곧 경계다. */
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.card-boxed .card-head {
+  border-bottom: 0;
+  padding-bottom: 0;
 }
 
 .card-title {

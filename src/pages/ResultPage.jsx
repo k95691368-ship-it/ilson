@@ -134,7 +134,6 @@ function Result({ id }) {
       <section className="card">
         <div className="card-head">
           <span className="card-title">어떻게 나온 숫자인가</span>
-          <span className="card-note">접어 두지 않습니다</span>
         </div>
 
         <div className="formula">
@@ -206,7 +205,7 @@ function Result({ id }) {
         )}
       </section>
 
-      <section className="card">
+      <section className="card card-boxed">
         <div className="card-head">
           <span className="card-title">계산에 넣을 값</span>
           <span className="card-note">적게 잡으면 성과가 커 보입니다</span>

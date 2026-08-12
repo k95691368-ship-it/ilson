@@ -365,7 +365,7 @@ function Feedback({ data, id, toast, onDone }) {
   const [form, setForm] = useState({ dept: '', person_label: '', body: '', feedback_kind: '의견' })
 
   return (
-    <section className="card">
+    <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">실제로 써 본 사람이 한 말</span>
         <span className="card-note">

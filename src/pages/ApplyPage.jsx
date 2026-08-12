@@ -202,7 +202,7 @@ export default function ApplyPage() {
             </section>
           )}
 
-          <section className="card">
+          <section className="card card-boxed">
             <div className="card-head">
               <span className="card-title">누가 신청하나요</span>
             </div>
@@ -239,7 +239,7 @@ export default function ApplyPage() {
             </div>
           </section>
 
-          <section className="card">
+          <section className="card card-boxed">
             <div className="card-head">
               <span className="card-title">무엇이 막혀 있나요</span>
             </div>
@@ -320,7 +320,7 @@ export default function ApplyPage() {
             </Field>
           </section>
 
-          <section className="card">
+          <section className="card card-boxed">
             <div className="card-head">
               <span className="card-title">지금 얼마나 드나요</span>
               <span className="card-note">나중에 성과를 재는 기준이 됩니다</span>

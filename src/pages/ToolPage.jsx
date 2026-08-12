@@ -482,7 +482,6 @@ export default function ToolPage() {
         <section className="card">
           <div className="card-head">
             <span className="card-title">이 도구가 걸어온 일</span>
-            <span className="card-note">숨기지 않고 적어 둡니다</span>
           </div>
 
           {data.restored && (

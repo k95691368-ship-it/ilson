@@ -342,7 +342,7 @@ export default function ReviewPage() {
             />
           </section>
 
-          <section className="card">
+          <section className="card card-boxed">
             <div className="card-head">
               <span className="card-title">골라 보기</span>
               <span className="card-note">{describeQuery(query, visible.length, items.length)}</span>

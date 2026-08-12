@@ -160,7 +160,6 @@ export default function FlowPage() {
       <section className="card">
         <div className="card-head">
           <span className="card-title">부서별로 보기</span>
-          <span className="card-note">이름을 누르면 그 부서와 있었던 일 전부</span>
         </div>
         <div className="chip-row">
           {DEPTS.map((d) => (
@@ -677,7 +676,6 @@ function Overview({ data }) {
             <section className="card">
               <div className="card-head">
                 <span className="card-title">부서별</span>
-                <span className="card-note">이름을 누르면 그 부서와 있었던 일 전부</span>
               </div>
               <div className="table-wrap" style={{ marginTop: 8 }}>
                 <table className="data-table">

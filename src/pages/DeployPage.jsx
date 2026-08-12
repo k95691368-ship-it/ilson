@@ -202,7 +202,7 @@ function Deploy({ id }) {
         </div>
       )}
 
-      <section className="card">
+      <section className="card card-boxed">
         <div className="card-head">
           <span className="card-title">{h ? '넘긴 내용 고치기' : '누구에게 넘기나'}</span>
           <span className="card-note">주소는 한 번 정해지면 바뀌지 않습니다</span>
