@@ -6716,3 +6716,38 @@ kbd {
     left: 0;
   }
 }
+
+/* 접힌 나머지. 목록을 화면에서 자를 때 쓴다. */
+.capped-more,
+.todo-later {
+  margin-top: 10px;
+}
+.fold-count {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-muted);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  background: var(--surface);
+}
+
+/* 인쇄할 때는 접힌 것을 전부 편다.
+   기록 문서·사용법서·조회 화면은 종이가 결과물이다. 접힌 채로 인쇄되면
+   그 종이에는 없는 것이 되고, 그게 이 사이트가 제일 하면 안 되는 일이다.
+   CSS 만으로는 브라우저마다 다르게 굴어서 App.jsx 의 beforeprint 가
+   실제로 open 을 달아 준다. 이건 그 위의 안전망이다. */
+@media print {
+  details {
+    display: block !important;
+  }
+  details > summary {
+    list-style: none;
+  }
+  details:not([open]) > *:not(summary) {
+    display: revert !important;
+  }
+  .capped-more > summary,
+  .todo-later > summary {
+    font-weight: 700;
+  }
+}

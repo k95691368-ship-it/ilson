@@ -117,8 +117,38 @@ function CrosscutMenu() {
   )
 }
 
+// 인쇄할 때는 접힌 것을 전부 편다.
+//
+// 기록 문서(/record)·사용법서·조회 화면은 **종이가 결과물**이다. 파일 머리에
+// 그렇게 적혀 있고, 화면에도 "인쇄하거나 그대로 붙여 넣으실 수 있습니다"라고
+// 적어 뒀다. 그런데 접기를 넣으면 접힌 것이 그대로 인쇄된다 — 그 종이에는
+// 없는 것이 되고, 받은 사람은 그런 것이 있었는지도 모른다.
+//
+// CSS 의 @media print 만으로는 브라우저마다 다르게 군다. 인쇄 직전에 실제로
+// open 을 달았다가 끝나면 원래대로 되돌린다.
+function usePrintUnfold() {
+  useEffect(() => {
+    let opened = []
+    const before = () => {
+      opened = [...document.querySelectorAll('details:not([open])')]
+      for (const d of opened) d.open = true
+    }
+    const after = () => {
+      for (const d of opened) d.open = false
+      opened = []
+    }
+    window.addEventListener('beforeprint', before)
+    window.addEventListener('afterprint', after)
+    return () => {
+      window.removeEventListener('beforeprint', before)
+      window.removeEventListener('afterprint', after)
+    }
+  }, [])
+}
+
 export default function App() {
   const bare = useBareLayout()
+  usePrintUnfold()
 
   return (
     <div className="app-shell">

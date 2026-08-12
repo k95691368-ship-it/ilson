@@ -4,6 +4,7 @@ import { STAGES } from '../lib/stages.js'
 import { useApi } from '../hooks/useApi.js'
 import { ago, num } from '../lib/format.js'
 import { buildTodo, todoSummary, NOTHING_CHECKED } from '../../shared/todo.js'
+import { URGENCY } from '../../shared/urgency.js'
 import { provenanceLine, provenanceDetail } from '../../shared/provenance.js'
 import {
   TRY_STEPS,
@@ -253,6 +254,11 @@ function NextStep({ overview }) {
 function Todo({ overview, reports, codes, tools, stalls, joins, signoffs, missing = [] }) {
   const items = buildTodo({ overview, reports, codes, tools, stalls, joins, signoffs })
   const s = todoSummary(items)
+  // 급한 것(금액·대기)은 펴 두고 '정리'만 접는다. 무게는 shared/urgency.js
+  // 가 한 벌로 정한다 — 화면마다 따로 판단하면 어느 화면에서는 접히고
+  // 어느 화면에서는 안 접힌다.
+  const urgent = items.filter((i) => (i.rank ?? URGENCY[i.kind] ?? 1) >= 2)
+  const later = items.filter((i) => (i.rank ?? URGENCY[i.kind] ?? 1) < 2)
 
   if (items.length === 0) {
     return (
@@ -281,24 +287,54 @@ function Todo({ overview, reports, codes, tools, stalls, joins, signoffs, missin
 
       {missing.length > 0 && <MissingNote missing={missing} />}
 
+      {/* 한 덩어리가 1,970px 이었다.
+          shared/todo.js 가 최대 12건을 내보내고 이 자리가 그 12건을 전부
+          폈다. 항목 하나가 약 138px 이라 노트북 화면 두 장 반이 이 목록
+          하나다. 그런데 그 12건이 배지·제목·회색 두 줄·버튼으로 전부 같은
+          모양이라, 금액 3건과 정리 3건이 모양으로 안 갈렸다.
+
+          급한 것은 편 채로 두고 '정리' 갈래만 접는다. 정리는 정의부터가
+          '나중에 문제가 될 것'이라 오늘 아침에 누를 것이 아니다.
+          접힌 줄에 몇 건인지와 제목을 적으므로 없는 것이 되지는 않는다. */}
       <ol className="todo-list">
-        {items.map((i) => (
-          <li key={i.key} className={`todo-item kind-${i.kind}`}>
-            <div className="todo-item-top">
-              <span className={`badge ${i.kind === '금액' ? 'badge-danger' : i.kind === '대기' ? 'badge-warning' : 'badge-neutral'}`}>
-                {i.kind}
-              </span>
-              <span className="todo-item-title">{i.title}</span>
-            </div>
-            {/* 이유 없이 시키면 아무도 안 한다. */}
-            <p className="todo-why">{i.why}</p>
-            <Link to={i.to} className="btn-ghost btn-sm">
-              {i.cta}
-            </Link>
-          </li>
+        {urgent.map((i) => (
+          <TodoItem key={i.key} i={i} />
         ))}
       </ol>
+
+      {later.length > 0 && (
+        <details className="disclose todo-later">
+          <summary>
+            나중에 문제가 될 것 {later.length}가지 — {later.map((i) => i.title).join(' · ')}
+          </summary>
+          <ol className="todo-list">
+            {later.map((i) => (
+              <TodoItem key={i.key} i={i} />
+            ))}
+          </ol>
+        </details>
+      )}
     </section>
+  )
+}
+
+function TodoItem({ i }) {
+  return (
+    <li className={`todo-item kind-${i.kind}`}>
+      <div className="todo-item-top">
+        <span
+          className={`badge ${i.kind === '금액' ? 'badge-danger' : i.kind === '대기' ? 'badge-warning' : 'badge-neutral'}`}
+        >
+          {i.kind}
+        </span>
+        <span className="todo-item-title">{i.title}</span>
+      </div>
+      {/* 이유 없이 시키면 아무도 안 한다. */}
+      <p className="todo-why">{i.why}</p>
+      <Link to={i.to} className="btn-ghost btn-sm">
+        {i.cta}
+      </Link>
+    </li>
   )
 }
 
