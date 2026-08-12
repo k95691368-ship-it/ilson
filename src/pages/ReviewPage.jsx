@@ -252,11 +252,6 @@ export default function ReviewPage() {
       {!error && items.length === 0 && (
         <section className="card">
           <div className="card-title">아직 접수된 신청서가 없습니다</div>
-          <p className="card-note" style={{ marginBottom: 12 }}>
-            검토는 여럿을 놓고 견주는 일이라 한 건만으로는 보여줄 것이 없습니다. 서로 성격이 다른
-            신청서 세 건을 심어 두면, 우선순위를 정하고 반려를 판정하는 과정을 그대로 보실 수
-            있습니다.
-          </p>
           <button type="button" className="btn-primary" onClick={seed} disabled={seeding}>
             {seeding ? '심는 중…' : '시연 신청서 심기'}
           </button>
@@ -542,9 +537,6 @@ export default function ReviewPage() {
                         <span className="badge badge-accent">열어 둔 것</span>
                       </span>
                       <span className="review-list-title">{pinned.title}</span>
-                      <span className="review-list-meta">
-                        지금 건 조건에는 안 들어오지만 오른쪽에 열려 있어 여기 붙여 둡니다
-                      </span>
                     </button>
                   </li>
                 </ul>
@@ -772,10 +764,6 @@ function BulkBar({ count, ids, onClear, onDone }) {
 
           {/* 판정은 여기서 안 된다는 것을 숨기지 않는다. 없는 기능을 찾다가
               시간 쓰는 것보다 왜 없는지 아는 편이 낫다. */}
-          <p className="card-note bulk-never">
-            수용·반려는 한 건씩 하셔야 합니다. 한 번에 판정하면 안 읽고 누르게 되고, 읽지도 않고
-            반려된 신청서를 부서는 알아챕니다.
-          </p>
         </>
       )}
     </div>
@@ -1086,7 +1074,6 @@ function Detail({ id, onSaved, pool }) {
                 placeholder="정산서에 과세·면세 구분 컬럼이 생기면. 그전에는 원천에 없는 값을 만들어 낼 수 없다."
               />
             </Field>
-            <p className="card-note">조건 없는 보류는 그냥 방치입니다.</p>
           </div>
         )}
 
@@ -1318,7 +1305,6 @@ function RefuseHelp({ code, onUse, filled }) {
 
       {help.suggested && (
         <div className="refuse-suggest">
-          <span className="card-note">이 사유에는 보통 이렇게 답합니다</span>
           <p>{help.suggested}</p>
           {/* 눌러야 들어간다. 이 건에 맞게 고쳐 쓰라는 뜻이다. */}
           <button type="button" className="btn-ghost btn-sm" onClick={() => onUse(help.suggested)}>

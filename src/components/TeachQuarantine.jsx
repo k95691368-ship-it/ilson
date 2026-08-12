@@ -21,9 +21,6 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
     <section className="card teach">
       <div className="card-head">
         <span className="card-title">밀려난 줄 {num(quarantine.length)}개</span>
-        <span className="card-note">
-          버린 것이 아니라 따로 빼 둔 것입니다. 왜 밀려났는지에 따라 하실 일이 다릅니다.
-        </span>
       </div>
 
       <div className="teach-groups">

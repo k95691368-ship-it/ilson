@@ -72,12 +72,6 @@ export default function StallPage() {
       <header className="page-head">
         <span className="page-eyebrow">막힌 곳</span>
         <h1>지금 어디서 멈춰 있나</h1>
-        <p className="page-sub">
-          이 사이트는 부서의 병목을 없애는 곳입니다. 그런데 정작 신청서 한 건이{' '}
-          <strong>여기서 얼마나 오래 걸려 있는지</strong>는 세지 않고 있었습니다. 오래 걸린 건일수록
-          목록 아래로 내려가서 조용해집니다. 단계마다 잣대를 따로 두고 셌습니다 — 검토가 사흘이면
-          늦은 것이고, 제작이 사흘이면 늦은 것이 아닙니다.
-        </p>
       </header>
 
       <section className="stall-line">
@@ -89,7 +83,6 @@ export default function StallPage() {
         <section className="card">
           <div className="card-head">
             <span className="card-title">제가 움직여야 풀리는 것 {mine.length}건</span>
-            <span className="card-note">부서 답을 기다리는 건보다 위에 둡니다</span>
           </div>
           <ul className="stall-list">
             {mine.map((s) => (
@@ -103,9 +96,6 @@ export default function StallPage() {
         <section className="card">
           <div className="card-head">
             <span className="card-title">부서 답을 기다리는 것 {theirs.length}건</span>
-            <span className="card-note">
-              제 잘못은 아니지만, 오래 기다리기만 한 것은 제 몫으로 올라옵니다
-            </span>
           </div>
           <ul className="stall-list">
             {theirs.map((s) => (
@@ -127,9 +117,6 @@ export default function StallPage() {
       <section className="card">
         <div className="card-head">
           <span className="card-title">단계마다 보통 며칠 걸리나</span>
-          <span className="card-note">
-            끝난 구간만 셉니다 — 아직 안 끝난 것을 세면 오래 걸리는 단계일수록 짧아 보입니다
-          </span>
         </div>
         <ul className="stall-typical">
           {data.typical.map((t) => (
@@ -158,7 +145,6 @@ export default function StallPage() {
         <section className="card">
           <div className="card-head">
             <span className="card-title">제때 가고 있는 것 {data.onTrack.length}건</span>
-            <span className="card-note">문제가 없다는 것도 알려 드립니다</span>
           </div>
           <ul className="stall-ok">
             {data.onTrack.map((s) => (

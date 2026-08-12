@@ -44,11 +44,6 @@ export default function BuiltPage() {
       <header className="page-head">
         <span className="page-eyebrow">기술 구현 보러가기</span>
         <h1>무엇을 만들었고, 어떻게 만들었나</h1>
-        <p className="page-sub">
-          두 칸으로 나눠 뒀습니다. 왼쪽은 이 사이트가 <strong>무슨 문제를 푸는지</strong>,
-          오른쪽은 <strong>어떻게 만들었는지</strong>입니다. 같은 이야기를 두 번 하지 않고
-          서로 다른 질문에 답합니다.
-        </p>
       </header>
 
       <div className="built-tabs" role="tablist">
@@ -60,7 +55,6 @@ export default function BuiltPage() {
           onClick={() => setTab('plain')}
         >
           무슨 문제를 푸나
-          <span className="card-note"> 코딩을 몰라도 읽힙니다</span>
         </button>
         <button
           type="button"
@@ -70,7 +64,6 @@ export default function BuiltPage() {
           onClick={() => setTab('tech')}
         >
           어떻게 만들었나
-          <span className="card-note"> 코딩 하시는 분용</span>
         </button>
       </div>
 

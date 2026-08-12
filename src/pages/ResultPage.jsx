@@ -208,7 +208,6 @@ function Result({ id }) {
       <section className="card card-boxed">
         <div className="card-head">
           <span className="card-title">계산에 넣을 값</span>
-          <span className="card-note">적게 잡으면 성과가 커 보입니다</span>
         </div>
         <div className="field-row">
           <Field label="만드는 데 든 시간" hint="회의·시험·고친 시간까지">
@@ -248,7 +247,6 @@ function Result({ id }) {
       <section className="card">
         <div className="card-head">
           <span className="card-title">부서가 확인했나</span>
-          <span className="card-note">만든 사람만 아는 성과는 성과가 아닙니다</span>
         </div>
         {data.saved?.dept_confirmed_at ? (
           <div className="decided">
@@ -259,9 +257,6 @@ function Result({ id }) {
           </div>
         ) : (
           <>
-            <p className="card-note" style={{ marginBottom: 10 }}>
-              이 숫자를 실제로 쓰는 부서가 아직 확인해 주지 않았습니다.
-            </p>
             <button
               type="button"
               className="btn-primary"

@@ -32,15 +32,6 @@ export default function PriorityPage() {
       <header className="page-head">
         <span className="page-eyebrow">무엇을 먼저 할까</span>
         <h1>수용한 것 중에 무엇부터 하나</h1>
-        <p className="page-sub">
-          판정은 한 건씩 합니다. 그런데 수용이 여러 건 쌓이면 그다음 질문이 옵니다 —{' '}
-          <strong>이 중에 무엇부터 하나.</strong> 2단계에서 매긴 임팩트·난이도와, 부서들이 적어 준
-          연간 시간을 한 판에 놓았습니다.
-        </p>
-        <p className="page-sub">
-          <strong>이 판은 순서를 정해 주지 않습니다.</strong> 무엇이 어디에 있는지까지만 말합니다.
-          고르는 것은 담당자가 하고, 고른 이유가 결정 기록에 남습니다.
-        </p>
       </header>
 
       {data.items.length === 0 ? (
@@ -286,7 +277,6 @@ function PickForm({ item, onClose, onDone, toast }) {
       <p className="card-note">{q.hint}</p>
 
       <label>
-        <span>왜 이것부터 하십니까</span>
         <textarea
           rows={3}
           value={why}
@@ -325,10 +315,6 @@ function OffBoard({ off }) {
           {open ? '접기' : '펼치기'}
         </button>
       </div>
-      <p className="card-note">
-        점수를 안 매겼거나, 아직 판정 전이거나, 반려·보류·완료된 것입니다. 이 판이 들어온 신청서
-        전부는 아닙니다.
-      </p>
       {open && (
         <ul className="offboard-list">
           {off.map((o) => (

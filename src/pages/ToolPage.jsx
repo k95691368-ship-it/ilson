@@ -295,10 +295,6 @@ export default function ToolPage() {
             placeholder={data.handedTo?.person ?? '성함'}
           />
         </label>
-        <span className="card-note">
-          실행 기록에 남습니다. 여러 분이 나눠 쓰시는지를 이걸로 압니다 — 한 분만 쓰고 계시면
-          그분이 자리를 비울 때 멈추기 때문입니다.
-        </span>
       </div>
 
       <section className="card">
@@ -444,10 +440,6 @@ export default function ToolPage() {
           있어야 한다. 여기가 실제로 막히는 자리다. */}
       <section className="card unclear-rest">
         <div className="card-title">사용법서에서 모르겠는 데가 있으신가요</div>
-        <p className="card-note">
-          쓴 사람은 다 압니다. 모르는 데가 어디인지는 실제로 읽는 분만 아십니다. 짚어 주시면 그
-          대목을 다시 씁니다 — 다음 분이 같은 데서 막히지 않게요.
-        </p>
         <Unclear slug={slug} section="upload" notes={notes} reload={loadNotes} />
         <Unclear slug={slug} section="contact" notes={notes} reload={loadNotes} />
       </section>
@@ -500,9 +492,6 @@ export default function ToolPage() {
                   <strong>내렸던 이유</strong> — {data.restored.why}
                 </p>
               )}
-              <p className="card-note">
-                다시 열렸다는 말만 드리면 못 미더우실 것 같아 무엇이 달라졌는지 함께 적습니다.
-              </p>
             </>
           )}
 
@@ -866,7 +855,6 @@ function AcceptBox({ slug }) {
       {mode === 'reject' ? (
         <div className="accept-reject">
           <label>
-            <span>무엇이 안 맞습니까</span>
             <textarea
               rows={2}
               value={reason}

@@ -23,9 +23,6 @@ export default function ComparePage() {
     return (
       <div className="empty">
         <div className="empty-title">견줄 신청서 둘을 골라주세요</div>
-        <div className="empty-sub">
-          검토 화면에서 비슷한 신청서가 걸리면 "나란히 놓고 보기"로 여기에 옵니다.
-        </div>
         <Link to="/review" className="btn-ghost btn-sm">
           검토 화면으로
         </Link>
@@ -341,7 +338,6 @@ function Verdict({ a, b, verdicts, onSaved }) {
     <form className="card decided" onSubmit={save}>
       <div className="card-head">
         <span className="origin-label origin-human">◆ 내 판정</span>
-        <span className="card-note">기록에 남아서 다음 사람이 다시 견주지 않아도 됩니다</span>
       </div>
 
       <div className="field">

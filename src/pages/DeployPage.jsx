@@ -136,7 +136,6 @@ function Deploy({ id }) {
             <strong>
               {h.handed_to_dept} {h.handed_to_person}
             </strong>
-            <span className="card-note">에게 넘겼습니다. 여기서부터 이 도구의 주인은 부서입니다.</span>
           </div>
 
           <div className="handed-link">

@@ -109,10 +109,6 @@ export default function SimilarNotice({ hits, tone = 'apply', onDismiss, selfId,
         ))}
       </ol>
 
-      <p className="card-note similar-foot">
-        낱말이 얼마나 겹치는지로 골라낸 것입니다. 여러 신청서에 다 나오는 말은 거의 세지 않고,
-        몇 건에만 나오는 말이 겹칠 때만 의심합니다. AI가 판단한 것이 아니라 정해진 규칙입니다.
-      </p>
     </section>
   )
 }
@@ -184,10 +180,6 @@ function JoinIn({ hit, draft }) {
 
   return (
     <form className="join-form" onSubmit={send}>
-      <p className="card-note">
-        새 신청서를 만들지 않습니다. 저 신청서에 <strong>그쪽 부서 몫을 같이 세어</strong> 둡니다.
-        저것이 만들어지면 그쪽도 바로 쓰시게 됩니다.
-      </p>
 
       <div className="join-row">
         <label>
@@ -203,7 +195,6 @@ function JoinIn({ hit, draft }) {
       </div>
 
       <label>
-        <span>그쪽 부서에서는 이 일이 어떻게 벌어집니까</span>
         <textarea
           rows={2}
           value={form.story}

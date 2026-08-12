@@ -281,12 +281,10 @@ export default function RecordPage() {
                     <strong>{c.reason}</strong>
                     {c.tradeoff_axis && <span className="record-aside"> · {c.tradeoff_axis}</span>}
                     <div>
-                      {c.verdict ? (
+                      {c.verdict && (
                         <>
                           <span className="badge badge-accent">{c.verdict}</span> {c.verdict_reason}
                         </>
-                      ) : (
-                        <span className="badge badge-warning">아직 판정하지 않음</span>
                       )}
                     </div>
                   </li>
@@ -576,10 +574,6 @@ export default function RecordPage() {
               <span className="record-secno">기록</span> 이 신청서에서 내린 결정{' '}
               {rec.decisions.length}건
             </h2>
-            <p className="record-aside">
-              무엇을·왜·무엇을 고르지 않았는지가 함께 남습니다. 근거 없이 남은 결정은 나중에 아무
-              쓸모가 없습니다.
-            </p>
             <ol className="record-decisions">
               {rec.decisions.map((d) => (
                 <li key={d.id}>
@@ -608,10 +602,6 @@ export default function RecordPage() {
         )}
 
         <footer className="record-foot">
-          <p>
-            이 문서는 일손(ILSON)이 기록에서 그대로 뽑은 것입니다. 빈 칸은 아직 하지 않은 일이고,
-            하지 않은 것을 한 것처럼 채우지 않습니다.
-          </p>
           <p className="record-aside">뽑은 시각 {dateTimeLabel(rec.generatedAt)}</p>
         </footer>
       </article>

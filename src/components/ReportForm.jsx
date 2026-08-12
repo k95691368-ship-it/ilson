@@ -55,9 +55,6 @@ export default function ReportForm({ slug }) {
   if (!open) {
     return (
       <div className="report-open">
-        <span className="card-note">
-          결과가 이상하거나 안 돌아가면 알려주세요. 만들 때 놓친 것은 만든 사람이 못 찾습니다.
-        </span>
         <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
           이상한 점 알리기
         </button>

@@ -28,11 +28,6 @@ export default function DeptPage() {
       <header className="page-head">
         <span className="page-eyebrow">부서</span>
         <h1>{data.dept}와 나 사이에 있었던 일</h1>
-        <p className="page-sub">
-          신청서 단위가 아니라 부서 단위로 봅니다. 이 부서 담당자와 마주 앉기 전에 알아야 할 것은
-          신청서 하나가 어디까지 왔는지가 아니라, <strong>지금 내가 이 부서에 못 준 것이 무엇인지</strong>
-          입니다.
-        </p>
       </header>
 
       {/* 내가 빚진 것. 맨 위다. */}
@@ -40,7 +35,6 @@ export default function DeptPage() {
         <section className="owed">
           <div className="owed-head">
             <span className="owed-title">내가 {data.dept}에 못 준 것 {data.owed.length}가지</span>
-            <span className="card-note">이 부서를 만나기 전에 이것부터 봅니다</span>
           </div>
           <ol>
             {data.owed.map((o, i) => (
@@ -62,10 +56,6 @@ export default function DeptPage() {
       ) : (
         <section className="card decided">
           <div className="card-title">{data.dept}에 밀린 것은 없습니다</div>
-          <p className="card-note">
-            답을 못 준 신청서도, 사유 없이 기각한 요구도, 판정 못 낸 충돌도, 답 못 한 의견도
-            없습니다. 이 상태를 유지하는 것이 이 화면의 목적입니다.
-          </p>
         </section>
       )}
 
@@ -133,7 +123,6 @@ export default function DeptPage() {
           <div className="pending-head">
             <span className="pending-title">{pendingHeadline(data.dept, data.pending)}</span>
             <span className="spacer" />
-            <span className="card-note">이건 부서 몫입니다</span>
           </div>
           <p className="card-note pending-why">{pendingWhy(data.pending)}</p>
 
@@ -246,10 +235,6 @@ export default function DeptPage() {
                   채택 {data.summary.requirementsTaken} · 기각 {data.summary.requirementsRejected}
                 </span>
               </div>
-              <p className="card-note" style={{ marginBottom: 10 }}>
-                기각한 것도 지웁니다. 기각한 것을 안 보이게 하면, 다음 회의에서 같은 요구가 다시
-                나오고 저는 왜 기각했는지 기억하지 못합니다.
-              </p>
               <ul className="dept-reqs">
                 {data.requirements.map((r) => (
                   <li key={r.id} className={r.status === '기각' ? 'rejected' : ''}>
@@ -281,10 +266,6 @@ export default function DeptPage() {
                 <span className="card-title">다른 부서와 부딪힌 것</span>
                 <span className="card-note">{data.conflicts.length}건</span>
               </div>
-              <p className="card-note" style={{ marginBottom: 10 }}>
-                부서마다 원하는 것이 다릅니다. 어느 쪽이 이겼는지와 왜 그렇게 정했는지가 남아
-                있어야, 진 쪽에게 설명할 수 있습니다.
-              </p>
               <ul className="dept-conflicts">
                 {data.conflicts.map((c) => (
                   <li key={c.id}>

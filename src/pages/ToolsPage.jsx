@@ -42,19 +42,11 @@ export default function ToolsPage() {
       <header className="page-head">
         <span className="page-eyebrow">넘긴 뒤</span>
         <h1>넘긴 도구는 지금 어떻게 됐나</h1>
-        <p className="page-sub">
-          만들었다는 기록은 흔합니다. 만든 것이 <strong>지금도 돌고 있다는 증거</strong>는 드뭅니다.
-          넘겨 놓고 아무도 안 쓰는 도구를 여기서 숨기지 않습니다 — 그게 가장 중요한 신호입니다.
-        </p>
       </header>
 
       {data.items.length === 0 ? (
         <div className="empty">
           <div className="empty-title">아직 넘긴 도구가 없습니다</div>
-          <div className="empty-sub">
-            7단계 배포에서 부서에 넘기면 여기에 쌓입니다. 넘긴 뒤 실제로 쓰이는지가 이 화면에
-            그대로 나옵니다.
-          </div>
           <Link to="/deploy" className="btn-ghost btn-sm">
             배포 화면으로
           </Link>
@@ -288,9 +280,6 @@ export default function ToolsPage() {
                 <span className="card-title">
                   부서가 겪은 것 {reports.summary.open}건이 아직 안 고쳐졌습니다
                 </span>
-                <span className="card-note">
-                  만들 때 놓친 것은 만든 사람이 못 찾습니다. 매일 그 일을 하는 사람만 찾습니다.
-                </span>
               </div>
               {reports.tools.map((t) => (
                 <ReportTool key={t.applicationId} tool={t} onFixed={reloadReports} />
@@ -302,7 +291,6 @@ export default function ToolsPage() {
             <section className="card">
               <div className="card-head">
                 <span className="card-title">실패한 실행 {data.failures.length}건</span>
-                <span className="card-note">성공만 세면 잘 돌고 있는 것처럼 보입니다</span>
               </div>
               <ul className="tool-failures">
                 {data.failures.map((f, i) => (

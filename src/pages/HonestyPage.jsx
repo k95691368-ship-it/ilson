@@ -31,15 +31,6 @@ export default function HonestyPage() {
       <header className="page-head">
         <span className="page-eyebrow">정직</span>
         <h1>못 한 것과 증명하지 못한 것</h1>
-        <p className="page-sub">
-          이 사이트의 다른 화면은 전부 무엇을 했는지 말합니다. 그것만 있으면 읽는 분은 결국
-          <strong> 그래서 안 된 건 뭔데</strong>를 속으로 묻게 되고, 그 질문에 답이 없으면 잘된
-          것까지 못 믿게 됩니다. 그래서 안 좋은 것만 한곳에 모았습니다.
-        </p>
-        <p className="page-sub">
-          여기 숫자는 손으로 적은 반성문이 아니라 <strong>데이터에서 만들어집니다</strong>. 반려가
-          늘면 늘고, 격리가 줄면 줍니다.
-        </p>
       </header>
 
       <section className="stat-row">
@@ -93,10 +84,6 @@ export default function HonestyPage() {
             ))}
           </ul>
 
-          <p className="card-note">
-            응답률에 목표선을 긋지 않습니다. "80% 넘으면 좋음" 같은 선을 그으면 그 선에 맞추게
-            되고, 이 정도 표본에서는 비율보다 <strong>몇 건 중 몇 건인지</strong>가 정직합니다.
-          </p>
         </section>
       )}
 
@@ -104,7 +91,6 @@ export default function HonestyPage() {
       <section className="card">
         <div className="card-head">
           <span className="card-title">증명하지 못한 것</span>
-          <span className="card-note">한계를 적어 놓고 아무 말도 안 하면 그건 회피입니다</span>
         </div>
         <div className="unproven-list">
           {data.unproven.map((u) => (
@@ -123,12 +109,7 @@ export default function HonestyPage() {
         <section className="card">
           <div className="card-head">
             <span className="card-title">아직 손도 못 댄 신청서 {data.stuck.length}건</span>
-            <span className="card-note">가장 오래 앉아 있는 것부터</span>
           </div>
-          <p className="card-note" style={{ marginBottom: 11 }}>
-            부서가 시간을 들여 적어 낸 것인데 아직 답을 못 줬습니다. 낸 사람 입장에서는 어디에도
-            안 보이는 상태입니다.
-          </p>
           <ul className="honest-list">
             {data.stuck.map((a) => (
               <li key={a.id}>
@@ -161,10 +142,6 @@ export default function HonestyPage() {
               <span className="card-note">전부 대안을 함께 보냈습니다</span>
             )}
           </div>
-          <p className="card-note" style={{ marginBottom: 11 }}>
-            할 수 있는 것만 하겠다고 말한 기록입니다. 대안 없는 반려는 그냥 거절이라서, 무엇 대신
-            무엇을 드릴 수 있는지를 같이 적습니다.
-          </p>
           <ul className="honest-list">
             {data.refused.map((r) => (
               <li key={r.id}>
@@ -201,12 +178,7 @@ export default function HonestyPage() {
             <span className="card-title">
               도구가 처리 못 하고 밀어 둔 줄 {num(data.quarantineTotal)}줄
             </span>
-            <span className="card-note">버린 것이 아니라 따로 빼 둔 것입니다</span>
           </div>
-          <p className="card-note" style={{ marginBottom: 11 }}>
-            처리 못 한 줄을 조용히 빼고 합계를 내면 숫자는 예뻐지지만 그 합계는 틀린 것입니다. 왜
-            못 읽었는지까지 남겨 두고, 사람이 보고 고칠 수 있게 합니다.
-          </p>
           {/* 이유별로 나눌 수 있는 것은 만드는 중에 시운전한 것뿐이다.
               넘긴 뒤 실제 실행은 브라우저에서 돌고 서버에는 개수만 남는다.
               여태 이 화면은 시운전 것만 세서, 부서가 매주 겪는 줄이 0으로
@@ -246,10 +218,6 @@ export default function HonestyPage() {
           <div className="card-head">
             <span className="card-title">넘겨 놓고 아무도 안 쓰는 도구 {data.idleTools.length}개</span>
           </div>
-          <p className="card-note" style={{ marginBottom: 11 }}>
-            만들어서 넘긴 것으로 끝난 도구입니다. 아무도 안 쓰는 도구를 넘겨 놓고 성과를 말하면
-            안 됩니다.
-          </p>
           <ul className="honest-list">
             {data.idleTools.map((t) => (
               <li key={t.slug}>
@@ -305,10 +273,6 @@ export default function HonestyPage() {
               만들기로 해 놓고 아직 안 재 본 것 {data.acceptedWithoutBaseline.length}건
             </span>
           </div>
-          <p className="card-note">
-            재지 않고 만들면 나중에 얼마나 줄었는지 말할 수 없습니다. 만든 뒤에 재면 이미 늦습니다 —
-            비교할 대상이 없어집니다.
-          </p>
           <ul className="honest-list">
             {data.acceptedWithoutBaseline.map((a) => (
               <li key={a.ticket_no}>
@@ -390,10 +354,6 @@ function RefuseCatalog() {
           {open ? '접기' : '펼치기'}
         </button>
       </div>
-      <p className="card-note">
-        반려당한 뒤에 "그건 원래 안 됩니다"를 듣는 것과, 내기 전에 아는 것은 다릅니다. 무엇을 못
-        하는지 먼저 밝혀 둡니다. 못 하는 것마다 대신 드릴 수 있는 것을 함께 적었습니다.
-      </p>
       {open && (
         <ul className="honest-list" style={{ marginTop: 12 }}>
           {REFUSE_REASONS.map((r) => (

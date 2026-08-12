@@ -67,12 +67,6 @@ export default function FlowPage() {
       <header className="page-head">
         <span className="page-eyebrow">AX 실행 기록</span>
         <h1>부서의 병목이 도구가 되기까지</h1>
-        <p className="page-sub">
-          각 부서가 병목을 신청서로 적어 냅니다. AX 담당자가 열람하고, 무엇을 먼저 할지 정하고,
-          못 만드는 것은 이유와 함께 반려합니다. 부서와 협의해 합격 기준을 먼저 정하고,
-          만들고, 실제 담당자가 써 보고, 사용법서와 함께 넘긴 뒤, 처음에 재 둔 기준선과
-          비교해 성과를 정리합니다. 그 과정 전체가 신청서 한 건 아래 기록으로 남습니다.
-        </p>
       </header>
 
       {/* 보러 온 사람에게 눌러도 된다고 말한다.
@@ -702,7 +696,6 @@ function Overview({ data }) {
         <section className="card">
           <div className="card-head">
             <span className="card-title">어디서 막혀 있나</span>
-            <span className="card-note">병목은 신청서에만 있는 게 아닙니다</span>
           </div>
           <StageBars byStage={data.byStage} total={c.total} />
         </section>
@@ -743,9 +736,6 @@ function Overview({ data }) {
           {data.refuseMix.length > 0 && (
             <section className="card">
               <div className="card-title">무엇을 못 만든다고 했나</div>
-              <p className="card-note" style={{ margin: '4px 0 8px' }}>
-                반려가 0이면 오히려 아무 판단도 하지 않았다는 뜻입니다.
-              </p>
               <ul className="refuse-mix">
                 {data.refuseMix.map((r) => (
                   <li key={r.code}>
@@ -875,7 +865,6 @@ function LeadSpread({ lead }) {
     <section className="card lead-spread">
       <div className="card-head">
         <span className="card-title">가장 빨랐던 것과 가장 오래 걸린 것</span>
-        <span className="card-note">접수한 날부터 부서에 넘긴 날까지</span>
       </div>
       <div className="lead-spread-row">
         <div className="lead-spread-one">

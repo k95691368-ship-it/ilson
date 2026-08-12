@@ -52,11 +52,6 @@ export default function LogPage() {
       <header className="page-head">
         <span className="page-eyebrow">기록</span>
         <h1>내린 결정 전부</h1>
-        <p className="page-sub">
-          여덟 단계에 흩어져 있는 결정을 한 자리에 모았습니다. 각 결정마다 <strong>무엇을</strong>{' '}
-          정했고 <strong>왜</strong> 그렇게 정했고 <strong>무엇을 고르지 않았는지</strong>가 함께
-          남습니다. 근거 없이 남은 결정은 나중에 아무 쓸모가 없습니다.
-        </p>
       </header>
 
       {t && (
@@ -208,7 +203,6 @@ export default function LogPage() {
       {data && data.items.length === 0 && (
         <div className="empty">
           <div className="empty-title">조건에 맞는 결정이 없습니다</div>
-          <div className="empty-sub">조건을 지우고 다시 보세요.</div>
         </div>
       )}
 

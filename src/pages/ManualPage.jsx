@@ -127,7 +127,6 @@ function Manual({ id }) {
       <section className="card no-print">
         <div className="card-head">
           <span className="card-title">내가 써야 하는 것</span>
-          <span className="card-note">코드가 알 수 없는 것들입니다</span>
         </div>
 
         <Field label="제목">
@@ -282,10 +281,6 @@ function Manual({ id }) {
         </ol>
 
         <h2>검토함에 뜨면</h2>
-        <p className="card-note">
-          처리하지 못한 줄은 버리지 않고 검토함에 모읍니다. 조용히 버리면 합계가 조용히
-          틀리기 때문입니다.
-        </p>
         <div className="table-wrap">
           <table className="data-table">
             <thead>
@@ -310,7 +305,6 @@ function Manual({ id }) {
         </div>
 
         <h2>이 도구가 보장하지 않는 것</h2>
-        <p className="card-note">처음부터 적어 둡니다. 나중에 다투지 않기 위해서입니다.</p>
         <ul className="manual-list">
           {a.notGuaranteed.map((n, i) => (
             <li key={i}>{n}</li>
@@ -320,9 +314,6 @@ function Manual({ id }) {
         {data.faq.length > 0 && (
           <>
             <h2>자주 묻는 것</h2>
-            <p className="card-note">
-              지어낸 질문이 아니라 베타 테스트에서 실제로 나온 질문입니다.
-            </p>
             <dl className="manual-faq">
               {data.faq.map((f) => (
                 <div key={f.id}>
@@ -352,11 +343,6 @@ function Manual({ id }) {
         )}
 
         <hr />
-        <p className="card-note">
-          받는 파일 형식, 처리 단계, 검토함 안내는 실제로 도는 코드에서 그대로 뽑았습니다.
-          규칙이 바뀌면 이 문서도 같이 바뀝니다.
-          {data.manual?.updated_at && ` · 마지막 수정 ${ago(data.manual.updated_at)}`}
-        </p>
       </article>
     </div>
   )
@@ -369,7 +355,6 @@ function Faq({ data, id, toast, onDone }) {
     <section className="card no-print">
       <div className="card-head">
         <span className="card-title">자주 묻는 것</span>
-        <span className="card-note">베타에서 실제로 나온 말로 채웁니다</span>
       </div>
 
       {data.faq.length > 0 && (
@@ -518,7 +503,6 @@ function Unclear({ id, toast }) {
           <span className="badge badge-warning">{data.summary.mustFix}곳은 문서 문제</span>
         )}
         <span className="spacer" />
-        <span className="card-note">여기 적는 문장이 도구 화면 그 대목에 그대로 붙습니다</span>
       </div>
       <p className="card-note">{data.line}</p>
 
@@ -660,7 +644,6 @@ function FaqDraft({ draft, id, toast, reload }) {
             />
           </label>
           <label>
-            <span>답</span>
             <textarea
               rows={3}
               value={form.answer}

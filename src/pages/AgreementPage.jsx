@@ -179,7 +179,6 @@ function Stakeholders({ data, send, toast, openBy }) {
     <details className="card card-boxed" open={openBy('누가 이 일에 얽혀 있나')}>
       <summary className="card-head">
         <span className="card-title">누가 이 일에 얽혀 있나</span>
-        <span className="card-note">각자 원하는 것이 다르고, 그 차이가 충돌이 된다</span>
       </summary>
 
       {/* 손들었는데 아직 협의안에 사정이 안 들어온 부서.
@@ -265,7 +264,6 @@ function Meetings({ data, send, toast, openBy }) {
     <details className="card card-boxed" open={openBy('회의록')}>
       <summary className="card-head">
         <span className="card-title">회의록</span>
-        <span className="card-note">여기 적힌 말만 요구의 근거가 된다</span>
       </summary>
 
       {data.meetings.map((m) => (
@@ -361,9 +359,6 @@ function Requirements({ data, send, toast, openBy }) {
     <details className="card card-boxed" open={openBy('회의에서 나온 것들')}>
       <summary className="card-head">
         <span className="card-title">회의에서 나온 것들</span>
-        <span className="card-note">
-          가정이 특히 중요하다 — 나중에 깨지는 것은 대개 확인 없이 전제한 것이다
-        </span>
       </summary>
 
       {groups.초안.length > 0 && (
@@ -568,9 +563,6 @@ function RequirementCard({ r, send, toast, editable }) {
             onChange={(e) => setAmend(e.target.value)}
             placeholder="이 건에 맞게 다듬은 문장"
           />
-          <p className="card-note">
-            원문은 지우지 않고 같이 남습니다. 부서는 자기 말이 어떻게 바뀌었는지 봐야 합니다.
-          </p>
           <div className="row">
             <button
               type="button"
@@ -647,7 +639,6 @@ function Conflicts({ data, send, toast, openBy }) {
     <details className="card card-boxed" open={openBy('동시에 될 수 없는 것들')}>
       <summary className="card-head">
         <span className="card-title">동시에 될 수 없는 것들</span>
-        <span className="card-note">여기가 사람이 판단해야 하는 자리다</span>
       </summary>
 
       {data.conflicts.length === 0 && (
@@ -856,7 +847,6 @@ function Criteria({ data, send, toast, openBy }) {
     <details className="card" open={openBy('무엇을 통과로 볼 것인가')}>
       <summary className="card-head">
         <span className="card-title">무엇을 통과로 볼 것인가</span>
-        <span className="card-note">만들기 전에 정한다 — 나중에 정하면 결과에 맞춰 기준이 움직인다</span>
       </summary>
 
       {data.criteria.length > 0 && (
@@ -963,7 +953,6 @@ function Baseline({ data, send, toast, openBy }) {
     <details className="card" open={openBy('지금 실제로 얼마나 걸리나')}>
       <summary className="card-head">
         <span className="card-title">지금 실제로 얼마나 걸리나</span>
-        <span className="card-note">만들기 전에 잰다</span>
       </summary>
 
       <p className="card-note" style={{ marginBottom: 14 }}>
@@ -1281,10 +1270,6 @@ function PendingJoins({ pending, send, toast }) {
     <div className="pending-joins">
       <div className="pending-joins-head">
         <strong>손들었는데 아직 협의안에 없는 부서 {pending.length}곳</strong>
-        <span className="card-note">
-          이 부서들 사정이 요구 목록에 들어와야 만들기 시작할 수 있습니다. 지금 합의하시는 기준을,
-          이 부서들은 다 만들어진 뒤에 처음 봅니다.
-        </span>
       </div>
 
       {pending.map((p) => {

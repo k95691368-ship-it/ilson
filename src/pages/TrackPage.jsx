@@ -82,10 +82,6 @@ export default function TrackPage() {
       <header className="page-head">
         <span className="page-eyebrow">부서 담당자용</span>
         <h1>내가 낸 신청서, 어떻게 됐나요</h1>
-        <p className="page-sub">
-          신청서를 낼 때 받은 접수번호를 넣으면 지금 어느 단계까지 왔는지 보여드립니다.
-          반려된 경우에도 이유와 대안을 함께 보여드립니다.
-        </p>
       </header>
 
       <form
@@ -125,9 +121,6 @@ export default function TrackPage() {
       {!data && !error && (
         <div className="card">
           <div className="card-title">접수번호가 없으신가요</div>
-          <p className="card-note" style={{ marginBottom: 10 }}>
-            아직 신청하지 않으셨다면 지금 내실 수 있습니다. 로그인은 필요 없습니다.
-          </p>
           <Link to="/apply" className="btn-ghost">
             병목 신청서 내기
           </Link>
@@ -210,9 +203,6 @@ function Result({ data, as, onChanged }) {
           <Link to={`/record/${data.ticket}`} className="btn-ghost btn-sm">
             기록을 문서 한 장으로 보기
           </Link>
-          <span className="card-note">
-            여덟 단계에서 있었던 일이 한 문서로 이어집니다. 인쇄하거나 그대로 붙여 넣으실 수 있습니다.
-          </span>
         </div>
       </section>
 
@@ -226,12 +216,17 @@ function Result({ data, as, onChanged }) {
             <span className="card-note">{ago(data.mergedInto.at)}</span>
           </div>
           <h3>{data.mergedInto.ticket_no} 와 같은 건입니다</h3>
+          {/* 뒷문장을 설명 정리에서 뺐다가 되돌렸다.
+              '되풀이'로 판정됐는데, 이 자리에서 부서가 실제로 하는 걱정은
+              "그럼 내 신청서는 버려진 건가"다. 앞문장은 무슨 일이 있었는지만
+              말하고 그 걱정에는 답하지 않는다. 없애면 안 되는 문장이라
+              시험으로 못 박아 뒀었고, 그 시험이 잡았다. */}
           <p>
             내주신 것과 같은 병목을 {data.mergedInto.dept}에서 먼저 냈습니다. 두 번 만들지
-            않으려고 <strong>그쪽에서 함께 처리합니다</strong>.
-          </p>
-          <p className="card-note">
-            따로 만들지 않을 뿐이지 안 하는 것이 아닙니다. 그쪽이 다 되면 바로 쓰실 수 있습니다.
+            않으려고 <strong>그쪽에서 함께 처리합니다</strong>.{' '}
+            {/* 한 줄로 붙여 둔다. 두 줄로 나뉘면 이 문장을 못 박아 둔 시험이
+                글자를 못 찾는다 — 실제로 그렇게 한 번 걸렸다. */}
+            <span>따로 만들지 않을 뿐이지 안 하는 것이 아닙니다.</span>
           </p>
           {data.mergedInto.why && (
             <p className="merged-why">
@@ -299,7 +294,6 @@ function Result({ data, as, onChanged }) {
         <section className="track-actions">
           <div className="track-actions-head">
             <span className="track-actions-title">해주셔야 할 일 {actions.length}가지</span>
-            <span className="card-note">이게 있으면 저희 쪽에서는 더 못 나갑니다</span>
           </div>
           <ol>
             {actions.map((x) => (
@@ -606,7 +600,6 @@ function Retry({ ticket, onDone }) {
           {/* 바꾼 것을 맨 위에 둔다. 담당자가 열자마자 보는 것도 이것이고,
               부서가 적으면서 스스로 확인하게 되는 것도 이것이다. */}
           <label>
-            <span>무엇을 바꾸셨습니까</span>
             <textarea
               rows={3}
               value={form.changed}
@@ -643,10 +636,6 @@ function Retry({ ticket, onDone }) {
             <textarea rows={2} value={form.wish ?? ''} onChange={set('wish')} />
           </label>
 
-          <p className="card-note">
-            부서·신청자·연락처는 앞 신청서 그대로 갑니다. 같은 분이 같은 일로 다시 내시는 것이라
-            다시 여쭙지 않습니다.
-          </p>
 
           <div className="row">
             <button type="submit" className="btn-primary" disabled={busy}>
@@ -855,7 +844,6 @@ function Signoff({ ticket, as, onDone }) {
           )}
 
           <label>
-            <span>확인하신 분</span>
             <input
               value={by}
               onChange={(e) => setBy(e.target.value)}
@@ -1121,7 +1109,6 @@ function HoldLift({ ticket, onDone }) {
 
       {state.pending ? (
         <div className="row">
-          <span className="card-note">잘못 알리셨으면 거두실 수 있습니다.</span>
           <button
             type="button"
             className="btn-ghost btn-sm"

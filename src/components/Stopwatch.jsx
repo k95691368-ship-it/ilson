@@ -50,9 +50,6 @@ export default function Stopwatch({ onDone, disabled }) {
 
       {running ? (
         <>
-          <p className="card-note">
-            지금 재고 있습니다. 담당자가 그 일을 실제로 하는 동안 그대로 두세요.
-          </p>
           <div className="row" style={{ marginTop: 10 }}>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setErrors((n) => n + 1)}>
               실수 +1 <strong>({errors})</strong>
@@ -70,9 +67,6 @@ export default function Stopwatch({ onDone, disabled }) {
         </>
       ) : (
         <>
-          <p className="card-note">
-            담당자가 그 일을 시작할 때 누르세요. 중간에 실수가 나오면 세어 두었다가 함께 기록합니다.
-          </p>
           <button
             type="button"
             className="btn-primary btn-block"

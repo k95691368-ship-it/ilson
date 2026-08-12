@@ -160,10 +160,6 @@ function Beta({ id }) {
             </span>
           </div>
 
-          <p className="card-note" style={{ marginBottom: 12 }}>
-            사람이 눈으로 맞춰 보지 않습니다. 시험 파일을 만들 때 <strong>정답도 같이</strong>{' '}
-            만들어 뒀기 때문에, 채널별 금액과 검토함으로 뺀 줄을 기계가 하나하나 대조합니다.
-          </p>
 
           {latest && (
             <input
@@ -313,7 +309,6 @@ function Rounds({ rounds }) {
     <section className="card">
       <div className="card-head">
         <span className="card-title">시험 회차</span>
-        <span className="card-note">한 번에 통과하는 개발은 없습니다</span>
       </div>
       <div className="table-wrap">
         <table className="data-table">
@@ -368,9 +363,6 @@ function Feedback({ data, id, toast, onDone }) {
     <section className="card card-boxed">
       <div className="card-head">
         <span className="card-title">실제로 써 본 사람이 한 말</span>
-        <span className="card-note">
-          기계가 통과시켜도 사람이 못 쓰겠다고 하면 못 쓰는 것이다
-        </span>
       </div>
 
       {data.feedback.length > 0 && (

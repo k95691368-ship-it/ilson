@@ -145,11 +145,6 @@ function Build({ id }) {
           <span className="card-title">파일을 넣으면 합칩니다</span>
           <span className="badge badge-success">계산은 이 브라우저에서 돕니다</span>
         </div>
-        <p className="card-note" style={{ marginBottom: 12 }}>
-          파일이 서버로 올라가지 않습니다. 정산 자료를 밖으로 내보낼 이유가 없고, 올리고 기다리는
-          시간이 없어 결과가 바로 나옵니다. 서버에는 <strong>무엇이 나왔는지만</strong> 기록으로
-          남습니다.
-        </p>
 
         <div className="sample-grid">
           {SAMPLES.map((s) => (
@@ -224,9 +219,6 @@ function Build({ id }) {
             <section className="card">
               <div className="card-head">
                 <span className="card-title">채널별</span>
-                <span className="card-note">
-                  계약 수수료와 실제로 떼인 금액이 다르면 그 자리가 돈이 새는 곳이다
-                </span>
               </div>
               <div className="table-wrap">
                 <table className="data-table">
@@ -280,7 +272,6 @@ function Build({ id }) {
           <section className="card">
             <div className="card-head">
               <span className="card-title">합친 결과</span>
-              <span className="card-note">한 줄을 누르면 그 숫자가 어디서 왔는지 나옵니다</span>
             </div>
             <div className="grid-side">
               <div className="table-wrap" style={{ maxHeight: 460 }}>
@@ -411,7 +402,6 @@ function Quarantine({ data, id, onDone, toast }) {
     <section className="card">
       <div className="card-head">
         <span className="card-title">처리하지 못한 줄 {num(data.quarantine.length)}개</span>
-        <span className="card-note">버리지 않았습니다 — 버리면 합계가 조용히 틀립니다</span>
       </div>
 
       {unknownByCode.size > 0 && (

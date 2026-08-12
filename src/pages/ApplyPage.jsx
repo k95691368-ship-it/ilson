@@ -323,13 +323,7 @@ export default function ApplyPage() {
           <section className="card card-boxed">
             <div className="card-head">
               <span className="card-title">지금 얼마나 드나요</span>
-              <span className="card-note">나중에 성과를 재는 기준이 됩니다</span>
             </div>
-            <p className="card-note" style={{ marginBottom: 12 }}>
-              정확하지 않아도 됩니다. 이 값은 <strong>체감</strong>으로 기록되고, 협의 단계에서
-              실제로 재서 다시 확정합니다. 만든 사람이 나중에 기억으로 적은 숫자는 근거가 되지
-              못하기 때문입니다.
-            </p>
             <div className="field-row">
               <Field label="한 번에 몇 분" hint="분 단위" error={fieldErrors.current_minutes}>
                 <input
@@ -381,7 +375,6 @@ export default function ApplyPage() {
             {!error && items.length === 0 && (
               <div className="empty">
                 <div className="empty-title">아직 없습니다</div>
-                <div className="empty-sub">첫 신청서를 내 보세요.</div>
               </div>
             )}
 
