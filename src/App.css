@@ -2044,6 +2044,37 @@ p.card-note,
 }
 
 /* ===== 정의/근거 펼침 ===== */
+/* 구획을 접을 수 있게 한다.
+   한 화면에서 같은 것을 두 번 그리던 자리가 있었다 — 부서 조회 화면이
+   '그동안의 소식'과 '진행 상황'으로 여덟 단계를 두 번 늘어놓았다.
+   지우지 않고 접는다. 접어도 요약 줄에 "여덟 단계 중 몇 칸까지"가 남아서
+   없는 것이 되지는 않는다. */
+details.card > summary.card-head {
+  cursor: pointer;
+  list-style: none;
+}
+details.card > summary.card-head::-webkit-details-marker {
+  display: none;
+}
+details.card > summary.card-head .card-title::before {
+  content: '▸';
+  display: inline-block;
+  margin-right: 7px;
+  color: var(--text-muted);
+  transition: transform 0.15s ease;
+}
+details.card[open] > summary.card-head .card-title::before {
+  transform: rotate(90deg);
+}
+details.card > summary.card-head:hover .card-title {
+  color: var(--accent);
+}
+details.card > summary.card-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
 .disclose {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);

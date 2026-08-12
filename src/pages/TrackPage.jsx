@@ -361,10 +361,23 @@ function Result({ data, as, onChanged }) {
         </section>
       )}
 
-      <section className="card">
-        <div className="card-head">
+      {/* 여덟 단계를 두 번 그리고 있었다.
+          위의 '그동안의 소식'과 이 '진행 상황'이 같은 진행을 다른 모양으로
+          늘어놓는다. 부서가 접수번호를 넣고 여는 이유는 "어떻게 됐나"이고,
+          그 답은 새로 생긴 일이다. 여덟 단계 전부는 그다음에 보는 것이다.
+
+          소식이 있으면 접어 둔다. 접어도 지금 어느 단계인지는 요약 줄에
+          그대로 보이므로, 없는 것이 되지는 않는다. 소식이 없으면(처음
+          열었거나 아직 아무 일도 없으면) 펼쳐 둔다 — 그때는 이것이
+          유일하게 답이 되는 자리다. */}
+      <details className="card track-progress" open={notices.length === 0}>
+        <summary className="card-head">
           <span className="card-title">진행 상황</span>
-        </div>
+          <span className="spacer" />
+          <span className="card-note">
+            여덟 단계 중 {data.timeline.filter((t) => t.status === '완료').length}칸까지 왔습니다
+          </span>
+        </summary>
         <ol className="track-timeline">
           {data.timeline.map((t) => (
             <li key={t.stage} className={`track-step ${stepClass(t.status)}`}>
@@ -411,7 +424,7 @@ function Result({ data, as, onChanged }) {
             </li>
           ))}
         </ol>
-      </section>
+      </details>
 
       <details className="disclose">
         <summary>내가 적어 낸 내용 다시 보기</summary>

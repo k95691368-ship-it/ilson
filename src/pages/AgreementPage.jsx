@@ -101,16 +101,48 @@ function Agreement({ id }) {
   if (error) return <div className="notice notice-danger">{error}</div>
   if (!data) return null
 
+  // 한 화면에서 일곱 가지를 다 한다 — 이해관계자·회의록·요구·충돌·합격
+  // 기준·이의·기준선. 그런데 이건 **순서가 있는 일**이다. 요구를 판단해야
+  // 충돌이 보이고, 충돌을 판정해야 무엇을 통과로 볼지가 정해진다.
+  //
+  // 그래서 끝난 칸은 접는다. 지금 손봐야 하는 칸만 펼쳐 둔다. 접어도 제목은
+  // 남으므로 무엇이 있는지는 보이고, 눌러서 언제든 다시 편다.
+  //
+  // 아무것도 안 끝났으면 첫 칸부터 펼친다. 다 끝났으면 전부 접는다 — 그때는
+  // 위의 '협의가 끝났습니다'가 할 말을 다 한 것이다.
+  const done = {
+    '누가 이 일에 얽혀 있나': data.stakeholders.length > 0 && (data.pendingJoins ?? []).length === 0,
+    회의록: data.meetings.length > 0,
+    '회의에서 나온 것들': data.requirements.length > 0 && data.requirements.every((r) => r.status !== '초안'),
+    '동시에 될 수 없는 것들': data.conflicts.every((c) => c.verdict),
+    '무엇을 통과로 볼 것인가': data.criteria.some((c) => c.confirmed_at),
+    '부서가 합격 기준을 본 결과': false,
+    '지금 실제로 얼마나 걸리나': Boolean(data.baseline),
+  }
+  // 아직 안 끝난 것 중 **첫 칸**만 펼친다. 여러 칸을 한꺼번에 펼치면
+  // 접기 전과 같아진다.
+  const order = [
+    '누가 이 일에 얽혀 있나',
+    '회의록',
+    '회의에서 나온 것들',
+    '동시에 될 수 없는 것들',
+    '무엇을 통과로 볼 것인가',
+    '부서가 합격 기준을 본 결과',
+    '지금 실제로 얼마나 걸리나',
+  ]
+  const first = order.find((k) => !done[k]) ?? null
+  const openBy = (title) => title === first
+
   return (
     <div className="stack">
       <GateBanner gate={data.gate} />
-      <Stakeholders data={data} send={send} toast={toast} />
-      <Meetings data={data} send={send} toast={toast} />
-      <Requirements data={data} send={send} toast={toast} />
-      <Conflicts data={data} send={send} toast={toast} />
-      <Criteria data={data} send={send} toast={toast} />
-      <Objections id={id} toast={toast} />
-      <Baseline data={data} send={send} toast={toast} />
+      <Stakeholders data={data} send={send} toast={toast} openBy={openBy} />
+      <Meetings data={data} send={send} toast={toast} openBy={openBy} />
+      <Requirements data={data} send={send} toast={toast} openBy={openBy} />
+      <Conflicts data={data} send={send} toast={toast} openBy={openBy} />
+      <Criteria data={data} send={send} toast={toast} openBy={openBy} />
+      <Objections id={id} toast={toast} openBy={openBy} />
+      <Baseline data={data} send={send} toast={toast} openBy={openBy} />
     </div>
   )
 }
@@ -140,15 +172,15 @@ function GateBanner({ gate }) {
 }
 
 // ── 이해관계자 ──────────────────────────────────────────────
-function Stakeholders({ data, send, toast }) {
+function Stakeholders({ data, send, toast, openBy }) {
   const [form, setForm] = useState({ dept: '', role_label: '', person_label: '', wants: '' })
 
   return (
-    <section className="card card-boxed">
-      <div className="card-head">
+    <details className="card card-boxed" open={openBy('누가 이 일에 얽혀 있나')}>
+      <summary className="card-head">
         <span className="card-title">누가 이 일에 얽혀 있나</span>
         <span className="card-note">각자 원하는 것이 다르고, 그 차이가 충돌이 된다</span>
-      </div>
+      </summary>
 
       {/* 손들었는데 아직 협의안에 사정이 안 들어온 부서.
           이걸 안 하면 담당자는 낸 부서하고만 합의하고 넘어가고, 손든
@@ -220,21 +252,21 @@ function Stakeholders({ data, send, toast }) {
       >
         추가
       </button>
-    </section>
+    </details>
   )
 }
 
 // ── 회의록 ──────────────────────────────────────────────────
-function Meetings({ data, send, toast }) {
+function Meetings({ data, send, toast, openBy }) {
   const [draft, setDraft] = useState({ title: '', minutes_text: '' })
   const [editing, setEditing] = useState(null)
 
   return (
-    <section className="card card-boxed">
-      <div className="card-head">
+    <details className="card card-boxed" open={openBy('회의록')}>
+      <summary className="card-head">
         <span className="card-title">회의록</span>
         <span className="card-note">여기 적힌 말만 요구의 근거가 된다</span>
-      </div>
+      </summary>
 
       {data.meetings.map((m) => (
         <div key={m.id} className="meeting">
@@ -304,12 +336,12 @@ function Meetings({ data, send, toast }) {
           회의 추가
         </button>
       </div>
-    </section>
+    </details>
   )
 }
 
 // ── 요구사항 ────────────────────────────────────────────────
-function Requirements({ data, send, toast }) {
+function Requirements({ data, send, toast, openBy }) {
   const [form, setForm] = useState({
     req_kind: '요구',
     dept: '',
@@ -326,13 +358,13 @@ function Requirements({ data, send, toast }) {
   }
 
   return (
-    <section className="card card-boxed">
-      <div className="card-head">
+    <details className="card card-boxed" open={openBy('회의에서 나온 것들')}>
+      <summary className="card-head">
         <span className="card-title">회의에서 나온 것들</span>
         <span className="card-note">
           가정이 특히 중요하다 — 나중에 깨지는 것은 대개 확인 없이 전제한 것이다
         </span>
-      </div>
+      </summary>
 
       {groups.초안.length > 0 && (
         <>
@@ -436,7 +468,7 @@ function Requirements({ data, send, toast }) {
           </button>
         </div>
       </details>
-    </section>
+    </details>
   )
 }
 
@@ -607,16 +639,16 @@ function kindTone(kind) {
 }
 
 // ── 충돌 판정 ───────────────────────────────────────────────
-function Conflicts({ data, send, toast }) {
+function Conflicts({ data, send, toast, openBy }) {
   const [form, setForm] = useState({ req_a_id: '', req_b_id: '', reason: '', tradeoff_axis: '', severity: '보통' })
   const usable = data.requirements.filter((r) => r.status !== '기각')
 
   return (
-    <section className="card card-boxed">
-      <div className="card-head">
+    <details className="card card-boxed" open={openBy('동시에 될 수 없는 것들')}>
+      <summary className="card-head">
         <span className="card-title">동시에 될 수 없는 것들</span>
         <span className="card-note">여기가 사람이 판단해야 하는 자리다</span>
-      </div>
+      </summary>
 
       {data.conflicts.length === 0 && (
         <p className="card-note" style={{ marginBottom: 12 }}>
@@ -698,7 +730,7 @@ function Conflicts({ data, send, toast }) {
           </button>
         </div>
       </details>
-    </section>
+    </details>
   )
 }
 
@@ -817,15 +849,15 @@ function ConflictCard({ c, send, toast }) {
 }
 
 // ── 합격 기준 ───────────────────────────────────────────────
-function Criteria({ data, send, toast }) {
+function Criteria({ data, send, toast, openBy }) {
   const chosen = new Set(data.criteria.map((c) => c.check_key).filter(Boolean))
 
   return (
-    <section className="card">
-      <div className="card-head">
+    <details className="card" open={openBy('무엇을 통과로 볼 것인가')}>
+      <summary className="card-head">
         <span className="card-title">무엇을 통과로 볼 것인가</span>
         <span className="card-note">만들기 전에 정한다 — 나중에 정하면 결과에 맞춰 기준이 움직인다</span>
-      </div>
+      </summary>
 
       {data.criteria.length > 0 && (
         <div className="stack-sm" style={{ marginBottom: 14 }}>
@@ -915,12 +947,12 @@ function Criteria({ data, send, toast }) {
           </div>
         </div>
       </details>
-    </section>
+    </details>
   )
 }
 
 // ── 기준선 ──────────────────────────────────────────────────
-function Baseline({ data, send, toast }) {
+function Baseline({ data, send, toast, openBy }) {
   // 봉인할 때 같이 굳히는 값. 신청서에 적힌 체감값으로 채워 두고
   // 담당자가 고칠 수 있게 한다 — 실측해 보면 신청서와 다를 때가 많다.
   const [seal, setSeal] = useState({ people: '', frequency: '', hourly_wage_krw: '' })
@@ -928,11 +960,11 @@ function Baseline({ data, send, toast }) {
   const b = data.baseline
 
   return (
-    <section className="card">
-      <div className="card-head">
+    <details className="card" open={openBy('지금 실제로 얼마나 걸리나')}>
+      <summary className="card-head">
         <span className="card-title">지금 실제로 얼마나 걸리나</span>
         <span className="card-note">만들기 전에 잰다</span>
-      </div>
+      </summary>
 
       <p className="card-note" style={{ marginBottom: 14 }}>
         신청서에 적힌 시간은 신청자의 <strong>체감</strong>입니다. 8단계에서 &quot;몇 분이 몇 분이
@@ -1029,7 +1061,7 @@ function Baseline({ data, send, toast }) {
             : `${runs.length}번 잰 값으로 기준선 봉인하기`}
         </button>
       )}
-    </section>
+    </details>
   )
 }
 
@@ -1043,7 +1075,7 @@ function Baseline({ data, send, toast }) {
 // 기준이나 영영 막을 수 있다. 대신 그렇게 하면 그 사실이 기록에 남고,
 // 통과를 말할 때마다 같이 적힌다. 없앨 수 없게 하는 것이 못 하게 하는
 // 것보다 정직하다.
-function Objections({ id, toast }) {
+function Objections({ id, toast, openBy }) {
   const { data, reload } = useApi(`/applications/${id}/signoff`)
   const [open, setOpen] = useState(null)
   const [form, setForm] = useState({ code: '', reason: '', by: 'AX 담당자' })
@@ -1074,8 +1106,8 @@ function Objections({ id, toast }) {
   }
 
   return (
-    <section className="card card-boxed">
-      <div className="card-head">
+    <details className="card card-boxed" open={openBy('부서가 합격 기준을 본 결과')}>
+      <summary className="card-head">
         <span className="card-title">부서가 합격 기준을 본 결과</span>
         <span className={`badge ${state.binding ? 'badge-success' : 'badge-warning'}`}>
           {state.status}
@@ -1086,7 +1118,7 @@ function Objections({ id, toast }) {
             ? '이 기준으로 통과를 말해도 근거가 있습니다'
             : '지금 통과를 말하면 그 통과에 단서가 붙습니다'}
         </span>
-      </div>
+      </summary>
       <p className="card-note">{state.headline}</p>
 
       {objections.length === 0 && (
@@ -1151,7 +1183,7 @@ function Objections({ id, toast }) {
           </li>
         ))}
       </ul>
-    </section>
+    </details>
   )
 }
 
