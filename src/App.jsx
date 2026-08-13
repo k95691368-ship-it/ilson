@@ -22,6 +22,7 @@ const CodesPage = lazy(() => import('./pages/CodesPage.jsx'))
 const StallPage = lazy(() => import('./pages/StallPage.jsx'))
 const PriorityPage = lazy(() => import('./pages/PriorityPage.jsx'))
 const BuiltPage = lazy(() => import('./pages/BuiltPage.jsx'))
+const BugPage = lazy(() => import('./pages/BugPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
 // 여섯 단계 어디에도 안 들어가는 화면들. 단계를 가로로 지르며 본다.
@@ -114,9 +115,23 @@ export default function App() {
               </NavLink>
             ))}
 
-            {/* 목차 끝에 '0 기타' 한 칸이 있었다. 뺐다. 목차는 여섯 단계만
-                건다. 여기 걸려 있던 여덟 줄은 꼬리말로 되돌렸다 — 링크까지
-                같이 없애면 그 화면들로 가는 길이 하나도 안 남는다. */}
+            {/* 여섯 단계 밖의 칸은 이것 하나다. 나머지 가로로 훑는 화면들은
+                꼬리말에 있다 — 목차에 열네 칸을 한꺼번에 내밀면 처음 온
+                사람은 어디부터 눌러야 할지 모른다.
+                버그 신고만 목차에 두는 이유: 이 사이트가 이상하게 굴 때
+                말할 데가 여태 없었다. 부서가 낸 일만 받고 자기 버그는 안
+                받으면, 다른 화면에서 하는 "못 한 것을 숨기지 않는다"가
+                안쪽에서 먼저 깨진다. 그리고 이상한 것을 본 사람은 그 자리에서
+                말할 수 있어야 한다 — 꼬리말까지 내려가면 그냥 닫는다. */}
+            <NavLink
+              to="/bug"
+              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
+            >
+              <span className="topbar-link-no" aria-hidden="true">
+                0
+              </span>
+              버그 신고
+            </NavLink>
           </nav>
 
           <div className="topbar-right">
@@ -160,6 +175,7 @@ export default function App() {
             <Route path="/stall" element={<StallPage />} />
             <Route path="/priority" element={<PriorityPage />} />
             <Route path="/built" element={<BuiltPage />} />
+            <Route path="/bug" element={<BugPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>
         </Suspense>

@@ -560,7 +560,7 @@ function RequirementCard({ r, send, toast, editable }) {
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="왜 기각하는지 20자 이상 — 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다"
+            placeholder="왜 기각하는지 — 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다"
             style={{ width: '100%' }}
           />
           <button

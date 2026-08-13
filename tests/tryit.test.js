@@ -52,7 +52,7 @@ describe('무엇을 해볼 수 있는지', () => {
 
   it('판정 안내가 근거를 받는다는 것을 미리 말한다', () => {
     // 눌러 봤더니 서버가 막으면 고장인 줄 안다.
-    expect(stepOf('review').note).toContain('근거를 20자')
+    expect(stepOf('review').note).toContain('근거를 안 적으면')
     expect(stepOf('review').note).toContain('대안')
   })
 
@@ -154,8 +154,19 @@ describe('시험 삼아 낸 것을 치울 때', () => {
 // 온 사람에게 사이트가 거짓말을 하는 셈이다. 그래서 서버를 문장에 맞췄고,
 // 여기서 둘이 다시 갈라지지 않게 묶어 둔다.
 describe('초대문이 서버와 같은 말을 하는가', () => {
-  it('초대문이 말한 글자 수가 서버가 요구하는 것과 같다', () => {
-    expect(stepOf('review').note).toContain(`${MIN_REASON}자`)
+  it('초대문이 말한 것을 서버가 실제로 막는다', () => {
+    // 스무 자를 요구하다가 풀었다. 이제 막는 것은 빈칸뿐이라, 초대문도
+    // 글자 수를 말하지 않는다 — 둘이 갈라지면 화면이 또 거짓말을 한다.
+    expect(stepOf('review').note).not.toMatch(/\d+자/)
+    const empty = validateReview({
+      impact_score: 3,
+      difficulty_score: 3,
+      verdict: '수용',
+      verdict_reason: '',
+      alternatives_considered: '사람이 계속 하는 안을 견줬습니다',
+    })
+    expect(empty.ok).toBe(false)
+    expect(empty.errors.verdict_reason).toBeTruthy()
   })
 
   it('반려에 대안을 받는다는 것도 서버가 실제로 막는다', () => {
@@ -172,16 +183,17 @@ describe('초대문이 서버와 같은 말을 하는가', () => {
     expect(bad.errors.refuse_alternative).toBeTruthy()
   })
 
-  it('근거가 짧으면 막는다', () => {
-    const bad = validateReview({
+  it('짧아도 적혀 있으면 받는다', () => {
+    // 길이로는 근거가 있는지를 못 가린다. 정확한 한 마디가 스무 자를
+    // 못 채워 막히던 자리다.
+    const short = validateReview({
       impact_score: 3,
       difficulty_score: 3,
       verdict: '수용',
-      verdict_reason: '자동화할 자료가 아직 없습니다.',
-      alternatives_considered: '사람이 계속 하는 안을 견줬습니다 그것뿐입니다',
+      verdict_reason: '자료가 없습니다.',
+      alternatives_considered: '손으로 계속 하는 안.',
     })
-    expect(bad.ok).toBe(false)
-    expect(bad.errors.verdict_reason).toBeTruthy()
+    expect(short.ok).toBe(true)
   })
 
   it('보류는 다시 볼 조건을 받는다', () => {

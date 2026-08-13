@@ -21,7 +21,10 @@ import {
 
 // 요구를 기각할 때 받는 최소 길이. 판정 근거와 같은 선을 쓴다 — 화면마다
 // 다른 기준을 두면 담당자는 어디서 얼마나 적어야 하는지 매번 헷갈린다.
-const MIN_REJECT_REASON = 20
+//
+// 스무 자였다가 풀었다. 글자 수로는 근거가 있는지를 못 가린다. 비어
+// 있는지만 막는다.
+const MIN_REJECT_REASON = 1
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -415,7 +418,7 @@ export async function onRequestPatch({ env, params, request }) {
       // 이유 없이 접으면 그 사람은 다음 회의에서 아무 말도 안 한다.
       if (t(body.status) === '기각' && t(body.reject_reason).length < MIN_REJECT_REASON) {
         return failFields({
-          reject_reason: `왜 기각하시는지 ${MIN_REJECT_REASON}자 이상 적어주세요. 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다.`,
+          reject_reason: '왜 기각하시는지 적어주세요. 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다.',
         })
       }
       await env.DB.prepare(

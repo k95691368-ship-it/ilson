@@ -7,9 +7,13 @@ export const VERDICTS = ['수용', '반려', '보류']
 
 // 근거·대안·조건에 요구하는 최소 길이.
 //
-// 첫 화면 초대문이 "20자"라고 적어 뒀다. 그 문장과 이 숫자가 갈라지면
-// 화면이 또 거짓말을 한다.
-export const MIN_REASON = 20
+// 스무 자였다. 풀었다 — 글자 수를 세는 것으로는 근거가 있는지 없는지를
+// 가릴 수 없다. "그냥요"를 스무 자로 늘려 쓰는 것도 되고, 정확한 한 마디가
+// 스무 자를 못 채워 막히기도 한다. 길이는 판단을 흉내 낼 뿐이다.
+//
+// 대신 **비었는지는 계속 막는다.** 빈칸으로 눌리면 그건 결정이 아니라
+// 클릭이고, 그 말은 이 저장소가 여러 화면에서 하고 있는 약속이다.
+export const MIN_REASON = 1
 
 // 반려 사유. 이 목록이 곧 "우리가 만들지 않는 것"의 선언이다.
 //
@@ -137,16 +141,16 @@ export function validateReview(input) {
   // **그런데 아무것도 안 막고 있었다.** 막는 것은 임팩트·난이도·판정
   // 셋뿐이었고, 근거 열다섯 자에 대안 없는 반려가 실제로 저장돼 있다.
   //
-  // 결정적인 것은 첫 화면의 초대문이다. 보러 오신 분께 "근거를 20자 안
-  // 적으면 서버가 막습니다, 반려는 대안까지 받습니다"라고 적어 뒀는데
-  // 사실이 아니었다. 면접관이 빈칸으로 눌러 보면 그대로 저장된다 —
-  // 평가하러 온 사람에게 사이트가 거짓말을 하는 셈이다.
+  // 결정적인 것은 첫 화면의 초대문이다. 보러 오신 분께 "근거를 안 적으면
+  // 서버가 막습니다, 반려는 대안까지 받습니다"라고 적어 뒀는데 사실이
+  // 아니었다. 면접관이 빈칸으로 눌러 보면 그대로 저장된다 — 평가하러 온
+  // 사람에게 사이트가 거짓말을 하는 셈이다.
   if (v.verdict_reason.length < MIN_REASON) {
-    errors.verdict_reason = `왜 그렇게 판정하셨는지 ${MIN_REASON}자 이상 적어주세요. 근거 없이 누른 것은 결정이 아니라 클릭입니다.`
+    errors.verdict_reason = '왜 그렇게 판정하셨는지 적어주세요. 근거 없이 누른 것은 결정이 아니라 클릭입니다.'
   }
   if (v.alternatives_considered.length < MIN_REASON) {
     // 무엇을 고르지 않았는지를 적어야 판단이 판단이 된다.
-    errors.alternatives_considered = `무엇을 고르지 않으셨는지 ${MIN_REASON}자 이상 적어주세요. 대안을 적어야 판단이 판단이 됩니다.`
+    errors.alternatives_considered = '무엇을 고르지 않으셨는지 적어주세요. 대안을 적어야 판단이 판단이 됩니다.'
   }
 
   if (v.verdict === '반려') {
@@ -155,14 +159,14 @@ export function validateReview(input) {
     }
     // 만들지 못한다는 말만 하고 끝내면 병목은 그대로 남는다.
     if (v.refuse_alternative.length < MIN_REASON) {
-      errors.refuse_alternative = `대신 해보실 수 있는 것을 ${MIN_REASON}자 이상 적어주세요. 못 만든다는 말만 하고 끝내면 그 부서의 병목은 그대로 남습니다.`
+      errors.refuse_alternative = '대신 해보실 수 있는 것을 적어주세요. 못 만든다는 말만 하고 끝내면 그 부서의 병목은 그대로 남습니다.'
     }
   }
 
   if (v.verdict === '보류' && v.hold_until_condition.length < MIN_REASON) {
     // 조건 없이 미뤄 두면 부서는 언제까지 기다려야 하는지 모른다. 그리고
     // 보류는 아무도 안 움직이면 영원히 그대로인 유일한 상태다.
-    errors.hold_until_condition = `무엇이 풀리면 다시 볼지 ${MIN_REASON}자 이상 적어주세요. 조건이 없으면 부서는 언제까지 기다려야 하는지 모릅니다.`
+    errors.hold_until_condition = '무엇이 풀리면 다시 볼지 적어주세요. 조건이 없으면 부서는 언제까지 기다려야 하는지 모릅니다.'
   }
 
   if (Object.keys(errors).length > 0) return { ok: false, errors }
