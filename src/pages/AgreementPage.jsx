@@ -113,31 +113,12 @@ function Agreement({ id }) {
   if (error) return <div className="notice notice-danger">{error}</div>
   if (!data) return null
 
-  // 한 화면에서 일곱 가지를 다 한다 — 이해관계자·회의록·요구·충돌·합격
-  // 기준·이의·기준선. 그런데 이건 **순서가 있는 일**이다. 요구를 판단해야
-  // 충돌이 보이고, 충돌을 판정해야 무엇을 통과로 볼지가 정해진다.
+  // 들어오자마자 아무 칸도 펼치지 않는다.
   //
-  // 그래서 끝난 칸은 접는다. 지금 손봐야 하는 칸만 펼쳐 둔다. 접어도 제목은
-  // 남으므로 무엇이 있는지는 보이고, 눌러서 언제든 다시 편다.
-  //
-  // 아무것도 안 끝났으면 첫 칸부터 펼친다. 다 끝났으면 전부 접는다 — 그때는
-  // 위의 '협의가 끝났습니다'가 할 말을 다 한 것이다.
-  const done = {
-    '누가 이 일에 얽혀 있나': data.stakeholders.length > 0 && (data.pendingJoins ?? []).length === 0,
-    회의록: data.meetings.length > 0,
-    '회의에서 나온 것들': data.requirements.length > 0 && data.requirements.every((r) => r.status !== '초안'),
-    '부서가 합격 기준을 본 결과': false,
-  }
-  // 아직 안 끝난 것 중 **첫 칸**만 펼친다. 여러 칸을 한꺼번에 펼치면
-  // 접기 전과 같아진다.
-  const order = [
-    '누가 이 일에 얽혀 있나',
-    '회의록',
-    '회의에서 나온 것들',
-    '부서가 합격 기준을 본 결과',
-  ]
-  const first = order.find((k) => !done[k]) ?? null
-  const openBy = (title) => title === first
+  // 전에는 "아직 안 끝난 첫 칸"을 열어 뒀다. 그러면 신청서를 누른 순간
+  // 이해관계자 입력칸 넉 줄이 먼저 나온다 — 무엇이 있는지 보기도 전에
+  // 뭘 적으라고 하는 셈이다. 제목만 늘어놓고, 볼 칸을 사람이 고른다.
+  const openBy = () => false
 
   return (
     <div className="stack">

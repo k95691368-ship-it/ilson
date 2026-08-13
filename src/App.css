@@ -52,9 +52,11 @@
   gap: 18px;
   flex-wrap: wrap;
   padding: 12px 22px;
-  background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  /* 85%만 불투명하고 뒤를 흐리게 했었다. 흐림이 안 먹는 자리에서는 본문
+     글자가 목차 위로 그대로 읽혔다 — 조금만 내려도 '이 단계의 주인 …'이
+     목차 글자와 겹쳐 두 겹으로 보인다. 늘 붙어 있는 띠라 어느 화면에서나
+     그렇다. 비쳐 보여서 얻는 것이 없으므로 막는다. */
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 
