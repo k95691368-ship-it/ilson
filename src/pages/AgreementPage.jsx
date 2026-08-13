@@ -33,12 +33,18 @@ export default function AgreementPage() {
   // "어디를 보세요"는 안 말하는 셈이 된다.
   const wanted = params.get('id')
 
+  // 들어오자마자 아무것도 펼치지 않는다.
+  //
+  // 전에는 첫 건을 자동으로 골라 회의록·이해관계자·요구가 한꺼번에 펼쳐졌다.
+  // 3단계를 눌렀을 뿐인데 입력칸 여러 개가 먼저 나오면, 어느 신청서 얘기인지
+  // 확인하기도 전에 화면부터 채워진다. 신청서를 눌러야 그 아래가 열린다.
+  //
+  // 다만 할 일 목록이 `?id=` 로 특정 건을 짚어 보낼 때는 연다. 거기까지
+  // 데려다 놓고 다시 한 번 누르게 하면 "어디를 보세요"를 말하다 만 것이 된다.
   useEffect(() => {
-    if (selectedId || accepted.length === 0) return
-    // 주소로 온 건이 목록에 있으면 그것부터. 없으면(이미 처리했거나 상태가
-    // 바뀌었으면) 첫 건으로 떨어진다 — 빈 화면을 보여 주는 것보다 낫다.
-    const found = wanted && accepted.find((a) => a.id === wanted)
-    setSelectedId(found ? found.id : accepted[0].id)
+    if (selectedId || accepted.length === 0 || !wanted) return
+    const found = accepted.find((a) => a.id === wanted)
+    if (found) setSelectedId(found.id)
   }, [accepted, selectedId, wanted])
 
   return (
@@ -54,13 +60,17 @@ export default function AgreementPage() {
         </div>
       ) : (
         <>
+          {/* 고르는 칩이 여는 단추를 겸한다. 한 번 더 누르면 접힌다 —
+              펼치는 길만 있고 접는 길이 없으면 한 번 누른 뒤로는 되돌릴 수
+              없다. */}
           <div className="chip-row">
             {accepted.map((a) => (
               <button
                 key={a.id}
                 type="button"
                 className={`chip${selectedId === a.id ? ' on' : ''}`}
-                onClick={() => setSelectedId(a.id)}
+                aria-expanded={selectedId === a.id}
+                onClick={() => setSelectedId((prev) => (prev === a.id ? null : a.id))}
               >
                 {a.dept} · {a.title.slice(0, 22)}
                 {a.title.length > 22 && '…'}
@@ -68,7 +78,13 @@ export default function AgreementPage() {
             ))}
           </div>
 
-          {selectedId && <Agreement id={selectedId} />}
+          {selectedId ? (
+            <Agreement id={selectedId} />
+          ) : (
+            <p className="card-note">
+              위에서 신청서를 누르면 그 건의 협의 내용이 아래에 펼쳐집니다.
+            </p>
+          )}
         </>
       )}
     </div>
@@ -125,7 +141,6 @@ function Agreement({ id }) {
 
   return (
     <div className="stack">
-      <GateBanner gate={data.gate} />
       <Stakeholders data={data} send={send} toast={toast} openBy={openBy} />
       <Meetings data={data} send={send} toast={toast} openBy={openBy} />
       <Requirements data={data} send={send} toast={toast} openBy={openBy} />
@@ -134,29 +149,10 @@ function Agreement({ id }) {
   )
 }
 
-function GateBanner({ gate }) {
-  if (gate.ready) {
-    return (
-      <div className="notice notice-success">
-        <div className="notice-title">협의가 끝났습니다</div>
-        <p>
-          요구를 전부 판단했고, 충돌을 판정했고, 합격 기준을 <strong>모두</strong> 확정했고,
-          기준선을 봉인했습니다. 이제 만들기 시작할 수 있습니다.
-        </p>
-      </div>
-    )
-  }
-  return (
-    <div className="notice notice-warn">
-      <div className="notice-title">아직 만들기 시작하면 안 되는 이유</div>
-      <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
-        {gate.blockers.map((b, i) => (
-          <li key={i}>{b}</li>
-        ))}
-      </ul>
-    </div>
-  )
-}
+// 맨 위에 '아직 만들기 시작하면 안 되는 이유' 띠가 있었다. 지웠다.
+// 합격 기준과 기준선을 넣을 자리를 이 화면에서 걷어낸 뒤로는, 그 띠가
+// 미는 두 줄을 아무도 채울 수 없었다 — 시키는 대로 할 수 없는 안내는
+// 안내가 아니다.
 
 // ── 이해관계자 ──────────────────────────────────────────────
 function Stakeholders({ data, send, toast, openBy }) {

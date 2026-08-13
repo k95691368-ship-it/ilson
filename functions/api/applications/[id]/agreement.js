@@ -11,7 +11,6 @@ import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
 import { pendingJoinDepts } from '../../../../shared/join.js'
 import { loadJoins } from './join.js'
 import {
-  agreementGate,
   quoteFound,
   CRITERION_BY_KEY,
   CONFLICT_VERDICTS,
@@ -114,13 +113,6 @@ export async function onRequestGet({ env, params }) {
         steps: safeParse(s.step_timings_json, null),
       })),
       baseline: baseline ?? null,
-      gate: agreementGate({
-        requirements: reqs,
-        conflicts: conflicts.results,
-        criteria: criteria.results,
-        baseline,
-        pendingJoins,
-      }),
     })
   } catch (err) {
     return jsonError(`협의안을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

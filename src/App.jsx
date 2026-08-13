@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
 import ThemeToggle from './components/ThemeToggle.jsx'
 import { STAGES } from './lib/stages.js'
@@ -51,70 +51,6 @@ export const CROSSCUT = [
 function useBareLayout() {
   const path = useLocation().pathname
   return path.startsWith('/t/') || path === '/track' || path.startsWith('/record/')
-}
-
-// 여덟 단계 어디에도 안 들어가는 화면들을 목차 끝 한 칸에 묶는다.
-//
-// 마우스를 올리면 펼쳐진다. 다만 **마우스만으로는 안 된다** — 손가락으로
-// 여는 사람과 키보드로 훑는 사람이 못 연다. 그래서 누르면 열리고,
-// 안쪽으로 초점이 들어와도 열린다. 세 길이 같은 자리를 연다.
-function CrosscutMenu() {
-  const [open, setOpen] = useState(false)
-  const box = useRef(null)
-  const path = useLocation().pathname
-  const here = CROSSCUT.some((c) => path.startsWith(c.to))
-
-  // 주소가 바뀌면 닫는다. 안 닫으면 눌러서 넘어간 화면 위에 메뉴가 그대로 떠 있다.
-  useEffect(() => {
-    setOpen(false)
-  }, [path])
-
-  // 바깥을 누르면 닫는다. Esc 로도 닫는다 — 열어 놓고 나갈 길이 있어야 한다.
-  useEffect(() => {
-    if (!open) return
-    const away = (e) => {
-      if (!box.current?.contains(e.target)) setOpen(false)
-    }
-    const esc = (e) => {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('pointerdown', away)
-    document.addEventListener('keydown', esc)
-    return () => {
-      document.removeEventListener('pointerdown', away)
-      document.removeEventListener('keydown', esc)
-    }
-  }, [open])
-
-  return (
-    <div
-      className={`nav-more${open ? ' open' : ''}`}
-      ref={box}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-    >
-      <button
-        type="button"
-        className={`topbar-link${here ? ' active' : ''}`}
-        aria-expanded={open}
-        aria-haspopup="true"
-        onClick={() => setOpen((v) => !v)}
-      >
-        <span className="topbar-link-no" aria-hidden="true">
-          0
-        </span>
-        기타
-      </button>
-      <div className="nav-more-menu" role="menu" aria-label="가로로 훑어보는 화면">
-        {CROSSCUT.map((c) => (
-          <Link key={c.to} to={c.to} className="nav-more-item" role="menuitem">
-            <span className="nav-more-label">{c.label}</span>
-            <span className="nav-more-note">{c.note}</span>
-          </Link>
-        ))}
-      </div>
-    </div>
-  )
 }
 
 // 인쇄할 때는 접힌 것을 전부 편다.
@@ -180,11 +116,9 @@ export default function App() {
               </NavLink>
             ))}
 
-            {/* 여덟 단계 어디에도 안 들어가는 화면들.
-                꼬리말에 여덟 줄로 늘어놓았었다. 거기까지 내려가야 보이고,
-                내려가도 여덟 줄이 한꺼번에 펼쳐져 있다. 목차 끝에 한 칸으로
-                묶어 두고 필요할 때만 펼친다. */}
-            <CrosscutMenu />
+            {/* 목차 끝에 '0 기타' 한 칸이 있었다. 뺐다. 목차는 여덟 단계만
+                건다. 여기 걸려 있던 여덟 줄은 꼬리말로 되돌렸다 — 링크까지
+                같이 없애면 그 화면들로 가는 길이 하나도 안 남는다. */}
           </nav>
 
           <div className="topbar-right">
@@ -260,9 +194,17 @@ export default function App() {
                 신청서가 없는 상태에서는 아무 데서도 못 간다. 이 저장소에서 제일
                 자주 난 사고가 바로 그것이다 — 만들어는 뒀는데 아무도 못 가는 것.
                 꼬리말은 늘 있고, 목차와 자리를 다투지 않는다. */}
-            {/* '가로로 훑어보기' 여덟 줄이 여기 있었다. 목차 끝의 '기타'로
-                옮겼다 — 꼬리말까지 내려가야 보이는 데다, 내려가도 여덟 줄이
-                한꺼번에 펼쳐져 있었다. */}
+            <div className="footer-col">
+              <div className="footer-title">가로로 훑어보기</div>
+              <p className="footer-text">
+                {CROSSCUT.map((c, i) => (
+                  <span key={c.to}>
+                    {i > 0 && ' · '}
+                    <Link to={c.to}>{c.label}</Link>
+                  </span>
+                ))}
+              </p>
+            </div>
           </div>
           <div className="footer-bottom">
             <span>Cloudflare Pages Functions · D1 · 외부 서비스 호출 없음</span>
