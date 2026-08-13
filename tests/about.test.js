@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { PLAIN, TECH, techFacts } from '../shared/about.js'
@@ -139,6 +139,54 @@ describe('적어 둔 것이 실제로 그런가', () => {
     expect(auth).toBeTruthy()
     expect(src).not.toContain('bcrypt')
     expect(src).not.toContain('jsonwebtoken')
+  })
+
+  it('"link_kind 34종"이 실제 개수와 맞는다', () => {
+    // 이런 숫자는 기능을 더할 때마다 조용히 틀려진다. 글에 적힌 수와
+    // 소스에 있는 수를 매번 맞춰 본다.
+    const kinds = new Set()
+    for (const m of src.matchAll(/link_kind\s*[=:]\s*'([^']+)'/g)) kinds.add(m[1])
+    for (const m of src.matchAll(/_KIND\s*=\s*'([^']+)'/g)) kinds.add(m[1])
+    expect(kinds.size).toBeGreaterThan(20) // 이 검사가 헛돌지 않는다
+    const log = TECH.sections.find((s) => s.title.includes('decision_log'))
+    expect(Number(log.body.match(/(\d+)종/)?.[1])).toBe(kinds.size)
+  })
+
+  it('"테스트 4층"의 세 번째 층이 실제로 있다', () => {
+    // 층 수만 늘려 적고 그 층을 안 만들면 이 문서가 거짓이 된다.
+    const layers = TECH.sections.find((s) => s.title.includes('테스트'))
+    expect(layers.title).toContain('4층')
+    expect(layers.body).toContain('happy-dom')
+    expect(existsSync(join(ROOT, 'tests', 'pageRender.test.jsx'))).toBe(true)
+  })
+
+  it('"users·sessions 표를 지웠다"가 사실이다', () => {
+    // 안 쓴다고만 적고 표는 남겨 두면 언젠가 누가 그 표를 쓴다.
+    const auth = TECH.sections.find((s) => s.title.includes('인증 없음'))
+    expect(auth.body).toContain('DROP')
+    const sql = readdirSync(join(ROOT, 'migrations'))
+      .map((f) => readFileSync(join(ROOT, 'migrations', f), 'utf8'))
+      .join('\n')
+    expect(sql).toMatch(/DROP TABLE IF EXISTS users/i)
+    expect(sql).toMatch(/DROP TABLE IF EXISTS sessions/i)
+  })
+
+  it('"개수 없이는 접지 않는다"가 사실이다', () => {
+    // 부품이 그 조건 없이 접으면, 이 문단은 하지 않는 일을 적은 것이 된다.
+    const fold = TECH.sections.find((s) => s.title.includes('화면 길이'))
+    expect(fold.body).toContain('접지 않고')
+    const code = readFileSync(join(ROOT, 'src', 'components', 'Fold.jsx'), 'utf8')
+    expect(code).toContain('NEVER_FOLD')
+    expect(code).toMatch(/count == null/)
+  })
+
+  it('"한 곳에서만 센다"가 사실이다', () => {
+    // 합쳐 놓고 옛 계산이 남아 있으면 두 화면이 또 갈라진다.
+    const one = TECH.sections.find((s) => s.title.includes('한 숫자는'))
+    for (const fn of ['liveChallenges', 'fullySignedIds', 'daysSince', 'tally']) {
+      expect(one.body, fn).toContain(fn)
+      expect(src, fn).toContain(fn)
+    }
   })
 
   it('스택에 적은 것이 실제로 쓰인다', () => {
