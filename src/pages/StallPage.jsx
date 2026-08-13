@@ -105,19 +105,47 @@ export default function StallPage() {
         </section>
       )}
 
-      {data.stalls.length === 0 && data.summary.moving > 0 && (
-        <section className="card stall-clear">
-          <strong>늦어지고 있는 신청서가 없습니다.</strong>
-          <p className="card-note">
-            진행 중인 {data.summary.moving}건이 모두 각 단계의 보통 기간 안에 있습니다.
-          </p>
-        </section>
-      )}
+      {/* 늦은 것이 없는 것과 아예 아무것도 없는 것은 다른 상황이다. 같은
+          문장을 쓰면 "다 잘 가고 있습니다"로 읽힌다 — 갈 것이 없는데.
+          예전에는 뒤 조건 때문에 0건일 때 이 자리에 아무 말도 안 나왔다. */}
+      {data.stalls.length === 0 &&
+        (data.summary.moving > 0 ? (
+          <section className="card stall-clear">
+            <strong>늦어지고 있는 신청서가 없습니다.</strong>
+            <p className="card-note">
+              진행 중인 {data.summary.moving}건이 모두 각 단계의 보통 기간 안에 있습니다.
+            </p>
+          </section>
+        ) : (
+          <section className="card stall-clear">
+            <strong>아직 진행 중인 신청서가 없습니다.</strong>
+            <p className="card-note">
+              신청서가 들어오면 어느 단계에서 며칠째 멈춰 있는지 여기에 나옵니다.
+            </p>
+            <div className="row">
+              <Link to="/" className="btn-primary btn-sm">
+                예시 넣어 보기
+              </Link>
+              <Link to="/apply" className="btn-ghost btn-sm">
+                직접 신청서 내기
+              </Link>
+            </div>
+          </section>
+        ))}
 
       <section className="card">
         <div className="card-head">
           <span className="card-title">단계마다 보통 며칠 걸리나</span>
         </div>
+        {/* 여덟 줄이 전부 "표본 0건"이면 그 표는 아무 말도 하지 않으면서
+            화면만 차지한다. 그렇다고 카드를 통째로 없애면 이 사이트가 단계별
+            기간을 재고 있다는 것 자체가 안 보인다. 그래서 한 줄로 줄인다. */}
+        {data.typical.every((t) => t.n === 0) ? (
+          <p className="card-note">
+            아직 잰 것이 없습니다. 단계마다 {MIN_SAMPLE}건이 쌓이면 보통 며칠 걸리는지가
+            여기에 나옵니다.
+          </p>
+        ) : (
         <ul className="stall-typical">
           {data.typical.map((t) => (
             <li key={t.stage} className={t.enough ? '' : 'thin'}>
@@ -139,6 +167,7 @@ export default function StallPage() {
             </li>
           ))}
         </ul>
+        )}
       </section>
 
       {data.onTrack.length > 0 && (
