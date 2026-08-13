@@ -84,6 +84,23 @@ export function validateReport({ code, body, reporter }) {
   return fields
 }
 
+// 도구 주소 없이 제보할 때.
+//
+// 여태 신고하려면 넘겨받은 도구 주소(/t/…)를 알아야 했다. 그 주소를 아는
+// 사람은 그 도구를 받은 부서뿐이고, 주소를 잃어버리면 말할 데가 없어진다.
+// 그리고 아직 안 넘긴 것은 신고할 길이 아예 없다 — 만드는 중에 이상한 걸
+// 본 사람이 가장 먼저 아는데도.
+//
+// 그래서 어느 기능인지를 목록에서 고르는 창구를 따로 둔다. 받는 규칙은
+// 같다 — 두 벌로 만들면 한쪽만 고쳐지고 갈라진다.
+export function validateFiledReport({ applicationId, code, body, reporter } = {}) {
+  const fields = validateReport({ code, body, reporter })
+  if (!String(applicationId ?? '').trim()) {
+    fields.applicationId = '어느 기능에 대한 것인지 골라주세요.'
+  }
+  return fields
+}
+
 // 결정 기록 줄을 신고로 바꾼다.
 export function toReports(rows) {
   const items = (rows ?? [])
