@@ -7,14 +7,8 @@ import { krw, num, ms, ago } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { SKUS } from '../../shared/master.js'
 
-// 시연용 파일. 실제 정산서에서 만나는 것들이 그대로 들어 있다.
-const SAMPLES = [
-  { name: '01_자사몰_주문내역_2026-06.csv', hint: 'UTF-8 · 통화기호 섞임 · 중복 줄' },
-  { name: '02_올리브영_정산_2026-06.xlsx', hint: '엑셀 · 제목 병합 · 머리글 4행 · 맨 끝 합계 줄' },
-  { name: '03_쿠팡_정산내역_2026-06.csv', hint: 'CP949 · 반품 음수 줄' },
-  { name: '04_amazon-settlement-2026-06.csv', hint: '달러 · 미국식 날짜' },
-  { name: '05_Qoo10_JP_決済明細_2026Q2.xlsx', hint: '엑셀 · 시트 3장 · 엔화 · 다른 달 섞임' },
-]
+// 시연용 파일 다섯 장이 여기 박혀 있었다. 카드도 버튼도 실물 파일도 지웠다.
+// 이 화면은 이제 넣은 파일만 처리한다.
 
 export default function BuildPage() {
   const { data: list } = useApi('/applications')
@@ -105,25 +99,6 @@ function Build({ id }) {
     }
   }
 
-  async function runSamples() {
-    setRunning(true)
-    setProgress('시연 파일을 가져오는 중…')
-    try {
-      const files = await Promise.all(
-        SAMPLES.map(async (s) => {
-          const res = await fetch(`/samples/${encodeURIComponent(s.name)}`)
-          if (!res.ok) throw new Error(`${s.name}을 가져오지 못했습니다.`)
-          return { name: s.name, buffer: await res.arrayBuffer() }
-        })
-      )
-      await runWith(files)
-    } catch (err) {
-      toast.error(err.message)
-      setRunning(false)
-      setProgress('')
-    }
-  }
-
   async function runUploaded(fileList) {
     const files = await Promise.all(
       [...fileList].map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() }))
@@ -146,19 +121,7 @@ function Build({ id }) {
           <span className="badge badge-success">계산은 이 브라우저에서 돕니다</span>
         </div>
 
-        <div className="sample-grid">
-          {SAMPLES.map((s) => (
-            <div key={s.name} className="sample-card">
-              <strong>{s.name.replace(/^\d+_/, '').replace(/\.(csv|xlsx)$/, '')}</strong>
-              <span className="card-note">{s.hint}</span>
-            </div>
-          ))}
-        </div>
-
         <div className="row" style={{ marginTop: 12 }}>
-          <button type="button" className="btn-primary" onClick={runSamples} disabled={running}>
-            {running ? progress || '돌리는 중…' : '이 다섯 장으로 돌려보기'}
-          </button>
           <input
             ref={fileInput}
             type="file"
@@ -172,11 +135,11 @@ function Build({ id }) {
           />
           <button
             type="button"
-            className="btn-ghost"
+            className="btn-primary"
             onClick={() => fileInput.current?.click()}
             disabled={running}
           >
-            내 파일로 해보기
+            {running ? progress || '돌리는 중…' : '파일 넣기'}
           </button>
           {data.aliases.length > 0 && (
             <span className="card-note">

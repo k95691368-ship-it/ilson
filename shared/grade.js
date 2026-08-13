@@ -18,6 +18,19 @@ function fail(evidence, samples = []) {
   return { passed: false, evidence, samples }
 }
 
+// 정답표가 없을 때 쓴다.
+//
+// 시연 파일 다섯 장을 걷어내면서 함께 만들어 뒀던 정답표도 없앴다. 정답이
+// 없는데 정답 대조 기준을 **실패**로 적으면 도구가 틀린 것처럼 보인다.
+// 틀린 것이 아니라 **판정할 수 없는 것**이다. 그 둘을 같은 칸에 적으면
+// 이 화면의 통과율이 거짓말이 된다.
+function cannotJudge(what) {
+  return {
+    passed: null,
+    evidence: `${what} 정답표가 없어 기계가 판정하지 못했습니다. 넣으신 파일의 정답을 이 사이트는 모릅니다.`,
+  }
+}
+
 // ─────────────────────────────────────────────────────────────
 // 기준별 채점
 // ─────────────────────────────────────────────────────────────
@@ -25,6 +38,7 @@ function fail(evidence, samples = []) {
 const CHECKS = {
   // 채널별 순매출이 정답과 같은가
   amount_exact({ result, truth }) {
+    if (!truth?.agg_by_channel) return cannotJudge('채널별 금액')
     const mine = new Map(result.totals.byChannel.map((t) => [t.channel, t]))
     const diffs = []
     for (const t of truth.agg_by_channel) {
@@ -41,6 +55,7 @@ const CHECKS = {
 
   // 검토함으로 빼야 할 줄을 빠짐없이 뺐는가
   quarantine_complete({ result, truth }) {
+    if (!truth?.quarantine) return cannotJudge('검토함으로 뺄 줄의')
     const mine = new Set(
       result.quarantine.map((q) => `${q.source.file}|${q.source.sheet ?? ''}|${q.source.rowNo}`)
     )
@@ -57,6 +72,7 @@ const CHECKS = {
 
   // 멀쩡한 줄을 잘못 빼지는 않았는가
   quarantine_precise({ result, truth }) {
+    if (!truth?.quarantine) return cannotJudge('검토함으로 뺄 줄의')
     const truthSet = new Set(
       truth.quarantine.map((t) => `${t.source_file}|${t.source_sheet}|${t.source_row_no}`)
     )
@@ -284,7 +300,9 @@ export async function gradeAll({ criteria, files, aliases = {}, truth, period })
         check_key: c.check_key,
         is_required_safety: c.is_required_safety,
         kind: 'rule',
-        verdict: r.passed ? '통과' : '실패',
+        // passed 가 null 이면 못 판정한 것이다. 실패로 적으면 도구가 틀린
+        // 것처럼 보인다 — 틀린 것이 아니라 대조할 정답이 없는 것이다.
+        verdict: r.passed == null ? '판정불가' : r.passed ? '통과' : '실패',
         evidence: r.evidence,
         samples: r.samples ?? [],
       })
@@ -324,6 +342,8 @@ export function tally(list) {
   const machine = graded.filter((g) => g?.kind === 'rule')
   const passed = machine.filter((g) => g.verdict === '통과')
   const failed = machine.filter((g) => g.verdict === '실패')
+  // 못 판정한 것. 실패도 통과도 아니다.
+  const unjudged = machine.filter((g) => g.verdict === '판정불가')
   const safetyFailed = failed.filter(
     (g) => g.is_required_safety === 1 || g.is_required_safety === true
   )
@@ -335,8 +355,20 @@ export function tally(list) {
     failed: failed.length,
     humanNeeded: graded.filter((g) => g?.kind === 'human').length,
     safetyFailed: safetyFailed.length,
+    unjudged: unjudged.length,
     // 필수 안전 기준이 하나라도 깨지면 통과가 아니다. 다른 점수가 아무리
     // 좋아도 마찬가지다.
-    overall: failed.length === 0 ? '통과' : safetyFailed.length > 0 ? '차단' : '조건부',
+    //
+    // 그리고 **못 판정한 것이 남아 있으면 통과가 아니다.** 안 본 것을 통과로
+    // 세면 이 게이트는 안 보고 열어 주는 문이 된다. 여기가 "합격 기준을
+    // 통과해야만 넘길 수 있습니다"라고 적어 둔 자리다.
+    overall:
+      failed.length > 0
+        ? safetyFailed.length > 0
+          ? '차단'
+          : '조건부'
+        : unjudged.length > 0
+          ? '조건부'
+          : '통과',
   }
 }

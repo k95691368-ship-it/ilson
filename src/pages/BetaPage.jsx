@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
@@ -10,13 +10,10 @@ import { gradeAll } from '../../shared/grade.js'
 import { passCaveat } from '../../shared/signoff.js'
 import { PERIOD } from '../../shared/master.js'
 
-const SAMPLE_NAMES = [
-  '01_자사몰_주문내역_2026-06.csv',
-  '02_올리브영_정산_2026-06.xlsx',
-  '03_쿠팡_정산내역_2026-06.csv',
-  '04_amazon-settlement-2026-06.csv',
-  '05_Qoo10_JP_決済明細_2026Q2.xlsx',
-]
+// 시연 파일 다섯 장을 사이트에서 걷어냈다. 그래서 이 화면도 넣은 파일로
+// 채점한다. 정답표가 함께 없어졌으므로 정답 대조 기준 셋은 「판정불가」로
+// 나오고, 판정불가가 하나라도 남으면 이 회차는 통과가 아니다 —
+// 안 본 것을 통과로 세면 이 게이트는 안 보고 열어 주는 문이 된다.
 
 
 export default function BetaPage() {
@@ -76,23 +73,24 @@ function Beta({ id }) {
   const toast = useToast()
   const [testing, setTesting] = useState(false)
   const [progress, setProgress] = useState('')
+  const fileInput = useRef(null)
   const [fixedWhat, setFixedWhat] = useState('')
 
-  async function runTest() {
+  async function runTest(fileList) {
+    const picked = [...(fileList ?? [])]
+    if (picked.length === 0) return
     setTesting(true)
     try {
-      setProgress('시험 파일과 정답을 가져오는 중…')
-      const [files, truth, aliasData] = await Promise.all([
+      setProgress('파일을 읽는 중…')
+      const [files, aliasData] = await Promise.all([
         Promise.all(
-          SAMPLE_NAMES.map(async (n) => {
-            const res = await fetch(`/samples/${encodeURIComponent(n)}`)
-            if (!res.ok) throw new Error(`${n}을 가져오지 못했습니다.`)
-            return { name: n, buffer: await res.arrayBuffer() }
-          })
+          picked.map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() }))
         ),
-        fetch('/samples/ground_truth.json').then((r) => r.json()),
         api.get(`/applications/${id}/build`),
       ])
+      // 정답표는 없다. 없으면 없는 대로 넘긴다 — 대조할 정답이 없는 기준은
+      // 실패가 아니라 판정불가로 적힌다.
+      const truth = undefined
 
       setProgress('합격 기준으로 채점하는 중…')
       const aliases = Object.fromEntries(
@@ -170,8 +168,24 @@ function Beta({ id }) {
             />
           )}
 
-          <button type="button" className="btn-primary btn-block" onClick={runTest} disabled={testing}>
-            {testing ? progress || '채점하는 중…' : latest ? '다시 시험하기' : '시험 시작'}
+          <input
+            ref={fileInput}
+            type="file"
+            multiple
+            className="sr-only"
+            accept=".csv,.xlsx,.xls,.txt"
+            onChange={(e) => {
+              runTest(e.target.files)
+              e.target.value = ''
+            }}
+          />
+          <button
+            type="button"
+            className="btn-primary btn-block"
+            onClick={() => fileInput.current?.click()}
+            disabled={testing}
+          >
+            {testing ? progress || '채점하는 중…' : latest ? '파일 넣고 다시 시험하기' : '파일 넣고 시험 시작'}
           </button>
         </section>
       )}

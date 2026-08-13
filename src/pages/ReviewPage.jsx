@@ -13,7 +13,6 @@ import {
   applyQuery,
   facetCounts,
   presentStatuses,
-  queueStats,
   describeQuery,
   isFiltered,
   sumAnnualHours,
@@ -87,7 +86,6 @@ export default function ReviewPage() {
   const visible = useMemo(() => applyQuery(items, query), [items, query])
   const facets = useMemo(() => facetCounts(items, query), [items, query])
   const totals = useMemo(() => sumAnnualHours(visible), [visible])
-  const queue = useMemo(() => queueStats(visible), [visible])
   const statuses = useMemo(() => presentStatuses(items), [items])
   // 시연용으로 심은 것이 몇 건 남아 있는가. 접수번호로만 가른다 —
   // 다른 기준을 쓰면 실제 신청서가 걸릴 여지가 생긴다.
@@ -296,46 +294,14 @@ export default function ReviewPage() {
 
       {items.length > 0 && (
         <>
-          {/* 세는 자리와 고르는 자리를 섞지 않는다.
-              한 줄에 선 숫자 중 어떤 것은 조건을 따라가고 어떤 것은 전체
-              기준이면, 담당자는 잔글씨를 읽어야 어느 쪽인지 안다. 여기 셋은
-              전부 "지금 보고 있는 것"의 요약이고, 고르는 일은 아래 칩이 한다. */}
-          <section className="stat-row">
-            <Tile
-              label="지금 보고 있는 것"
-              value={num(visible.length)}
-              note={`접수된 ${num(items.length)}건 중${isFiltered(query) ? ' · 조건이 걸려 있습니다' : ''}`}
-            />
-            <Tile
-              label="아직 판정 안 한 것"
-              value={num(queue.waiting)}
-              note={
-                queue.stale > 0
-                  ? `그중 ${STALE_HOURS}시간 넘게 안 본 것 ${num(queue.stale)}건`
-                  : '하루 넘게 밀린 것은 없습니다'
-              }
-            />
-            {/* 부서가 먼저 물어 온 것. 0이면 안 띄운다 — 늘 0인 칸이 있으면
-                그 자리는 다음부터 안 읽힌다. */}
-            {queue.deptAsked > 0 && (
-              <Tile
-                label="부서가 물어봤습니다"
-                value={num(queue.deptAsked)}
-                note="부서에는 재촉할 길이 없습니다. 짧게라도 답하면 그 자리에서 부서 화면에 뜹니다."
-              />
-            )}
-            {/* 이 화면의 머릿수는 건수가 아니라 이 값이다 — 아무도 손대지
-                않은 채로 흘러가는 시간. */}
-            <Tile
-              label="여기 묶여 있는 시간"
-              value={totals.hours > 0 ? `연 ${num(totals.hours, 0)}시간` : '—'}
-              note={
-                totals.missing > 0
-                  ? `${krw(totals.hours * 25000)} · 소요를 안 적은 ${totals.missing}건은 뺐습니다`
-                  : `시급 25,000원으로 환산하면 ${krw(totals.hours * 25000)}`
-              }
-            />
-          </section>
+          {/* 숫자 칸 세 개가 이 자리에 있었다. 전부 지웠다 — 셋 다 같은 화면
+              아래에 이미 있는 말을 한 번 더 하고 있었다.
+                · "지금 보고 있는 것" → 바로 아래 「골라 보기」가 같은 말을 한다
+                · "아직 판정 안 한 것" → 그 아래 칩이 세어서 누를 수 있게 준다
+                · "여기 묶여 있는 시간" → 목록 끝에 같은 계산이 그대로 있다
+              같은 숫자를 두 번 적으면 읽는 쪽은 둘이 다른 것인 줄 알고 잔글씨를
+              읽는다. 화면 맨 위 한 줄을 통째로 쓰면서 새로 알려 주는 것이
+              없으면 그건 요약이 아니라 장식이다. */}
 
           <section className="card card-boxed">
             <div className="card-head">
@@ -1159,17 +1125,6 @@ function Field({ label, required, hint, error, children }) {
       {children}
       {error && <span className="field-error" style={{ marginTop: 5, display: 'block' }}>{error}</span>}
     </label>
-  )
-}
-
-// 세기만 한다. 고르는 일은 아래 칩이 한다.
-function Tile({ label, value, note }) {
-  return (
-    <div className="stat-tile">
-      <div className="stat-label">{label}</div>
-      <div className="stat-value">{value}</div>
-      <div className="stat-note">{note}</div>
-    </div>
   )
 }
 
