@@ -83,7 +83,7 @@ export async function onRequestPost({ env, request }) {
 // 실수 한 번으로 실제 신청서가 날아간다.
 //
 // 딸린 기록은 대부분 표가 알아서 같이 지운다(ON DELETE CASCADE). 그런데
-// **결정 기록은 아니다** — 여덟 단계를 관통하려고 일부러 신청서에 매달지
+// **결정 기록은 아니다** — 여섯 단계를 관통하려고 일부러 신청서에 매달지
 // 않고 만든 표라, 신청서를 지워도 그대로 남는다. 그러면 결정 기록 화면에
 // 없는 신청서를 가리키는 줄이 남는다. 손으로 같이 지운다.
 export async function onRequestDelete({ env, request }) {

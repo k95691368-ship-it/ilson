@@ -17,7 +17,7 @@ import { OUTCOME_KIND } from '../../shared/accept.js'
 import { unprovenList } from '../../shared/unproven.js'
 
 // 몇 건인지를 말하는 문장은 손으로 적으면 안 된다. 데이터가 바뀌어도 문장은
-// 안 바뀌기 때문이다. 실제로 화면이 여덟 단계를 끝까지 간 것이 한 건 있다고
+// 안 바뀌기 때문이다. 실제로 화면이 여섯 단계를 끝까지 간 것이 한 건 있다고
 // 단언하는 동안 그런 신청서는 한 건도 없었다. 그래서 아래에서 셋을 세어
 // shared/unproven.js 에 넘기고, 문장은 그 숫자를 보고 골라진다.
 
@@ -163,7 +163,7 @@ export async function onRequestGet({ env }) {
         // "증명하지 못한 것" 중 개수를 말하는 세 문장이 쓸 숫자.
         //
         // 끝까지 갔다 = 부서에 넘겼고(되돌리지 않았고) 성과까지 냈다.
-        // 둘 중 하나만으로는 여덟 단계를 밟은 것이 아니다.
+        // 둘 중 하나만으로는 여섯 단계를 밟은 것이 아니다.
         env.DB.prepare(
           `SELECT
              (SELECT COUNT(*) FROM application a

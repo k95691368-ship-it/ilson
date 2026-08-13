@@ -68,10 +68,8 @@ export async function onRequestGet({ env, params }) {
         failures: stats?.failures ?? 0,
         quarantineTotal: stats?.quarantine_total ?? 0,
         avgMs: stats?.avg_ms ?? null,
-        lastUsed: stats?.last_used ?? null,
       },
       stakeholders: stakeholders.results,
-      canHandOver: blockers.length === 0,
       blockers,
     })
   } catch (err) {

@@ -35,7 +35,7 @@ const stepOf = (key) => TRY_STEPS.find((s) => s.key === key) ?? null
 
 describe('무엇을 해볼 수 있는지', () => {
   it('한 번 누르면 결과가 보이는 것부터 놓는다', () => {
-    // 여덟 단계를 처음부터 따라가라고 하면 아무도 안 한다.
+    // 여섯 단계를 처음부터 따라가라고 하면 아무도 안 한다.
     expect(TRY_STEPS[0].key).toBe('review')
   })
 
@@ -131,7 +131,7 @@ describe('시험 삼아 낸 것을 치울 때', () => {
   })
 
   it('왜 그 선을 그었는지도 적는다', () => {
-    // 가장 값나가는 것이 여덟 단계를 끝까지 밟은 한 건인데, 그건 시연
+    // 가장 값나가는 것이 여섯 단계를 끝까지 밟은 한 건인데, 그건 시연
     // 시드가 아니라 손으로 만든 것이다. 그걸 날리면 시연이 통째로 빈다.
     expect(VISITOR_NOTE.why).toContain('아무 일도 안 일어난 것')
     expect(VISITOR_NOTE.why).toContain('보여드릴 것이 있는 기록')

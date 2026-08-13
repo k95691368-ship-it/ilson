@@ -67,10 +67,11 @@ describe('아무도 안 읽는 값을 응답에 싣지 않는다', () => {
 
   it('이 검사가 헛돌지 않는다', () => {
     // 실제로 쓰이는 이름은 걸러 낸다. 늘 빈 배열이면 아무것도 안 지킨다.
-    expect(readerText).toContain('awaitingAccept')
     expect(readerText).toContain('remainingToday')
+    expect(readerText).toContain('quarantineTotal')
     // 그리고 지운 이름은 정말로 안 닿아야 한다.
-    for (const gone of ['rowsProcessed', 'quarantineLiveTools', 'toolsAffected']) {
+    // awaitingAccept·noManual 은 사용법서·배포 단계를 걷어내면서 같이 지웠다.
+    for (const gone of ['rowsProcessed', 'quarantineLiveTools', 'toolsAffected', 'awaitingAccept', 'noManual']) {
       expect(readerText.includes(gone), gone).toBe(false)
     }
   })

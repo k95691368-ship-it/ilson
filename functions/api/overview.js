@@ -374,9 +374,7 @@ export async function onRequestGet({ env }) {
         // 투어의 배포 칸은 "부서가 받았다고 눌러야 넘긴 것으로 칩니다. 그
         // 전까지는 넘긴 것이 아닙니다"라고 적어 놓고, 정작 넘기자마자 다음
         // 칸으로 넘어갔다. 적어 둔 쪽이 옳으니 안내가 이 수를 보게 한다.
-        awaitingAccept: handovers.results.filter((h) => !h.rolled_back_at && !h.accepted_at).length,
         totalRuns: uses?.n ?? 0,
-        lastUsed: uses?.last ?? null,
         list: handovers.results
           .filter((h) => !h.rolled_back_at)
           .map((h) => ({ slug: h.slug, title: h.title, dept: h.dept })),

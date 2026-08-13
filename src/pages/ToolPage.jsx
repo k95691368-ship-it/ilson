@@ -179,7 +179,7 @@ export default function ToolPage() {
               이 도구가 나온 신청서 보기
             </Link>
             <Link to={`/record/${encodeURIComponent(data.ticket)}`} className="btn-ghost btn-sm">
-              여덟 단계 기록 문서
+              여섯 단계 기록 문서
             </Link>
             <span className="card-note mono">{data.ticket}</span>
           </div>

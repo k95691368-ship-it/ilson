@@ -73,7 +73,7 @@ describe('언제부터 언제까지 어느 단계에 있었나', () => {
     // 검토 단계 기록을 하나 붙였기 때문이다.
     const s = spansOf(
       [
-        { stage: '배포', created_at: ago(20) },
+        { stage: '제작', created_at: ago(20) },
         { stage: '성과', created_at: ago(12) },
         { stage: '검토', created_at: ago(1) },
       ],
@@ -88,14 +88,14 @@ describe('언제부터 언제까지 어느 단계에 있었나', () => {
     // 내려갔다가 원래 자리보다 더 앞으로 가 버리면 되돌아간 것이 아니다.
     const s = spansOf(
       [
-        { stage: '배포', created_at: ago(20) },
+        { stage: '제작', created_at: ago(20) },
         { stage: '검토', created_at: ago(15) },
         { stage: '성과', created_at: ago(10) },
       ],
       NOW,
       ago(30)
     )
-    expect(s.map((x) => x.stage)).toEqual(['신청서', '배포', '성과'])
+    expect(s.map((x) => x.stage)).toEqual(['신청서', '제작', '성과'])
   })
 
   it('같은 단계 기록이 여러 개여도 한 구간이다', () => {
@@ -247,8 +247,8 @@ describe('보통 며칠 걸리는가', () => {
     expect(t.find((x) => x.stage === '제작').n).toBe(3)
   })
 
-  it('여덟 단계를 다 돌려준다', () => {
-    expect(stageTypical([])).toHaveLength(8)
+  it('여섯 단계를 다 돌려준다', () => {
+    expect(stageTypical([])).toHaveLength(6)
   })
 })
 
@@ -292,7 +292,7 @@ describe('목록 세우기', () => {
     // 여기서 또 세면 같은 건이 두 줄에 올라가고, 담당자는 두 배로 밀린 줄 안다.
     const early = [
       { application: app({ id: 'x', ticket_no: 'AX-X' }), logs: [{ stage: '검토', created_at: ago(9) }] },
-      { application: app({ id: 'y', ticket_no: 'AX-Y' }), logs: [{ stage: '사용법서', created_at: ago(9) }] },
+      { application: app({ id: 'y', ticket_no: 'AX-Y' }), logs: [{ stage: '제작', created_at: ago(20) }] },
     ]
     const s = stallBoard(early, NOW).summary
     expect(s.mine).toBe(2)

@@ -92,7 +92,7 @@ describe('화면마다 들어갈 문이 있는가', () => {
     // 라우트를 하나도 못 읽으면 위 검사는 늘 통과한다.
     expect(all.length).toBeGreaterThan(15)
     expect(always.size).toBeGreaterThan(10)
-    // 실제로 여덟 단계와 꼬리말 양쪽에서 읽고 있는지 확인한다.
+    // 실제로 여섯 단계와 꼬리말 양쪽에서 읽고 있는지 확인한다.
     expect(always.has('/apply')).toBe(true) // 목차
     expect(always.has('/log')).toBe(true) // 꼬리말
     expect(always.has('/built')).toBe(true) // 목차 옆
@@ -167,7 +167,7 @@ describe('죽은 화면 파일이 남아 있지 않은가', () => {
 // 부서가 자기 기록을 못 가져갔다.
 //
 // 인쇄 문서(/record/:id)는 담당자 화면 여덟 곳에서 열리는데 부서 화면에서는
-// 한 곳도 없었다. 신청서를 낸 쪽이, 여덟 단계를 다 겪은 쪽이, 자기 건의
+// 한 곳도 없었다. 신청서를 낸 쪽이, 여섯 단계를 다 겪은 쪽이, 자기 건의
 // 기록을 문서로 못 받아 갔다.
 //
 // 부서장에게 "우리가 낸 것이 이렇게 처리됐습니다"를 보여 줄 때 조회 화면

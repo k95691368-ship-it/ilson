@@ -3,9 +3,9 @@
 // 빈 화면에 "예시 세 건 넣기"를 놨다. 눌러 보면 접수함에 세 건이 들어온다.
 // 그리고 거기서 끝난다.
 //
-// 처음 오신 분 입장에서 보면 이렇다. 여덟 단계 목차가 있고 접수함에
+// 처음 오신 분 입장에서 보면 이렇다. 여섯 단계 목차가 있고 접수함에
 // 신청서가 있다. 그런데 나머지 일곱 단계는 전부 비어 있다.
-// 무엇을 눌러야 이 사이트가 말하는 "여덟 단계 기록"을 볼 수 있는지가
+// 무엇을 눌러야 이 사이트가 말하는 "여섯 단계 기록"을 볼 수 있는지가
 // 아무 데도 안 적혀 있다. 한 단계씩 짚어 가려면 각 화면에서 무엇이
 // 필요한지를 먼저 알아야 하는데, 그건 눌러 봐야 안다.
 //
@@ -72,42 +72,9 @@ const STEPS = [
     where: '/beta',
   },
   {
-    key: 'manual',
-    stage: '사용법서',
-    at: (s) => s.tested > 0 && s.documented === 0,
-    label: '쓰는 법을 적기',
-    what: '부서가 읽고 따라 할 수 있게 적습니다.',
-    need: '부서가 "이 대목 모르겠다"를 짚으면 그 자리가 표시되고, 고치면 고쳤다고 뜹니다.',
-    shows: '사용법서가 확정돼야 넘길 수 있습니다.',
-    where: '/manual',
-  },
-  {
-    key: 'deploy',
-    stage: '배포',
-    // 넘기기만 해서는 안 끝난다. 아래 shows 에 그렇게 적어 놓고 정작 넘기는
-    // 순간 다음 칸으로 넘어갔었다 — 라이브에서 주소만 만들었는데 안내가
-    // "얼마나 줄었는지 세기"로 바뀌었다. 적어 둔 쪽이 옳으니 조건을 맞춘다.
-    at: (s) => s.documented > 0 && (s.handed === 0 || s.awaitingAccept > 0),
-    label: '부서에 넘기기',
-    what: '주소를 만들어 넘깁니다.',
-    need: '합격 기준을 통과하고 사용법서가 확정돼야만 넘어갑니다. 둘 중 하나라도 안 되면 막힙니다.',
-    shows: '부서가 받았다고 눌러야 넘긴 것으로 칩니다. 그 전까지는 넘긴 것이 아닙니다.',
-    where: '/deploy',
-    // 주소는 넘겼는데 부서가 아직 안 누른 상태. 같은 칸이지만 할 일이 다르다.
-    // "넘기기"라고 계속 떠 있으면 이미 한 일을 또 하라는 말이 된다.
-    instead: (s) =>
-      s.handed > 0 &&
-      s.awaitingAccept > 0 && {
-        label: '부서가 받았다고 누르기를 기다리는 중',
-        what: '주소는 넘겼습니다. 이제 부서가 그 도구 화면에서 "받았습니다"를 눌러야 합니다.',
-        need: '넘겼다는 말을 넘긴 쪽 말만 듣고 적지 않습니다. 받은 쪽이 눌러야 적습니다.',
-        shows: '아직이면 도구 주소를 부서에 다시 알려 주세요. 주소는 이 화면에 있습니다.',
-      },
-  },
-  {
     key: 'result',
     stage: '성과',
-    at: (s) => s.handed > 0 && s.confirmed === 0,
+    at: (s) => s.tested > 0 && s.confirmed === 0,
     label: '얼마나 줄었는지 세기',
     what: '봉인해 둔 기준선과 실제 실행 기록으로 계산합니다.',
     need: '만든 공수와 검수 시간을 빼고 셉니다. 그리고 부서가 그 숫자에 동의해야 성과로 칩니다.',
@@ -124,7 +91,7 @@ const DONE = {
   key: 'record',
   stage: '기록',
   label: '한 건의 기록을 처음부터 끝까지 펴 보기',
-  what: '신청서 한 건 아래 여덟 단계에서 있었던 일이 한 문서로 이어집니다.',
+  what: '신청서 한 건 아래 여섯 단계에서 있었던 일이 한 문서로 이어집니다.',
   need: '누가 언제 무엇을 왜 그렇게 정했는지가 전부 들어갑니다. 지운 것이 없습니다.',
   shows: '이 문서가 이 사이트가 만들어 내는 물건입니다.',
   where: '/log',
@@ -143,14 +110,12 @@ export function passedCounts(byStage = {}) {
   // 뒤에서부터 더해 나간다. 반려·보류는 어느 단계도 지나오지 않은 것으로
   // 치지 않는다 — 판정은 받았으므로 검토는 지났다.
   const confirmed = n('성과')
-  const handed = confirmed + n('배포')
-  const documented = handed + n('사용법서')
-  const tested = documented + n('베타테스트')
+  const tested = confirmed + n('베타테스트')
   const built = tested + n('제작')
   const agreed = built + n('협의안')
   const reviewed = agreed + n('검토') + n('반려') + n('보류')
   const total = reviewed + n('신청서')
-  return { total, reviewed, agreed, built, tested, documented, handed, confirmed }
+  return { total, reviewed, agreed, built, tested, confirmed }
 }
 
 // 다음에 할 것 한 가지.
@@ -159,13 +124,7 @@ export function passedCounts(byStage = {}) {
 // 자리가 아니다 — 그때는 "예시 넣기"가 맞는 말이다.
 export function nextStep(overview) {
   if (!overview?.byStage) return null
-  // 단계 개수만으로는 모르는 것이 하나 있다 — 넘기긴 했는데 부서가 아직
-  // 안 받은 것. 신청서는 배포 단계에 있지만 배포가 끝난 것은 아니다.
-  const awaiting = overview.tools?.awaitingAccept
-  const s = {
-    ...passedCounts(overview.byStage),
-    awaitingAccept: awaiting == null || awaiting === '' ? 0 : Number(awaiting) || 0,
-  }
+  const s = passedCounts(overview.byStage)
   if (s.total === 0) return null
   const step = STEPS.find((x) => x.at(s))
   if (step) {
@@ -177,14 +136,12 @@ export function nextStep(overview) {
   return { ...DONE, remaining: 0 }
 }
 
-// 여덟 단계 중 몇 칸까지 왔나. 진행 막대에 쓴다.
+// 여섯 단계 중 몇 칸까지 왔나. 진행 막대에 쓴다.
 export function tourProgress(overview) {
   const s = passedCounts(overview?.byStage ?? {})
-  const done = [s.reviewed, s.agreed, s.built, s.tested, s.documented, s.handed, s.confirmed].filter(
-    (v) => v > 0
-  ).length
+  const done = [s.reviewed, s.agreed, s.built, s.tested, s.confirmed].filter((v) => v > 0).length
   // 신청서 자체가 첫 칸이다.
-  return { done: s.total > 0 ? done + 1 : 0, total: 8 }
+  return { done: s.total > 0 ? done + 1 : 0, total: 6 }
 }
 
 export { STEPS as TOUR_STEPS, DONE as TOUR_DONE }

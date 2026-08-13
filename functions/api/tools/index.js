@@ -189,7 +189,6 @@ export async function onRequestGet({ env }) {
       // 사람은 무엇이 실제로 쓰이는 값인지 알 수 없게 된다.
       rolledBack: items.filter((i) => i.health === '내림').length,
       unconfirmed: items.filter((i) => !i.accepted_at && !i.rolled_back_at).length,
-      noManual: items.filter((i) => !i.manual_published_at && !i.rolled_back_at).length,
       // 내려 둔 채 잊은 것.
       //
       // 내린 도구는 넘긴 목록에서도 빠져서 화면 어디에도 안 보인다. 그동안
@@ -225,9 +224,6 @@ export async function onRequestGet({ env }) {
       unclearIds,
       unconfirmedIds: items
         .filter((i) => !i.accepted_at && !i.rolled_back_at)
-        .map((i) => i.application_id),
-      noManualIds: items
-        .filter((i) => !i.manual_published_at && !i.rolled_back_at)
         .map((i) => i.application_id),
     }
 

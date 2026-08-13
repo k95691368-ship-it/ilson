@@ -41,8 +41,8 @@ describe('두 칸이 서로 다른 질문에 답하는가', () => {
     }
   })
 
-  it('여덟 단계를 전부 설명한다', () => {
-    expect(PLAIN.stages).toHaveLength(8)
+  it('여섯 단계를 전부 설명한다', () => {
+    expect(PLAIN.stages).toHaveLength(6)
     // 실제 단계 이름과 같아야 한다. 글에만 있는 단계는 없다.
     expect(PLAIN.stages.map((s) => s.title)).toEqual(STAGE_ORDER)
   })

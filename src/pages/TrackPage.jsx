@@ -192,7 +192,7 @@ function Result({ data, as, onChanged }) {
 
         {/* 기록을 문서 한 장으로 받아 가는 자리.
             이 문서는 담당자 화면 여덟 곳에서 열리는데 부서 화면에서는 한
-            곳도 없었다. 신청서를 낸 쪽이, 여덟 단계를 다 겪은 쪽이, 자기
+            곳도 없었다. 신청서를 낸 쪽이, 여섯 단계를 다 겪은 쪽이, 자기
             건의 기록을 못 가져갔다.
             부서장에게 "우리가 낸 것이 이렇게 처리됐습니다"를 보여 줄 때
             이 화면 주소를 보내면 상대는 접수번호부터 물어야 한다. 문서는
@@ -355,10 +355,10 @@ function Result({ data, as, onChanged }) {
         </section>
       )}
 
-      {/* 여덟 단계를 두 번 그리고 있었다.
+      {/* 여섯 단계를 두 번 그리고 있었다.
           위의 '그동안의 소식'과 이 '진행 상황'이 같은 진행을 다른 모양으로
           늘어놓는다. 부서가 접수번호를 넣고 여는 이유는 "어떻게 됐나"이고,
-          그 답은 새로 생긴 일이다. 여덟 단계 전부는 그다음에 보는 것이다.
+          그 답은 새로 생긴 일이다. 여섯 단계 전부는 그다음에 보는 것이다.
 
           소식이 있으면 접어 둔다. 접어도 지금 어느 단계인지는 요약 줄에
           그대로 보이므로, 없는 것이 되지는 않는다. 소식이 없으면(처음
@@ -369,7 +369,7 @@ function Result({ data, as, onChanged }) {
           <span className="card-title">진행 상황</span>
           <span className="spacer" />
           <span className="card-note">
-            여덟 단계 중 {data.timeline.filter((t) => t.status === '완료').length}칸까지 왔습니다
+            여섯 단계 중 {data.timeline.filter((t) => t.status === '완료').length}칸까지 왔습니다
           </span>
         </summary>
         <ol className="track-timeline">

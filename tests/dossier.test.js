@@ -7,7 +7,7 @@ import { dossierText, dossierFilename, progressOf } from '../shared/dossier.js'
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 // 기록 문서에서 가장 중요한 성질은 "하지 않은 것을 한 것처럼 적지 않는다"이다.
-// 여덟 단계 중 두 단계만 밟은 신청서가 여덟 단계를 다 밟은 것처럼 보이면
+// 여섯 단계 중 두 단계만 밟은 신청서가 여섯 단계를 다 밟은 것처럼 보이면
 // 그건 기록이 아니라 홍보물이다. 그 성질을 여기서 못 박는다.
 
 const MINIMAL = {
@@ -28,7 +28,7 @@ describe('진행 단계 세기', () => {
   it('밟은 단계만 센다', () => {
     const p = progressOf({ 신청서: true, 검토: true })
     expect(p.count).toBe(2)
-    expect(p.total).toBe(8)
+    expect(p.total).toBe(6)
     expect(p.reached).toEqual(['신청서', '검토'])
   })
 
@@ -54,7 +54,7 @@ describe('기록 문서 만들기', () => {
     const text = dossierText(MINIMAL)
     expect(text).toContain('AX-ABC-123')
     expect(text).toContain('매주 채널 정산서를 손으로 붙입니다')
-    expect(text).toContain('여덟 단계 중 1단계까지 기록됨')
+    expect(text).toContain('여섯 단계 중 1단계까지 기록됨')
   })
 
   it('하지 않은 단계를 숨기지 않고 아직 안 했다고 적는다', () => {
@@ -62,7 +62,7 @@ describe('기록 문서 만들기', () => {
     expect(text).toContain('[2] 검토')
     expect(text).toContain('아직 판정하지 않았습니다')
     expect(text).toContain('[5] 베타테스트')
-    expect(text).toContain('[8] 성과')
+    expect(text).toContain('[6] 성과')
   })
 
   it('기각한 요구도 사유와 함께 남는다', () => {
@@ -151,23 +151,6 @@ describe('기록 문서 만들기', () => {
     expect(text).toContain("'보수적 추정치'로 부릅니다")
   })
 
-  it('넘겼지만 부서가 확인 안 했으면 그렇다고 적는다', () => {
-    const text = dossierText({
-      ...MINIMAL,
-      handover: {
-        slug: 'settlement',
-        handed_to_dept: '재무',
-        handed_to_person: '정산 담당자',
-        handed_at: '2026-07-30 10:00:00',
-        accepted_at: null,
-        daily_limit: 20,
-        max_file_mb: 10,
-      },
-    })
-    expect(text).toContain('넘겼다고 받은 것이 아닙니다')
-    expect(text).toContain('넘긴 뒤 아직 한 번도 쓰이지 않았습니다')
-  })
-
   it('요청받지 않고 먼저 제안한 결정에는 표시가 붙는다', () => {
     const text = dossierText({
       ...MINIMAL,
@@ -236,7 +219,7 @@ describe('내려받을 파일 이름', () => {
   })
 })
 
-// 여덟 단계가 만들어 내는 숫자가 그 여덟 단계를 편 문서에 없었다.
+// 여섯 단계가 만들어 내는 숫자가 그 여섯 단계를 편 문서에 없었다.
 //
 // 인쇄 문서의 성과 칸에는 만든 공수와 자기 반박만 있었다. 얼마나 줄었는지는
 // 없었다. 심지어 "미해소 반박이 N건 남아 있어 이 금액은 '보수적 추정치'로

@@ -9,8 +9,6 @@ const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'))
 const AgreementPage = lazy(() => import('./pages/AgreementPage.jsx'))
 const BuildPage = lazy(() => import('./pages/BuildPage.jsx'))
 const BetaPage = lazy(() => import('./pages/BetaPage.jsx'))
-const ManualPage = lazy(() => import('./pages/ManualPage.jsx'))
-const DeployPage = lazy(() => import('./pages/DeployPage.jsx'))
 const ResultPage = lazy(() => import('./pages/ResultPage.jsx'))
 const ToolPage = lazy(() => import('./pages/ToolPage.jsx'))
 const TrackPage = lazy(() => import('./pages/TrackPage.jsx'))
@@ -26,7 +24,7 @@ const PriorityPage = lazy(() => import('./pages/PriorityPage.jsx'))
 const BuiltPage = lazy(() => import('./pages/BuiltPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
-// 여덟 단계 어디에도 안 들어가는 화면들. 단계를 가로로 지르며 본다.
+// 여섯 단계 어디에도 안 들어가는 화면들. 단계를 가로로 지르며 본다.
 //
 // 순서는 담당자가 하루를 시작하는 순서다 — 무엇을 먼저 할지 정하고, 멈춘
 // 것을 보고, 넘긴 것이 잘 도는지 보고, 그다음 기록과 못 한 것을 본다.
@@ -34,7 +32,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 export const CROSSCUT = [
   { to: '/priority', label: '먼저 할 것', note: '무엇부터 할지 정하는 자리' },
   { to: '/stall', label: '막힌 곳', note: '어느 단계에서 멈춰 있나' },
-  { to: '/tools', label: '넘긴 뒤', note: '배포한 도구가 실제로 쓰이나' },
+  { to: '/tools', label: '넘긴 뒤', note: '부서에 넘긴 도구가 실제로 쓰이나' },
   { to: '/codes', label: '알려 준 코드', note: '부서가 이어 둔 상품코드' },
   { to: '/log', label: '결정 기록', note: '무엇을 왜 그렇게 정했나' },
   { to: '/honesty', label: '못 한 것', note: '안 되는 것과 증명 못 한 것' },
@@ -55,7 +53,7 @@ function useBareLayout() {
 
 // 인쇄할 때는 접힌 것을 전부 편다.
 //
-// 기록 문서(/record)·사용법서·조회 화면은 **종이가 결과물**이다. 파일 머리에
+// 기록 문서(/record)·조회 화면은 **종이가 결과물**이다. 파일 머리에
 // 그렇게 적혀 있고, 화면에도 "인쇄하거나 그대로 붙여 넣으실 수 있습니다"라고
 // 적어 뒀다. 그런데 접기를 넣으면 접힌 것이 그대로 인쇄된다 — 그 종이에는
 // 없는 것이 되고, 받은 사람은 그런 것이 있었는지도 모른다.
@@ -99,7 +97,7 @@ export default function App() {
               일
             </span>
             일손
-            <span className="topbar-brand-sub">부서 병목을 도구로 바꾸는 여덟 단계</span>
+            <span className="topbar-brand-sub">부서 병목을 도구로 바꾸는 여섯 단계</span>
           </Link>
 
           <nav className="topbar-nav" aria-label="진행 단계">
@@ -116,7 +114,7 @@ export default function App() {
               </NavLink>
             ))}
 
-            {/* 목차 끝에 '0 기타' 한 칸이 있었다. 뺐다. 목차는 여덟 단계만
+            {/* 목차 끝에 '0 기타' 한 칸이 있었다. 뺐다. 목차는 여섯 단계만
                 건다. 여기 걸려 있던 여덟 줄은 꼬리말로 되돌렸다 — 링크까지
                 같이 없애면 그 화면들로 가는 길이 하나도 안 남는다. */}
           </nav>
@@ -149,8 +147,6 @@ export default function App() {
             <Route path="/agreement" element={<AgreementPage />} />
             <Route path="/build" element={<BuildPage />} />
             <Route path="/beta" element={<BetaPage />} />
-            <Route path="/manual" element={<ManualPage />} />
-            <Route path="/deploy" element={<DeployPage />} />
             <Route path="/result" element={<ResultPage />} />
             <Route path="/t/:slug" element={<ToolPage />} />
             <Route path="/track" element={<TrackPage />} />
@@ -176,17 +172,16 @@ export default function App() {
               <div className="footer-title">일손 (ILSON)</div>
               <p className="footer-text">
                 각 부서가 병목을 신청서로 적어 내면, AX 담당자가 검토하고 협의해 도구로 만들고,
-                베타 테스트를 거쳐 사용법서와 함께 넘기고, 기준선 대비 성과를 정리하기까지의
-                과정 전체입니다.
+                베타 테스트를 거쳐 성과를 정리하기까지의 과정 전체입니다.
               </p>
             </div>
             <div className="footer-col">
-              <div className="footer-title">여덟 단계</div>
+              <div className="footer-title">여섯 단계</div>
               <p className="footer-text">
                 {STAGES.map((s) => `${s.no} ${s.label}`).join(' · ')}
               </p>
             </div>
-            {/* 여덟 단계를 세로로 내려가는 것이 아니라 **가로로 훑는** 화면들.
+            {/* 여섯 단계를 세로로 내려가는 것이 아니라 **가로로 훑는** 화면들.
                 목차에 같이 걸어 뒀다가 뺐다 — 처음 온 사람에게 열네 칸을 한꺼번에
                 내밀면 어디부터 눌러야 할지 모른다.
                 그렇다고 링크를 아예 없애면 안 된다. 이 화면들로 가는 다른 길은

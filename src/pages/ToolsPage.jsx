@@ -47,9 +47,6 @@ export default function ToolsPage() {
       {data.items.length === 0 ? (
         <div className="empty">
           <div className="empty-title">아직 넘긴 도구가 없습니다</div>
-          <Link to="/deploy" className="btn-ghost btn-sm">
-            배포 화면으로
-          </Link>
         </div>
       ) : (
         <>

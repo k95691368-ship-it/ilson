@@ -6,7 +6,7 @@ import { dateTimeLabel, duration, krw, num } from '../lib/format.js'
 
 // 신청서 한 건의 기록 전부를 한 문서로 편다.
 //
-// 여덟 단계가 여덟 화면에 흩어져 있으면, 신청서 한 건이 어떻게 시작해서
+// 여섯 단계가 여덟 화면에 흩어져 있으면, 신청서 한 건이 어떻게 시작해서
 // 어떻게 끝났는지 보려면 화면을 여덟 번 옮겨 다녀야 한다. 기록을 남기는
 // 것과 꺼내 보는 것은 다른 일이고, 꺼낼 수 없는 기록은 그냥 저장이다.
 //
@@ -14,7 +14,7 @@ import { dateTimeLabel, duration, krw, num } from '../lib/format.js'
 // 내는 것은 결국 종이나 PDF다. 화면 주소를 보내면 상대는 로그인부터 해야 한다.
 //
 // 빈 단계를 숨기지 않는다. "아직 하지 않았습니다"라고 적는다. 하지 않은
-// 것을 안 보이게 하면 여덟 단계를 다 밟은 것처럼 보이기 때문이다.
+// 것을 안 보이게 하면 여섯 단계를 다 밟은 것처럼 보이기 때문이다.
 export default function RecordPage() {
   const { id } = useParams()
   // 어디로 돌아갈 것인가.
@@ -105,7 +105,7 @@ export default function RecordPage() {
               ))}
             </div>
             <p className="record-progress-note">
-              여덟 단계 중 <strong>{p.count}단계</strong>까지 기록이 남아 있습니다.
+              여섯 단계 중 <strong>{p.count}단계</strong>까지 기록이 남아 있습니다.
               {p.skipped.length > 0 && ` 건너뛴 단계: ${p.skipped.join(', ')}.`} 빈 단계는 숨기지
               않고 그대로 적습니다.
             </p>

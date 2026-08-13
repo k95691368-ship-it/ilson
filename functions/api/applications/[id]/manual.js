@@ -22,43 +22,23 @@ export async function onRequestGet({ env, params }) {
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
   try {
-    const [manual, faq, feedback, stakeholders, lastBeta] = await Promise.all([
+    const [manual, faq, stakeholders] = await Promise.all([
       env.DB.prepare('SELECT * FROM manual WHERE application_id = ?').bind(app.id).first(),
       env.DB.prepare('SELECT * FROM manual_faq WHERE application_id = ? ORDER BY ord')
         .bind(app.id)
         .all(),
-      // 아직 자주 묻는 것으로 옮기지 않은 현업 피드백.
-      // 지어낸 질문보다 실제로 나온 질문이 훨씬 쓸모 있다.
-      env.DB.prepare(
-        `SELECT f.* FROM beta_feedback f
-         WHERE f.application_id = ?
-           AND f.id NOT IN (SELECT COALESCE(from_feedback_id, '') FROM manual_faq WHERE application_id = ?)
-         ORDER BY f.created_at DESC`
-      )
-        .bind(app.id, app.id)
-        .all(),
       env.DB.prepare('SELECT dept, person_label, role_label FROM stakeholder WHERE application_id = ?')
         .bind(app.id)
         .all(),
-      env.DB.prepare(
-        'SELECT seq, overall, created_at FROM beta_round WHERE application_id = ? ORDER BY seq DESC LIMIT 1'
-      )
-        .bind(app.id)
-        .first(),
     ])
 
     return jsonResponse({
       application: app,
       manual: manual ?? null,
       faq: faq.results,
-      unusedFeedback: feedback.results,
       stakeholders: stakeholders.results,
-      // 마지막 베타 회차를 통째로 내려보냈었다. 화면이 읽는 것은 바로
-      // 아래 betaPassed 하나다.
       // 코드에서 뽑은 부분. 저장하지 않으므로 절대 낡지 않는다.
       auto: autoSections(),
-      // 베타를 통과하지 않았으면 아직 넘길 단계가 아니다.
-      betaPassed: lastBeta?.overall === '통과',
     })
   } catch (err) {
     return jsonError(`사용법서를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)

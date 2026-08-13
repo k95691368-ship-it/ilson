@@ -24,7 +24,7 @@ import { readableWhy } from '../../shared/notice.js'
 import { DEPTS } from '../../shared/depts.js'
 import { nextStep, tourProgress } from '../../shared/tour.js'
 
-// 첫 화면. 여덟 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
+// 첫 화면. 여섯 단계가 한 장에 보이고, 그 위에 지금 이 조직에 무슨 일이
 // 일어나고 있는지가 숫자로 얹힌다.
 //
 // 목차만 있으면 "그래서 뭐가 어떻게 됐는데"에 답하지 못한다. 몇 건이 들어왔고,
@@ -107,7 +107,7 @@ export default function FlowPage() {
           아래는 "이 사이트가 무엇인가"다. 간격이 전부 같으면 아홉 덩어리가
           한 줄로 보여서 어디서 끊어 읽을지를 읽는 사람이 정해야 했다. */}
       <div className="row-between band-break">
-        <h2 style={{ margin: 0 }}>여덟 단계</h2>
+        <h2 style={{ margin: 0 }}>여섯 단계</h2>
         <div className="row">
           {/* 넘긴 도구 화면은 아래 '부서에 넘긴 도구' 칸으로만 갈 수 있었는데,
               그 칸은 넘긴 것이 있어야 뜬다. 넘긴 것이 없을 때 "넘기면 어떻게
@@ -217,7 +217,7 @@ function NextStep({ overview }) {
         <span className="spacer" />
         {/* 몇 칸 남았는지 안 보이면 끝이 없는 일처럼 느껴진다. */}
         <span className="card-note">
-          여덟 단계 중 {p.done}칸까지 왔습니다
+          여섯 단계 중 {p.done}칸까지 왔습니다
         </span>
       </div>
 
@@ -788,7 +788,7 @@ function Overview({ data }) {
   )
 }
 
-// 반려·보류는 단계가 아니다. 여덟 단계를 지나가다 빠진 자리다.
+// 반려·보류는 단계가 아니다. 여섯 단계를 지나가다 빠진 자리다.
 // 막대에는 같이 그리되(어디로 빠졌는지 보여야 한다), 세는 문장에서는
 // 갈라 적는다.
 const OFF_STAGE = ['반려', '보류']
@@ -829,11 +829,11 @@ function StageBars({ byStage, total }) {
           </div>
         )
       })}
-      {/* 여덟 단계에 있는 것만 센다.
+      {/* 여섯 단계에 있는 것만 센다.
           전체 건수를 그대로 적으면 반려·보류처럼 단계에 없는 것까지
-          여덟 단계에 있는 것처럼 읽힌다. 막대 합과 이 숫자가 안 맞는다. */}
+          여섯 단계에 있는 것처럼 읽힌다. 막대 합과 이 숫자가 안 맞는다. */}
       <p className="card-note" style={{ marginTop: 8 }}>
-        {inStages}건이 여덟 단계 위에 있습니다
+        {inStages}건이 여섯 단계 위에 있습니다
         {total > inStages && ` · 나머지 ${total - inStages}건은 반려·보류처럼 단계 밖입니다`}.
       </p>
     </div>

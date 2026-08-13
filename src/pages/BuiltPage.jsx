@@ -83,7 +83,7 @@ function Plain() {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">여덟 단계</span>
+          <span className="card-title">여섯 단계</span>
         </div>
         <ol className="built-stages">
           {PLAIN.stages.map((s) => (

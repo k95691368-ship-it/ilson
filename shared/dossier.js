@@ -17,8 +17,6 @@ const STAGE_ORDER = [
   '협의안',
   '제작',
   '베타테스트',
-  '사용법서',
-  '배포',
   '성과',
 ]
 
@@ -84,10 +82,6 @@ export function dossierText(record) {
     betaRounds = [],
     betaResults = [],
     betaFeedback = [],
-    manual,
-    faqs = [],
-    handover,
-    uses = [],
     outcome,
     challenges = [],
     money,
@@ -107,7 +101,7 @@ export function dossierText(record) {
       a.title,
       '='.repeat(60),
       `${a.dept} · ${a.applicant_label} · ${when(a.created_at)} 접수`,
-      `여덟 단계 중 ${p.count}단계까지 기록됨 — ${p.reached.join(' → ') || '없음'}`,
+      `여섯 단계 중 ${p.count}단계까지 기록됨 — ${p.reached.join(' → ') || '없음'}`,
       p.skipped.length > 0 ? `건너뛴 단계: ${p.skipped.join(', ')}` : null,
       `이 문서를 뽑은 시각: ${when(generatedAt)}`,
     ]
@@ -248,57 +242,15 @@ export function dossierText(record) {
       : block('[5] 베타테스트', ['아직 채점하지 않았습니다.'])
   )
 
-  // ⑥ 사용법서
-  out.push(
-    manual
-      ? block('[6] 사용법서 — 부서가 읽을 것', [
-          line('제목', manual.title),
-          line('이게 무엇인가', manual.intro),
-          line('언제 돌리나', manual.when_to_run),
-          line('결과를 받으면', manual.what_to_do_after),
-          line('막히면', manual.contact),
-          line('그 밖에', manual.notes),
-          faqs.length > 0
-            ? `자주 묻는 것 ${faqs.length}개\n${faqs.map((f) => `Q. ${f.question}\nA. ${f.answer}`).join('\n\n')}`
-            : null,
-          line('공개 시각', when(manual.published_at)),
-        ])
-      : block('[6] 사용법서', ['아직 쓰지 않았습니다.'])
-  )
-
-  // ⑦ 배포
-  out.push(
-    handover
-      ? block('[7] 배포 — 부서에 넘김', [
-          line('주소', `/t/${handover.slug}`),
-          line('넘긴 곳', `${handover.handed_to_dept} ${handover.handed_to_person}`),
-          line('넘긴 시각', when(handover.handed_at)),
-          line(
-            '부서가 받았다고 확인',
-            handover.accepted_at
-              ? `${when(handover.accepted_at)} · ${handover.accepted_by ?? ''}`
-              : '아직 확인하지 않았습니다 — 넘겼다고 받은 것이 아닙니다'
-          ),
-          line('사용 한도', `하루 ${handover.daily_limit}회, 파일 ${handover.max_file_mb}MB`),
-          handover.rolled_back_at
-            ? `되돌림: ${when(handover.rolled_back_at)} — ${handover.rollback_reason ?? ''}`
-            : null,
-          uses.length > 0
-            ? `넘긴 뒤 실제 사용 ${uses.length}회 (실패 ${uses.filter((u) => !u.ok).length}회)`
-            : '넘긴 뒤 아직 한 번도 쓰이지 않았습니다.',
-        ])
-      : block('[7] 배포', ['아직 넘기지 않았습니다.'])
-  )
-
-  // ⑧ 성과
+  // ⑥ 성과
   const unresolved = challenges.filter((c) => !c.resolved_at)
   out.push(
     outcome
-      ? block('[8] 성과 — 기준선과 대조', [
+      ? block('[6] 성과 — 기준선과 대조', [
           // **얼마나 줄었는지**를 맨 앞에 적는다.
           //
-          // 여태 이 칸에는 만든 공수와 자기 반박만 있었다. 여덟 단계가
-          // 만들어 내는 숫자가 그 여덟 단계를 편 문서에 없었던 것이다.
+          // 여태 이 칸에는 만든 공수와 자기 반박만 있었다. 여섯 단계가
+          // 만들어 내는 숫자가 그 여섯 단계를 편 문서에 없었던 것이다.
           // 아래에 "이 금액은 보수적 추정치로 부릅니다"라는 줄이 있는데,
           // 정작 그 금액이 안 적혀 있었다.
           //
@@ -347,7 +299,7 @@ export function dossierText(record) {
             ? `미해소 반박이 ${unresolved.length}건 남아 있어 이 금액은 '보수적 추정치'로 부릅니다.`
             : null,
         ])
-      : block('[8] 성과', ['아직 정리하지 않았습니다.'])
+      : block('[6] 성과', ['아직 정리하지 않았습니다.'])
   )
 
   // 결정 기록 — 전 단계를 관통한다.

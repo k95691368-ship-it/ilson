@@ -146,13 +146,6 @@ describe('고쳐서 다시 올리기', () => {
     expect(deploy).toContain('지금 내려가 있지 않습니다')
   })
 
-  it('화면에 그 버튼이 있다', () => {
-    // 서버만 만들고 화면에 안 다는 일이 이 저장소에서 되풀이됐다.
-    const page = readFileSync(join(ROOT, 'src', 'pages', 'DeployPage.jsx'), 'utf8')
-    expect(page).toContain('고쳐서 다시 올리기')
-    expect(page).toContain("kind: 'restore'")
-  })
-
   it('기록에 남길 종류 이름이 한 벌이다', () => {
     expect(RESTORE_KIND).toBe('다시올림')
     expect(deploy).toContain('RESTORE_KIND')
