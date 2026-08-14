@@ -64,6 +64,10 @@ export const TECH = {
     },
     { k: '테스트', v: 'Vitest — 순수 함수 / 라우트 스모크 / 화면 렌더(happy-dom) / 배선 검증 4층' },
     { k: 'CI', v: 'GitHub Actions. push마다 lint + test + build' },
+    {
+      k: '방문 통계',
+      v: 'Google Analytics(GA4). 다만 `send_page_view`를 끄고 라우터 변화를 직접 보냅니다 — 주소에 접수번호(`/track?no=AX-…`)·도구 slug·신청서 id가 들어 있어 그대로 보내면 **남의 신청서를 여는 열쇠가 구글 계정 화면에 쌓입니다.** 경로의 id 자리를 `:id`로 바꾸고 물음표 뒤는 통째로 버린 뒤 보냅니다',
+    },
     { k: '차트', v: '외부 라이브러리 없이 SVG 직접 렌더링' },
   ],
 

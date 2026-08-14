@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
 import ThemeToggle from './components/ThemeToggle.jsx'
+import PageViewTracker from './components/PageViewTracker.jsx'
 import { STAGES } from './lib/stages.js'
 
 const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
@@ -87,6 +88,9 @@ export default function App() {
 
   return (
     <div className="app-shell">
+      {/* 주소가 바뀌어도 새 문서를 안 받아오므로, 화면 이동을 여기서 듣고
+          직접 보낸다. 열쇠(접수번호·도구 주소·신청서 id)는 가려서 보낸다. */}
+      <PageViewTracker />
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
@@ -218,7 +222,13 @@ export default function App() {
             </div>
           </div>
           <div className="footer-bottom">
-            <span>Cloudflare Pages Functions · D1 · 외부 서비스 호출 없음</span>
+            {/* 여기가 아무것도 밖으로 안 부른다고 적고 있었다. 사실이 아니었다 —
+                글꼴을 CDN 에서 받아 오고 있었고, 이제 방문 통계도 보낸다.
+                판정·계산·금액에 외부를 안 부른다는 것이 원래 하려던 말이라
+                그 말만 남기고 나머지는 있는 대로 적는다. */}
+            <span>
+              Cloudflare Pages Functions · D1 · 판정과 계산은 외부 호출 없음 (글꼴·방문 통계 제외)
+            </span>
             <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>
         </footer>
