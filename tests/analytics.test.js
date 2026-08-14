@@ -76,6 +76,33 @@ describe('태그를 켜 둔 방식', () => {
   })
 })
 
+describe('화면 녹화는 가릴 데를 가리는가', () => {
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+  const app = readFileSync(join(ROOT, 'src', 'App.jsx'), 'utf8')
+
+  it('태그가 붙어 있다', () => {
+    expect(html).toContain('clarity.ms/tag/')
+    expect(html).toContain('y28b6n8ub2')
+  })
+
+  it('부서가 여는 화면은 녹화에서 가린다', () => {
+    // 녹화는 애널리틱스와 다르다. 무엇이 떠 있었는지가 그대로 남는다.
+    // 특히 도구 화면 — 이 사이트는 "파일이 서버로 가지 않습니다"를 내세우는데,
+    // 넣은 파일의 계산 결과가 뜬 화면을 녹화해 보내면 그 약속이 뒷문으로 깨진다.
+    expect(app).toContain('data-clarity-mask')
+    // 가리는 조건이 목차 없이 여는 세 화면(bare)과 같아야 한다. 따로 적으면
+    // 화면이 하나 늘 때 한쪽만 고쳐진다.
+    expect(app).toMatch(/data-clarity-mask=\{bare \? 'true' : undefined\}/)
+  })
+
+  it('가리는 화면이 실제로 그 셋이다', () => {
+    // bare 판정이 바뀌면 녹화에서 가리는 범위도 조용히 바뀐다.
+    expect(app).toMatch(/startsWith\('\/t\/'\)/)
+    expect(app).toMatch(/=== '\/track'/)
+    expect(app).toMatch(/startsWith\('\/record\/'\)/)
+  })
+})
+
 describe('없다고 적어 둔 것이 사실인가', () => {
   it('"외부 호출 없음"을 그대로 두지 않았다', () => {
     // 꼬리말이 "외부 서비스 호출 없음"이라고 적고 있었다. 글꼴을 CDN 에서
@@ -89,5 +116,8 @@ describe('없다고 적어 둔 것이 사실인가', () => {
     const about = readFileSync(join(ROOT, 'shared', 'about.js'), 'utf8')
     expect(about).toContain('Google Analytics')
     expect(about).toContain('send_page_view')
+    // 녹화를 켜 놓고 안 적으면, 보는 사람은 자기 화면이 찍히는 줄 모른다.
+    expect(about).toContain('Microsoft Clarity')
+    expect(about).toContain('data-clarity-mask')
   })
 })

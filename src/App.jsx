@@ -157,7 +157,17 @@ export default function App() {
         </header>
       )}
 
-      <main className={bare ? 'app-main app-main-bare' : 'app-main'} id="main">
+      {/* 클레어티가 화면을 녹화한다. 부서 담당자가 여는 세 화면은 통째로
+          가린다 — 접수번호 조회, 넘겨받은 도구, 기록 문서.
+          도구 화면이 특히 그렇다. 이 사이트는 "파일이 서버로 가지 않습니다"를
+          내세우는데, 넣은 파일의 계산 결과가 뜬 화면을 녹화해 보내면 그
+          약속이 뒷문으로 깨진다. 세 화면은 목차·꼬리말도 없이 여는 자리라
+          bare 하나로 같이 잡힌다. */}
+      <main
+        className={bare ? 'app-main app-main-bare' : 'app-main'}
+        id="main"
+        data-clarity-mask={bare ? 'true' : undefined}
+      >
         <Suspense fallback={<div className="page-loading">불러오는 중…</div>}>
           <Routes>
             <Route path="/" element={<FlowPage />} />

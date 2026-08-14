@@ -38,6 +38,34 @@
       gtag('js', new Date())
       gtag('config', 'G-VLP0X6V7TM', { send_page_view: false })
     </script>
+
+    <!-- Microsoft Clarity -->
+    <!--
+      클레어티는 애널리틱스와 성격이 다르다. 화면을 녹화한다. 어디를 눌렀고
+      무엇이 떠 있었는지가 그대로 남는다.
+
+      그래서 가릴 자리를 따로 잡아 뒀다(src/App.jsx). 부서 담당자가 여는 세
+      화면 — 접수번호 조회, 넘겨받은 도구, 기록 문서 — 은 통째로 가린다.
+      특히 도구 화면이 중요하다. 이 사이트는 "파일이 서버로 가지 않습니다"를
+      내세우는데, 넣은 파일의 계산 결과가 화면에 뜨는 것을 녹화해 보내면 그
+      약속이 뒷문으로 깨진다.
+
+      입력칸에 친 값은 클레어티가 기본으로 가린다.
+    -->
+    <script type="text/javascript">
+      ;(function (c, l, a, r, i, t, y) {
+        c[a] =
+          c[a] ||
+          function () {
+            ;(c[a].q = c[a].q || []).push(arguments)
+          }
+        t = l.createElement(r)
+        t.async = 1
+        t.src = 'https://www.clarity.ms/tag/' + i
+        y = l.getElementsByTagName(r)[0]
+        y.parentNode.insertBefore(t, y)
+      })(window, document, 'clarity', 'script', 'y28b6n8ub2')
+    </script>
   </head>
   <body>
     <div id="root"></div>
