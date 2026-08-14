@@ -19,7 +19,7 @@
 // 물음표 뒤는 통째로 버린다. 지금 열쇠가 든 것은 `no` 하나지만, 나중에 누가
 // 조회용 값을 하나 더 붙일 때 여기를 같이 고칠 것이라고 기대할 수 없다.
 // 남기지 않는 쪽을 기본으로 둔다.
-const MEASUREMENT_ID = 'G-TS0R5KYWWW'
+const MEASUREMENT_ID = 'G-CYR0Y4ZPPS'
 
 // 이 앱이 주소에 넣는 값의 모양.
 //
