@@ -15,7 +15,7 @@
 import { SKU_BY_CODE, SKUS } from './master.js'
 
 // 밀려난 이유마다 부서가 할 수 있는 일이 다르다.
-export const RESOLUTION = {
+const RESOLUTION = {
   unknown_sku: {
     kind: 'teach',
     title: '이 코드가 어느 상품인지 알려주실 수 있습니다',

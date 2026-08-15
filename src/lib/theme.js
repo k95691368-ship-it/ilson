@@ -7,10 +7,10 @@
 // 화면이고 어두운 배경을 전제로 색 대비를 맞췄다. 대신 토글을 상단에 항상
 // 보이게 두고, 한 번 고르면 그 선택을 기억한다.
 
-export const THEME_KEY = 'ilson-theme'
-export const THEMES = ['light', 'dark']
+const THEME_KEY = 'ilson-theme'
+const THEMES = ['light', 'dark']
 
-export function isTheme(value) {
+function isTheme(value) {
   return THEMES.includes(value)
 }
 
@@ -22,7 +22,7 @@ export function nextTheme(current) {
   return current === 'dark' ? 'light' : 'dark'
 }
 
-export function themeLabel(theme) {
+function themeLabel(theme) {
   return theme === 'dark' ? '어두운 화면' : '밝은 화면'
 }
 

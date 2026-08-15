@@ -210,41 +210,6 @@
   }
 }
 
-/* 꼬리말의 가로 훑기 링크.
-   글이 아니라 목록이므로 줄 간격을 좁히고, 각 줄에 "여기 눌러서 무엇을
-   보는가"를 한 마디로 붙인다. 이름만 있으면 안 누른다. */
-.footer-links {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.footer-link {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 5px 8px;
-  margin-left: -8px;
-  border-radius: 8px;
-  color: var(--text-h);
-  font-size: 14.5px;
-  font-weight: 600;
-  text-decoration: none;
-  transition: background 0.14s ease;
-}
-
-.footer-link:hover,
-.footer-link:focus-visible {
-  background: var(--surface);
-}
-
-.footer-link-note {
-  font-size: 12.5px;
-  font-weight: 400;
-  color: var(--text-muted);
-  line-height: 1.35;
-}
-
 .footer-title {
   font-size: 15px;
   font-weight: 700;
@@ -266,11 +231,6 @@
   gap: 16px;
   flex-wrap: wrap;
   font-size: 14px;
-}
-
-.footer-link {
-  color: var(--text-muted);
-  font-weight: 600;
 }
 
 /* ===== 페이지 머리 ===== */
@@ -364,11 +324,6 @@ p.card-note,
 .grid-2 {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-.grid-3 {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
 }
 .grid-side {
@@ -756,43 +711,6 @@ p.card-note,
 .dropzone:hover {
   border-color: var(--accent-border);
 }
-
-.peek {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
-  background: var(--bg);
-}
-.peek-top {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.peek-name {
-  color: var(--text-h);
-  font-size: 15px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 46%;
-}
-.peek-note {
-  margin: 8px 0 0;
-  font-size: 14px;
-  line-height: 1.55;
-  color: var(--warning-text);
-}
-.peek-meta {
-  margin-top: 8px;
-  font-size: 14px;
-  color: var(--text-muted);
-}
-.peek-table {
-  margin-top: 8px;
-  max-height: 190px;
-  overflow-y: auto;
-}
 .peek-table .data-table {
   min-width: 0;
   font-size: 14px;
@@ -987,27 +905,9 @@ p.card-note,
   font-weight: 600;
   font-size: 14px;
 }
-
-.feasible-box {
-  padding: 12px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid;
-  font-size: 15px;
-  line-height: 1.6;
-}
-.feasible-box.yes {
-  background: var(--success-bg);
-  border-color: var(--success-border);
-}
 .feasible-box.no {
   background: var(--danger-bg);
   border-color: var(--danger-border);
-}
-.feasible-partial,
-.feasible-alt {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
 }
 
 /* ===== 점수 고르기 ===== */
@@ -1163,41 +1063,6 @@ p.card-note,
   color: var(--text-h);
   line-height: 1.55;
 }
-.conflict-tag {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 5px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  font-size: 12.5px;
-  font-weight: 800;
-  margin-right: 5px;
-}
-
-.criterion-pick {
-  display: block;
-  width: 100%;
-  text-align: left;
-  padding: 11px 13px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--bg);
-  font-weight: 500;
-}
-.criterion-pick:hover:not(:disabled) {
-  border-color: var(--accent-border);
-  background: var(--surface);
-}
-.criterion-pick strong {
-  display: block;
-  color: var(--text-h);
-  font-size: 15px;
-  line-height: 1.5;
-  margin-bottom: 3px;
-}
 
 /* ===== 스톱워치 ===== */
 .stopwatch {
@@ -1227,34 +1092,6 @@ p.card-note,
 .stopwatch .row,
 .stopwatch p {
   text-align: left;
-}
-
-.baseline-sealed {
-  border: 1px solid var(--success-border);
-  background: var(--success-bg);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-}
-
-/* ===== 4단계 제작 ===== */
-.sample-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 8px;
-}
-.sample-card {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.sample-card strong {
-  font-size: 14.5px;
-  color: var(--text-h);
-  line-height: 1.4;
 }
 
 /* 모르는 상품코드를 사람이 알려 주는 자리.
@@ -1405,90 +1242,6 @@ p.card-note,
   color: var(--text);
 }
 
-/* ===== 6단계 사용법서 ===== */
-.manual-doc {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 32px 36px;
-  line-height: 1.75;
-}
-@media (max-width: 700px) {
-  .manual-doc {
-    padding: 22px 20px;
-  }
-}
-
-.manual-doc h1 {
-  font-size: 26px;
-  margin-bottom: 4px;
-}
-.manual-doc h2 {
-  font-size: 19px;
-  margin: 28px 0 8px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-.manual-doc h2:first-of-type {
-  border-top: none;
-  padding-top: 0;
-}
-.manual-doc p {
-  margin-bottom: 10px;
-  color: var(--text);
-}
-.manual-intro {
-  font-size: 16.5px;
-  color: var(--text-h);
-}
-.manual-doc hr {
-  border: none;
-  border-top: 1px solid var(--border);
-  margin: 24px 0 14px;
-}
-
-.manual-steps {
-  margin: 0 0 10px;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-.manual-steps li {
-  line-height: 1.65;
-}
-.manual-steps strong {
-  color: var(--text-h);
-}
-
-.manual-list {
-  margin: 0 0 10px;
-  padding-left: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.manual-faq {
-  margin: 0;
-}
-.manual-faq > div {
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
-}
-.manual-faq > div:last-child {
-  border-bottom: none;
-}
-.manual-faq dt {
-  font-weight: 700;
-  color: var(--text-h);
-  margin-bottom: 4px;
-}
-.manual-faq dd {
-  margin: 0;
-  color: var(--text);
-}
-
 /* 인쇄할 때는 문서만 남긴다.
    부서 담당자가 종이로 뽑거나 PDF로 저장해 자기 폴더에 보관할 것이라,
    편집 화면과 상단 목차가 같이 나오면 안 된다. */
@@ -1504,22 +1257,6 @@ p.card-note,
     padding: 0;
     max-width: none;
   }
-  .manual-doc {
-    border: none;
-    padding: 0;
-    background: #fff;
-    color: #000;
-  }
-  .manual-doc h1,
-  .manual-doc h2,
-  .manual-doc strong {
-    color: #000;
-  }
-  .manual-doc p,
-  .manual-doc li,
-  .manual-doc dd {
-    color: #222;
-  }
   .data-table th,
   .data-table td {
     border-color: #ccc;
@@ -1532,28 +1269,6 @@ p.card-note,
   .card-note {
     color: #555;
   }
-}
-
-/* ===== 7단계 인수인계 ===== */
-.handed-card {
-  border: 1px solid var(--success-border);
-  background: var(--success-bg);
-  border-radius: var(--radius);
-  padding: 16px 18px;
-}
-.handed-to strong {
-  font-size: 17px;
-  color: var(--text-h);
-  margin-right: 6px;
-}
-.handed-link {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: 8px;
-  padding: 8px 11px;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
 }
 
 /* 부서가 여는 도구 화면의 한도 표시. 늘 보여야 한다 —
@@ -2153,11 +1868,6 @@ details.card > summary.card-head:focus-visible {
   border-color: var(--danger-border);
   color: var(--text-h);
 }
-.notice-success {
-  background: var(--success-bg);
-  border-color: var(--success-border);
-  color: var(--text-h);
-}
 .notice-title {
   font-weight: 700;
   color: var(--text-h);
@@ -2266,29 +1976,6 @@ details.card > summary.card-head:focus-visible {
   }
 }
 
-/* ===== 모달 ===== */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 150;
-  background: var(--overlay);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-}
-.modal-content {
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 22px 24px;
-  width: min(620px, 100%);
-  max-height: 86svh;
-  overflow-y: auto;
-  text-align: left;
-}
-
 /* ===== 오류 경계 ===== */
 .error-boundary {
   max-width: 620px;
@@ -2304,56 +1991,6 @@ details.card > summary.card-head:focus-visible {
 .notfound {
   text-align: center;
   padding: 90px 20px;
-}
-
-/* ===== 신청서에 딸려 온 파일 ===== */
-.file-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.file-item {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  overflow: hidden;
-}
-.file-row {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  padding: 9px 10px 9px 12px;
-  flex-wrap: wrap;
-}
-.file-icon {
-  font-size: 16px;
-  color: var(--text-dim);
-  flex-shrink: 0;
-}
-.file-name {
-  font-weight: 600;
-  font-size: 15px;
-  color: var(--text-h);
-  /* 정산서 파일명은 길다. 줄바꿈되더라도 버튼을 밀어내지 않게 한다. */
-  word-break: break-all;
-  min-width: 0;
-}
-.file-preview {
-  border-top: 1px solid var(--border);
-  background: var(--bg);
-  padding: 11px 12px 13px;
-}
-.file-sheet + .file-sheet {
-  margin-top: 16px;
-  padding-top: 14px;
-  border-top: 1px dashed var(--border);
-}
-.file-note {
-  margin: 0 0 8px;
-  padding: 7px 9px;
-  border-left: 2px solid var(--warning-border, var(--border));
-  background: var(--warning-bg, var(--surface));
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 .file-preview .data-table {
   font-size: 14px;
@@ -2671,21 +2308,6 @@ p.record-aside {
     margin: 16mm 14mm;
   }
 }
-
-/* ===== 접수함 골라 보기 ===== */
-
-/* 세어 놓은 숫자를 누를 수 있게 만든 타일. 모양은 그대로 두고 눌리는
-   느낌만 더한다 — 모양이 달라지면 옆의 안 눌리는 타일과 다른 것으로 보인다. */
-.stat-tile-btn {
-  display: block;
-  width: 100%;
-  text-align: left;
-  cursor: pointer;
-  border: 1px solid transparent;
-}
-.stat-tile-btn:hover:not(:disabled) {
-  border-color: var(--border);
-}
 .stat-tile-btn.on {
   border-color: var(--accent);
   background: var(--accent-bg);
@@ -2699,23 +2321,6 @@ p.record-aside {
   padding-top: 11px;
   border-top: 1px dashed var(--border);
   line-height: 1.7;
-}
-
-/* 조건을 걸어서 지금 열어 둔 신청서가 목록에서 사라졌을 때.
-   오른쪽 내용을 갈아치우지 않고 이것만 띄운다. */
-.review-list-warn {
-  margin: 8px 8px 0;
-  padding: 10px 11px;
-  border: 1px solid var(--warning-border);
-  background: var(--warning-bg);
-  border-radius: var(--radius-sm);
-  font-size: 13.5px;
-  line-height: 1.65;
-  color: var(--text);
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 7px;
 }
 
 .review-list-empty {
@@ -3055,7 +2660,6 @@ kbd {
   line-height: 1.7;
 }
 
-
 /* 조건에서 빠졌지만 오른쪽에 열려 있는 신청서. 목록 맨 위에 붙여 둔다.
    경고를 띄우는 대신 이렇게 한다 — 검색어 한 글자마다, 판정을 저장할
    때마다 노란 경고가 뜨면 정상 동작이 사고처럼 보이고, 경고가 늘 떠 있으면
@@ -3257,12 +2861,6 @@ kbd {
   flex-wrap: wrap;
   margin-top: 9px;
 }
-.similar-foot {
-  margin: 12px 0 0;
-  padding-top: 10px;
-  border-top: 1px dashed var(--border);
-  line-height: 1.7;
-}
 
 /* ===== 이미 들어와 있는 것 같습니다 ===== */
 .similar {
@@ -3332,12 +2930,6 @@ kbd {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 9px;
-}
-.similar-foot {
-  margin: 11px 0 0;
-  padding-top: 10px;
-  border-top: 1px dashed var(--warning-border);
-  line-height: 1.7;
 }
 
 /* ===== 못 한 것 ===== */
@@ -3752,114 +3344,14 @@ kbd {
   color: var(--text-h);
   margin-right: 5px;
 }
-
-/* ===== 주간 ===== */
-/* 보고할 때 그대로 읽는 한 줄. 표보다 위에 둔다 — 표를 보고 문장을
-   만드는 일을 매주 하게 하지 않는 것이 이 화면의 목적이다. */
-.weekly-line {
-  padding: 15px 16px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  background: var(--accent-bg);
-}
-.weekly-line-label {
-  display: block;
-  font-size: 12.5px;
-  color: var(--text-muted);
-  margin-bottom: 5px;
-}
-.weekly-line p {
-  margin: 0;
-  font-size: 16px;
-  line-height: 1.7;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
-.weekly-bars {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.weekly-bars > li {
-  padding: 12px 13px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
 .weekly-bars > li.now {
   border-color: var(--accent);
-}
-.weekly-head {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  flex-wrap: wrap;
-  margin-bottom: 9px;
-}
-.weekly-when {
-  font-size: 15px;
-  font-weight: 700;
-  color: var(--text-h);
-}
-.weekly-row {
-  display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) 34px;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 5px;
-  font-size: 13.5px;
-}
-.weekly-key {
-  color: var(--text-muted);
-}
-.weekly-row strong {
-  text-align: right;
-  color: var(--text-h);
-}
-.weekly-bar {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--border);
-  overflow: hidden;
-}
-/* 들어온 것과 판정한 것을 색만으로 가르지 않는다. 왼쪽에 글로도 적혀 있다. */
-.weekly-bar > span {
-  display: block;
-  height: 100%;
-  border-radius: 4px;
-  min-width: 2px;
 }
 .weekly-bar > .in {
   background: var(--accent);
 }
 .weekly-bar > .out {
   background: var(--text-muted);
-}
-.weekly-depts {
-  margin-top: 9px;
-  flex-wrap: wrap;
-}
-.weekly-cmp {
-  margin-top: 8px;
-  padding-top: 8px;
-  border-top: 1px dashed var(--border);
-  font-size: 13.5px;
-  color: var(--text);
-}
-/* 표본이 적어 말할 수 없다는 안내는 흐리게. 숫자와 같은 무게로 보이면
-   그것도 결론처럼 읽힌다. */
-.weekly-cmp.weak {
-  color: var(--text-muted);
-}
-.weekly-foot {
-  margin: 14px 0 0;
-  padding-top: 12px;
-  border-top: 1px dashed var(--border);
-  line-height: 1.75;
 }
 
 /* ===== 밀려난 줄 알려주기 ===== */
@@ -4273,13 +3765,6 @@ kbd {
 }
 .bulk-why strong {
   color: var(--text-h);
-}
-/* 판정이 왜 여기 없는지. 없는 기능을 찾다 시간 쓰는 것보다 낫다. */
-.bulk-never {
-  margin: 10px 0 0;
-  padding-top: 9px;
-  border-top: 1px dashed var(--border);
-  line-height: 1.7;
 }
 
 /* ===== 막힌 곳 ===== */
@@ -4923,75 +4408,6 @@ kbd {
   margin-top: 7px;
 }
 
-/* ===== 자주 묻는 것 초안 ===== */
-/* 짚힌 것에서 뽑아 제안한다. 문장은 자동으로 안 고친다 — 규칙으로
-   "어떻게 말할지"까지 만들면 어색한 한국어가 나오고 부서가 그걸 읽는다. */
-.faq-drafts {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius-sm);
-  background: var(--accent-bg);
-  display: grid;
-  gap: 9px;
-}
-.faq-drafts-head {
-  display: grid;
-  gap: 3px;
-}
-.faq-drafts-head strong {
-  font-size: 14.5px;
-  color: var(--text-h);
-}
-.faq-draft {
-  padding: 11px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-.faq-draft-head {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  flex-wrap: wrap;
-  margin-bottom: 7px;
-}
-.faq-draft-q {
-  margin: 0 0 4px;
-  font-size: 14.5px;
-  font-weight: 600;
-  line-height: 1.7;
-  color: var(--text-h);
-}
-.faq-draft-a {
-  margin: 0 0 9px;
-  font-size: 14px;
-  line-height: 1.75;
-  color: var(--text);
-}
-.faq-dup {
-  margin: 0 0 8px;
-  padding: 7px 9px;
-  border-radius: var(--radius-sm);
-  background: var(--warning-bg);
-  color: var(--warning-text);
-  font-size: 13.5px;
-  line-height: 1.7;
-}
-.faq-draft-form {
-  display: grid;
-  gap: 8px;
-}
-.faq-draft-form label {
-  display: grid;
-  gap: 4px;
-}
-.faq-draft-form label > span {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
-}
-
 /* ===== 연 환산 — 뺀 것과 안 뺀 것 ===== */
 /* 나란히 놓인 두 숫자가 다른 기준으로 잰 값이면, 읽는 사람은 큰 쪽을
    기억하고 그 숫자가 보고에 올라간다. 그래서 갈라 적는다. */
@@ -5154,37 +4570,6 @@ kbd {
 .signoff-depts > li.done {
   color: var(--text-h);
   font-weight: 600;
-}
-
-/* ===== 봉인할 때 같이 굳히는 값 ===== */
-/* 인원과 주기는 8단계 절감 계산의 곱하기 자리에 그대로 들어간다.
-   이 칸이 없던 동안 전부 1명으로 봉인됐고 절감이 인원수만큼 줄었다. */
-.seal-inputs {
-  margin-top: 12px;
-  padding: 12px;
-  border: 1px solid var(--warning);
-  border-radius: var(--radius-sm);
-  background: var(--warning-bg);
-}
-.seal-inputs > p {
-  margin: 0 0 9px;
-  line-height: 1.75;
-}
-.seal-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.seal-row > label {
-  flex: 1;
-  min-width: 130px;
-  display: grid;
-  gap: 4px;
-}
-.seal-row > label > span {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text-h);
 }
 
 /* ===== 돌리시는 분 ===== */
@@ -6651,73 +6036,13 @@ kbd {
   border-left: 2px solid currentColor;
   line-height: 1.55;
 }
-
-/* ===== 목차 끝의 '기타' ===== */
-/* 여덟 단계에 안 들어가는 화면 여덟 개를 한 칸으로 묶는다.
-   꼬리말에 여덟 줄로 늘어놓았던 것을 옮겼다 — 거기까지 내려가야 보였고,
-   내려가도 여덟 줄이 한꺼번에 펼쳐져 있었다. */
-.nav-more {
-  position: relative;
-  display: inline-flex;
-}
-
-/* 마우스로 여는 것 말고 초점으로도 열린다. 키보드로 훑는 사람이 못 열면
-   그 여덟 화면은 그 사람에게 없는 것이다. */
-.nav-more-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  right: 0;
-  z-index: 40;
-  min-width: 268px;
-  padding: 7px;
-  display: none;
-  flex-direction: column;
-  gap: 1px;
-  background: var(--surface);
-  border: 1px solid var(--btn-line);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-}
 .nav-more.open .nav-more-menu,
 .nav-more:focus-within .nav-more-menu {
   display: flex;
 }
 
-.nav-more-item {
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-  padding: 9px 12px;
-  border-radius: var(--radius-sm);
-  text-decoration: none;
-  color: var(--text-h);
-}
-.nav-more-item:hover,
-.nav-more-item:focus-visible {
-  background: var(--accent-bg);
-  color: var(--accent);
-  text-decoration: none;
-}
-.nav-more-label {
-  font-size: 15px;
-  font-weight: 600;
-}
-.nav-more-note {
-  font-size: 13.5px;
-  color: var(--text-muted);
-}
-.nav-more-item:hover .nav-more-note {
-  color: var(--accent);
-}
-
 /* 좁은 화면에서는 목차가 가로로 넘치며 스크롤된다. 그때 메뉴가 오른쪽에
    붙으면 화면 밖으로 나간다. 왼쪽 끝에 맞춘다. */
-@media (max-width: 900px) {
-  .nav-more-menu {
-    right: auto;
-    left: 0;
-  }
-}
 
 /* 접힌 나머지. 목록을 화면에서 자를 때 쓴다. */
 .capped-more,

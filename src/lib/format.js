@@ -19,11 +19,6 @@ export function num(value, digits = 0) {
   })
 }
 
-export function pct(value, digits = 1) {
-  if (value == null || Number.isNaN(value)) return '—'
-  return `${(value * 100).toFixed(digits)}%`
-}
-
 // 초를 사람이 읽는 단위로. 1분 미만은 초, 1시간 미만은 분, 그 위는 시간+분.
 // 반올림해서 "2시간"으로 뭉개지 않는 이유는, 이 값이 절감 근거로 쓰이기 때문이다.
 export function duration(seconds) {

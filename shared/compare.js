@@ -22,7 +22,7 @@ export const TEXT_FIELDS = [
   { key: 'impact_if_wrong', label: '틀리면' },
 ]
 
-export const VALUE_FIELDS = [
+const VALUE_FIELDS = [
   { key: 'dept', label: '신청 부서' },
   { key: 'applicant_label', label: '적어 낸 사람' },
   { key: 'status', label: '지금 상태' },

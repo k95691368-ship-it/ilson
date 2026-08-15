@@ -66,9 +66,8 @@ export const STAGES = [
 ]
 
 export const STAGE_BY_KEY = Object.fromEntries(STAGES.map((s) => [s.key, s]))
-export const STAGE_BY_PATH = Object.fromEntries(STAGES.map((s) => [s.path, s]))
 
-export function stageByNo(no) {
+function stageByNo(no) {
   return STAGES.find((s) => s.no === no) ?? null
 }
 

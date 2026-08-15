@@ -12,7 +12,7 @@
 // 남은 횟수가 이 아래로 내려가면 눈에 띄게 한다.
 //
 // 늘 경고가 떠 있으면 아무도 안 읽는다. 넉넉할 때는 조용히 둔다.
-export const LOW_RATIO = 0.34
+const LOW_RATIO = 0.34
 export const LOW_ABSOLUTE = 3
 
 export function quotaState({ remaining, limit }) {

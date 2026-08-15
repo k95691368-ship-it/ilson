@@ -43,8 +43,8 @@ function sideOf(kind) {
 //
 // "?" 한 글자를 던져 놓고 답을 기다리면 부서는 무엇을 답해야 할지 모른다.
 // 물을 거면 무엇이 궁금한지 적어야 한다.
-export const MIN_ASK = 10
-export const MIN_ANSWER = 2
+const MIN_ASK = 10
+const MIN_ANSWER = 2
 
 // 결정 기록 줄을 주고받은 말로 바꾼다.
 //

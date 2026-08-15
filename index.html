@@ -8,10 +8,17 @@
       name="description"
       content="사내 반복업무를 도구로 인수인계하는 시스템. 기준선을 실측해 봉인하고, 합격 시험을 통과한 도구만 주소를 받습니다."
     />
+    <!--
+      글꼴은 다른 도메인에서 받아 온다. 그 도메인에 처음 닿는 데만 DNS 조회와
+      TLS 악수가 붙는데, 이 파일은 **첫 그림을 막는 파일**이라 그 시간이
+      그대로 흰 화면이 된다. 미리 연결해 두면 그만큼 앞당겨진다.
+
+      as="style" 은 rel="preload" 일 때만 뜻이 있는 값이라 뺐다. crossorigin
+      도 뺐다 — 스타일시트에 붙이면 CORS 로 받아 오게 되는데 그럴 이유가 없다.
+    -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
     <link
       rel="stylesheet"
-      as="style"
-      crossorigin
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
     />
     <title>일손 — 사내 반복업무 인수인계 시스템</title>

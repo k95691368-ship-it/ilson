@@ -227,7 +227,7 @@ function pad(n) {
 }
 
 // 상품명에 전각 공백이 섞여 들어오는 경우가 있다(한글 입력기에서 흔하다).
-export function cleanText(value) {
+function cleanText(value) {
   return String(value ?? '')
     .replace(/[　 ]/g, ' ')
     .trim()

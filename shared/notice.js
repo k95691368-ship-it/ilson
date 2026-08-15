@@ -238,7 +238,7 @@ export function newSince(notices, lastSeen) {
   return (notices ?? []).filter((n) => String(n.at ?? '') > String(lastSeen))
 }
 
-export const SEEN_PREFIX = 'ilson:seen:'
+const SEEN_PREFIX = 'ilson:seen:'
 
 export function seenKey(ticket) {
   return `${SEEN_PREFIX}${String(ticket ?? '').toUpperCase()}`

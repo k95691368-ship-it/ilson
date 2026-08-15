@@ -59,7 +59,7 @@ export const NEVER_BULK = ['수용', '반려']
 // "봤다고 알리기"가 걸려 검토 단계 기록이 붙었고, 그러면 막힌 곳 화면이
 // 그 건을 "검토 단계에 있음"으로 읽는다. 애초에 뜻도 없는 조작이다 —
 // 이미 도구를 쓰고 있는 부서에 "읽었습니다"를 보내 봐야 할 말이 아니다.
-export const INBOX_STATUSES = ['접수', '검토중', '보류']
+const INBOX_STATUSES = ['접수', '검토중', '보류']
 
 export function validateBulk({ action, ids, reason }) {
   const fields = {}

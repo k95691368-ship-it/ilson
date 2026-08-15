@@ -20,7 +20,7 @@ export const NEVER_FOLD = 3
 
 // 이 목록에 든 것은 무게와 상관없이 접지 않는다. 접기를 넣는 사람이
 // 매번 판단하지 않게, 이름으로 못 박아 둔다.
-export const NEVER_FOLD_KINDS = new Set([
+const NEVER_FOLD_KINDS = new Set([
   '금액', // 숫자가 틀린다는 신고
   '막음', // 지금 다음 단계로 못 가게 막고 있는 것
   '되돌릴수없음', // 누르면 되돌릴 수 없는 것의 경고
@@ -32,6 +32,3 @@ export function rankOf(kind) {
   return URGENCY[kind] ?? 1
 }
 
-export function canFold(kind) {
-  return rankOf(kind) < NEVER_FOLD
-}

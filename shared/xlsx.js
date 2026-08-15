@@ -42,7 +42,7 @@ async function inflateRaw(bytes) {
 }
 
 // zip 안의 파일들을 { 경로: 내용(bytes) } 로 돌려준다.
-export async function unzip(buffer) {
+async function unzip(buffer) {
   const bytes = new Uint8Array(buffer)
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 

@@ -222,7 +222,7 @@ const SAME_DEPT_BONUS = 0.12
 export const SIMILAR_THRESHOLD = 0.34
 
 // 이만큼이면 거의 확실히 같은 건이다. 화면에서 더 세게 말한다.
-export const SAME_THRESHOLD = 0.55
+const SAME_THRESHOLD = 0.55
 
 export function similarity(draft, other, corpus) {
   let weighted = 0

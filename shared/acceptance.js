@@ -8,7 +8,7 @@
 // 정답도 같이 만들어 두었기 때문에, 사람이 눈으로 맞춰 볼 필요가 없다.
 // 'human'인 것은 사람이 직접 봐야 한다.
 
-export const CRITERION_CATALOG = [
+const CRITERION_CATALOG = [
   {
     key: 'amount_exact',
     body: '정답 대비 채널별 순매출 합계 오차가 0원이어야 한다.',

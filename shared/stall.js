@@ -73,7 +73,7 @@ export const STAGE_ORDER = Object.keys(STALL_RULES)
 //
 // mine은 "이건 내가 움직여야 풀린다"는 뜻이다. 담당자 화면에서 위로 올리는
 // 기준으로 쓴다.
-export const WAITING = {
+const WAITING = {
   ax: { label: '제 차례입니다', mine: true },
   dept: { label: '부서 답을 기다리는 중', mine: false },
   both: { label: '같이 앉아야 넘어갑니다', mine: true },
