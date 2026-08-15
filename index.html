@@ -17,10 +17,32 @@
       도 뺐다 — 스타일시트에 붙이면 CORS 로 받아 오게 되는데 그럴 이유가 없다.
     -->
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <!--
+      글꼴 파일은 받되 **첫 그림을 막지 않는다.**
+
+      스타일시트로 그냥 걸어 두면 브라우저는 그 파일이 남의 도메인에서 올
+      때까지 아무것도 안 그린다. 흰 화면이 그만큼 길어진다.
+
+      preload 로 받아 두었다가 다 받은 뒤에 스타일시트로 바꿔 단다. 그러면
+      글자가 먼저 뜨고 글꼴이 나중에 갈아 끼워진다. 그렇게 해도 되는 이유가
+      둘 있다 — 이 글꼴 파일 자체가 font-display:swap 이라 어차피 대체 글꼴로
+      먼저 그리게 돼 있고, 우리 쪽 글꼴 목록도 system-ui 로 받아 두어서
+      한글이 깨지지 않는다.
+
+      자바스크립트를 끈 브라우저를 위해 noscript 로 원래 방식도 남긴다.
+    -->
     <link
-      rel="stylesheet"
+      rel="preload"
+      as="style"
       href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+      />
+    </noscript>
     <title>일손 — 사내 반복업무 인수인계 시스템</title>
 
     <!-- Google tag (gtag.js) -->
@@ -76,6 +98,31 @@
   </head>
   <body>
     <div id="root"></div>
+    <!--
+      첫 화면이 부를 것을 지금 띄워 둔다.
+
+      여태 순서는 이랬다 — 자바스크립트를 받고, 실행하고, 그제서야 화면이
+      뜨면서 서버를 부른다. 그때까지 서버는 놀고 있다. 이 파일은 맨 먼저
+      도착하므로 여기서 걸어 두면 **받는 동안 서버가 같이 일한다.**
+
+      첫 화면에서만 쓰는 둘이다. 다른 주소로 들어온 사람에게는 헛일이 되는데,
+      GET 두 번이고 응답이 작아서 그만한 값은 한다.
+
+      src/api/client.js 가 이걸 한 번만 꺼내 쓴다. 두 번째부터는 새로 부른다 —
+      다시 부르는 것은 값이 바뀌었을까 봐 부르는 것이라, 미리 받아 둔 옛 답을
+      주면 새로고침이 안 되는 화면이 된다.
+    -->
+    <script>
+      if (location.pathname === '/') {
+        window.__boot = {}
+        for (const p of ['/overview', '/reports']) {
+          // 실패하면 null 이 된다. 여기서 거절을 남기면 아무도 안 받는
+          // 거절이 되어 브라우저 콘솔에 오류로 찍힌다. 화면은 null 을 보고
+          // 그냥 제 손으로 다시 부른다.
+          window.__boot[p] = fetch('/api' + p).catch(() => null)
+        }
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

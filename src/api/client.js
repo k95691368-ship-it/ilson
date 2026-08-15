@@ -18,10 +18,34 @@ class ApiError extends Error {
 
 export { ApiError }
 
+// 첫 화면이 부를 것을 index.html 이 미리 띄워 둔다.
+//
+// 여태 순서는 이랬다 — index.js 를 받고, 실행하고, 그제서야 화면이 뜨면서
+// /overview 를 부른다. 그때까지 서버는 놀고 있다.
+//
+// index.html 은 맨 먼저 도착하므로 거기서 fetch 만 걸어 두면, 자바스크립트를
+// 받는 동안 서버가 같이 일한다. 화면이 뜰 때쯤 답이 이미 와 있다.
+//
+// 규칙 둘.
+//   · **한 번만 쓴다.** 다시 부르는 것은 값이 바뀌었을 수 있어서 부르는
+//     것이라, 미리 받아 둔 옛 답을 주면 새로고침이 안 되는 화면이 된다.
+//   · GET 만. 미리 띄우는 것이라 무언가를 바꾸는 요청이면 안 된다.
+function takeBooted(path, options) {
+  const booted = typeof window !== 'undefined' && window.__boot
+  if (!booted || (options.method && options.method !== 'GET')) return null
+  const hit = booted[path]
+  if (!hit) return null
+  delete booted[path]
+  return hit
+}
+
 async function send(path, options = {}) {
   let res
   try {
-    res = await fetch(`${BASE}${path}`, options)
+    // 미리 띄워 둔 것이 있으면 그것을 쓴다. 그것이 실패했으면 null 이 오고,
+    // 그때는 아무 일 없었던 것처럼 지금 부른다.
+    const booted = takeBooted(path, options)
+    res = (booted && (await booted)) || (await fetch(`${BASE}${path}`, options))
   } catch {
     // 인터넷이 끊겼거나 서버가 아예 안 뜬 경우. 상태 코드조차 없다.
     throw new ApiError('서버에 닿지 못했습니다. 인터넷 연결을 확인해주세요.', { status: 0 })

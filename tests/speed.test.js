@@ -49,6 +49,60 @@ describe('두 번째 방문에 다시 안 받게 해 뒀는가', () => {
   })
 })
 
+describe('글꼴이 첫 그림을 막지 않는가', () => {
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+
+  it('스타일시트로 곧장 걸어 두지 않는다', () => {
+    // 그냥 걸면 남의 도메인에서 그 파일이 올 때까지 아무것도 안 그린다.
+    // preload 로 받아 두었다가 다 받은 뒤에 바꿔 단다.
+    expect(html).toMatch(/rel="preload"\s+as="style"/)
+    expect(html).toContain("this.rel='stylesheet'")
+  })
+
+  it('자바스크립트를 끈 브라우저에도 글꼴이 간다', () => {
+    expect(html).toContain('<noscript>')
+  })
+
+  it('글꼴이 안 와도 한글이 깨지지 않는다', () => {
+    // 바꿔 다는 방식은 대체 글꼴로 먼저 그린다는 뜻이다. 그 대체가 없으면
+    // 첫 그림이 엉뚱한 글꼴이 된다.
+    const css = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8')
+    const stack = css.match(/--sans:([^;]+);/)?.[1] ?? ''
+    expect(stack).toContain('system-ui')
+    expect(stack).toContain('sans-serif')
+  })
+})
+
+describe('서버를 놀리지 않는가', () => {
+  const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+  const client = readFileSync(join(ROOT, 'src', 'api', 'client.js'), 'utf8')
+
+  it('첫 화면이 부를 것을 미리 띄운다', () => {
+    expect(html).toContain('__boot')
+    expect(html).toContain('/overview')
+  })
+
+  it('미리 띄운 것이 실패해도 거절을 남기지 않는다', () => {
+    // 아무도 안 받는 거절은 콘솔에 오류로 찍힌다. null 로 받아 넘긴다.
+    expect(html).toMatch(/catch\(\(\) => null\)/)
+  })
+
+  it('미리 받은 답을 두 번 쓰지 않는다', () => {
+    // 다시 부르는 것은 값이 바뀌었을까 봐 부르는 것이다. 옛 답을 또 주면
+    // 새로고침이 안 되는 화면이 된다.
+    expect(client).toContain('delete booted[path]')
+  })
+
+  it('무언가 바꾸는 요청에는 안 쓴다', () => {
+    // 미리 띄워 두는 것이라 GET 이 아니면 안 된다.
+    expect(client).toMatch(/options\.method && options\.method !== 'GET'/)
+  })
+
+  it('미리 띄운 것이 없으면 그냥 부른다', () => {
+    expect(client).toMatch(/await fetch\(`\$\{BASE\}\$\{path\}`, options\)/)
+  })
+})
+
 describe('첫 화면 코드를 기다렸다 받지 않는가', () => {
   const config = readFileSync(join(ROOT, 'vite.config.js'), 'utf8')
 
