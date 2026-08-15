@@ -97,17 +97,6 @@ const COLUMN_MAP = {
   },
 }
 
-// 사용법서가 "이 도구는 어떤 파일을 받나요"를 적을 때 쓴다.
-//
-// 문서에 손으로 옮겨 적지 않고 여기서 가져가게 하는 이유: 규칙이 바뀌었는데
-// 문서가 그대로면, 담당자가 문서대로 했는데 안 되는 상황이 온다. 그러면
-// 그다음부터는 아무도 문서를 안 본다.
-export const CHANNEL_RULES_PUBLIC = CHANNEL_RULES.map((r) => ({
-  channel: r.channel,
-  mustHave: r.mustHave,
-  columns: Object.entries(COLUMN_MAP[r.channel] ?? {}).map(([from, to]) => ({ from, to })),
-}))
-
 // 없으면 아예 처리할 수 없는 칸.
 const REQUIRED_FIELDS = ['date', 'sku', 'qty', 'gross']
 
