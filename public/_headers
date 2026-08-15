@@ -1,0 +1,31 @@
+# 무엇을 얼마나 오래 들고 있어도 되는가.
+#
+# 이게 없으면 클라우드플레어가 전부 `max-age=0, must-revalidate` 로 내보낸다.
+# 그러면 두 번째 방문에도 브라우저가 파일 하나하나를 "이거 그대로예요?"라고
+# 다시 물어본다. 답이 304(그대로다)라 내려받는 양은 적지만, **물어보는
+# 왕복 자체가 그리기 전에 쌓인다.** 첫 화면이 받는 파일이 네댓 개니 그만큼이다.
+
+# 이름에 내용 해시가 박힌 파일. 내용이 바뀌면 이름이 바뀐다.
+# 그래서 "영원히 들고 있어도 된다"고 말할 수 있다 — 바뀐 파일은 다른 이름으로
+# 오므로 낡은 것을 계속 쓰는 일이 생기지 않는다.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# 문서는 매번 확인해야 한다. 이걸 오래 들고 있으면 새로 올려도 옛 화면이 뜬다.
+/
+  Cache-Control: public, max-age=0, must-revalidate
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+# 신청서·판정·성과는 사람마다 다른 값이고, 주소에 접수번호가 들어간다.
+# 중간에 있는 캐시가 그걸 들고 있으면 안 된다.
+/api/*
+  Cache-Control: no-store
+
+# 잘 안 바뀌지만 바뀌었을 때 하루 안에는 반영돼야 하는 것들.
+/favicon.svg
+  Cache-Control: public, max-age=86400
+
+/robots.txt
+  Cache-Control: public, max-age=86400
