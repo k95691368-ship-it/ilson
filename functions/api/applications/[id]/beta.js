@@ -9,7 +9,7 @@
 import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
-import { tally } from '../../../../shared/grade.js'
+import { tally } from '../../../../shared/tally.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import { signoffState } from '../../../../shared/signoff.js'
 
@@ -149,7 +149,7 @@ export async function onRequestPost({ env, params, request }) {
   // 적었다. 필수 안전 기준이 전부 실패인 채점에 "통과"만 붙여 보내면 통과로
   // 적혔고 다음 단계로 넘어갔다. 라이브에서 확인한 일이다.
   //
-  // 채점하는 함수와 같은 것으로 센다(shared/grade.js 의 tally). 두 군데서 따로
+  // 채점하는 함수와 같은 것으로 센다(shared/tally.js 의 tally). 두 군데서 따로
   // 세면 화면과 기록이 다른 말을 한다.
   const s = { ...(body.summary ?? {}), ...tally(graded) }
 

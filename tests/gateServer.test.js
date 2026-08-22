@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { tally } from '../shared/grade.js'
+import { tally } from '../shared/tally.js'
 import { onRequestPost } from '../functions/api/applications/[id]/beta.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -125,7 +125,7 @@ describe('세는 함수는 한 벌만', () => {
   it('서버가 그 함수를 실제로 부른다', () => {
     // 규칙을 복사해 두면 언젠가 갈라진다.
     const src = readFileSync(join(ROOT, 'functions', 'api', 'applications', '[id]', 'beta.js'), 'utf8')
-    expect(src).toContain("from '../../../../shared/grade.js'")
+    expect(src).toContain("from '../../../../shared/tally.js'")
     expect(src).toContain('tally(graded)')
     // 보내온 판정을 그대로 쓰던 자리가 남아 있으면 안 된다.
     expect(src).not.toMatch(/const s = body\.summary \?\? \{\}/)

@@ -127,3 +127,42 @@ describe('첫 화면 코드를 기다렸다 받지 않는가', () => {
     expect(existsSync(join(ROOT, 'dist', m[1])), m[1]).toBe(true)
   })
 })
+
+describe('서버가 브라우저 몫까지 지고 뜨지 않는가', () => {
+  // Workers 는 잠들었다 깰 때마다 실려 있는 코드를 다시 편다. 그래서 서버
+  // 묶음에 무엇이 들어가 있는지가 첫 요청 시간에 그대로 붙는다.
+  //
+  // 실제로 그랬다. 베타 회차를 저장하는 라우트가 세는 함수 하나(tally, 1.4KB)를
+  // 쓰려고 grade.js 를 가져왔는데, grade.js 는 맨 위에서 pipeline.js 를 끌고
+  // 오고 그 pipeline 은 다시 xlsx.js·csv.js·master.js 를 끌고 온다. 파일을
+  // 합치는 일은 전부 브라우저에서 도는데도 서버가 그 엔진을 통째로 안고
+  // 시작하고 있었다.
+  const serverFiles = []
+  const walkServer = (d) => {
+    for (const e of readdirSync(d, { withFileTypes: true })) {
+      const p = join(d, e.name)
+      if (e.isDirectory()) walkServer(p)
+      else if (p.endsWith('.js')) serverFiles.push(p)
+    }
+  }
+  walkServer(join(ROOT, 'functions'))
+  const serverSrc = serverFiles.map((f) => readFileSync(f, 'utf8')).join('\n')
+
+  it('파일 합치는 엔진을 서버가 안 가져온다', () => {
+    for (const mod of ['pipeline.js', 'xlsx.js', 'csv.js', 'grade.js']) {
+      expect(serverSrc.includes(`shared/${mod}'`), `서버가 ${mod} 를 import 한다`).toBe(false)
+    }
+  })
+
+  it('세는 함수는 따로 떼어 둔 것을 쓴다', () => {
+    // 떼어 놓고 안 쓰면 아무 의미가 없다.
+    expect(serverSrc).toContain("shared/tally.js'")
+    expect(existsSync(join(ROOT, 'shared', 'tally.js'))).toBe(true)
+  })
+
+  it('떼어 낸 파일이 아무것도 안 끌고 온다', () => {
+    // 여기에 import 가 하나라도 생기면 그 순간 다시 딸려 오기 시작한다.
+    const tally = readFileSync(join(ROOT, 'shared', 'tally.js'), 'utf8')
+    expect(tally).not.toMatch(/^import /m)
+  })
+})
