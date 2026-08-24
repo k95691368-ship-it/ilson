@@ -38,12 +38,21 @@ const app = (i) => ({
 
 const make = (n) => Array.from({ length: n }, (_, i) => app(i))
 
-// 다섯 번 돌려 평균을 낸다. 한 번만 재면 그날 기계 사정이 그대로 결론이 된다.
+// 여러 번 돌려 **가장 빨랐던 값**을 쓴다.
+//
+// 평균을 쓰면 기계가 잠깐 바쁜 것이 그대로 결과에 섞인다. 가장 빠른 값은
+// "이 기계가 방해받지 않았을 때 이만큼 걸린다"에 가깝고, 차수를 보려는
+// 여기서는 그쪽이 훨씬 덜 흔들린다. 실제로 평균을 쓰다가 CI 에서 한 번
+// 빨개졌다.
 function ms(fn) {
   fn()
-  const started = performance.now()
-  for (let i = 0; i < 5; i += 1) fn()
-  return (performance.now() - started) / 5
+  let best = Infinity
+  for (let i = 0; i < 7; i += 1) {
+    const started = performance.now()
+    fn()
+    best = Math.min(best, performance.now() - started)
+  }
+  return best
 }
 
 // 데이터 네 배에 시간이 몇 배가 되는가.
@@ -54,8 +63,8 @@ function ms(fn) {
 const QUADRATIC = 8
 
 function growth(fn) {
-  const small = make(200)
-  const big = make(800)
+  const small = make(300)
+  const big = make(1200)
   const a = ms(() => fn(small))
   const b = ms(() => fn(big))
   // 너무 빨라 잴 수 없는 것은 비율을 따질 수 없다. 그건 통과다.
@@ -66,22 +75,22 @@ function growth(fn) {
 describe('데이터가 네 배가 돼도 제곱으로 늘지 않는다', () => {
   it('비슷한 신청서 찾기', () => {
     const g = growth((list) => findSimilar(list[0], list, { limit: 2 }))
-    expect(g.ratio, `200건 ${g.a.toFixed(1)}ms → 800건 ${g.b.toFixed(1)}ms`).toBeLessThan(QUADRATIC)
+    expect(g.ratio, `300건 ${g.a.toFixed(2)}ms → 1200건 ${g.b.toFixed(2)}ms`).toBeLessThan(QUADRATIC)
   })
 
   it('둘 견주기', () => {
     const g = growth((list) => compare(list[0], list[1], list))
-    expect(g.ratio, `200건 ${g.a.toFixed(1)}ms → 800건 ${g.b.toFixed(1)}ms`).toBeLessThan(QUADRATIC)
+    expect(g.ratio, `300건 ${g.a.toFixed(2)}ms → 1200건 ${g.b.toFixed(2)}ms`).toBeLessThan(QUADRATIC)
   })
 
   it('접수함 거르기', () => {
     const g = growth((list) => applyQuery(list, { q: '정산', sort: 'old' }))
-    expect(g.ratio, `200건 ${g.a.toFixed(1)}ms → 800건 ${g.b.toFixed(1)}ms`).toBeLessThan(QUADRATIC)
+    expect(g.ratio, `300건 ${g.a.toFixed(2)}ms → 1200건 ${g.b.toFixed(2)}ms`).toBeLessThan(QUADRATIC)
   })
 
   it('칩 개수 세기', () => {
     const g = growth((list) => facetCounts(list, {}))
-    expect(g.ratio, `200건 ${g.a.toFixed(1)}ms → 800건 ${g.b.toFixed(1)}ms`).toBeLessThan(QUADRATIC)
+    expect(g.ratio, `300건 ${g.a.toFixed(2)}ms → 1200건 ${g.b.toFixed(2)}ms`).toBeLessThan(QUADRATIC)
   })
 
   it('막힌 곳 판 세우기', () => {
@@ -91,12 +100,19 @@ describe('데이터가 네 배가 돼도 제곱으로 늘지 않는다', () => {
         Date.now()
       )
     )
-    expect(g.ratio, `200건 ${g.a.toFixed(1)}ms → 800건 ${g.b.toFixed(1)}ms`).toBeLessThan(QUADRATIC)
+    expect(g.ratio, `300건 ${g.a.toFixed(2)}ms → 1200건 ${g.b.toFixed(2)}ms`).toBeLessThan(QUADRATIC)
   })
 
   it('이 검사가 헛돌지 않는다', () => {
     // 일부러 제곱으로 도는 것을 넣어 본다. 이게 안 걸리면 위 다섯도 못 믿는다.
-    const g = growth((list) => list.forEach((x) => list.forEach((y) => x.id === y.id)))
+    // 낱말 비교를 목록 안에서 한 번 더 돈다. `x.id === y.id` 같은 값
+    // 비교는 엔진이 통째로 들어내 버려서 제곱인데도 시간이 안 늘었다 —
+    // 그래서 이 검사가 CI 에서 한 번 헛돌았다.
+    const g = growth((list) => {
+      let hit = 0
+      for (const x of list) for (const y of list) if (x.title.localeCompare(y.title) === 0) hit += 1
+      return hit
+    })
     expect(g.ratio).toBeGreaterThan(QUADRATIC)
   })
 })
