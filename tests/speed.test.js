@@ -166,3 +166,42 @@ describe('서버가 브라우저 몫까지 지고 뜨지 않는가', () => {
     expect(tally).not.toMatch(/^import /m)
   })
 })
+
+describe('서버로 나가는 것이 압축되는가', () => {
+  // 여기서 한 번 크게 틀렸다.
+  //
+  // "주석은 빌드할 때 사라지니 가독성과 실행 속도는 무관하다"고 두 번
+  // 말했는데, 브라우저 쪽만 그랬다. Cloudflare Pages 는 functions/ 를
+  // 묶기만 하고 **압축하지 않는다.** 재 보니 473KB 짜리 파일에 한글 주석
+  // 682줄이 그대로 들어가 배포되고 있었다. Workers 는 잠들었다 깰 때마다
+  // 그것을 다시 편다.
+  //
+  // 압축하면 473KB → 311KB 다. 원본은 그대로 두고 나가는 것만 줄인다.
+  const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
+
+  it('빌드가 서버 묶음을 압축해서 내놓는다', () => {
+    expect(pkg.scripts.build).toContain('pages functions build')
+    expect(pkg.scripts.build).toContain('--minify')
+    expect(pkg.scripts.build).toContain('_worker.js')
+  })
+
+  it('나온 파일에 주석이 한 줄도 없다', () => {
+    const worker = join(ROOT, 'dist', '_worker.js')
+    if (!existsSync(worker)) return
+    const src = readFileSync(worker, 'utf8')
+    const lines = src.split(String.fromCharCode(10))
+    const comments = lines.filter((l) => l.trim().startsWith('//')).length
+    expect(comments, '서버 묶음에 주석이 남았다').toBe(0)
+    // 압축되면 줄이 확 준다. 안 되면 만 줄이 넘는다.
+    expect(lines.length).toBeLessThan(2000)
+  })
+
+  it('캐시 규칙 파일이 빌드 결과에 같이 실린다', () => {
+    // _worker.js 를 쓰면 Pages 가 고급 모드로 도는데, 그때 _headers 가
+    // 안 실리면 자산 캐시가 조용히 사라진다. 미리보기에 올려 살아 있는
+    // 것을 확인했고, 여기서는 파일이 딸려 나오는지를 지킨다.
+    const out = join(ROOT, 'dist', '_headers')
+    if (!existsSync(join(ROOT, 'dist'))) return
+    expect(existsSync(out), 'dist/_headers 가 없다').toBe(true)
+  })
+})

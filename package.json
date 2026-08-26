@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:full": "wrangler pages dev -- npm run dev",
-    "build": "vite build",
+    "build": "vite build && wrangler pages functions build --outfile=dist/_worker.js --minify",
     "lint": "oxlint src shared functions",
     "test": "vitest run --exclude tests/smoke.test.js --exclude tests/e2e.test.js",
     "smoke": "vitest run tests/smoke.test.js",
