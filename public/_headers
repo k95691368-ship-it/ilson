@@ -29,3 +29,34 @@
 
 /robots.txt
   Cache-Control: public, max-age=86400
+
+# ── 방화벽: 모든 응답에 붙이는 보호막 ──────────────────────────
+#
+# 이 사이트에는 로그인이 없다. 그래서 "누가 들어왔나"로 막을 수가 없고,
+# 막을 수 있는 것은 **무엇을 하게 둘 것인가**뿐이다.
+/*
+  # 남의 사이트가 이 화면을 틀 안에 넣어 띄우는 것을 막는다.
+  # 그대로 두면 투명한 창을 덮어씌워 두고 "여기 눌러보세요"로 유도해
+  # 판정이나 신고 버튼을 대신 누르게 할 수 있다(클릭재킹).
+  X-Frame-Options: DENY
+  # 받은 파일을 브라우저가 제멋대로 다른 형식으로 해석하지 않게 한다.
+  X-Content-Type-Options: nosniff
+  # 다른 사이트로 넘어갈 때 주소를 통째로 넘기지 않는다. 이 사이트 주소에는
+  # 접수번호가 들어간다.
+  Referrer-Policy: strict-origin-when-cross-origin
+  # 안 쓰는 장치는 아예 못 쓰게 잠근다. 쓸 일이 생기면 그때 연다.
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  # 한 번 https 로 들어온 브라우저는 그다음부터 http 로 시도하지 않는다.
+  Strict-Transport-Security: max-age=31536000; includeSubDomains
+  # 어디서 온 것만 실행하고 어디로만 말을 걸 수 있는지 못 박는다.
+  #
+  # 실제로 부르는 곳은 넷뿐이다 -- 글꼴(jsdelivr), 방문 통계(구글),
+  # 화면 녹화(마이크로소프트), 그리고 우리 자신. 그 밖의 주소에서 온
+  # 스크립트는 실행되지 않는다.
+  #
+  # unsafe-inline 과 unsafe-eval 을 열어 둔 것은 통계와 녹화 도구가 그것을
+  # 요구하기 때문이다. 그만큼 약해지는 것은 사실이지만, 이 사이트는 사용자가
+  # 쓴 글을 원문 HTML 로 꽂는 자리가 한 군데도 없고(dangerouslySetInnerHTML 0건)
+  # 리액트가 기본으로 글자를 escape 한다. 그래서 남는 값은 "모르는 주소에서
+  # 온 스크립트를 막는 것"이고, 그건 그대로 얻는다.
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' data: https://cdn.jsdelivr.net; img-src 'self' data: https:; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.clarity.ms; worker-src 'self' blob:

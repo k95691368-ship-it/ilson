@@ -183,12 +183,17 @@ describe('서버로 나가는 것이 압축되는가', () => {
     expect(pkg.scripts.build).toContain('pages functions build')
     expect(pkg.scripts.build).toContain('--minify')
     expect(pkg.scripts.build).toContain('_worker.js')
+    // --outfile 은 평범한 JS 가 아니라 multipart 묶음을 쓴다. 그걸로 한 번
+    // 배포가 통째로 실패했고, 라이브는 옛 배포를 계속 돌고 있었다.
+    expect(pkg.scripts.build).not.toContain('--outfile')
   })
 
   it('나온 파일에 주석이 한 줄도 없다', () => {
     const worker = join(ROOT, 'dist', '_worker.js')
     if (!existsSync(worker)) return
     const src = readFileSync(worker, 'utf8')
+    // 배포가 실패했던 그 모양. 파일이 JS 가 아니라 업로드 양식이었다.
+    expect(src.startsWith('--'), '_worker.js 가 JS 가 아니다').toBe(false)
     const lines = src.split(String.fromCharCode(10))
     const comments = lines.filter((l) => l.trim().startsWith('//')).length
     expect(comments, '서버 묶음에 주석이 남았다').toBe(0)

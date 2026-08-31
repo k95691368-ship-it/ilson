@@ -383,7 +383,16 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
     // 라우트 파일이 내보내는 onRequest* 를 전부 모아, 이 검사가 아는
     // 목록에 없는 것이 있으면 여기서 깨진다. 새 방식을 쓰기 시작하면
     // 그날 바로 알게 된다.
-    const known = new Set(['onRequestGet', 'onRequestPost', 'onRequestDelete', 'onRequestPatch', 'onRequestPut'])
+    // onRequest 는 미들웨어다. 메서드 이름이 안 붙은 것은 그것 하나뿐이고,
+    // 모든 요청이 거기를 지난다(functions/api/_middleware.js).
+    const known = new Set([
+      'onRequest',
+      'onRequestGet',
+      'onRequestPost',
+      'onRequestDelete',
+      'onRequestPatch',
+      'onRequestPut',
+    ])
     const unseen = new Set()
     for (const file of files) {
       const src = readFileSync(file, 'utf8')

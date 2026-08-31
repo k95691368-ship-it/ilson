@@ -43,3 +43,6 @@ dist-ssr
 # 점검하며 만든 임시 파일
 .tmpcheck/
 *.tmp.mjs
+
+# 서버 묶음을 압축해 내놓는 중간 폴더.
+.worker
