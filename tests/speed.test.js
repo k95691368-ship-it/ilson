@@ -167,46 +167,29 @@ describe('서버가 브라우저 몫까지 지고 뜨지 않는가', () => {
   })
 })
 
-describe('서버로 나가는 것이 압축되는가', () => {
-  // 여기서 한 번 크게 틀렸다.
+describe('서버 묶음을 압축하려던 시도', () => {
+  // 결론부터: 못 한다. 되돌렸다.
   //
-  // "주석은 빌드할 때 사라지니 가독성과 실행 속도는 무관하다"고 두 번
-  // 말했는데, 브라우저 쪽만 그랬다. Cloudflare Pages 는 functions/ 를
-  // 묶기만 하고 **압축하지 않는다.** 재 보니 473KB 짜리 파일에 한글 주석
-  // 682줄이 그대로 들어가 배포되고 있었다. Workers 는 잠들었다 깰 때마다
-  // 그것을 다시 편다.
+  // 재 보니 Cloudflare Pages 는 functions/ 를 묶기만 하고 압축하지 않는다.
+  // 473KB 에 한글 주석 682줄이 그대로 배포되고, Workers 는 깰 때마다 그것을
+  // 다시 편다. 직접 압축해서 dist/_worker.js 로 내놓으면 311KB 가 된다.
   //
-  // 압축하면 473KB → 311KB 다. 원본은 그대로 두고 나가는 것만 줄인다.
+  // 그런데 Pages 는 functions/ 와 _worker.js 를 같이 두는 것을 받지 않는다.
+  // 두 번 올려 두 번 다 배포가 Failure 로 끝났고, 그동안 라이브는 옛 배포를
+  // 계속 돌고 있었다. 사이트가 죽지 않아서 더 늦게 알았다.
+  //
+  // 그래서 빌드는 vite build 하나로 되돌렸다. 압축을 다시 하려면 functions/
+  // 를 통째로 안 쓰는 구조로 옮겨야 하는데, 그건 라우팅 전체를 바꾸는 일이라
+  // 지금 얻는 것(콜드 스타트 몇 밀리초)에 비해 잃을 것이 크다.
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 
-  it('빌드가 서버 묶음을 압축해서 내놓는다', () => {
-    expect(pkg.scripts.build).toContain('pages functions build')
-    expect(pkg.scripts.build).toContain('--minify')
-    expect(pkg.scripts.build).toContain('_worker.js')
-    // --outfile 은 평범한 JS 가 아니라 multipart 묶음을 쓴다. 그걸로 한 번
-    // 배포가 통째로 실패했고, 라이브는 옛 배포를 계속 돌고 있었다.
-    expect(pkg.scripts.build).not.toContain('--outfile')
+  it('빌드를 단순하게 되돌려 뒀다', () => {
+    // 이 줄이 다시 복잡해지면, 위에 적어 둔 이유를 먼저 읽고 손대라는 뜻이다.
+    expect(pkg.scripts.build).toBe('vite build')
   })
 
-  it('나온 파일에 주석이 한 줄도 없다', () => {
-    const worker = join(ROOT, 'dist', '_worker.js')
-    if (!existsSync(worker)) return
-    const src = readFileSync(worker, 'utf8')
-    // 배포가 실패했던 그 모양. 파일이 JS 가 아니라 업로드 양식이었다.
-    expect(src.startsWith('--'), '_worker.js 가 JS 가 아니다').toBe(false)
-    const lines = src.split(String.fromCharCode(10))
-    const comments = lines.filter((l) => l.trim().startsWith('//')).length
-    expect(comments, '서버 묶음에 주석이 남았다').toBe(0)
-    // 압축되면 줄이 확 준다. 안 되면 만 줄이 넘는다.
-    expect(lines.length).toBeLessThan(2000)
-  })
-
-  it('캐시 규칙 파일이 빌드 결과에 같이 실린다', () => {
-    // _worker.js 를 쓰면 Pages 가 고급 모드로 도는데, 그때 _headers 가
-    // 안 실리면 자산 캐시가 조용히 사라진다. 미리보기에 올려 살아 있는
-    // 것을 확인했고, 여기서는 파일이 딸려 나오는지를 지킨다.
-    const out = join(ROOT, 'dist', '_headers')
-    if (!existsSync(join(ROOT, 'dist'))) return
-    expect(existsSync(out), 'dist/_headers 가 없다').toBe(true)
+  it('빌드 결과에 _worker.js 가 없다', () => {
+    // 있으면 Pages 가 functions/ 와 충돌해 배포가 통째로 실패한다.
+    expect(existsSync(join(ROOT, 'dist', '_worker.js'))).toBe(false)
   })
 })
