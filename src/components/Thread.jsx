@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useId, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { toThread, openQuestions, waitingOnDept, waitingOnStaff } from '../../shared/thread.js'
 import { ago, dateTimeLabel } from '../lib/format.js'
+import Field from './Field.jsx'
 
 // 담당자와 부서가 주고받은 것.
 //
@@ -23,10 +24,10 @@ export default function Thread({ decisions, applicationId, ticket, mode, onChang
   return (
     <section className={`thread${open.length > 0 ? ' waiting' : ''}`}>
       <div className="card-head">
-        <span className="card-title">
+        <h3 className="card-title">
           {isDept ? '담당자와 주고받은 것' : '부서와 주고받은 것'}
           {thread.length > 0 && <span className="card-note"> {thread.length}개</span>}
-        </span>
+        </h3>
         <span className="spacer" />
         {open.length > 0 && (
           <span className="badge badge-warning">
@@ -125,24 +126,21 @@ function AskForm({ applicationId, onSaved }) {
   }
 
   return (
-    <form className="thread-form" onSubmit={send}>
-      <label className="field">
-        <span className="field-label">
-          무엇이 궁금하십니까<span className="field-required"> *</span>
-        </span>
+    <form className="thread-form" onSubmit={send} noValidate>
+      <Field label="무엇이 궁금하십니까" required error={fieldErrors.question}>
         <textarea
           rows={2}
           value={form.question}
           onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
           placeholder="정산서를 받는 채널이 몇 개인지, 그리고 양식이 매달 바뀌는지 알려주실 수 있을까요?"
         />
-        {fieldErrors.question && <div className="field-error">{fieldErrors.question}</div>}
-      </label>
+      </Field>
 
-      <label className="field">
-        <span className="field-label">
-          이걸 알아야 무엇을 정할 수 있습니까<span className="field-required"> *</span>
-        </span>
+      <Field
+        label="이걸 알아야 무엇을 정할 수 있습니까"
+        required
+        error={fieldErrors.why}
+      >
         <textarea
           rows={2}
           value={form.why}
@@ -151,8 +149,7 @@ function AskForm({ applicationId, onSaved }) {
         />
         {/* 왜 묻는지를 안 적으면 부서는 "이걸 왜 물어보지" 하고 대충 답한다.
             판정에 무엇이 걸려 있는지 알면 답이 달라진다. */}
-        {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-      </label>
+      </Field>
 
       <div className="row">
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
@@ -195,32 +192,24 @@ function AnswerForm({ ticket, questionId, onSaved }) {
   }
 
   return (
-    <form className="thread-form" onSubmit={send}>
-      <label className="field">
-        <span className="field-label">
-          답<span className="field-required"> *</span>
-        </span>
+    <form className="thread-form" onSubmit={send} noValidate>
+      <Field label="답" required error={fieldErrors.answer}>
         <textarea
           rows={2}
           value={form.answer}
           onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
           placeholder="다섯 개입니다. 양식은 자사몰만 가끔 바뀌고 나머지는 그대로입니다."
         />
-        {fieldErrors.answer && <div className="field-error">{fieldErrors.answer}</div>}
-      </label>
+      </Field>
 
-      <label className="field">
-        <span className="field-label">
-          누가 답하십니까<span className="field-required"> *</span>
-        </span>
+      <Field label="누가 답하십니까" required error={fieldErrors.author}>
         <input
           value={form.author}
           onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
           placeholder="정산 담당자"
           maxLength={60}
         />
-        {fieldErrors.author && <div className="field-error">{fieldErrors.author}</div>}
-      </label>
+      </Field>
 
       <div className="row">
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
@@ -281,24 +270,22 @@ function DeptAskForm({ ticket, onSaved }) {
   }
 
   return (
-    <form className="thread-form" onSubmit={send}>
-      <label className="field">
-        <span className="field-label">
-          무엇이 궁금하십니까<span className="field-required"> *</span>
-        </span>
+    <form className="thread-form" onSubmit={send} noValidate>
+      <Field label="무엇이 궁금하십니까" required error={fieldErrors.question}>
         <textarea
           rows={2}
           value={form.question}
           onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
           placeholder="언제쯤 시작될지 알 수 있을까요? 이번 달 마감 전에 필요해서 그렇습니다."
         />
-        {fieldErrors.question && <div className="field-error">{fieldErrors.question}</div>}
-      </label>
+      </Field>
 
-      <label className="field">
-        <span className="field-label">
-          누가 물으십니까<span className="field-required"> *</span>
-        </span>
+      <Field
+        label="누가 물으십니까"
+        required
+        hint="이름 대신 직책도 됩니다. 로그인이 없어서 증명은 아니고, 나중에 누가 물었는지 알아볼 수 있게 하는 것입니다."
+        error={fieldErrors.author}
+      >
         <input
           value={form.author}
           onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
@@ -306,12 +293,7 @@ function DeptAskForm({ ticket, onSaved }) {
         />
         {/* 로그인이 없어서 계정으로 증명할 수 없다. 아닌 것을 맞다고 하지
             않는다 — 증명이 아니라고 화면에도 적어 둔다. */}
-        <div className="field-hint">
-          이름 대신 직책도 됩니다. 로그인이 없어서 증명은 아니고, 나중에 누가 물었는지
-          알아볼 수 있게 하는 것입니다.
-        </div>
-        {fieldErrors.author && <div className="field-error">{fieldErrors.author}</div>}
-      </label>
+      </Field>
 
       <div className="row">
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
@@ -333,6 +315,7 @@ function DeptAskForm({ ticket, onSaved }) {
 // 못 받는다. 그건 물을 데가 없는 것보다 나쁘다 — 물어본 사람은 기다린다.
 function ReplyForm({ applicationId, questionId, onSaved }) {
   const toast = useToast()
+  const uid = useId().replaceAll(':', '')
   const [form, setForm] = useState({ answer: '', author: 'AX 담당자' })
   const [fieldErrors, setFieldErrors] = useState({})
   const [saving, setSaving] = useState(false)
@@ -356,25 +339,29 @@ function ReplyForm({ applicationId, questionId, onSaved }) {
 
   return (
     <form className="thread-answer" onSubmit={send}>
-      <textarea
-        rows={2}
-        value={form.answer}
-        onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
-        placeholder="이번 주 안에 착수합니다. 마감 전에 쓰실 수 있게 하겠습니다."
-      />
-      {fieldErrors.answer && <div className="field-error">{fieldErrors.answer}</div>}
-      <div className="row">
-        <input
-          className="thread-author"
-          value={form.author}
-          onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
-          placeholder="누가 답하십니까"
+      <Field label="답변" required error={fieldErrors.answer}>
+        <textarea
+          id={`reply-answer-${uid}`}
+          rows={2}
+          value={form.answer}
+          onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
+          placeholder="이번 주 안에 착수합니다. 마감 전에 쓰실 수 있게 하겠습니다."
         />
+      </Field>
+      <div className="row">
+        <Field label="답변하는 분" required error={fieldErrors.author}>
+          <input
+            id={`reply-author-${uid}`}
+            className="thread-author"
+            value={form.author}
+            onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
+            placeholder="예: AX 담당자"
+          />
+        </Field>
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
           {saving ? '보내는 중…' : '답하기'}
         </button>
       </div>
-      {fieldErrors.author && <div className="field-error">{fieldErrors.author}</div>}
     </form>
   )
 }

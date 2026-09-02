@@ -1,6 +1,5 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
-import ThemeToggle from './components/ThemeToggle.jsx'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import { STAGES } from './lib/stages.js'
 
@@ -40,6 +39,7 @@ export const CROSSCUT = [
   { to: '/honesty', label: '못 한 것', note: '안 되는 것과 증명 못 한 것' },
   { to: '/built', label: '기술 구현', note: '무엇을 어떻게 만들었나' },
   { to: '/track', label: '접수번호 조회', note: '부서가 자기 신청서를 보는 자리' },
+  { to: '/bug', label: '버그 신고', note: '사용 중 발견한 문제를 알리는 자리' },
 ]
 
 // 목차와 꼬리말 없이 여는 화면들.
@@ -86,8 +86,10 @@ export default function App() {
   const bare = useBareLayout()
   usePrintUnfold()
 
+  const navClass = ({ isActive }) => `topbar-link${isActive ? ' active' : ''}`
+
   return (
-    <div className="app-shell">
+    <div className={`app-shell${bare ? ' app-shell-bare' : ''}`}>
       {/* 주소가 바뀌어도 새 문서를 안 받아오므로, 화면 이동을 여기서 듣고
           직접 보낸다. 열쇠(접수번호·도구 주소·신청서 id)는 가려서 보낸다. */}
       <PageViewTracker />
@@ -97,63 +99,52 @@ export default function App() {
 
       {!bare && (
         <header className="topbar">
-          <Link to="/" className="topbar-brand">
-            <span className="topbar-logo" aria-hidden="true">
-              일
-            </span>
-            일손
-            <span className="topbar-brand-sub">부서 병목을 도구로 바꾸는 여섯 단계</span>
-          </Link>
-
-          <nav className="topbar-nav" aria-label="진행 단계">
-            {STAGES.map((s) => (
-              <NavLink
-                key={s.key}
-                to={s.path}
-                className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-              >
-                <span className="topbar-link-no" aria-hidden="true">
-                  {s.no}
-                </span>
-                {s.label}
-              </NavLink>
-            ))}
-
-            {/* 여섯 단계 밖의 칸은 이것 하나다. 나머지 가로로 훑는 화면들은
-                꼬리말에 있다 — 목차에 열네 칸을 한꺼번에 내밀면 처음 온
-                사람은 어디부터 눌러야 할지 모른다.
-                버그 신고만 목차에 두는 이유: 이 사이트가 이상하게 굴 때
-                말할 데가 여태 없었다. 부서가 낸 일만 받고 자기 버그는 안
-                받으면, 다른 화면에서 하는 "못 한 것을 숨기지 않는다"가
-                안쪽에서 먼저 깨진다. 그리고 이상한 것을 본 사람은 그 자리에서
-                말할 수 있어야 한다 — 꼬리말까지 내려가면 그냥 닫는다. */}
-            <NavLink
-              to="/bug"
-              className={({ isActive }) => `topbar-link${isActive ? ' active' : ''}`}
-            >
-              <span className="topbar-link-no" aria-hidden="true">
-                0
+          <div className="topbar-inner">
+            <Link to="/" className="topbar-brand">
+              <span className="topbar-logo" aria-hidden="true">
+                IL
               </span>
-              버그 신고
-            </NavLink>
-          </nav>
+              <span className="topbar-brand-copy">
+                <strong>일손</strong>
+                <span className="topbar-brand-sub">업무 자동화 포트폴리오</span>
+              </span>
+            </Link>
 
-          <div className="topbar-right">
-            {/* 여기 여섯 칸이 더 있었다 — 먼저 할 것·막힌 곳·주간·넘긴 뒤·
-                못 한 것·기록. 전부 뺐다.
-                셋(먼저 할 것·막힌 곳·주간)은 첫 화면 할 일 목록이 이미
-                같은 것을 말하고 있었다. 나머지 셋은 화면은 남기고 링크만
-                제 자리로 옮겼다 — 넘긴 뒤는 배포 단계에서, 못 한 것과
-                기록은 첫 화면에서 간다. 목차 옆에 늘어놓을수록 처음 온
-                사람은 어디부터 눌러야 할지 모른다. */}
-            <NavLink
-              to="/built"
-              className={({ isActive }) => `topbar-link built-link${isActive ? ' active' : ''}`}
-            >
-              기술 구현 보러가기
-            </NavLink>
-            <ThemeToggle />
+            <nav className="topbar-nav" aria-label="여섯 단계">
+              {STAGES.map((s) => (
+                <NavLink key={s.key} to={s.path} className={navClass}>
+                  <span className="topbar-link-no" aria-hidden="true">
+                    {s.no}
+                  </span>
+                  <span className="topbar-link-copy">
+                    <strong>{s.label}</strong>
+                  </span>
+                </NavLink>
+              ))}
+            </nav>
+
+            <div className="topbar-right">
+              <NavLink
+                to="/track"
+                className={({ isActive }) => `portal-link${isActive ? ' active' : ''}`}
+                aria-label="접수번호 조회"
+              >
+                접수 조회
+              </NavLink>
+            </div>
           </div>
+        </header>
+      )}
+
+      {bare && (
+        <header className="barebar">
+          <Link to="/" className="barebar-brand" aria-label="일손 운영 홈으로">
+            <span aria-hidden="true">IL</span>
+            <strong>일손</strong>
+          </Link>
+          <span className="barebar-context">부서 전용 화면</span>
+          <span className="spacer" />
+          <Link to="/" className="barebar-back">전체 과정 보기 →</Link>
         </header>
       )}
 
@@ -166,6 +157,7 @@ export default function App() {
       <main
         className={bare ? 'app-main app-main-bare' : 'app-main'}
         id="main"
+        tabIndex="-1"
         data-clarity-mask={bare ? 'true' : undefined}
       >
         <Suspense fallback={<div className="page-loading">불러오는 중…</div>}>
@@ -199,45 +191,39 @@ export default function App() {
         <footer className="app-footer">
           <div className="footer-grid">
             <div className="footer-col">
-              <div className="footer-title">일손 (ILSON)</div>
+              <h2 className="footer-title">일손 (ILSON)</h2>
               <p className="footer-text">
-                각 부서가 병목을 신청서로 적어 내면, AX 담당자가 검토하고 협의해 도구로 만들고,
-                베타 테스트를 거쳐 성과를 정리하기까지의 과정 전체입니다.
+                현업의 반복 업무를 신청받아 검토하고 합의한 뒤, 실제 도구로 만들어
+                효과까지 확인합니다.
               </p>
             </div>
-            <div className="footer-col">
-              <div className="footer-title">여섯 단계</div>
-              <p className="footer-text">
-                {STAGES.map((s) => `${s.no} ${s.label}`).join(' · ')}
-              </p>
-            </div>
-            {/* 여섯 단계를 세로로 내려가는 것이 아니라 **가로로 훑는** 화면들.
-                목차에 같이 걸어 뒀다가 뺐다 — 처음 온 사람에게 열네 칸을 한꺼번에
-                내밀면 어디부터 눌러야 할지 모른다.
-                그렇다고 링크를 아예 없애면 안 된다. 이 화면들로 가는 다른 길은
-                첫 화면 할 일 목록뿐인데, 그건 **할 일이 있을 때만** 뜬다. 지금처럼
-                신청서가 없는 상태에서는 아무 데서도 못 간다. 이 저장소에서 제일
-                자주 난 사고가 바로 그것이다 — 만들어는 뒀는데 아무도 못 가는 것.
-                꼬리말은 늘 있고, 목차와 자리를 다투지 않는다. */}
-            <div className="footer-col">
-              <div className="footer-title">가로로 훑어보기</div>
-              <p className="footer-text">
-                {CROSSCUT.map((c, i) => (
+            <nav className="footer-col" aria-labelledby="footer-stages-title">
+              <h2 className="footer-title" id="footer-stages-title">여섯 단계</h2>
+              <div className="footer-links">
+                {STAGES.map((s, i) => (
+                  <span key={s.key}>
+                    {i > 0 && ' · '}
+                    <Link to={s.path}>{s.no} {s.label}</Link>
+                  </span>
+                ))}
+              </div>
+            </nav>
+            <nav className="footer-col" aria-labelledby="footer-crosscut-title">
+              <h2 className="footer-title" id="footer-crosscut-title">운영 메뉴</h2>
+              <div className="footer-links">
+                {CROSSCUT.filter((c) => c.to !== '/bug').map((c, i) => (
                   <span key={c.to}>
                     {i > 0 && ' · '}
                     <Link to={c.to}>{c.label}</Link>
                   </span>
                 ))}
-              </p>
-            </div>
+                <span> · <Link to="/bug">버그 신고</Link></span>
+              </div>
+            </nav>
           </div>
           <div className="footer-bottom">
-            {/* 여기가 아무것도 밖으로 안 부른다고 적고 있었다. 사실이 아니었다 —
-                글꼴을 CDN 에서 받아 오고 있었고, 이제 방문 통계도 보낸다.
-                판정·계산·금액에 외부를 안 부른다는 것이 원래 하려던 말이라
-                그 말만 남기고 나머지는 있는 대로 적는다. */}
             <span>
-              Cloudflare Pages Functions · D1 · 판정과 계산은 외부 호출 없음 (글꼴·방문 통계 제외)
+              Cloudflare Pages Functions · D1 · 판정과 계산의 외부 AI 호출 0회
             </span>
             <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>

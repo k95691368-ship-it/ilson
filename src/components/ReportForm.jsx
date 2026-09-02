@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { REPORT_KINDS, REPORT_BY_CODE } from '../../shared/report.js'
+import Field from './Field.jsx'
+import { handleRadioGroupKeyDown } from '../lib/radioGroup.js'
 
 // 부서가 도구에 이상을 신고한다.
 //
@@ -65,21 +67,31 @@ export default function ReportForm({ slug }) {
   return (
     <form className="card report-form" onSubmit={send}>
       <div className="card-head">
-        <span className="card-title">무엇이 이상하셨습니까</span>
+        <h2 className="card-title">무엇이 이상하셨습니까</h2>
         <span className="spacer" />
         <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
           그만두기
         </button>
       </div>
 
-      <div className="report-kinds">
-        {REPORT_KINDS.map((k) => (
+      <div
+        className="report-kinds"
+        role="radiogroup"
+        aria-label="이상 유형"
+        aria-required="true"
+        aria-invalid={fieldErrors.code ? 'true' : undefined}
+        aria-describedby={fieldErrors.code ? 'report-code-error' : undefined}
+        onKeyDown={handleRadioGroupKeyDown}
+      >
+        {REPORT_KINDS.map((k, index) => (
           <button
             key={k.code}
             type="button"
             className={`report-kind${form.code === k.code ? ' on' : ''}`}
             onClick={() => setForm((f) => ({ ...f, code: k.code }))}
-            aria-pressed={form.code === k.code}
+            role="radio"
+            aria-checked={form.code === k.code}
+            tabIndex={form.code ? (form.code === k.code ? 0 : -1) : (index === 0 ? 0 : -1)}
           >
             <span className="report-kind-label">
               {k.label}
@@ -89,38 +101,29 @@ export default function ReportForm({ slug }) {
           </button>
         ))}
       </div>
-      {fieldErrors.code && <div className="field-error">{fieldErrors.code}</div>}
+      {fieldErrors.code && <div className="field-error" id="report-code-error" role="alert">{fieldErrors.code}</div>}
 
       {/* 유형을 먼저 고르게 하면 그 유형에 필요한 것을 그 자리에서 물을 수 있다.
           자유롭게 적게만 하면 "이상해요" 한 줄이 오고, 담당자가 다시 물어야 한다. */}
       {kind && (
-        <label className="field" style={{ marginTop: 12 }}>
-          <span className="field-label">
-            {kind.ask}
-            <span className="field-required"> *</span>
-          </span>
+        <Field label={kind.ask} required error={fieldErrors.body}>
           <textarea
             rows={3}
             value={form.body}
             onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
             placeholder={placeholderFor(kind.code)}
           />
-          {fieldErrors.body && <div className="field-error">{fieldErrors.body}</div>}
-        </label>
+        </Field>
       )}
 
-      <label className="field">
-        <span className="field-label">
-          누가 겪으신 일입니까<span className="field-required"> *</span>
-        </span>
+      <Field label="누가 겪으신 일입니까" required error={fieldErrors.reporter}>
         <input
           value={form.reporter}
           onChange={(e) => setForm((f) => ({ ...f, reporter: e.target.value }))}
           placeholder="정산 담당자"
           maxLength={60}
         />
-        {fieldErrors.reporter && <div className="field-error">{fieldErrors.reporter}</div>}
-      </label>
+      </Field>
 
       <button type="submit" className="btn-primary btn-sm" disabled={saving || !form.code}>
         {saving ? '보내는 중…' : '알리기'}

@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { groupQuarantine, affectedRows, catalog } from '../../shared/teach.js'
 import { QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { num } from '../lib/format.js'
+import Field from './Field.jsx'
 
 // 밀려난 줄을 부서가 되돌려 알려준다.
 //
@@ -20,7 +21,7 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
   return (
     <section className="card teach">
       <div className="card-head">
-        <span className="card-title">밀려난 줄 {num(quarantine.length)}개</span>
+        <h2 className="card-title">밀려난 줄 {num(quarantine.length)}개</h2>
       </div>
 
       <div className="teach-groups">
@@ -148,10 +149,7 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
 
       {open && (
         <form className="teach-form" onSubmit={send}>
-          <label className="field">
-            <span className="field-label">
-              어느 상품입니까<span className="field-required"> *</span>
-            </span>
+          <Field label="어느 상품입니까" required error={fieldErrors.canonicalCode}>
             {/* 직접 적게 하지 않고 고르게 한다. 없는 코드로 이어 두면 그 줄이
                 또 밀려나거나, 더 나쁘게는 엉뚱한 상품 매출로 잡힌다. */}
             <select
@@ -165,23 +163,16 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
                 </option>
               ))}
             </select>
-            {fieldErrors.canonicalCode && (
-              <div className="field-error">{fieldErrors.canonicalCode}</div>
-            )}
-          </label>
+          </Field>
 
-          <label className="field">
-            <span className="field-label">
-              누가 알려주십니까<span className="field-required"> *</span>
-            </span>
+          <Field label="누가 알려주십니까" required error={fieldErrors.teacher}>
             <input
               value={form.teacher}
               onChange={(e) => setForm((f) => ({ ...f, teacher: e.target.value }))}
               placeholder="정산 담당자"
               maxLength={60}
             />
-            {fieldErrors.teacher && <div className="field-error">{fieldErrors.teacher}</div>}
-          </label>
+          </Field>
 
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>

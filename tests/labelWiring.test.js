@@ -12,9 +12,9 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 // 초점이 안 간다. 이 사이트는 부서 담당자에게 긴 글을 적어 달라고 하는
 // 화면이 여럿이라, 그 자리에서 걸리면 아예 안 적는다.
 //
-// 바깥을 label 로 바꿔 입력칸을 품게 했다(암묵적 연결). 버튼 묶음은 감싸지
-// 않는다 — 라벨은 컨트롤 하나에만 붙고, 감싸면 아무 데나 눌러도 첫 버튼이
-// 눌린다. 그쪽은 role="group" 과 이름을 준다.
+// 공통 Field가 고유 id와 htmlFor를 만들어 명시적으로 연결한다. 버튼 묶음은
+// label로 감싸지 않는다 — 라벨은 컨트롤 하나에만 붙고, 감싸면 아무 데나
+// 눌러도 첫 버튼이 눌린다. 그쪽은 role="group"과 이름을 준다.
 
 const files = []
 const walk = (d) => {
@@ -33,8 +33,9 @@ const read = (f) =>
     .map((l) => l.replace(/\r$/, ''))
 
 describe('라벨이 입력칸과 연결돼 있다', () => {
-  it('입력칸을 품은 field 는 label 이다', () => {
-    // div.field 안에 입력칸이 하나 있으면 그 라벨은 아무것도 안 가리킨다.
+  it('공통 Field 밖의 div.field에 이름 없는 입력칸을 두지 않는다', () => {
+    // 공통 Field는 실행 시 id/htmlFor를 연결한다. 그 밖의 div.field 안에
+    // 입력칸을 직접 두면 라벨이 아무것도 가리키지 않을 수 있다.
     const orphans = []
     for (const f of files) {
       const lines = read(f)
@@ -80,16 +81,19 @@ describe('라벨이 입력칸과 연결돼 있다', () => {
       for (const g of groups) {
         const re = new RegExp(`className="${g}"([^>]*)>`, 'g')
         for (const m of src.matchAll(re)) {
-          expect(m[1], `${rel(f)} 의 ${g}`).toMatch(/role="group"/)
+          expect(m[1], `${rel(f)} 의 ${g}`).toMatch(/role="radiogroup"/)
           expect(m[1], `${rel(f)} 의 ${g}`).toMatch(/aria-label/)
         }
       }
     }
   })
 
-  it('이 검사가 헛돌지 않는다', () => {
-    // 실제로 label.field 가 있어야 한다. 없으면 위 검사들이 공회전이다.
-    const wrapped = files.filter((f) => readFileSync(f, 'utf8').includes('<label className="field'))
-    expect(wrapped.length).toBeGreaterThan(5)
+  it('공통 Field가 명시적 연결을 만들고 여러 화면에서 쓰인다', () => {
+    const field = readFileSync(join(ROOT, 'src', 'components', 'Field.jsx'), 'utf8')
+    expect(field).toContain('htmlFor={controlId}')
+    expect(field).toContain('id: controlId')
+
+    const consumers = files.filter((f) => readFileSync(f, 'utf8').includes('<Field '))
+    expect(consumers.length).toBeGreaterThan(5)
   })
 })

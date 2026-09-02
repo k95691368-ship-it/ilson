@@ -80,7 +80,7 @@ export default function LogPage() {
 
       <section className="card card-boxed">
         <div className="card-head">
-          <span className="card-title">골라 보기</span>
+          <h2 className="card-title">골라 보기</h2>
           {(filters.stage || filters.dept || filters.actor || filters.side || filters.unrequested || filters.q) && (
             <button
               type="button"
@@ -122,6 +122,7 @@ export default function LogPage() {
                 key={s}
                 type="button"
                 className={`chip${filters.stage === s ? ' on' : ''}`}
+                aria-pressed={filters.stage === s}
                 onClick={() => toggle('stage', s)}
               >
                 {s}
@@ -142,6 +143,7 @@ export default function LogPage() {
                   key={d.dept}
                   type="button"
                   className={`chip${filters.dept === d.dept ? ' on' : ''}`}
+                  aria-pressed={filters.dept === d.dept}
                   onClick={() => toggle('dept', d.dept)}
                 >
                   {d.dept}
@@ -164,6 +166,7 @@ export default function LogPage() {
                 key={sd.key}
                 type="button"
                 className={`chip${filters.side === sd.key ? ' on' : ''}`}
+                aria-pressed={filters.side === sd.key}
                 title={sd.hint}
                 onClick={() => toggle('side', sd.key)}
               >
@@ -182,6 +185,7 @@ export default function LogPage() {
             <button
               type="button"
               className={`chip${filters.actor === 'human' ? ' on' : ''}`}
+              aria-pressed={filters.actor === 'human'}
               onClick={() => toggle('actor', 'human')}
             >
               사람이 정한 것
@@ -189,6 +193,7 @@ export default function LogPage() {
             <button
               type="button"
               className={`chip${filters.unrequested ? ' on' : ''}`}
+              aria-pressed={filters.unrequested}
               onClick={() => setFilters((f) => ({ ...f, unrequested: !f.unrequested }))}
             >
               먼저 제안한 것만

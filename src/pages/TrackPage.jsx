@@ -92,6 +92,7 @@ export default function TrackPage() {
         }}
       >
         <input
+          id="track-ticket"
           value={ticket}
           onChange={(e) => setTicket(normalize(e.target.value))}
           placeholder="AX-000-000"
@@ -99,6 +100,8 @@ export default function TrackPage() {
           maxLength={10}
           autoComplete="off"
           aria-label="접수번호"
+          aria-invalid={error ? true : undefined}
+          aria-describedby={error ? 'track-ticket-error' : undefined}
         />
         <button type="submit" className="btn-primary" disabled={loading}>
           {loading ? '찾는 중…' : '찾기'}
@@ -106,7 +109,7 @@ export default function TrackPage() {
       </form>
 
       {error && (
-        <div className="notice notice-warn">
+        <div id="track-ticket-error" className="notice notice-warn" role="alert">
           <div className="notice-title">찾지 못했습니다</div>
           <p>{error}</p>
           <p className="card-note" style={{ marginTop: 6 }}>
@@ -120,7 +123,7 @@ export default function TrackPage() {
 
       {!data && !error && (
         <div className="card">
-          <div className="card-title">접수번호가 없으신가요</div>
+          <h2 className="card-title">접수번호가 없으신가요</h2>
           <Link to="/apply" className="btn-ghost">
             병목 신청서 내기
           </Link>
@@ -315,7 +318,7 @@ function Result({ data, as, onChanged }) {
       {notices.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">그동안의 소식</span>
+            <h3 className="card-title">그동안의 소식</h3>
             <span className="spacer" />
             <span className="card-note">
               {lastSeen
@@ -366,7 +369,7 @@ function Result({ data, as, onChanged }) {
           유일하게 답이 되는 자리다. */}
       <details className="card track-progress" open={notices.length === 0}>
         <summary className="card-head">
-          <span className="card-title">진행 상황</span>
+          <h3 className="card-title">진행 상황</h3>
           <span className="spacer" />
           <span className="card-note">
             여섯 단계 중 {data.timeline.filter((t) => t.status === '완료').length}칸까지 왔습니다
@@ -601,12 +604,20 @@ function Retry({ ticket, onDone }) {
               부서가 적으면서 스스로 확인하게 되는 것도 이것이다. */}
           <label>
             <textarea
+              id="retry-changed"
               rows={3}
               value={form.changed}
               onChange={set('changed')}
               placeholder="등록까지가 아니라 올릴 파일까지만 만들어 주시면 됩니다. 등록 버튼은 저희가 누르겠습니다."
+              aria-label="무엇을 바꾸셨습니까"
+              aria-invalid={errors.changed ? true : undefined}
+              aria-describedby={errors.changed ? 'retry-changed-error' : undefined}
             />
-            {errors.changed && <em className="field-error">{errors.changed}</em>}
+            {errors.changed && (
+              <em id="retry-changed-error" className="field-error" role="alert">
+                {errors.changed}
+              </em>
+            )}
             <small className="card-note">
               이걸 안 적으면 담당자가 앞 판정을 찾아 대조해야 무엇이 달라졌는지 압니다. 그 일을
               시키지 않으려고 여쭙습니다.
@@ -615,20 +626,52 @@ function Retry({ ticket, onDone }) {
 
           <label>
             <span>제목</span>
-            <input value={form.title} onChange={set('title')} />
-            {errors.title && <em className="field-error">{errors.title}</em>}
+            <input
+              id="retry-title"
+              value={form.title}
+              onChange={set('title')}
+              aria-invalid={errors.title ? true : undefined}
+              aria-describedby={errors.title ? 'retry-title-error' : undefined}
+            />
+            {errors.title && (
+              <em id="retry-title-error" className="field-error" role="alert">
+                {errors.title}
+              </em>
+            )}
           </label>
 
           <label>
             <span>무엇이 병목입니까</span>
-            <textarea rows={3} value={form.bottleneck} onChange={set('bottleneck')} />
-            {errors.bottleneck && <em className="field-error">{errors.bottleneck}</em>}
+            <textarea
+              id="retry-bottleneck"
+              rows={3}
+              value={form.bottleneck}
+              onChange={set('bottleneck')}
+              aria-invalid={errors.bottleneck ? true : undefined}
+              aria-describedby={errors.bottleneck ? 'retry-bottleneck-error' : undefined}
+            />
+            {errors.bottleneck && (
+              <em id="retry-bottleneck-error" className="field-error" role="alert">
+                {errors.bottleneck}
+              </em>
+            )}
           </label>
 
           <label>
             <span>그래서 지금 무슨 일이 벌어집니까</span>
-            <textarea rows={3} value={form.problem} onChange={set('problem')} />
-            {errors.problem && <em className="field-error">{errors.problem}</em>}
+            <textarea
+              id="retry-problem"
+              rows={3}
+              value={form.problem}
+              onChange={set('problem')}
+              aria-invalid={errors.problem ? true : undefined}
+              aria-describedby={errors.problem ? 'retry-problem-error' : undefined}
+            />
+            {errors.problem && (
+              <em id="retry-problem-error" className="field-error" role="alert">
+                {errors.problem}
+              </em>
+            )}
           </label>
 
           <label>
@@ -763,7 +806,7 @@ function Signoff({ ticket, as, onDone }) {
       <ul className="signoff-list">
         {criteria.map((c) => (
           <li key={c.id} className={verdicts[c.id] === 'no' ? 'objected' : ''}>
-            <div className="signoff-body">
+            <div className="signoff-body" id={`signoff-criterion-${c.id}`}>
               {c.body}
               {c.is_required_safety === 1 && (
                 <span className="badge badge-danger">이건 빼면 안 되는 것</span>
@@ -790,7 +833,14 @@ function Signoff({ ticket, as, onDone }) {
             )}
 
             {state.canSign && (
-              <div className="signoff-pick">
+              <div
+                className="signoff-pick"
+                role="radiogroup"
+                aria-labelledby={`signoff-criterion-${c.id}`}
+                aria-required="true"
+                aria-invalid={errors.verdicts ? 'true' : undefined}
+                aria-describedby={errors.verdicts ? 'signoff-verdicts-error' : undefined}
+              >
                 {Object.entries(VERDICTS).map(([code, v]) => (
                   <label key={code}>
                     <input
@@ -806,8 +856,11 @@ function Signoff({ ticket, as, onDone }) {
                   <input
                     className="signoff-reason"
                     placeholder="무엇이 다릅니까 — 이걸 모르면 고칠 수가 없습니다"
+                    aria-label={`${c.body} — 다른 이유`}
                     value={reasons[c.id] ?? ''}
                     onChange={(e) => setReasons((s) => ({ ...s, [c.id]: e.target.value }))}
+                    aria-invalid={errors.reasons ? true : undefined}
+                    aria-describedby={errors.reasons ? 'signoff-reasons-error' : undefined}
                   />
                 )}
               </div>
@@ -818,15 +871,29 @@ function Signoff({ ticket, as, onDone }) {
 
       {state.canSign && (
         <form className="signoff-form" onSubmit={submit}>
-          {errors.verdicts && <em className="field-error">{errors.verdicts}</em>}
-          {errors.reasons && <em className="field-error">{errors.reasons}</em>}
+          {errors.verdicts && (
+            <em id="signoff-verdicts-error" className="field-error" role="alert">
+              {errors.verdicts}
+            </em>
+          )}
+          {errors.reasons && (
+            <em id="signoff-reasons-error" className="field-error" role="alert">
+              {errors.reasons}
+            </em>
+          )}
           {/* 걸린 부서가 여럿이면 어느 부서로 확인하시는지 골라야 한다.
               자유 입력으로 두면 "마케팅"과 "마케팅팀"이 다른 부서가 되어,
               다 모였는데도 영영 "일부만 확인"으로 남는다. */}
           {(data.requiredDepts?.length ?? 0) > 1 && (
             <label>
               <span>어느 부서로 확인하십니까</span>
-              <select value={dept} onChange={(e) => setDept(e.target.value)}>
+              <select
+                id="signoff-dept"
+                value={dept}
+                onChange={(e) => setDept(e.target.value)}
+                aria-invalid={errors.dept ? true : undefined}
+                aria-describedby={errors.dept ? 'signoff-dept-error' : undefined}
+              >
                 <option value="">고르세요</option>
                 {data.requiredDepts.map((d) => (
                   <option key={d} value={d} disabled={state.signedDepts?.includes(d)}>
@@ -835,7 +902,11 @@ function Signoff({ ticket, as, onDone }) {
                   </option>
                 ))}
               </select>
-              {errors.dept && <em className="field-error">{errors.dept}</em>}
+              {errors.dept && (
+                <em id="signoff-dept-error" className="field-error" role="alert">
+                  {errors.dept}
+                </em>
+              )}
               <small className="card-note">
                 이 일은 {data.requiredDepts.length}개 부서가 걸려 있습니다. 부서마다 한 번씩
                 확인해주셔야 이 기준으로 판정할 수 있습니다.
@@ -845,11 +916,19 @@ function Signoff({ ticket, as, onDone }) {
 
           <label>
             <input
+              id="signoff-by"
               value={by}
               onChange={(e) => setBy(e.target.value)}
               placeholder="김대리"
+              aria-label="확인하신 분"
+              aria-invalid={errors.by ? true : undefined}
+              aria-describedby={errors.by ? 'signoff-by-error' : undefined}
             />
-            {errors.by && <em className="field-error">{errors.by}</em>}
+            {errors.by && (
+              <em id="signoff-by-error" className="field-error" role="alert">
+                {errors.by}
+              </em>
+            )}
             <small className="card-note">
               계정을 만드시라고 하지 않습니다. 다만 서명인데 누가 하셨는지 모르면 서명이 아니라서
               성함만 여쭙습니다.
@@ -1124,7 +1203,14 @@ function HoldLift({ ticket, onDone }) {
         </button>
       ) : (
         <form className="dconf-form" onSubmit={submit}>
-          <div className="dconf-pick">
+          <div
+            className="dconf-pick"
+            role="radiogroup"
+            aria-label="달라진 것의 종류"
+            aria-required="true"
+            aria-invalid={errors.kind ? 'true' : undefined}
+            aria-describedby={errors.kind ? 'holdlift-kind-error' : undefined}
+          >
             {LIFT_KINDS.map((k) => (
               <label key={k.code} className={kind === k.code ? 'on' : ''}>
                 <input
@@ -1137,24 +1223,46 @@ function HoldLift({ ticket, onDone }) {
               </label>
             ))}
           </div>
-          {errors.kind && <em className="field-error">{errors.kind}</em>}
+          {errors.kind && (
+            <em id="holdlift-kind-error" className="field-error" role="alert">
+              {errors.kind}
+            </em>
+          )}
 
           <label>
             <span>무엇이 달라졌습니까</span>
             <textarea
+              id="holdlift-body"
               rows={3}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder={liftKindOf(kind)?.hint ?? ''}
+              aria-invalid={errors.body ? true : undefined}
+              aria-describedby={errors.body ? 'holdlift-body-error' : undefined}
             />
-            {errors.body && <em className="field-error">{errors.body}</em>}
+            {errors.body && (
+              <em id="holdlift-body-error" className="field-error" role="alert">
+                {errors.body}
+              </em>
+            )}
             <small className="card-note">{liftKindOf(kind)?.hint}</small>
           </label>
 
           <label>
             <span>알려주시는 분</span>
-            <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="김대리" />
-            {errors.by && <em className="field-error">{errors.by}</em>}
+            <input
+              id="holdlift-by"
+              value={by}
+              onChange={(e) => setBy(e.target.value)}
+              placeholder="김대리"
+              aria-invalid={errors.by ? true : undefined}
+              aria-describedby={errors.by ? 'holdlift-by-error' : undefined}
+            />
+            {errors.by && (
+              <em id="holdlift-by-error" className="field-error" role="alert">
+                {errors.by}
+              </em>
+            )}
           </label>
 
           <div className="row">
@@ -1267,7 +1375,14 @@ function BetaSay({ ticket, onDone }) {
         </button>
       ) : (
         <form className="dconf-form" onSubmit={submit}>
-          <div className="dconf-pick">
+          <div
+            className="dconf-pick"
+            role="radiogroup"
+            aria-label="써 본 뒤 느낀 점 종류"
+            aria-required="true"
+            aria-invalid={errors.kind ? 'true' : undefined}
+            aria-describedby={errors.kind ? 'betasay-kind-error' : undefined}
+          >
             {BETA_SAY_KINDS.map((k) => (
               <label key={k.code} className={kind === k.code ? 'on' : ''}>
                 <input
@@ -1280,24 +1395,46 @@ function BetaSay({ ticket, onDone }) {
               </label>
             ))}
           </div>
-          {errors.kind && <em className="field-error">{errors.kind}</em>}
+          {errors.kind && (
+            <em id="betasay-kind-error" className="field-error" role="alert">
+              {errors.kind}
+            </em>
+          )}
 
           <label>
             <span>무슨 일이 있었습니까</span>
             <textarea
+              id="betasay-body"
               rows={3}
               value={body}
               onChange={(e) => setBody(e.target.value)}
               placeholder={kindOf(kind)?.hint ?? ''}
+              aria-invalid={errors.body ? true : undefined}
+              aria-describedby={errors.body ? 'betasay-body-error' : undefined}
             />
-            {errors.body && <em className="field-error">{errors.body}</em>}
+            {errors.body && (
+              <em id="betasay-body-error" className="field-error" role="alert">
+                {errors.body}
+              </em>
+            )}
             <small className="card-note">{kindOf(kind)?.hint}</small>
           </label>
 
           <label>
             <span>적어주신 분</span>
-            <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="김대리" />
-            {errors.by && <em className="field-error">{errors.by}</em>}
+            <input
+              id="betasay-by"
+              value={by}
+              onChange={(e) => setBy(e.target.value)}
+              placeholder="김대리"
+              aria-invalid={errors.by ? true : undefined}
+              aria-describedby={errors.by ? 'betasay-by-error' : undefined}
+            />
+            {errors.by && (
+              <em id="betasay-by-error" className="field-error" role="alert">
+                {errors.by}
+              </em>
+            )}
           </label>
 
           <div className="row">
@@ -1442,29 +1579,57 @@ function OutcomeCheck({ ticket, onDone }) {
 
       {!done && (
         <form className="dconf-form" onSubmit={submit}>
-          <div className="dconf-pick">
+          <div
+            className="dconf-pick"
+            role="radiogroup"
+            aria-label="성과 체감 확인"
+            aria-required="true"
+            aria-invalid={errors.agree ? 'true' : undefined}
+            aria-describedby={errors.agree ? 'outcome-agree-error' : undefined}
+          >
             <label className={agree === true ? 'on' : ''}>
-              <input type="radio" name="agree" checked={agree === true} onChange={() => setAgree(true)} />
+              <input
+                type="radio"
+                name="agree"
+                checked={agree === true}
+                onChange={() => setAgree(true)}
+              />
               대충 맞습니다
             </label>
             <label className={agree === false ? 'on' : ''}>
-              <input type="radio" name="agree" checked={agree === false} onChange={() => setAgree(false)} />
+              <input
+                type="radio"
+                name="agree"
+                checked={agree === false}
+                onChange={() => setAgree(false)}
+              />
               그것보다 적게/많이 걸립니다
             </label>
           </div>
-          {errors.agree && <em className="field-error">{errors.agree}</em>}
+          {errors.agree && (
+            <em id="outcome-agree-error" className="field-error" role="alert">
+              {errors.agree}
+            </em>
+          )}
 
           {agree === false && (
             <label>
               <span>실제로는 한 번에 몇 분쯤 걸리십니까</span>
               <input
+                id="outcome-felt"
                 type="number"
                 min="0"
                 value={felt}
                 onChange={(e) => setFelt(e.target.value)}
                 placeholder="40"
+                aria-invalid={errors.felt ? true : undefined}
+                aria-describedby={errors.felt ? 'outcome-felt-error' : undefined}
               />
-              {errors.felt && <em className="field-error">{errors.felt}</em>}
+              {errors.felt && (
+                <em id="outcome-felt-error" className="field-error" role="alert">
+                  {errors.felt}
+                </em>
+              )}
               <small className="card-note">
                 정확하지 않아도 됩니다. 저희가 잰 값과 크게 다르면 성과 화면의 금액을{' '}
                 <strong>보수적 추정으로 내리고</strong> 다시 재겠습니다.
@@ -1483,8 +1648,19 @@ function OutcomeCheck({ ticket, onDone }) {
 
           <label>
             <span>확인하신 분</span>
-            <input value={by} onChange={(e) => setBy(e.target.value)} placeholder="김대리" />
-            {errors.by && <em className="field-error">{errors.by}</em>}
+            <input
+              id="outcome-by"
+              value={by}
+              onChange={(e) => setBy(e.target.value)}
+              placeholder="김대리"
+              aria-invalid={errors.by ? true : undefined}
+              aria-describedby={errors.by ? 'outcome-by-error' : undefined}
+            />
+            {errors.by && (
+              <em id="outcome-by-error" className="field-error" role="alert">
+                {errors.by}
+              </em>
+            )}
           </label>
 
           <button type="submit" className="btn-primary" disabled={busy}>

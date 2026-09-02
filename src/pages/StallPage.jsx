@@ -82,7 +82,7 @@ export default function StallPage() {
       {mine.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">제가 움직여야 풀리는 것 {mine.length}건</span>
+            <h2 className="card-title">제가 움직여야 풀리는 것 {mine.length}건</h2>
           </div>
           <ul className="stall-list">
             {mine.map((s) => (
@@ -95,7 +95,7 @@ export default function StallPage() {
       {theirs.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">부서 답을 기다리는 것 {theirs.length}건</span>
+            <h2 className="card-title">부서 답을 기다리는 것 {theirs.length}건</h2>
           </div>
           <ul className="stall-list">
             {theirs.map((s) => (
@@ -135,7 +135,7 @@ export default function StallPage() {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">단계마다 보통 며칠 걸리나</span>
+          <h2 className="card-title">단계마다 보통 며칠 걸리나</h2>
         </div>
         {/* 여덟 줄이 전부 "표본 0건"이면 그 표는 아무 말도 하지 않으면서
             화면만 차지한다. 그렇다고 카드를 통째로 없애면 이 사이트가 단계별
@@ -173,7 +173,7 @@ export default function StallPage() {
       {data.onTrack.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">제때 가고 있는 것 {data.onTrack.length}건</span>
+            <h2 className="card-title">제때 가고 있는 것 {data.onTrack.length}건</h2>
           </div>
           <ul className="stall-ok">
             {data.onTrack.map((s) => (

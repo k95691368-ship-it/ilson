@@ -4,6 +4,7 @@ import { reasonText } from '../../shared/similar.js'
 import { api } from '../api/client.js'
 import { ago, num } from '../lib/format.js'
 import { validateJoin, FREQUENCIES, joinTrackPath } from '../../shared/join.js'
+import Field from './Field.jsx'
 
 // "이거 이미 들어와 있는데요"
 //
@@ -182,42 +183,36 @@ function JoinIn({ hit, draft }) {
     <form className="join-form" onSubmit={send}>
 
       <div className="join-row">
-        <label>
-          <span>부서</span>
+        <Field label="부서" required error={errors.dept}>
           <input value={form.dept} onChange={set('dept')} placeholder="마케팅" />
-          {errors.dept && <em className="field-error">{errors.dept}</em>}
-        </label>
-        <label>
-          <span>성함</span>
+        </Field>
+        <Field label="성함" required error={errors.by}>
           <input value={form.by} onChange={set('by')} placeholder="이과장" />
-          {errors.by && <em className="field-error">{errors.by}</em>}
-        </label>
+        </Field>
       </div>
 
-      <label>
+      <Field
+        label="우리 부서의 사정"
+        required
+        error={errors.story}
+        hint="같은 병목이라도 부서마다 다릅니다. 다른 데가 있으면 그것부터 적어 주세요."
+      >
         <textarea
           rows={2}
           value={form.story}
           onChange={set('story')}
           placeholder="저희도 매주 채널별로 숫자를 옮겨 적습니다. 다만 저희는 광고비까지 같이 봅니다."
         />
-        {errors.story && <em className="field-error">{errors.story}</em>}
-        <small className="card-note">같은 병목이라도 부서마다 다릅니다. 다른 데가 있으면 그것부터 적어 주세요.</small>
-      </label>
+      </Field>
 
       <div className="join-row">
-        <label>
-          <span>한 번에 몇 분</span>
+        <Field label="한 번에 몇 분" required error={errors.minutes}>
           <input type="number" min="1" value={form.minutes} onChange={set('minutes')} />
-          {errors.minutes && <em className="field-error">{errors.minutes}</em>}
-        </label>
-        <label>
-          <span>몇 분이</span>
+        </Field>
+        <Field label="몇 분이" required error={errors.people}>
           <input type="number" min="1" value={form.people} onChange={set('people')} placeholder="1" />
-          {errors.people && <em className="field-error">{errors.people}</em>}
-        </label>
-        <label>
-          <span>얼마나 자주</span>
+        </Field>
+        <Field label="얼마나 자주" required error={errors.frequency}>
           <select value={form.frequency} onChange={set('frequency')}>
             <option value="">고르세요</option>
             {FREQUENCIES.map((f) => (
@@ -226,8 +221,7 @@ function JoinIn({ hit, draft }) {
               </option>
             ))}
           </select>
-          {errors.frequency && <em className="field-error">{errors.frequency}</em>}
-        </label>
+        </Field>
       </div>
 
       <div className="row">

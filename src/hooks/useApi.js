@@ -21,9 +21,13 @@ import { api } from '../api/client.js'
 //
 // 요청마다 번호를 매기고 **마지막에 보낸 것만** 받는다.
 export function useApi(path, { skip = false } = {}) {
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(!skip)
+  const resourceKey = skip || !path ? null : path
+  const [snapshot, setSnapshot] = useState(() => ({
+    key: resourceKey,
+    data: null,
+    error: null,
+    loading: Boolean(resourceKey),
+  }))
   const alive = useRef(true)
   const seq = useRef(0)
 
@@ -35,29 +39,68 @@ export function useApi(path, { skip = false } = {}) {
   }, [])
 
   const load = useCallback(async () => {
-    if (skip || !path) return
     const mine = ++seq.current
+    if (!resourceKey) {
+      setSnapshot({ key: null, data: null, error: null, loading: false })
+      return
+    }
+
     // 내가 보낸 것이 아직 최신인가. 응답을 쓰기 직전마다 다시 본다.
     const latest = () => alive.current && seq.current === mine
-    setLoading(true)
+    setSnapshot((previous) =>
+      previous.key === resourceKey
+        ? { ...previous, loading: true }
+        : { key: resourceKey, data: null, error: null, loading: true }
+    )
     try {
-      const result = await api.get(path)
+      const result = await api.get(resourceKey)
       if (latest()) {
-        setData(result)
-        setError(null)
+        setSnapshot({ key: resourceKey, data: result, error: null, loading: true })
       }
     } catch (err) {
-      if (latest()) setError(err.message || '불러오지 못했습니다.')
+      if (latest()) {
+        setSnapshot((previous) => ({
+          key: resourceKey,
+          data: previous.key === resourceKey ? previous.data : null,
+          error: err.message || '불러오지 못했습니다.',
+          loading: true,
+        }))
+      }
     } finally {
       // 뒤처진 응답은 loading 도 안 건드린다. 건드리면 아직 오는 중인
       // 최신 요청이 다 온 것처럼 보인다.
-      if (latest()) setLoading(false)
+      if (latest()) {
+        setSnapshot((previous) =>
+          previous.key === resourceKey ? { ...previous, loading: false } : previous
+        )
+      }
     }
-  }, [path, skip])
+  }, [resourceKey])
 
   useEffect(() => {
     load()
   }, [load])
+
+  const setData = useCallback(
+    (next) => {
+      setSnapshot((previous) => {
+        const previousData = previous.key === resourceKey ? previous.data : null
+        return {
+          key: resourceKey,
+          data: typeof next === 'function' ? next(previousData) : next,
+          error: previous.key === resourceKey ? previous.error : null,
+          loading: previous.key === resourceKey ? previous.loading : false,
+        }
+      })
+    },
+    [resourceKey]
+  )
+
+  // effect가 새 요청을 시작하기 전 렌더에서도 다른 URL의 상태는 숨긴다.
+  const isCurrentResource = snapshot.key === resourceKey
+  const data = isCurrentResource ? snapshot.data : null
+  const error = isCurrentResource ? snapshot.error : null
+  const loading = resourceKey ? (isCurrentResource ? snapshot.loading : true) : false
 
   return { data, error, loading, reload: load, setData }
 }

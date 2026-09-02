@@ -4,6 +4,8 @@ import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago, duration, num } from '../lib/format.js'
+import Field from '../components/Field.jsx'
+import { handleRadioGroupKeyDown } from '../lib/radioGroup.js'
 
 // 두 신청서를 나란히 놓고 본다.
 //
@@ -91,7 +93,7 @@ export default function ComparePage() {
           다른 것만 도드라지게 한다. */}
       <section className="card">
         <div className="card-head">
-          <span className="card-title">값으로 적힌 것</span>
+          <h2 className="card-title">값으로 적힌 것</h2>
         </div>
         <div className="cmp-values">
           {data.values
@@ -118,7 +120,7 @@ export default function ComparePage() {
         .map((f) => (
           <section key={f.key} className="card">
             <div className="card-head">
-              <span className="card-title">{f.label}</span>
+              <h3 className="card-title">{f.label}</h3>
               {f.onlyOneSide ? (
                 <span className="badge badge-neutral">한쪽만 적었습니다</span>
               ) : (
@@ -204,10 +206,11 @@ function Unmerge({ merged, onDone }) {
         </button>
       ) : (
         <form className="thread-form" onSubmit={send}>
-          <label className="field">
-            <span className="field-label">
-              어느 상태로 되돌립니까<span className="field-required"> *</span>
-            </span>
+          <Field
+            label="어느 상태로 되돌립니까"
+            required
+            hint="묶기 전 상태를 시스템이 알 수 없어 직접 골라야 합니다."
+          >
             <select
               value={form.restoreTo}
               onChange={(e) => setForm((f) => ({ ...f, restoreTo: e.target.value }))}
@@ -218,15 +221,8 @@ function Unmerge({ merged, onDone }) {
                 </option>
               ))}
             </select>
-            <p className="card-note" style={{ marginTop: 5 }}>
-              묶기 전 상태를 시스템이 알 수 없어 직접 고르셔야 합니다. 짐작으로 되돌리면 진행
-              단계가 조용히 틀어집니다.
-            </p>
-          </label>
-          <label className="field">
-            <span className="field-label">
-              왜 푸십니까<span className="field-required"> *</span>
-            </span>
+          </Field>
+          <Field label="왜 푸십니까" required error={fieldErrors.why}>
             <textarea
               rows={2}
               value={form.why}
@@ -234,8 +230,7 @@ function Unmerge({ merged, onDone }) {
               placeholder="묶는 방향이 반대였습니다. 이쪽이 이미 만들어지고 있는 건입니다."
             />
             {/* 부서에게 두 번째로 말이 바뀌는 것이라 이유가 남아야 한다. */}
-            {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-          </label>
+          </Field>
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
               {saving ? '푸는 중…' : '풀고 기록에 남기기'}
@@ -341,26 +336,40 @@ function Verdict({ a, b, verdicts, onSaved }) {
       </div>
 
       <div className="field">
-        <span className="field-label">
+        <span className="field-label" id="compare-verdict-label">
           같은 건입니까<span className="field-required"> *</span>
         </span>
         {/* 버튼 묶음이라 라벨로 감싸지 않는다 — 라벨은 컨트롤 하나에만
             붙고, 감싸면 아무 데나 눌러도 첫 버튼이 눌린다. 묶음에 이름을 준다. */}
-        <div className="verdict-row" role="group" aria-label="같은 건입니까">
-          {verdicts.map((v) => (
+        <div
+          className="verdict-row"
+          role="radiogroup"
+          aria-labelledby="compare-verdict-label"
+          aria-required="true"
+          aria-invalid={fieldErrors.verdict ? 'true' : undefined}
+          aria-describedby={fieldErrors.verdict ? 'compare-verdict-error' : undefined}
+          onKeyDown={handleRadioGroupKeyDown}
+        >
+          {verdicts.map((v, index) => (
             <button
               key={v.verdict}
               type="button"
               className={`verdict-btn${verdict === v.verdict ? ' on' : ''}`}
               onClick={() => setVerdict(v.verdict)}
-              aria-pressed={verdict === v.verdict}
+              role="radio"
+              aria-checked={verdict === v.verdict}
+              tabIndex={verdict ? (verdict === v.verdict ? 0 : -1) : (index === 0 ? 0 : -1)}
             >
               {v.verdict}
             </button>
           ))}
         </div>
         {chosen && <p className="card-note" style={{ marginTop: 7 }}>{chosen.meaning}</p>}
-        {fieldErrors.verdict && <div className="field-error">{fieldErrors.verdict}</div>}
+        {fieldErrors.verdict && (
+          <div className="field-error" id="compare-verdict-error" role="alert">
+            {fieldErrors.verdict}
+          </div>
+        )}
       </div>
 
       {verdict === '같은 건' && (
@@ -377,18 +386,14 @@ function Verdict({ a, b, verdicts, onSaved }) {
         </label>
       )}
 
-      <label className="field">
-        <span className="field-label">
-          왜 그렇게 보셨습니까<span className="field-required"> *</span>
-        </span>
+      <Field label="왜 그렇게 보셨습니까" required error={fieldErrors.reason}>
         <textarea
           rows={3}
           value={reason}
           onChange={(e) => setReason(e.target.value)}
           placeholder="둘 다 다섯 채널 정산서를 엑셀로 합치는 일이다. 부서도 같고 주기도 같다. 적은 사람만 다르다."
         />
-        {fieldErrors.reason && <div className="field-error">{fieldErrors.reason}</div>}
-      </label>
+      </Field>
 
       <button type="submit" className="btn-primary" disabled={saving || !verdict}>
         {saving ? '남기는 중…' : '판정하고 기록에 남기기'}

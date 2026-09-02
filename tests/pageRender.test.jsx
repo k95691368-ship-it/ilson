@@ -49,7 +49,6 @@ const FATAL =
 
 // 화면을 실제 앱과 같은 껍데기 안에서 그린다. src/main.jsx 가 씌우는 것과
 // 같은 순서다 — 껍데기가 다르면 여기서만 나는 오류를 쫓게 된다.
-const { ThemeProvider } = await import(pathToFileURL(join(ROOT, 'src/context/ThemeContext.jsx')).href)
 const { ToastProvider } = await import(pathToFileURL(join(ROOT, 'src/context/ToastContext.jsx')).href)
 
 function wrap(node) {
@@ -57,13 +56,9 @@ function wrap(node) {
     StrictMode,
     null,
     createElement(
-      ThemeProvider,
+      ToastProvider,
       null,
-      createElement(
-        ToastProvider,
-        null,
-        createElement(MemoryRouter, { initialEntries: ['/'] }, node)
-      )
+      createElement(MemoryRouter, { initialEntries: ['/'] }, node)
     )
   )
 }

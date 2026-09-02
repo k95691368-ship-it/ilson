@@ -9,6 +9,7 @@ import { ago, duration, num } from '../lib/format.js'
 const FREQUENCIES = ['하루 여러 번', '매일', '주 2~3회', '주 1회', '격주', '매월', '분기', '비정기']
 
 import SimilarNotice from '../components/SimilarNotice.jsx'
+import Field from '../components/Field.jsx'
 import {
   loadDraft,
   saveDraft,
@@ -204,7 +205,7 @@ export default function ApplyPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <span className="card-title">누가 신청하나요</span>
+              <h2 className="card-title">누가 신청하나요</h2>
             </div>
             <div className="field-row">
               <Field label="신청 부서" required error={fieldErrors.dept}>
@@ -241,7 +242,7 @@ export default function ApplyPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <span className="card-title">무엇이 막혀 있나요</span>
+              <h2 className="card-title">무엇이 막혀 있나요</h2>
             </div>
 
             <Field label="한 줄로" required hint="이것만 있으면 낼 수 있습니다" error={fieldErrors.title}>
@@ -322,7 +323,7 @@ export default function ApplyPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <span className="card-title">지금 얼마나 드나요</span>
+              <h2 className="card-title">지금 얼마나 드나요</h2>
             </div>
             <div className="field-row">
               <Field label="한 번에 몇 분" hint="분 단위" error={fieldErrors.current_minutes}>
@@ -366,7 +367,7 @@ export default function ApplyPage() {
         <aside className="stack">
           <section className="card">
             <div className="card-head">
-              <span className="card-title">접수된 신청서</span>
+              <h2 className="card-title">접수된 신청서</h2>
               {data && <span className="card-note">{num(data.summary.total)}건</span>}
             </div>
 
@@ -411,36 +412,6 @@ export default function ApplyPage() {
         </aside>
       </div>
     </div>
-  )
-}
-
-// 라벨과 입력칸이 연결돼 있지 않았다.
-//
-// <label> 이 글자만 감싸고 입력칸은 그 옆에 형제로 있었다. htmlFor 도 없다.
-// 그러면 화면 낭독기에서 이름 없는 칸이 되고, 라벨을 눌러도 입력칸에 초점이
-// 안 간다. 이 사이트는 부서 담당자에게 긴 글을 적어 달라고 하는 화면이
-// 여럿이라, 그 자리에서 걸리면 아예 안 적는다.
-//
-// 바깥을 label 로 바꿔 입력칸을 품게 한다(암묵적 연결). 안쪽 글자는 span
-// 으로 내린다 — 라벨 안에 라벨을 넣을 수는 없다.
-function Field({ label, required, hint, error, count, children }) {
-  return (
-    <label className={`field${error ? ' has-error' : ''}`}>
-      <span className="field-label">
-        {label}
-        {required && <span className="field-required"> *</span>}
-        {hint && <span className="field-hint">{hint}</span>}
-      </span>
-      {children}
-      <span className="field-foot">
-        {error && <span className="field-error">{error}</span>}
-        {count && (
-          <span className="field-count">
-            {count[0]}/{count[1]}
-          </span>
-        )}
-      </span>
-    </label>
   )
 }
 

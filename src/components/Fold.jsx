@@ -36,7 +36,7 @@ export default function Fold({
     return (
       <section className={`fold fold-open ${className}`.trim()}>
         <div className="card-head">
-          <span className="card-title">{label}</span>
+          <h2 className="card-title">{label}</h2>
           {countable && <span className="fold-count">{n}건</span>}
           {note && (
             <>
@@ -56,7 +56,7 @@ export default function Fold({
   return (
     <details className={`card fold ${className}`.trim()} open={open}>
       <summary className="card-head">
-        <span className="card-title">{label}</span>
+        <h2 className="card-title">{label}</h2>
         <span className="fold-count">{n}건</span>
         {note && (
           <>

@@ -5,6 +5,7 @@ import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
 import { validateAccept, validateReject, proxyNote } from '../../shared/accept.js'
 import ReportForm from '../components/ReportForm.jsx'
 import TeachQuarantine from '../components/TeachQuarantine.jsx'
+import Field from '../components/Field.jsx'
 import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../shared/quota.js'
 import { annotateRuns, summarizeRuns, usersOf } from '../../shared/history.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -232,7 +233,7 @@ export default function ToolPage() {
       {data.payoff && (
         <section className="card payoff">
           <div className="card-head">
-            <span className="card-title">이 도구가 지금까지 아껴 드린 것</span>
+            <h2 className="card-title">이 도구가 지금까지 아껴 드린 것</h2>
             <span className="card-note">{data.payoff.runs}번 돌린 기록으로 계산했습니다</span>
           </div>
           <div className="payoff-row">
@@ -358,21 +359,22 @@ export default function ToolPage() {
 
           <section className="card">
             <div className="card-head">
-              <span className="card-title">채널별 결과</span>
+              <h2 className="card-title">채널별 결과</h2>
               <button type="button" className="btn-primary btn-sm" onClick={download}>
                 엑셀로 내려받기
               </button>
             </div>
             <div className="table-wrap">
               <table className="data-table">
+                <caption className="sr-only">채널별 처리 결과</caption>
                 <thead>
                   <tr>
-                    <th>채널</th>
-                    <th className="num">줄</th>
-                    <th className="num">수량</th>
-                    <th className="num">순매출</th>
-                    <th className="num">수수료</th>
-                    <th className="num">기여이익</th>
+                    <th scope="col">채널</th>
+                    <th scope="col" className="num">줄</th>
+                    <th scope="col" className="num">수량</th>
+                    <th scope="col" className="num">순매출</th>
+                    <th scope="col" className="num">수수료</th>
+                    <th scope="col" className="num">기여이익</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -393,16 +395,17 @@ export default function ToolPage() {
 
           {result.quarantine.length > 0 && (
             <section className="card">
-              <div className="card-title">검토할 줄</div>
+              <h2 className="card-title">검토할 줄</h2>
               <div className="table-wrap" style={{ maxHeight: 300, marginTop: 8 }}>
                 <table className="data-table">
+                  <caption className="sr-only">처리하지 못해 검토가 필요한 줄</caption>
                   <thead>
                     <tr>
-                      <th>이유</th>
-                      <th>파일</th>
-                      <th>시트</th>
-                      <th className="num">줄</th>
-                      <th>내용</th>
+                      <th scope="col">이유</th>
+                      <th scope="col">파일</th>
+                      <th scope="col">시트</th>
+                      <th scope="col" className="num">줄</th>
+                      <th scope="col">내용</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -430,7 +433,7 @@ export default function ToolPage() {
 
       {data.manual?.what_to_do_after && (
         <section className="card">
-          <div className="card-title">결과를 어떻게 쓰나요</div>
+          <h2 className="card-title">결과를 어떻게 쓰나요</h2>
           <p className="card-note">{data.manual.what_to_do_after}</p>
           <Unclear slug={slug} section="what_to_do_after" notes={notes} reload={loadNotes} />
         </section>
@@ -439,7 +442,7 @@ export default function ToolPage() {
       {/* 어떤 파일을 올리는지, 막혔을 때 누구에게 연락하는지도 짚을 수
           있어야 한다. 여기가 실제로 막히는 자리다. */}
       <section className="card unclear-rest">
-        <div className="card-title">사용법서에서 모르겠는 데가 있으신가요</div>
+        <h2 className="card-title">사용법서에서 모르겠는 데가 있으신가요</h2>
         <Unclear slug={slug} section="upload" notes={notes} reload={loadNotes} />
         <Unclear slug={slug} section="contact" notes={notes} reload={loadNotes} />
       </section>
@@ -473,7 +476,7 @@ export default function ToolPage() {
       {(data.restored || (data.trust?.urgent === 0 && data.trust?.open > 0)) && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">이 도구가 걸어온 일</span>
+            <h2 className="card-title">이 도구가 걸어온 일</h2>
           </div>
 
           {data.restored && (
@@ -529,7 +532,7 @@ function MyReports({ reports }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">알려 주신 것 {reports.length}건</span>
+        <h2 className="card-title">알려 주신 것 {reports.length}건</h2>
         {open.length > 0 ? (
           <span className="badge badge-warning">아직 {open.length}건 처리 중</span>
         ) : (
@@ -585,7 +588,7 @@ function RunHistory({ runs }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">이 도구를 돌린 기록 {s.total}번</span>
+        <h2 className="card-title">이 도구를 돌린 기록 {s.total}번</h2>
         <span className="spacer" />
         {s.flagged > 0 && (
           <span className="badge badge-warning">살펴볼 것 {s.flagged}번</span>
@@ -740,8 +743,12 @@ function Unclear({ slug, section, notes, reload }) {
 
       {open ? (
         <form className="unclear-form" onSubmit={send}>
-          <label>
-            <span>{spec?.label} — 무엇이 모르겠으신가요</span>
+          <Field
+            label={`${spec?.label} — 무엇이 모르겠으신가요`}
+            required
+            error={error}
+            hint="성함은 안 여쭙습니다. 적어주신 내용만 담당자에게 갑니다."
+          >
             <textarea
               rows={2}
               value={body}
@@ -751,9 +758,7 @@ function Unclear({ slug, section, notes, reload }) {
               }}
               placeholder={spec?.hint}
             />
-          </label>
-          {error && <em className="field-error">{error}</em>}
-          <small className="card-note">성함은 안 여쭙습니다. 적어주신 내용만 담당자에게 갑니다.</small>
+          </Field>
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={busy}>
               {busy ? '보내는 중…' : '보내기'}
@@ -846,24 +851,25 @@ function AcceptBox({ slug }) {
         있습니다. 그냥 두시면 저희는 잘 쓰고 계신 줄 압니다.
       </p>
 
-      <label className="accept-name">
-        <span>받으시는 분</span>
+      <Field label="받으시는 분" required error={errors.by}>
         <input value={by} onChange={(e) => setBy(e.target.value)} placeholder={data.handedTo.person} />
-        {errors.by && <em className="field-error">{errors.by}</em>}
-      </label>
+      </Field>
 
       {mode === 'reject' ? (
         <div className="accept-reject">
-          <label>
+          <Field
+            label="쓰지 못하는 이유"
+            required
+            error={errors.reason}
+            hint="이 한 줄이면 고칠 수 있습니다."
+          >
             <textarea
               rows={2}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
               placeholder="광고비 칸이 비어서 옵니다. 그것만 채워지면 쓸 수 있습니다."
             />
-            {errors.reason && <em className="field-error">{errors.reason}</em>}
-            <small className="card-note">이 한 줄이면 고칠 수 있습니다.</small>
-          </label>
+          </Field>
           <div className="row">
             <button type="button" className="btn-danger btn-sm" disabled={busy} onClick={() => send('reject')}>
               {busy ? '보내는 중…' : '이대로는 못 쓰겠습니다'}

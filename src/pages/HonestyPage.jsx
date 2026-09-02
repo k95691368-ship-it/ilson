@@ -46,7 +46,7 @@ export default function HonestyPage() {
       {resp?.show && (
         <section className={`card response-card${resp.answered === 0 ? ' none' : ''}`}>
           <div className="card-head">
-            <span className="card-title">부서에 부탁한 것과 돌아온 답</span>
+            <h2 className="card-title">부서에 부탁한 것과 돌아온 답</h2>
             <span className="spacer" />
             <span className="badge badge-neutral">
               {num(resp.answered)} / {num(resp.asked)}
@@ -90,7 +90,7 @@ export default function HonestyPage() {
       {/* 데이터로 증명할 수 없는 것. 이것만은 손으로 적었다. */}
       <section className="card">
         <div className="card-head">
-          <span className="card-title">증명하지 못한 것</span>
+          <h2 className="card-title">증명하지 못한 것</h2>
         </div>
         <div className="unproven-list">
           {data.unproven.map((u) => (
@@ -108,7 +108,7 @@ export default function HonestyPage() {
       {data.stuck.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">아직 손도 못 댄 신청서 {data.stuck.length}건</span>
+            <h2 className="card-title">아직 손도 못 댄 신청서 {data.stuck.length}건</h2>
           </div>
           <ul className="honest-list">
             {data.stuck.map((a) => (
@@ -133,7 +133,7 @@ export default function HonestyPage() {
       {data.refused.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">못 하겠다고 답한 것 {data.refused.length}건</span>
+            <h2 className="card-title">못 하겠다고 답한 것 {data.refused.length}건</h2>
             {data.refusedWithoutAlternative > 0 ? (
               <span className="badge badge-warning">
                 대안 없이 반려한 것 {data.refusedWithoutAlternative}건
@@ -175,9 +175,9 @@ export default function HonestyPage() {
       {(data.quarantine.length > 0 || data.quarantineLive > 0) && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">
+            <h2 className="card-title">
               도구가 처리 못 하고 밀어 둔 줄 {num(data.quarantineTotal)}줄
-            </span>
+            </h2>
           </div>
           {/* 이유별로 나눌 수 있는 것은 만드는 중에 시운전한 것뿐이다.
               넘긴 뒤 실제 실행은 브라우저에서 돌고 서버에는 개수만 남는다.
@@ -216,7 +216,7 @@ export default function HonestyPage() {
       {data.idleTools.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">넘겨 놓고 아무도 안 쓰는 도구 {data.idleTools.length}개</span>
+            <h2 className="card-title">넘겨 놓고 아무도 안 쓰는 도구 {data.idleTools.length}개</h2>
           </div>
           <ul className="honest-list">
             {data.idleTools.map((t) => (
@@ -238,7 +238,7 @@ export default function HonestyPage() {
       {(data.failedChecks.length > 0 || data.unresolvedChallenges.length > 0) && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">아직 통과 못 한 것과 못 푼 반박</span>
+            <h2 className="card-title">아직 통과 못 한 것과 못 푼 반박</h2>
           </div>
           {data.failedChecks.length > 0 && (
             <ul className="honest-list" style={{ marginBottom: 12 }}>
@@ -269,9 +269,9 @@ export default function HonestyPage() {
       {data.acceptedWithoutBaseline.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">
+            <h2 className="card-title">
               만들기로 해 놓고 아직 안 재 본 것 {data.acceptedWithoutBaseline.length}건
-            </span>
+            </h2>
           </div>
           <ul className="honest-list">
             {data.acceptedWithoutBaseline.map((a) => (
@@ -348,7 +348,7 @@ function RefuseCatalog() {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">애초에 안 받는 일 {REFUSE_REASONS.length}가지</span>
+        <h2 className="card-title">애초에 안 받는 일 {REFUSE_REASONS.length}가지</h2>
         <span className="spacer" />
         <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen((v) => !v)}>
           {open ? '접기' : '펼치기'}

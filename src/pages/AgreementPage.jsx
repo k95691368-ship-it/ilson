@@ -9,6 +9,7 @@ import { ago } from '../lib/format.js'
 import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
 import { joinAsRequirement } from '../../shared/join.js'
 import { withJosa } from '../../shared/korean.js'
+import Field from '../components/Field.jsx'
 import {
   REQUIREMENT_KINDS,
   PRIORITIES,
@@ -69,6 +70,7 @@ export default function AgreementPage() {
                 key={a.id}
                 type="button"
                 className={`chip${selectedId === a.id ? ' on' : ''}`}
+                aria-pressed={selectedId === a.id}
                 aria-expanded={selectedId === a.id}
                 onClick={() => setSelectedId((prev) => (prev === a.id ? null : a.id))}
               >
@@ -79,7 +81,7 @@ export default function AgreementPage() {
           </div>
 
           {selectedId ? (
-            <Agreement id={selectedId} />
+            <Agreement key={selectedId} id={selectedId} />
           ) : (
             <p className="card-note">
               위에서 신청서를 누르면 그 건의 협의 내용이 아래에 펼쳐집니다.
@@ -142,7 +144,7 @@ function Stakeholders({ data, send, toast, openBy }) {
   return (
     <details className="card card-boxed" open={openBy('누가 이 일에 얽혀 있나')}>
       <summary className="card-head">
-        <span className="card-title">누가 이 일에 얽혀 있나</span>
+        <h2 className="card-title">누가 이 일에 얽혀 있나</h2>
       </summary>
 
       {/* 손들었는데 아직 협의안에 사정이 안 들어온 부서.
@@ -175,31 +177,38 @@ function Stakeholders({ data, send, toast, openBy }) {
       )}
 
       <div className="field-row">
-        <select value={form.dept} onChange={(e) => setForm({ ...form, dept: e.target.value })}>
-          <option value="">부서</option>
-          {DEPTS.map((d) => (
-            <option key={d} value={d}>
-              {d}
-            </option>
-          ))}
-        </select>
-        <input
-          value={form.person_label}
-          onChange={(e) => setForm({ ...form, person_label: e.target.value })}
-          placeholder="누구 (예: 정산 담당자)"
-        />
-        <input
-          value={form.role_label}
-          onChange={(e) => setForm({ ...form, role_label: e.target.value })}
-          placeholder="역할 (예: 주관)"
-        />
+        <Field label="부서" required>
+          <select value={form.dept} onChange={(e) => setForm({ ...form, dept: e.target.value })}>
+            <option value="">고르세요</option>
+            {DEPTS.map((d) => (
+              <option key={d} value={d}>
+                {d}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="누구입니까">
+          <input
+            value={form.person_label}
+            onChange={(e) => setForm({ ...form, person_label: e.target.value })}
+            placeholder="예: 정산 담당자"
+          />
+        </Field>
+        <Field label="역할">
+          <input
+            value={form.role_label}
+            onChange={(e) => setForm({ ...form, role_label: e.target.value })}
+            placeholder="예: 주관"
+          />
+        </Field>
       </div>
-      <input
-        value={form.wants}
-        onChange={(e) => setForm({ ...form, wants: e.target.value })}
-        placeholder="이 사람이 원하는 것 한 줄 — 예: 금액이 1원도 틀리면 안 된다"
-        style={{ width: '100%', marginTop: 8 }}
-      />
+      <Field label="이 사람이 원하는 것" required>
+        <input
+          value={form.wants}
+          onChange={(e) => setForm({ ...form, wants: e.target.value })}
+          placeholder="예: 금액이 1원도 틀리면 안 된다"
+        />
+      </Field>
       <button
         type="button"
         className="btn-ghost"
@@ -227,7 +236,7 @@ function Meetings({ data, send, toast, openBy }) {
   return (
     <details className="card card-boxed" open={openBy('회의록')}>
       <summary className="card-head">
-        <span className="card-title">회의록</span>
+        <h2 className="card-title">회의록</h2>
       </summary>
 
       {data.meetings.map((m) => (
@@ -250,6 +259,7 @@ function Meetings({ data, send, toast, openBy }) {
                 rows={14}
                 defaultValue={m.minutes_text ?? ''}
                 id={`minutes-${m.id}`}
+                aria-label={`${m.title} 회의록`}
                 style={{ width: '100%', marginTop: 8, fontFamily: 'var(--mono)', fontSize: 13 }}
               />
               <button
@@ -284,6 +294,7 @@ function Meetings({ data, send, toast, openBy }) {
         <input
           value={draft.title}
           onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+          aria-label="새 회의 제목"
           placeholder="회의 제목 (예: 1차 발굴 회의)"
           style={{ flex: 1 }}
         />
@@ -322,12 +333,12 @@ function Requirements({ data, send, toast, openBy }) {
   return (
     <details className="card card-boxed" open={openBy('회의에서 나온 것들')}>
       <summary className="card-head">
-        <span className="card-title">회의에서 나온 것들</span>
+        <h2 className="card-title">회의에서 나온 것들</h2>
       </summary>
 
       {groups.초안.length > 0 && (
         <>
-          <h4>아직 판단하지 않음 {groups.초안.length}</h4>
+          <h3>아직 판단하지 않음 {groups.초안.length}</h3>
           <div className="stack-sm" style={{ marginBottom: 14 }}>
             {groups.초안.map((r) => (
               <RequirementCard key={r.id} r={r} send={send} toast={toast} editable />
@@ -338,7 +349,7 @@ function Requirements({ data, send, toast, openBy }) {
 
       {groups.확정.length > 0 && (
         <>
-          <h4>확정 {groups.확정.length}</h4>
+          <h3>확정 {groups.확정.length}</h3>
           <div className="stack-sm" style={{ marginBottom: 14 }}>
             {groups.확정.map((r) => (
               <RequirementCard key={r.id} r={r} send={send} toast={toast} />
@@ -349,7 +360,7 @@ function Requirements({ data, send, toast, openBy }) {
 
       {groups.기각.length > 0 && (
         <>
-          <h4>기각 {groups.기각.length}</h4>
+          <h3>기각 {groups.기각.length}</h3>
           <div className="stack-sm" style={{ marginBottom: 14 }}>
             {groups.기각.map((r) => (
               <RequirementCard key={r.id} r={r} send={send} toast={toast} />
@@ -362,54 +373,63 @@ function Requirements({ data, send, toast, openBy }) {
         <summary>회의에서 나온 것 적기</summary>
         <div className="disclose-body">
           <div className="field-row">
-            <select
-              value={form.req_kind}
-              onChange={(e) => setForm({ ...form, req_kind: e.target.value })}
-            >
-              {REQUIREMENT_KINDS.map((k) => (
-                <option key={k} value={k}>
-                  {k}
-                </option>
-              ))}
-            </select>
-            <select value={form.dept} onChange={(e) => setForm({ ...form, dept: e.target.value })}>
-              <option value="">어느 부서가</option>
-              {DEPTS.map((d) => (
-                <option key={d} value={d}>
-                  {d}
-                </option>
-              ))}
-            </select>
-            <select
-              value={form.priority}
-              onChange={(e) => setForm({ ...form, priority: e.target.value })}
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+            <Field label="종류">
+              <select
+                value={form.req_kind}
+                onChange={(e) => setForm({ ...form, req_kind: e.target.value })}
+              >
+                {REQUIREMENT_KINDS.map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="부서">
+              <select value={form.dept} onChange={(e) => setForm({ ...form, dept: e.target.value })}>
+                <option value="">고르세요</option>
+                {DEPTS.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field label="우선순위">
+              <select
+                value={form.priority}
+                onChange={(e) => setForm({ ...form, priority: e.target.value })}
+              >
+                {PRIORITIES.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </Field>
           </div>
-          <textarea
-            rows={2}
-            value={form.body}
-            onChange={(e) => setForm({ ...form, body: e.target.value })}
-            placeholder="내용 — 예: 정답 대비 금액 오차가 0원이어야 한다"
-            style={{ width: '100%', marginTop: 8 }}
-          />
-          <input
-            value={form.quote}
-            onChange={(e) => setForm({ ...form, quote: e.target.value })}
-            placeholder='회의록에서 그대로 옮긴 말 (예: "금액이 1원이라도 틀리면 안 됩니다")'
-            style={{ width: '100%', marginTop: 8 }}
-          />
-          <input
-            value={form.measurable}
-            onChange={(e) => setForm({ ...form, measurable: e.target.value })}
-            placeholder="통과/실패를 가를 수 있는 형태로 바꾼다면 (선택)"
-            style={{ width: '100%', marginTop: 8 }}
-          />
+          <Field label="내용" required>
+            <textarea
+              rows={2}
+              value={form.body}
+              onChange={(e) => setForm({ ...form, body: e.target.value })}
+              placeholder="예: 정답 대비 금액 오차가 0원이어야 한다"
+            />
+          </Field>
+          <Field label="회의록에서 그대로 옮긴 말">
+            <input
+              value={form.quote}
+              onChange={(e) => setForm({ ...form, quote: e.target.value })}
+              placeholder='예: "금액이 1원이라도 틀리면 안 됩니다"'
+            />
+          </Field>
+          <Field label="통과와 실패를 가르는 기준" hint="선택 사항">
+            <input
+              value={form.measurable}
+              onChange={(e) => setForm({ ...form, measurable: e.target.value })}
+              placeholder="예: 금액 오차 0원"
+            />
+          </Field>
           <button
             type="button"
             className="btn-ghost"
@@ -525,6 +545,7 @@ function RequirementCard({ r, send, toast, editable }) {
             rows={2}
             value={amend}
             onChange={(e) => setAmend(e.target.value)}
+            aria-label={`${r.dept} 요구사항을 고친 문장`}
             placeholder="이 건에 맞게 다듬은 문장"
           />
           <div className="row">
@@ -560,6 +581,7 @@ function RequirementCard({ r, send, toast, editable }) {
             rows={2}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
+            aria-label={`${r.dept} 요구사항 기각 사유`}
             placeholder="왜 기각하는지 — 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다"
             style={{ width: '100%' }}
           />
@@ -640,7 +662,7 @@ function Objections({ id, toast, openBy }) {
   return (
     <details className="card card-boxed" open={openBy('부서가 합격 기준을 본 결과')}>
       <summary className="card-head">
-        <span className="card-title">부서가 합격 기준을 본 결과</span>
+        <h2 className="card-title">부서가 합격 기준을 본 결과</h2>
         <span className={`badge ${state.binding ? 'badge-success' : 'badge-warning'}`}>
           {state.status}
         </span>
@@ -673,29 +695,40 @@ function Objections({ id, toast, openBy }) {
               </p>
             ) : open === o.id ? (
               <div className="objection-form">
-                {ways.map((w) => (
-                  <label key={w.code}>
-                    <input
-                      type="radio"
-                      name={`w-${o.id}`}
-                      checked={form.code === w.code}
-                      onChange={() => setForm((f) => ({ ...f, code: w.code }))}
-                    />
-                    {w.label}
-                    {w.resign && <span className="card-note"> — 부서에 다시 확인을 요청합니다</span>}
-                  </label>
-                ))}
-                {errors.code && <em className="field-error">{errors.code}</em>}
+                <div
+                  role="radiogroup"
+                  aria-label={`${o.criterion?.body ?? '합격 기준'} 이의 처리 방식`}
+                  aria-required="true"
+                  aria-invalid={errors.code ? 'true' : undefined}
+                  aria-describedby={errors.code ? 'objection-code-error' : undefined}
+                >
+                  {ways.map((w) => (
+                    <label key={w.code}>
+                      <input
+                        type="radio"
+                        name={`w-${o.id}`}
+                        checked={form.code === w.code}
+                        onChange={() => setForm((f) => ({ ...f, code: w.code }))}
+                      />
+                      {w.label}
+                      {w.resign && <span className="card-note"> — 부서에 다시 확인을 요청합니다</span>}
+                    </label>
+                  ))}
+                </div>
+                {errors.code && <em className="field-error" id="objection-code-error" role="alert">{errors.code}</em>}
 
                 <textarea
                   rows={2}
                   value={form.reason}
                   onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+                  aria-label="이의 처리 내용"
+                  aria-invalid={errors.reason ? 'true' : undefined}
+                  aria-describedby={errors.reason ? 'objection-reason-error' : undefined}
                   placeholder={
                     RESOLUTION_BY_CODE[form.code]?.reasonLabel ?? '무엇을 하셨습니까'
                   }
                 />
-                {errors.reason && <em className="field-error">{errors.reason}</em>}
+                {errors.reason && <em className="field-error" id="objection-reason-error" role="alert">{errors.reason}</em>}
                 <small className="card-note">이 문장이 그대로 부서 조회 화면에 갑니다.</small>
 
                 <div className="row">
@@ -776,6 +809,7 @@ function PendingJoins({ pending, send, toast }) {
               rows={2}
               value={value}
               onChange={(e) => setDraft((d) => ({ ...d, [p.join_id]: e.target.value }))}
+              aria-label={`${p.dept} 요구 내용`}
             />
             <small className="card-note">
               적어 주신 것은 <strong>사정</strong>입니다. 무엇을 요구하시는지로 바꿔 올리세요.

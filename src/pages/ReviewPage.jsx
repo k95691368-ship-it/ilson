@@ -4,6 +4,8 @@ import StageHeader from '../components/StageHeader.jsx'
 import HotkeyHelp from '../components/HotkeyHelp.jsx'
 import SimilarNotice from '../components/SimilarNotice.jsx'
 import Thread from '../components/Thread.jsx'
+import Field from '../components/Field.jsx'
+import { handleRadioGroupKeyDown } from '../lib/radioGroup.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -162,7 +164,20 @@ export default function ReviewPage() {
   // 신청서 하나 보고 판정하고 다음 것으로 넘어가는 일을 하루 종일 반복하는
   // 자리다. 그때마다 왼쪽 목록으로 마우스를 옮겨 클릭하는 것이 전부 손해다.
   const searchRef = useRef(null)
+  const detailRef = useRef(null)
   const [helpOpen, setHelpOpen] = useState(false)
+  const closeHelp = useCallback(() => setHelpOpen(false), [])
+
+  const selectApplication = useCallback((id) => {
+    setSelectedId(id)
+    if (!window.matchMedia?.('(max-width: 900px)').matches) return
+    window.requestAnimationFrame(() => {
+      detailRef.current?.scrollIntoView({
+        behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+        block: 'start',
+      })
+    })
+  }, [])
 
   const step = useCallback(
     (delta) => {
@@ -184,7 +199,7 @@ export default function ReviewPage() {
     '?': () => setHelpOpen((v) => !v),
     Escape: (e) => {
       if (helpOpen) {
-        setHelpOpen(false)
+        closeHelp()
         return
       }
       // 검색창 안에서 눌렀으면 거기서 빠져나온다. 밖에서 눌렀으면 조건을 지운다.
@@ -238,7 +253,7 @@ export default function ReviewPage() {
     <div className="stack">
       <StageHeader stageKey="review" />
 
-      <HotkeyHelp open={helpOpen} onClose={() => setHelpOpen(false)} keys={HOTKEYS} />
+      <HotkeyHelp open={helpOpen} onClose={closeHelp} keys={HOTKEYS} />
 
       {error && (
         <div className="notice notice-danger">
@@ -249,7 +264,7 @@ export default function ReviewPage() {
 
       {!error && items.length === 0 && (
         <section className="card">
-          <div className="card-title">아직 접수된 신청서가 없습니다</div>
+          <h2 className="card-title">아직 접수된 신청서가 없습니다</h2>
           <button type="button" className="btn-primary" onClick={seed} disabled={seeding}>
             {seeding ? '심는 중…' : '시연 신청서 심기'}
           </button>
@@ -305,7 +320,7 @@ export default function ReviewPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <span className="card-title">골라 보기</span>
+              <h2 className="card-title">골라 보기</h2>
               <span className="card-note">{describeQuery(query, visible.length, items.length)}</span>
               <span className="spacer" />
               {isFiltered(query) && (
@@ -460,12 +475,12 @@ export default function ReviewPage() {
           <div className="review-layout">
             <nav className="review-list" aria-label="접수된 신청서">
               <div className="review-list-head">
-                <span className="card-title">
+                <h2 className="card-title">
                   접수함
                   {isFiltered(query) && (
                     <span className="card-note"> {visible.length}/{items.length}</span>
                   )}
-                </span>
+                </h2>
                 <div className="row">
                   {/* 숨어 있는 단축키는 없는 것과 같다. 만들어 놓고 아무도
                       모르면 만든 사람만 쓴다. */}
@@ -494,7 +509,7 @@ export default function ReviewPage() {
                     <button
                       type="button"
                       className="review-list-item on"
-                      onClick={() => setSelectedId(pinned.id)}
+                      onClick={() => selectApplication(pinned.id)}
                       aria-current="true"
                     >
                       <span className="review-list-top">
@@ -558,7 +573,7 @@ export default function ReviewPage() {
                     <button
                       type="button"
                       className={`review-list-item${selectedId === a.id ? ' on' : ''}`}
-                      onClick={() => setSelectedId(a.id)}
+                      onClick={() => selectApplication(a.id)}
                       aria-current={selectedId === a.id ? 'true' : undefined}
                     >
                       <span className="review-list-top">
@@ -617,9 +632,9 @@ export default function ReviewPage() {
               )}
             </nav>
 
-            <div className="review-detail">
+            <div className="review-detail" ref={detailRef}>
               {selectedId ? (
-                <Detail id={selectedId} onSaved={reload} pool={items} />
+                <Detail key={selectedId} id={selectedId} onSaved={reload} pool={items} />
               ) : (
                 <div className="empty">
                   <div className="empty-title">왼쪽에서 신청서를 고르세요</div>
@@ -703,19 +718,14 @@ function BulkBar({ count, ids, onClear, onDone }) {
                 {spec.detail} <strong>왜 한 번에 해도 되나</strong> {spec.why}
               </p>
               {spec.needsReason && (
-                <label className="field">
-                  <span className="field-label">
-                    {spec.reasonLabel}
-                    <span className="field-required"> *</span>
-                  </span>
+                <Field label={spec.reasonLabel} required error={fieldErrors.reason}>
                   <textarea
                     rows={2}
                     value={reason}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder={spec.reasonPlaceholder}
                   />
-                  {fieldErrors.reason && <div className="field-error">{fieldErrors.reason}</div>}
-                </label>
+                </Field>
               )}
               <button
                 type="button"
@@ -816,7 +826,7 @@ function Detail({ id, onSaved, pool }) {
     <div className="stack">
       <section className="card">
         <div className="card-head">
-          <span className="card-title">{a.title}</span>
+          <h2 className="card-title">{a.title}</h2>
           <span className="mono card-note">{a.ticket_no}</span>
           <span className="spacer" />
           {/* 이 신청서에 지금까지 일어난 일 전부를 한 문서로. 결재에 붙이거나
@@ -948,24 +958,38 @@ function Detail({ id, onSaved, pool }) {
         </Field>
 
         <div className="field">
-          <span className="field-label">
+          <span className="field-label" id="review-verdict-label">
             판정<span className="field-required"> *</span>
           </span>
           {/* 버튼 묶음이라 라벨로 감싸지 않는다. 묶음에 이름을 준다. */}
-          <div className="verdict-row" role="group" aria-label="판정">
-            {VERDICTS.map((v) => (
+          <div
+            className="verdict-row"
+            role="radiogroup"
+            aria-labelledby="review-verdict-label"
+            aria-required="true"
+            aria-invalid={fieldErrors.verdict ? 'true' : undefined}
+            aria-describedby={fieldErrors.verdict ? 'review-verdict-error' : undefined}
+            onKeyDown={handleRadioGroupKeyDown}
+          >
+            {VERDICTS.map((v, index) => (
               <button
                 key={v}
                 type="button"
                 className={`verdict-btn ${v}${form.verdict === v ? ' on' : ''}`}
                 onClick={() => set('verdict', v)}
-                aria-pressed={form.verdict === v}
+                role="radio"
+                aria-checked={form.verdict === v}
+                tabIndex={form.verdict ? (form.verdict === v ? 0 : -1) : (index === 0 ? 0 : -1)}
               >
                 {v}
               </button>
             ))}
           </div>
-          {fieldErrors.verdict && <div className="field-error">{fieldErrors.verdict}</div>}
+          {fieldErrors.verdict && (
+            <div className="field-error" id="review-verdict-error" role="alert">
+              {fieldErrors.verdict}
+            </div>
+          )}
         </div>
 
         <Field label="판정 근거" hint="근거 없이 누른 것은 결정이 아니라 클릭입니다" error={fieldErrors.verdict_reason}>
@@ -1050,7 +1074,7 @@ function Detail({ id, onSaved, pool }) {
 
       {data.decisions.length > 0 && (
         <section className="card">
-          <div className="card-title">이 신청서에 남은 기록</div>
+          <h2 className="card-title">이 신청서에 남은 기록</h2>
           <ol className="decision-list">
             {data.decisions.map((dec) => (
               <li key={dec.id} className={dec.actor === 'ai' ? 'draft' : 'decided'}>
@@ -1084,6 +1108,7 @@ function Detail({ id, onSaved, pool }) {
 
 function ScoreField({ label, scale, value, onChange, error }) {
   const current = scale.find((s) => String(s.score) === String(value))
+  const errorId = `review-score-${label === '임팩트' ? 'impact' : 'difficulty'}-error`
   return (
     <div className="field">
       <span className="field-label">
@@ -1092,21 +1117,31 @@ function ScoreField({ label, scale, value, onChange, error }) {
         {current && <span className="field-hint">{current.detail}</span>}
       </span>
       {/* 점수도 버튼 묶음이다. 묶음 이름은 그 칸의 제목을 그대로 쓴다. */}
-      <div className="score-row" role="group" aria-label={label}>
-        {scale.map((s) => (
+      <div
+        className="score-row"
+        role="radiogroup"
+        aria-label={label}
+        aria-required="true"
+        aria-invalid={error ? 'true' : undefined}
+        aria-describedby={error ? errorId : undefined}
+        onKeyDown={handleRadioGroupKeyDown}
+      >
+        {scale.map((s, index) => (
           <button
             key={s.score}
             type="button"
             className={`score-btn${String(s.score) === String(value) ? ' on' : ''}`}
             onClick={() => onChange(String(s.score))}
-            aria-pressed={String(s.score) === String(value)}
+            role="radio"
+            aria-checked={String(s.score) === String(value)}
+            tabIndex={value ? (String(s.score) === String(value) ? 0 : -1) : (index === 0 ? 0 : -1)}
           >
             <span className="score-num">{s.score}</span>
             <span className="score-label">{s.label}</span>
           </button>
         ))}
       </div>
-      {error && <div className="field-error">{error}</div>}
+      {error && <div className="field-error" id={errorId} role="alert">{error}</div>}
     </div>
   )
 }
@@ -1114,20 +1149,6 @@ function ScoreField({ label, scale, value, onChange, error }) {
 // 라벨이 글자만 감싸고 입력칸은 형제로 있어서 둘이 연결돼 있지 않았다.
 // 바깥을 label 로 바꿔 입력칸을 품게 한다(암묵적 연결). 안쪽 글자는 span
 // 으로 내린다 — 라벨 안에 라벨은 못 넣는다.
-function Field({ label, required, hint, error, children }) {
-  return (
-    <label className={`field${error ? ' has-error' : ''}`}>
-      <span className="field-label">
-        {label}
-        {required && <span className="field-required"> *</span>}
-        {hint && <span className="field-hint">{hint}</span>}
-      </span>
-      {children}
-      {error && <span className="field-error" style={{ marginTop: 5, display: 'block' }}>{error}</span>}
-    </label>
-  )
-}
-
 function statusTone(status) {
   if (status === '수용' || status === '완료') return 'badge-success'
   if (status === '반려') return 'badge-danger'

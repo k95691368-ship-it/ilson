@@ -83,7 +83,7 @@ function Plain() {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">여섯 단계</span>
+          <h2 className="card-title">여섯 단계</h2>
         </div>
         <ol className="built-stages">
           {PLAIN.stages.map((s) => (
@@ -100,7 +100,7 @@ function Plain() {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">다른 관리 도구와 다른 점</span>
+          <h2 className="card-title">다른 관리 도구와 다른 점</h2>
         </div>
         <div className="built-points">
           {PLAIN.points.map((p) => (
@@ -152,7 +152,7 @@ function Tech({ facts }) {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">스택</span>
+          <h2 className="card-title">스택</h2>
         </div>
         <dl className="built-stack">
           {TECH.stack.map((s) => (
@@ -167,7 +167,7 @@ function Tech({ facts }) {
       {TECH.sections.map((s) => (
         <section key={s.title} className="card">
           <div className="card-head">
-            <span className="card-title">{s.title}</span>
+            <h3 className="card-title">{s.title}</h3>
           </div>
           <Body text={s.body} />
         </section>
@@ -176,7 +176,7 @@ function Tech({ facts }) {
       {/* LLM 이야기는 반드시 물어보는 것이라 따로 세워 둔다. */}
       <section className="card built-llm">
         <div className="card-head">
-          <span className="card-title">{TECH.llm.title}</span>
+          <h2 className="card-title">{TECH.llm.title}</h2>
         </div>
 
         <div className="built-llm-half">

@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago } from '../lib/format.js'
 import Fold from '../components/Fold.jsx'
+import Field from '../components/Field.jsx'
 import { REPORT_KINDS, REPORT_BY_CODE } from '../../shared/report.js'
 
 // 우리가 만든 기능이 이상할 때 말할 데.
@@ -76,15 +77,12 @@ export default function BugPage() {
           </Link>
         </div>
       ) : (
-        <form className="card card-boxed" onSubmit={send}>
+        <form className="card card-boxed" onSubmit={send} noValidate>
           <div className="card-head">
-            <span className="card-title">무엇이 이상한가요</span>
+            <h2 className="card-title">무엇이 이상한가요</h2>
           </div>
 
-          <label className="field">
-            <span className="field-label">
-              어느 기능<span className="field-required"> *</span>
-            </span>
+          <Field label="어느 기능" required error={fieldErrors.applicationId}>
             <select
               value={form.applicationId}
               onChange={(e) => set({ applicationId: e.target.value })}
@@ -96,15 +94,9 @@ export default function BugPage() {
                 </option>
               ))}
             </select>
-            {fieldErrors.applicationId && (
-              <span className="field-error">{fieldErrors.applicationId}</span>
-            )}
-          </label>
+          </Field>
 
-          <label className="field">
-            <span className="field-label">
-              무슨 일이<span className="field-required"> *</span>
-            </span>
+          <Field label="무슨 일이" required error={fieldErrors.code}>
             <select value={form.code} onChange={(e) => set({ code: e.target.value })}>
               <option value="">고르기</option>
               {REPORT_KINDS.map((k) => (
@@ -113,37 +105,31 @@ export default function BugPage() {
                 </option>
               ))}
             </select>
-            {fieldErrors.code && <span className="field-error">{fieldErrors.code}</span>}
-          </label>
+          </Field>
 
-          <label className="field">
-            <span className="field-label">
-              자세히<span className="field-required"> *</span>
-              {/* 고른 유형에 맞춰 무엇을 적어야 하는지 그 자리에서 알려준다.
-                  "이상해요" 한 줄이 오면 담당자가 다시 물어야 하고 하루가 간다. */}
-              {asked && <span className="field-hint">{asked}</span>}
-            </span>
+          {/* 고른 유형에 맞춰 무엇을 적어야 하는지 그 자리에서 알려준다.
+              "이상해요" 한 줄이 오면 담당자가 다시 물어야 하고 하루가 간다. */}
+          <Field label="자세히" required hint={asked} error={fieldErrors.body}>
             <textarea
               rows={3}
               value={form.body}
               onChange={(e) => set({ body: e.target.value })}
               placeholder="본 대로 적어 주시면 됩니다"
             />
-            {fieldErrors.body && <span className="field-error">{fieldErrors.body}</span>}
-          </label>
+          </Field>
 
-          <label className="field">
-            <span className="field-label">
-              누구신지<span className="field-required"> *</span>
-              <span className="field-hint">되물을 데가 있어야 고칠 수 있습니다</span>
-            </span>
+          <Field
+            label="누구신지"
+            required
+            hint="되물을 데가 있어야 고칠 수 있습니다"
+            error={fieldErrors.reporter}
+          >
             <input
               value={form.reporter}
               onChange={(e) => set({ reporter: e.target.value })}
               placeholder="예: 재무 정산 담당자"
             />
-            {fieldErrors.reporter && <span className="field-error">{fieldErrors.reporter}</span>}
-          </label>
+          </Field>
 
           <button type="submit" className="btn-primary" disabled={sending}>
             {sending ? '보내는 중…' : '신고하기'}
@@ -166,7 +152,7 @@ export default function BugPage() {
       {openTools.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">아직 안 고친 것 {summary.open}건</span>
+            <h2 className="card-title">아직 안 고친 것 {summary.open}건</h2>
             {summary.urgent > 0 && (
               <span className="badge badge-danger">결과를 믿을 수 없는 것 {summary.urgent}건</span>
             )}
@@ -202,7 +188,7 @@ function ToolReports({ t }) {
   return (
     <div className="card card-boxed">
       <div className="card-head">
-        <span className="card-title">{t.toolTitle}</span>
+        <h3 className="card-title">{t.toolTitle}</h3>
         <span className="card-note">
           {t.ticket_no} · {t.dept}
         </span>

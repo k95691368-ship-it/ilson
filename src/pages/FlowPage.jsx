@@ -64,9 +64,21 @@ export default function FlowPage() {
 
   return (
     <div className="stack">
-      <header className="page-head">
-        <span className="page-eyebrow">AX 실행 기록</span>
-        <h1>부서의 병목이 도구가 되기까지</h1>
+      <header className="page-head home-hero">
+        <span className="page-eyebrow">업무 자동화 포트폴리오</span>
+        <h1>반복 업무를 실제 도구로.</h1>
+        <p className="page-lede">
+          현업이 겪는 반복 업무를 함께 정의하고, 작동하는 도구로 만든 뒤 실제 효과를 확인합니다.
+        </p>
+        <div className="page-head-actions">
+          <Link to="/apply" className="btn-primary">반복 업무 신청하기</Link>
+          <a href="#process" className="btn-ghost">과정 보기</a>
+        </div>
+        <ul className="hero-proof" aria-label="일손의 주요 사실">
+          <li><strong>6단계</strong><span>신청부터 성과까지</span></li>
+          <li><strong>외부 AI 호출 0회</strong><span>판정과 계산 기준</span></li>
+          <li><strong>원본 근거</strong><span>모든 숫자를 다시 확인</span></li>
+        </ul>
       </header>
 
       {/* 보러 온 사람에게 눌러도 된다고 말한다.
@@ -106,7 +118,7 @@ export default function FlowPage() {
       {/* 여기서부터 화면의 성격이 바뀐다. 위는 "지금 무엇을 할까",
           아래는 "이 사이트가 무엇인가"다. 간격이 전부 같으면 아홉 덩어리가
           한 줄로 보여서 어디서 끊어 읽을지를 읽는 사람이 정해야 했다. */}
-      <div className="row-between band-break">
+      <div className="row-between band-break" id="process">
         <h2 style={{ margin: 0 }}>여섯 단계</h2>
         <div className="row">
           {/* 넘긴 도구 화면은 아래 '부서에 넘긴 도구' 칸으로만 갈 수 있었는데,
@@ -154,7 +166,7 @@ export default function FlowPage() {
           부서 이름을 못 찾으면 그런 화면이 있다는 것 자체를 모른다. */}
       <section className="card">
         <div className="card-head">
-          <span className="card-title">부서별로 보기</span>
+          <h2 className="card-title">부서별로 보기</h2>
         </div>
         <div className="chip-row">
           {DEPTS.map((d) => (
@@ -173,7 +185,7 @@ export default function FlowPage() {
       {data?.tools?.list?.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">부서에 넘긴 도구</span>
+            <h2 className="card-title">부서에 넘긴 도구</h2>
             <span className="card-note">
               넘긴 뒤 {num(data.tools.totalRuns)}번 쓰였습니다
             </span>
@@ -410,7 +422,7 @@ function TryIt({ provenance, counts }) {
       <section className="tryit tryit-empty">
         <div className="tryit-head">
           <span className="badge badge-accent">보러 오신 분께</span>
-          <strong className="tryit-title">{EMPTY_INVITE.title}</strong>
+          <h2 className="tryit-title">{EMPTY_INVITE.title}</h2>
         </div>
         <p className="tryit-sub">{EMPTY_INVITE.why}</p>
 
@@ -472,7 +484,7 @@ function TryIt({ provenance, counts }) {
     <section className="tryit">
       <div className="tryit-head">
         <span className="badge badge-accent">보러 오신 분께</span>
-        <strong className="tryit-title">읽기만 하지 마시고 직접 눌러 보셔도 됩니다</strong>
+        <h2 className="tryit-title">읽기만 하지 마시고 직접 눌러 보셔도 됩니다</h2>
         <span className="spacer" />
         <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen((v) => !v)}>
           {open ? '접기' : '무엇을 해볼 수 있나'}
@@ -695,7 +707,7 @@ function Overview({ data }) {
       <div className="grid-side">
         <section className="card">
           <div className="card-head">
-            <span className="card-title">어디서 막혀 있나</span>
+            <h2 className="card-title">어디서 막혀 있나</h2>
           </div>
           <StageBars byStage={data.byStage} total={c.total} />
         </section>
@@ -704,16 +716,17 @@ function Overview({ data }) {
           {data.byDept.length > 0 && (
             <section className="card">
               <div className="card-head">
-                <span className="card-title">부서별</span>
+                <h3 className="card-title">부서별</h3>
               </div>
               <div className="table-wrap" style={{ marginTop: 8 }}>
                 <table className="data-table">
+                  <caption className="sr-only">부서별 신청과 처리 현황</caption>
                   <thead>
                     <tr>
-                      <th>부서</th>
-                      <th className="num">낸 것</th>
-                      <th className="num">반려</th>
-                      <th className="num">완료</th>
+                      <th scope="col">부서</th>
+                      <th scope="col" className="num">낸 것</th>
+                      <th scope="col" className="num">반려</th>
+                      <th scope="col" className="num">완료</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -735,7 +748,7 @@ function Overview({ data }) {
 
           {data.refuseMix.length > 0 && (
             <section className="card">
-              <div className="card-title">무엇을 못 만든다고 했나</div>
+              <h3 className="card-title">무엇을 못 만든다고 했나</h3>
               <ul className="refuse-mix">
                 {data.refuseMix.map((r) => (
                   <li key={r.code}>
@@ -752,7 +765,7 @@ function Overview({ data }) {
       {data.recentDecisions.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">최근 결정</span>
+            <h2 className="card-title">최근 결정</h2>
             {data.unrequestedCount > 0 && (
               // 이 숫자는 최근 것이 아니라 전체다. 옆의 목록은 최근 네 건만
               // 보여주므로, 여기서 세는 범위가 다르다는 것을 링크로 분명히
@@ -864,7 +877,7 @@ function LeadSpread({ lead }) {
   return (
     <section className="card lead-spread">
       <div className="card-head">
-        <span className="card-title">가장 빨랐던 것과 가장 오래 걸린 것</span>
+        <h2 className="card-title">가장 빨랐던 것과 가장 오래 걸린 것</h2>
       </div>
       <div className="lead-spread-row">
         <div className="lead-spread-one">

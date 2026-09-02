@@ -4,6 +4,7 @@ import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago, dateTimeLabel, duration, ms, num } from '../lib/format.js'
+import Field from '../components/Field.jsx'
 
 // 넘긴 뒤에 무슨 일이 일어나고 있나.
 //
@@ -274,9 +275,9 @@ export default function ToolsPage() {
           {reports?.tools?.length > 0 && (
             <section className="stack">
               <div className="card-head">
-                <span className="card-title">
+                <h2 className="card-title">
                   부서가 겪은 것 {reports.summary.open}건이 아직 안 고쳐졌습니다
-                </span>
+                </h2>
               </div>
               {reports.tools.map((t) => (
                 <ReportTool key={t.applicationId} tool={t} onFixed={reloadReports} />
@@ -287,7 +288,7 @@ export default function ToolsPage() {
           {data.failures.length > 0 && (
             <section className="card">
               <div className="card-head">
-                <span className="card-title">실패한 실행 {data.failures.length}건</span>
+                <h2 className="card-title">실패한 실행 {data.failures.length}건</h2>
               </div>
               <ul className="tool-failures">
                 {data.failures.map((f, i) => (
@@ -401,30 +402,22 @@ function ReportItem({ report, onFixed }) {
         </div>
       ) : open ? (
         <form className="thread-form" onSubmit={send}>
-          <label className="field">
-            <span className="field-label">
-              무엇을 하셨습니까<span className="field-required"> *</span>
-            </span>
+          <Field label="무엇을 하셨습니까" required error={fieldErrors.how}>
             <textarea
               rows={2}
               value={form.how}
               onChange={(e) => setForm((f) => ({ ...f, how: e.target.value }))}
               placeholder="할인액 컬럼 이름이 바뀐 것을 못 잡고 있었습니다. 컬럼이 사라지면 막도록 고쳤습니다."
             />
-            {fieldErrors.how && <div className="field-error">{fieldErrors.how}</div>}
-          </label>
-          <label className="field">
-            <span className="field-label">
-              왜 그랬던 것입니까<span className="field-required"> *</span>
-            </span>
+          </Field>
+          <Field label="왜 그랬던 것입니까" required error={fieldErrors.why}>
             <textarea
               rows={2}
               value={form.why}
               onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
               placeholder="필수 컬럼이 아니어서 없어도 넘어가게 해 뒀습니다. 금액에 들어가는 컬럼은 없으면 막아야 합니다."
             />
-            {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-          </label>
+          </Field>
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
               {saving ? '남기는 중…' : '처리했다고 남기기'}

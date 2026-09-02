@@ -40,6 +40,7 @@ export default function BuildPage() {
                 key={a.id}
                 type="button"
                 className={`chip${selectedId === a.id ? ' on' : ''}`}
+                aria-pressed={selectedId === a.id}
                 onClick={() => setSelectedId(a.id)}
               >
                 {a.dept} · {a.title.slice(0, 22)}
@@ -47,7 +48,7 @@ export default function BuildPage() {
               </button>
             ))}
           </div>
-          {selectedId && <Build id={selectedId} />}
+          {selectedId && <Build key={selectedId} id={selectedId} />}
         </>
       )}
     </div>
@@ -117,7 +118,7 @@ function Build({ id }) {
     <div className="stack">
       <section className="card">
         <div className="card-head">
-          <span className="card-title">파일을 넣으면 합칩니다</span>
+          <h2 className="card-title">파일을 넣으면 합칩니다</h2>
           <span className="badge badge-success">계산은 이 브라우저에서 돕니다</span>
         </div>
 
@@ -127,6 +128,7 @@ function Build({ id }) {
             type="file"
             multiple
             className="sr-only"
+            aria-label="합칠 파일 선택"
             accept=".csv,.xlsx,.xls,.txt"
             onChange={(e) => {
               runUploaded(e.target.files)
@@ -181,19 +183,20 @@ function Build({ id }) {
           {latest.totals?.byChannel && (
             <section className="card">
               <div className="card-head">
-                <span className="card-title">채널별</span>
+                <h3 className="card-title">채널별</h3>
               </div>
               <div className="table-wrap">
                 <table className="data-table">
+                  <caption className="sr-only">제작 결과의 채널별 집계</caption>
                   <thead>
                     <tr>
-                      <th>채널</th>
-                      <th className="num">줄</th>
-                      <th className="num">수량</th>
-                      <th className="num">순매출</th>
-                      <th className="num">수수료</th>
-                      <th className="num">정산서상 수수료</th>
-                      <th className="num">기여이익</th>
+                      <th scope="col">채널</th>
+                      <th scope="col" className="num">줄</th>
+                      <th scope="col" className="num">수량</th>
+                      <th scope="col" className="num">순매출</th>
+                      <th scope="col" className="num">수수료</th>
+                      <th scope="col" className="num">정산서상 수수료</th>
+                      <th scope="col" className="num">기여이익</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -234,19 +237,20 @@ function Build({ id }) {
 
           <section className="card">
             <div className="card-head">
-              <span className="card-title">합친 결과</span>
+              <h3 className="card-title">합친 결과</h3>
             </div>
             <div className="grid-side">
               <div className="table-wrap" style={{ maxHeight: 460 }}>
                 <table className="data-table">
+                  <caption className="sr-only">합친 정산 결과와 원본 추적 정보</caption>
                   <thead>
                     <tr>
-                      <th>날짜</th>
-                      <th>채널</th>
-                      <th>상품</th>
-                      <th className="num">수량</th>
-                      <th className="num">순매출</th>
-                      <th className="num">기여이익</th>
+                      <th scope="col">날짜</th>
+                      <th scope="col">채널</th>
+                      <th scope="col">상품</th>
+                      <th scope="col" className="num">수량</th>
+                      <th scope="col" className="num">순매출</th>
+                      <th scope="col" className="num">기여이익</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -304,16 +308,17 @@ function Build({ id }) {
           </section>
 
           <section className="card">
-            <div className="card-title">실행 기록</div>
+            <h2 className="card-title">실행 기록</h2>
             <div className="table-wrap" style={{ marginTop: 8 }}>
               <table className="data-table">
+                <caption className="sr-only">정산 도구 실행 기록</caption>
                 <thead>
                   <tr>
-                    <th>회차</th>
-                    <th className="num">합친 줄</th>
-                    <th className="num">검토함</th>
-                    <th className="num">걸린 시간</th>
-                    <th>언제</th>
+                    <th scope="col">회차</th>
+                    <th scope="col" className="num">합친 줄</th>
+                    <th scope="col" className="num">검토함</th>
+                    <th scope="col" className="num">걸린 시간</th>
+                    <th scope="col">언제</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -364,12 +369,12 @@ function Quarantine({ data, id, onDone, toast }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">처리하지 못한 줄 {num(data.quarantine.length)}개</span>
+        <h2 className="card-title">처리하지 못한 줄 {num(data.quarantine.length)}개</h2>
       </div>
 
       {unknownByCode.size > 0 && (
         <>
-          <h4>어느 상품인지 알려주시면 다음부터 자동으로 처리됩니다</h4>
+          <h3>어느 상품인지 알려주시면 다음부터 자동으로 처리됩니다</h3>
           <div className="stack-sm" style={{ marginBottom: 16 }}>
             {[...unknownByCode.values()].map((q) => (
               <div key={q.external_code} className="teach-row">
@@ -380,6 +385,7 @@ function Quarantine({ data, id, onDone, toast }) {
                 </div>
                 <select
                   value={teaching[q.external_code] ?? ''}
+                  aria-label={`${q.external_code}에 해당하는 상품`}
                   onChange={(e) =>
                     setTeaching({ ...teaching, [q.external_code]: e.target.value })
                   }
@@ -428,12 +434,13 @@ function Quarantine({ data, id, onDone, toast }) {
               {items[0].note && <p className="card-note">{items[0].note}</p>}
               <div className="table-wrap" style={{ maxHeight: 220 }}>
                 <table className="data-table">
+                  <caption className="sr-only">격리 사유별 원본 줄</caption>
                   <thead>
                     <tr>
-                      <th>파일</th>
-                      <th>시트</th>
-                      <th className="num">줄</th>
-                      <th>내용</th>
+                      <th scope="col">파일</th>
+                      <th scope="col">시트</th>
+                      <th scope="col" className="num">줄</th>
+                      <th scope="col">내용</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -471,7 +478,7 @@ function Lineage({ row }) {
 
   return (
     <div className="card-flat lineage">
-      <div className="card-title">이 숫자가 온 길</div>
+      <h3 className="card-title">이 숫자가 온 길</h3>
 
       <div className="lineage-source">
         <div className="card-note">원본</div>

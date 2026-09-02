@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
+import Field from '../components/Field.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
@@ -45,6 +46,7 @@ export default function ResultPage() {
                 key={a.id}
                 type="button"
                 className={`chip${selectedId === a.id ? ' on' : ''}`}
+                aria-pressed={selectedId === a.id}
                 onClick={() => setSelectedId(a.id)}
               >
                 {a.dept} · {a.title.slice(0, 22)}
@@ -52,7 +54,7 @@ export default function ResultPage() {
               </button>
             ))}
           </div>
-          {selectedId && <Result id={selectedId} />}
+          {selectedId && <Result key={selectedId} id={selectedId} />}
         </>
       )}
     </div>
@@ -133,7 +135,7 @@ function Result({ id }) {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">어떻게 나온 숫자인가</span>
+          <h2 className="card-title">어떻게 나온 숫자인가</h2>
         </div>
 
         <div className="formula">
@@ -207,7 +209,7 @@ function Result({ id }) {
 
       <section className="card card-boxed">
         <div className="card-head">
-          <span className="card-title">계산에 넣을 값</span>
+          <h2 className="card-title">계산에 넣을 값</h2>
         </div>
         <div className="field-row">
           <Field label="만드는 데 든 시간" hint="회의·시험·고친 시간까지">
@@ -246,7 +248,7 @@ function Result({ id }) {
 
       <section className="card">
         <div className="card-head">
-          <span className="card-title">부서가 확인했나</span>
+          <h2 className="card-title">부서가 확인했나</h2>
         </div>
         {data.saved?.dept_confirmed_at ? (
           <div className="decided">
@@ -287,7 +289,7 @@ function ClaimedVsMeasured({ claimed, baseline }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">체감과 실측</span>
+        <h2 className="card-title">체감과 실측</h2>
       </div>
       <div className="grid-2">
         <div className="card-flat">
@@ -324,7 +326,7 @@ function Challenges({ data, send, toast }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">이 숫자를 의심해보세요</span>
+        <h2 className="card-title">이 숫자를 의심해보세요</h2>
         <span className="card-note">
           해소하지 못한 것 {data.unresolvedCount}개 / 전체 {data.challenges.length}개
         </span>
@@ -394,14 +396,3 @@ function Challenges({ data, send, toast }) {
 
 // 라벨이 글자만 감싸고 입력칸은 형제로 있어서 둘이 연결돼 있지 않았다.
 // 바깥을 label 로 바꿔 입력칸을 품게 한다(암묵적 연결).
-function Field({ label, hint, children }) {
-  return (
-    <label className="field">
-      <span className="field-label">
-        {label}
-        {hint && <span className="field-hint">{hint}</span>}
-      </span>
-      {children}
-    </label>
-  )
-}

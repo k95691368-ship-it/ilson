@@ -54,6 +54,7 @@ export default function BetaPage() {
                 key={a.id}
                 type="button"
                 className={`chip${selectedId === a.id ? ' on' : ''}`}
+                aria-pressed={selectedId === a.id}
                 onClick={() => setSelectedId(a.id)}
               >
                 {a.dept} · {a.title.slice(0, 22)}
@@ -61,7 +62,7 @@ export default function BetaPage() {
               </button>
             ))}
           </div>
-          {selectedId && <Beta id={selectedId} />}
+          {selectedId && <Beta key={selectedId} id={selectedId} />}
         </>
       )}
     </div>
@@ -150,9 +151,9 @@ function Beta({ id }) {
       {data.canTest && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">
+            <h2 className="card-title">
               {latest ? `${latest.seq + 1}차 시험 돌리기` : '시험 돌리기'}
-            </span>
+            </h2>
             <span className="card-note">
               합격 기준 {data.criteria.length}개로 채점합니다
             </span>
@@ -193,7 +194,7 @@ function Beta({ id }) {
       {data.latestResults.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <span className="card-title">기준별 판정</span>
+            <h2 className="card-title">기준별 판정</h2>
             <span className="card-note">
               통과 {latest.passed} · 실패 {latest.failed} · 사람 확인 {latest.human_needed}
             </span>
@@ -291,10 +292,11 @@ function ResultCard({ r }) {
           <div className="disclose-body">
             <div className="table-wrap">
               <table className="data-table">
+                <caption className="sr-only">합격 기준에서 어긋난 표본</caption>
                 <thead>
                   <tr>
                     {Object.keys(r.samples[0]).map((k) => (
-                      <th key={k}>{k}</th>
+                      <th scope="col" key={k}>{k}</th>
                     ))}
                   </tr>
                 </thead>
@@ -322,20 +324,21 @@ function Rounds({ rounds }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">시험 회차</span>
+        <h2 className="card-title">시험 회차</h2>
       </div>
       <div className="table-wrap">
         <table className="data-table">
+          <caption className="sr-only">베타 테스트 회차별 판정 결과</caption>
           <thead>
             <tr>
-              <th>회차</th>
-              <th>판정</th>
-              <th className="num">통과</th>
-              <th className="num">실패</th>
-              <th className="num">필수 안전 실패</th>
-              <th>무엇을 고쳤나</th>
-              <th className="num">채점 시간</th>
-              <th>언제</th>
+              <th scope="col">회차</th>
+              <th scope="col">판정</th>
+              <th scope="col" className="num">통과</th>
+              <th scope="col" className="num">실패</th>
+              <th scope="col" className="num">필수 안전 실패</th>
+              <th scope="col">무엇을 고쳤나</th>
+              <th scope="col" className="num">채점 시간</th>
+              <th scope="col">언제</th>
             </tr>
           </thead>
           <tbody>
@@ -376,7 +379,7 @@ function Feedback({ data, id, toast, onDone }) {
   return (
     <section className="card card-boxed">
       <div className="card-head">
-        <span className="card-title">실제로 써 본 사람이 한 말</span>
+        <h2 className="card-title">실제로 써 본 사람이 한 말</h2>
       </div>
 
       {data.feedback.length > 0 && (

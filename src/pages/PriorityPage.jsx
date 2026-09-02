@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago, num } from '../lib/format.js'
 import { validatePick, QUADRANTS, QUADRANT_BY_KEY, MID } from '../../shared/priority.js'
+import Field from '../components/Field.jsx'
 
 // 무엇을 먼저 할 것인가.
 //
@@ -36,7 +37,7 @@ export default function PriorityPage() {
 
       {data.items.length === 0 ? (
         <section className="card">
-          <div className="card-title">판에 올릴 것이 없습니다</div>
+          <h2 className="card-title">판에 올릴 것이 없습니다</h2>
           <p className="card-note">
             2단계에서 <strong>수용</strong>으로 판정하고 임팩트·난이도를 매기신 신청서가 여기
             올라옵니다.
@@ -49,7 +50,7 @@ export default function PriorityPage() {
         <>
           <section className="card">
             <div className="card-head">
-              <span className="card-title">{data.items.length}건이 판 위에 있습니다</span>
+              <h2 className="card-title">{data.items.length}건이 판 위에 있습니다</h2>
               <span className="card-note">점 크기 = 연 몇 시간짜리 일인가</span>
             </div>
             <Board items={data.items} picked={data.picked} onPick={(id) => setOpen(id)} />
@@ -67,7 +68,7 @@ export default function PriorityPage() {
 
           <section className="card">
             <div className="card-head">
-              <span className="card-title">먼저 하기로 정한 것</span>
+              <h2 className="card-title">먼저 하기로 정한 것</h2>
               <span className="card-note">{data.line}</span>
             </div>
             <Picked
@@ -276,18 +277,19 @@ function PickForm({ item, onClose, onDone, toast }) {
       </p>
       <p className="card-note">{q.hint}</p>
 
-      <label>
+      <Field
+        label="먼저 할 이유"
+        required
+        error={errors.why}
+        hint="이 문장이 결정 기록에 남습니다. 뒤로 밀린 부서가 물어볼 때 답할 것이 됩니다."
+      >
         <textarea
           rows={3}
           value={why}
           onChange={(e) => setWhy(e.target.value)}
           placeholder="정산 마감이 다음 주라 금액이 틀리면 되돌릴 수 없습니다. 다른 건은 한 주 밀려도 됩니다."
         />
-        {errors.why && <em className="field-error">{errors.why}</em>}
-        <small className="card-note">
-          이 문장이 결정 기록에 남습니다. 뒤로 밀린 부서가 물어볼 때 답할 것이 됩니다.
-        </small>
-      </label>
+      </Field>
 
       <div className="row">
         <button type="submit" className="btn-primary" disabled={busy}>
@@ -309,7 +311,7 @@ function OffBoard({ off }) {
   return (
     <section className="card">
       <div className="card-head">
-        <span className="card-title">판에 안 올라온 것 {off.length}건</span>
+        <h2 className="card-title">판에 안 올라온 것 {off.length}건</h2>
         <span className="spacer" />
         <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen((v) => !v)}>
           {open ? '접기' : '펼치기'}

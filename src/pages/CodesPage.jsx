@@ -3,6 +3,7 @@ import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago, dateTimeLabel, num } from '../lib/format.js'
+import Field from '../components/Field.jsx'
 
 // 알려 준 상품코드.
 //
@@ -169,10 +170,7 @@ function CodeRow({ code, catalog, onChanged }) {
             act('correct', form)
           }}
         >
-          <label className="field">
-            <span className="field-label">
-              어느 상품이었습니까<span className="field-required"> *</span>
-            </span>
+          <Field label="어느 상품이었습니까" required error={fieldErrors.canonicalCode}>
             <select
               value={form.canonicalCode}
               onChange={(e) => setForm((f) => ({ ...f, canonicalCode: e.target.value }))}
@@ -184,22 +182,15 @@ function CodeRow({ code, catalog, onChanged }) {
                 </option>
               ))}
             </select>
-            {fieldErrors.canonicalCode && (
-              <div className="field-error">{fieldErrors.canonicalCode}</div>
-            )}
-          </label>
-          <label className="field">
-            <span className="field-label">
-              왜 바꾸십니까<span className="field-required"> *</span>
-            </span>
+          </Field>
+          <Field label="왜 바꾸십니까" required error={fieldErrors.why}>
             <textarea
               rows={2}
               value={form.why}
               onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
               placeholder="이름이 비슷한 다른 상품이었습니다. 원본 주문서와 맞춰 봤습니다."
             />
-            {fieldErrors.why && <div className="field-error">{fieldErrors.why}</div>}
-          </label>
+          </Field>
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
               {saving ? '바꾸는 중…' : '바꾸고 기록에 남기기'}

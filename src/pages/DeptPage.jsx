@@ -55,7 +55,7 @@ export default function DeptPage() {
         </section>
       ) : (
         <section className="card decided">
-          <div className="card-title">{data.dept}에 밀린 것은 없습니다</div>
+          <h2 className="card-title">{data.dept}에 밀린 것은 없습니다</h2>
         </section>
       )}
 
@@ -183,7 +183,7 @@ export default function DeptPage() {
         <div className="stack">
           <section className="card">
             <div className="card-head">
-              <span className="card-title">이 부서가 낸 신청서</span>
+              <h2 className="card-title">이 부서가 낸 신청서</h2>
               <span className="card-note">{data.applications.length}건</span>
             </div>
             {data.applications.length === 0 ? (
@@ -230,7 +230,7 @@ export default function DeptPage() {
           {data.requirements.length > 0 && (
             <section className="card">
               <div className="card-head">
-                <span className="card-title">이 부서가 회의에서 낸 요구</span>
+                <h2 className="card-title">이 부서가 회의에서 낸 요구</h2>
                 <span className="card-note">
                   채택 {data.summary.requirementsTaken} · 기각 {data.summary.requirementsRejected}
                 </span>
@@ -263,7 +263,7 @@ export default function DeptPage() {
           {data.conflicts.length > 0 && (
             <section className="card">
               <div className="card-head">
-                <span className="card-title">다른 부서와 부딪힌 것</span>
+                <h2 className="card-title">다른 부서와 부딪힌 것</h2>
                 <span className="card-note">{data.conflicts.length}건</span>
               </div>
               <ul className="dept-conflicts">
@@ -296,7 +296,7 @@ export default function DeptPage() {
         <div className="stack">
           {data.stakeholders.length > 0 && (
             <section className="card">
-              <div className="card-title">이 부서에서 만난 사람</div>
+              <h2 className="card-title">이 부서에서 만난 사람</h2>
               <ul className="dept-people">
                 {data.stakeholders.map((p) => (
                   <li key={p.id}>
@@ -312,7 +312,7 @@ export default function DeptPage() {
 
           {data.tools.length > 0 && (
             <section className="card">
-              <div className="card-title">이 부서에 넘긴 도구</div>
+              <h2 className="card-title">이 부서에 넘긴 도구</h2>
               <ul className="dept-tools">
                 {data.tools.map((t) => (
                   <li key={t.application_id}>
@@ -342,7 +342,7 @@ export default function DeptPage() {
 
           {data.meetings.length > 0 && (
             <section className="card">
-              <div className="card-title">함께한 회의 {data.meetings.length}번</div>
+              <h2 className="card-title">함께한 회의 {data.meetings.length}번</h2>
               <ul className="dept-meetings">
                 {data.meetings.map((m) => (
                   <li key={m.id}>
@@ -361,7 +361,7 @@ export default function DeptPage() {
 
           {data.feedback.length > 0 && (
             <section className="card">
-              <div className="card-title">써 보고 남겨 주신 말</div>
+              <h2 className="card-title">써 보고 남겨 주신 말</h2>
               <ul className="dept-feedback">
                 {data.feedback.map((f) => (
                   <li key={f.id}>
@@ -385,7 +385,7 @@ export default function DeptPage() {
 
           {data.decisions.length > 0 && (
             <section className="card">
-              <div className="card-title">이 부서 건으로 내린 결정 {data.decisions.length}건</div>
+              <h2 className="card-title">이 부서 건으로 내린 결정 {data.decisions.length}건</h2>
               <ul className="dept-decisions">
                 {data.decisions.map((d, i) => (
                   <li key={i}>
