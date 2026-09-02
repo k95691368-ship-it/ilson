@@ -25,6 +25,16 @@ const BuiltPage = lazy(() => import('./pages/BuiltPage.jsx'))
 const BugPage = lazy(() => import('./pages/BugPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 
+const BOTTOM_TABS = [
+  { to: '/', label: '홈', icon: '홈' },
+  ...STAGES.map((s) => ({
+    to: s.path,
+    label: s.label,
+    icon: `${s.no}`,
+  })),
+  { to: '/track', label: '조회', icon: '조회' },
+]
+
 // 여섯 단계 어디에도 안 들어가는 화면들. 단계를 가로로 지르며 본다.
 //
 // 순서는 담당자가 하루를 시작하는 순서다 — 무엇을 먼저 할지 정하고, 멈춘
@@ -87,6 +97,7 @@ export default function App() {
   usePrintUnfold()
 
   const navClass = ({ isActive }) => `topbar-link${isActive ? ' active' : ''}`
+  const tabClass = ({ isActive }) => `app-tab-link${isActive ? ' active' : ''}`
 
   return (
     <div className={`app-shell${bare ? ' app-shell-bare' : ''}`}>
@@ -96,6 +107,22 @@ export default function App() {
       <a className="skip-link" href="#main">
         본문으로 건너뛰기
       </a>
+
+      {!bare && (
+        <nav className="app-tabbar" aria-label="하단 탭 메뉴">
+          {BOTTOM_TABS.map((tab) => (
+            <NavLink
+              key={tab.to}
+              to={tab.to}
+              className={tabClass}
+              end={tab.to === '/'}
+            >
+              <span aria-hidden="true" className="app-tab-icon">{tab.icon}</span>
+              <span className="app-tab-label">{tab.label}</span>
+            </NavLink>
+          ))}
+        </nav>
+      )}
 
       {!bare && (
         <header className="topbar">
