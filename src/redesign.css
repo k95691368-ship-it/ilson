@@ -5,26 +5,26 @@
 */
 
 :root {
-  --page-max: 1120px;
-  --page-pad: clamp(16px, 4.4vw, 44px);
-  --section-gap: clamp(20px, 4vw, 46px);
+  --page-max: 1200px;
+  --page-pad: clamp(18px, 4.8vw, 46px);
+  --section-gap: clamp(22px, 4vw, 50px);
   --surface: #ffffff;
   --surface-elevated: #ffffff;
   --surface-subtle: #f5f5f7;
-  --bg: #f2f3f6;
-  --bg-soft: #f7f8fb;
-  --border: #d8d8df;
-  --line: #dfdfe6;
+  --bg: #f5f5f7;
+  --bg-soft: #fbfbfd;
+  --border: #d2d2d7;
+  --line: #e2e2e7;
   --text: #1d1d1f;
   --text-h: #111113;
   --text-muted: #575761;
   --text-dim: #70707b;
 
-  --accent: #b53d35;
-  --accent-bg: #f6e6e3;
-  --accent-border: #e1a79f;
-  --accent-hover: #8f332c;
-  --accent-press: #7a2b25;
+  --accent: #111113;
+  --accent-bg: #ececf0;
+  --accent-border: #c2c2c8;
+  --accent-hover: #000000;
+  --accent-press: #2d2d2f;
 
   --danger: #a53b33;
   --danger-bg: #f7e8e6;
@@ -41,7 +41,7 @@
   --warning-border: #ceaf75;
   --warning-text: #6c3f0d;
 
-  --draft: #7a6038;
+  --draft: #6d5b34;
   --draft-bg: #f1eadf;
   --draft-border: #c7af91;
   --human-border: #111113;
@@ -50,12 +50,12 @@
   --toast-success: #2c6f4c;
   --toast-danger: #a53b33;
   --toast-info: #111113;
-  --toast-border: rgba(17, 17, 19, 0.14);
-  --shadow-sm: 0 1px 2px rgba(17, 17, 19, 0.08);
-  --shadow: 0 18px 46px rgba(17, 17, 19, 0.12);
+  --toast-border: rgba(17, 17, 19, 0.16);
+  --shadow-sm: 0 1px 2px rgba(17, 17, 19, 0.05);
+  --shadow: 0 18px 40px rgba(17, 17, 19, 0.08);
 
-  --radius: 22px;
-  --radius-sm: 14px;
+  --radius: 24px;
+  --radius-sm: 13px;
   --radius-full: 999px;
   --radius-pill: 999px;
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Pretendard Variable',
@@ -87,17 +87,7 @@ body {
 body {
   min-width: 320px;
   min-height: 100vh;
-  background: radial-gradient(
-      1200px 400px at 20% -120px,
-      rgba(255, 255, 255, 0.88),
-      transparent 45%
-    ),
-    radial-gradient(
-      900px 260px at 100% -80px,
-      rgba(255, 255, 255, 0.76),
-      transparent 54%
-    ),
-    var(--bg);
+  background: linear-gradient(180deg, #ffffff 0, #f5f5f7 24%, #f5f5f7 100%);
   color: var(--text);
 }
 
@@ -2211,4 +2201,400 @@ a.btn-danger:hover {
   details.disclose > .disclose-body {
     display: block !important;
   }
+}
+
+/* ============================================================
+   Apple-inspired visual layer (일손 화면 통일)
+   - 단색·여백 중심, 선명한 계층, 불필요한 강조 최소화
+   ============================================================ */
+
+:root {
+  --radius: 20px;
+  --radius-sm: 12px;
+  --shadow: 0 24px 48px rgba(17, 17, 19, 0.08);
+  --shadow-sm: 0 1px 2px rgba(17, 17, 19, 0.05);
+}
+
+h1 {
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+}
+
+h2 {
+  letter-spacing: -0.025em;
+}
+
+h3 {
+  letter-spacing: -0.016em;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 140;
+  background: color-mix(in srgb, #ffffff 82%, transparent);
+  border-bottom: 1px solid var(--line);
+  backdrop-filter: saturate(120%) blur(26px);
+  -webkit-backdrop-filter: saturate(120%) blur(26px);
+}
+
+.topbar-inner {
+  min-height: 58px;
+}
+
+.topbar-brand {
+  gap: 8px;
+  letter-spacing: -0.02em;
+}
+
+.topbar-brand-sub {
+  font-size: 0.82rem;
+  letter-spacing: -0.01em;
+}
+
+.topbar-link {
+  min-height: 34px;
+  border-radius: 999px;
+  padding: 0 12px;
+  font-size: 0.74rem;
+  letter-spacing: 0.005em;
+}
+
+.topbar-link::after {
+  left: 12px;
+  right: 12px;
+  bottom: 5px;
+}
+
+.topbar-logo,
+.barebar-brand > span:first-child {
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  border-color: #111113;
+}
+
+.topbar-logo::after,
+.barebar-brand > span:first-child::after {
+  width: 7px;
+  height: 7px;
+  border: 2px solid #ffffff;
+  right: -3px;
+  top: -3px;
+}
+
+.portal-link,
+.app-tab-link {
+  border-radius: 999px;
+}
+
+.app-main {
+  width: min(100%, calc(var(--page-max) + (var(--page-pad) * 2)));
+  padding-top: clamp(42px, 7.2vw, 72px);
+  padding-bottom: clamp(102px, 18vw, 140px);
+}
+
+button,
+a.btn-primary,
+a.btn-ghost,
+a.btn-danger,
+.btn-sm,
+.btn-primary,
+.btn-ghost,
+.btn-danger {
+  min-height: 42px;
+  border-radius: 999px;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease,
+    transform 160ms ease;
+}
+
+.btn-primary,
+a.btn-primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled),
+a.btn-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+  transform: translateY(-0.5px);
+}
+
+.btn-ghost {
+  border-color: var(--line);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.btn-ghost:hover {
+  border-color: #111113;
+}
+
+.btn-danger,
+a.btn-danger {
+  background: rgba(165, 59, 51, 0.11);
+  border-color: var(--danger);
+  color: var(--danger-text);
+}
+
+.btn-danger:hover,
+a.btn-danger:hover {
+  border-color: #7a2a1f;
+}
+
+.app-footer {
+  padding-top: 44px;
+  border-top-color: #dedee2;
+}
+
+.footer-grid {
+  gap: 22px;
+}
+
+.home-hero {
+  min-height: auto;
+  padding-top: 0;
+  gap: 14px;
+}
+
+.home-hero h1 {
+  font-size: clamp(2.2rem, 7vw, 4rem);
+  margin-bottom: 8px;
+}
+
+.hero-proof {
+  margin-top: clamp(18px, 2.5vw, 24px);
+  border-radius: calc(var(--radius) + 2px);
+  background: #ffffff;
+  border: 1px solid var(--line);
+}
+
+.hero-proof li {
+  min-width: 0;
+  padding: 18px clamp(14px, 3.2vw, 22px);
+}
+
+.hero-proof strong {
+  font-size: clamp(1.02rem, 1.55vw, 1.25rem);
+}
+
+.card,
+.card-boxed,
+.report-form,
+.track-detail,
+.tryit,
+.todo,
+.nextstep,
+.notice,
+.review-detail,
+.receipt,
+.honest-ready,
+.honest-alt,
+.joined,
+.owed,
+.pending-confirm,
+.merged-notice,
+.draft-restore,
+.conditional-box,
+.unproven,
+.verdict,
+.payoff,
+.teach,
+.dconf,
+.objection-form,
+.signoff-form,
+.retry,
+.unclear,
+.trust-open,
+.refuse-mix,
+.provenance,
+.lineage,
+.stat-tile,
+.flow-card,
+.tool-card,
+.app-item,
+.stage-card,
+.tool-pick,
+.track-actions,
+.todo-item,
+.table-wrap,
+.data-table,
+.tool-form,
+.record,
+.review-list-item {
+  border-color: var(--line);
+  background: #ffffff;
+}
+
+.card,
+.card-boxed,
+.report-form,
+.track-detail,
+.tryit,
+.todo,
+.nextstep,
+.notice,
+.review-detail,
+.receipt,
+.honest-ready,
+.honest-alt,
+.joined,
+.owed,
+.pending-confirm,
+.merged-notice,
+.draft-restore,
+.conditional-box,
+.unproven,
+.verdict,
+.payoff,
+.teach,
+.dconf,
+.objection-form,
+.signoff-form,
+.retry,
+.unclear,
+.trust-open,
+.refuse-mix,
+.provenance,
+.lineage,
+.record,
+.todo-item,
+.app-item,
+.tool-card,
+.track-actions {
+  border-radius: 22px;
+  box-shadow: 0 16px 30px rgba(17, 17, 19, 0.06);
+}
+
+.card,
+.card-boxed,
+.tryit,
+.todo,
+.notice,
+.nextstep,
+.report-form,
+.track-detail {
+  padding: clamp(18px, 3vw, 28px);
+}
+
+.card-head,
+.card-boxed .card-head,
+.todo-head,
+.tryit-head,
+.nextstep-head,
+.pending-head,
+.merged-head,
+.retry-head,
+.tool-card-head,
+.similar-head,
+.track-actions-head,
+.record-head,
+.signoff-head,
+.dconf-head,
+.report-done {
+  margin-bottom: 12px;
+}
+
+.flow-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 13px;
+  min-height: 108px;
+  padding: 16px 18px;
+}
+
+.flow-card:hover {
+  transform: translateY(-1px);
+  border-color: #b6b6be;
+}
+
+.flow-no {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: var(--accent-bg);
+  border-color: var(--line);
+  color: var(--accent);
+}
+
+.flow-title {
+  font-size: 1.05rem;
+}
+
+.flow-summary {
+  margin-top: 3px;
+}
+
+.page-head-actions {
+  margin-top: 19px;
+}
+
+.app-tabbar {
+  background: color-mix(in srgb, #ffffff 84%, transparent);
+}
+
+.app-tab-link {
+  border: 1px solid transparent;
+}
+
+.app-tab-link.active {
+  border-color: var(--line);
+  background: #ffffff;
+}
+
+table[data-table='provenance'],
+.data-table,
+table {
+  border-color: var(--line);
+}
+
+.data-table th,
+.data-table td {
+  padding: 11px 13px;
+}
+
+.data-table tbody tr:hover {
+  background: #fafafc;
+}
+
+.table-wrap {
+  border-color: var(--line);
+}
+
+details.disclose > summary {
+  min-height: 48px;
+  padding: 12px 13px;
+}
+
+.stat-row {
+  gap: 12px;
+}
+
+.stat-tile {
+  border-radius: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  background: #ffffff;
+}
+
+.todo-item {
+  border-left-width: 3px;
+  border-radius: 17px;
+}
+
+.hero-proof li + li {
+  border-left: 1px solid var(--line);
+}
+
+.toast-viewport {
+  right: 16px;
+}
+
+.toast {
+  box-shadow: var(--shadow-sm);
 }
