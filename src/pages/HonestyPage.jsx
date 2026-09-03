@@ -294,7 +294,7 @@ export default function HonestyPage() {
 
 // 이 배포가 실제로 살아 있는가.
 //
-// 서버에는 검사 창구가 있는데 화면에서 아무도 안 불렀다. 그래서 D1 바인딩이나
+// 서버에는 검사 창구가 있는데 화면에서 아무도 안 불렀다. 그래서 DB 바인딩이나
 // 스키마가 빠진 채 올라가면, 첫 화면은 멀쩡히 뜨고 각 API만 503을 낸다.
 // 올린 사람은 원인이 아니라 증상만 본다.
 //
@@ -308,7 +308,8 @@ function Ready() {
   // 그 확인을 지웠는데 목록만 남아서, **"파일 보관소(R2) 연결 — 모두 확인됨"
   // 이 라이브에 떠 있었다.** 있지도 않은 것을 확인했다고 말한 것이다.
   // 하필 이 화면이 그러면 여기 적힌 나머지도 다 못 믿게 된다.
-  const labels = { db: '데이터베이스(D1) 연결', schema: '표 구조 적용' }
+  const provider = data.checks?.provider === 'supabase' ? 'Supabase' : 'Cloudflare D1'
+  const labels = { db: `데이터베이스(${provider}) 연결`, schema: '표 구조 적용' }
 
   if (data.ready) {
     return (

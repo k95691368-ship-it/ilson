@@ -16,6 +16,7 @@
 
 import { jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
+import { withDbBinding } from '../_lib/dbBridge.js'
 
 // 한 사람이 십 분에 몇 번까지 쓸 수 있는가.
 //
@@ -27,6 +28,14 @@ const WINDOW_SECONDS = 600
 
 export async function onRequest(context) {
   const { request, next } = context
+  if (!context.env?.DBBridgeApplied) {
+    const db = await withDbBinding(context.env)
+    if (db) {
+      context.env.DB = db
+      context.env.DBBridgeApplied = true
+    }
+  }
+
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
     return next()
   }
