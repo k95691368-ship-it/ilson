@@ -74,11 +74,6 @@ export default function FlowPage() {
           <Link to="/apply" className="btn-primary">반복 업무 신청하기</Link>
           <a href="#process" className="btn-ghost">과정 보기</a>
         </div>
-        <ul className="hero-proof" aria-label="일손의 주요 사실">
-          <li><strong>6단계</strong><span>신청부터 성과까지</span></li>
-          <li><strong>외부 AI 호출 0회</strong><span>판정과 계산 기준</span></li>
-          <li><strong>원본 근거</strong><span>모든 숫자를 다시 확인</span></li>
-        </ul>
       </header>
 
       {/* 보러 온 사람에게 눌러도 된다고 말한다.

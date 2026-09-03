@@ -1955,6 +1955,200 @@ a.btn-danger:hover {
   padding: 18px 18px;
 }
 
+.built-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.built-tab {
+  flex: 1 1 240px;
+  text-align: left;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.built-tab.on {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+  color: var(--accent);
+}
+
+.built-lead h2 {
+  margin: 0 0 9px;
+  font-size: 1.15rem;
+}
+
+.built-lead p {
+  margin: 0;
+  line-height: 1.9;
+}
+
+.built-body {
+  margin: 0;
+  line-height: 1.9;
+  font-size: 0.95rem;
+}
+
+.built-why {
+  margin-top: 9px;
+  padding: 11px 13px;
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.built-stages {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.built-stages > li {
+  display: flex;
+  gap: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.built-stage-n {
+  flex: 0 0 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-bg);
+  color: var(--accent);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.built-stages p,
+.built-point p,
+.built-output-box p {
+  margin: 4px 0 0;
+  font-size: 0.95rem;
+  line-height: 1.9;
+}
+
+.built-points {
+  display: grid;
+  gap: 11px;
+}
+
+.built-point {
+  padding: 12px 14px;
+  border-left: 3px solid var(--success);
+}
+
+.built-facts {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+
+.built-facts > li {
+  display: grid;
+  gap: 2px;
+}
+
+.built-stack {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 7px 16px;
+  margin: 0;
+}
+
+.built-stack dt {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.built-stack dd {
+  margin: 0;
+}
+
+.built-llm {
+  border-color: var(--accent);
+}
+
+.built-llm-half + .built-llm-half {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.built-how {
+  margin: 9px 0 0;
+  padding-left: 18px;
+  font-size: 0.95rem;
+  line-height: 1.95;
+  display: grid;
+  gap: 6px;
+}
+
+.built-cta {
+  border-color: var(--accent);
+  background: var(--accent-bg);
+}
+
+.built-cta p {
+  margin: 0 0 11px;
+  line-height: 1.85;
+}
+
+.built-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.built-output-box {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  background: var(--surface);
+}
+
+.built-output-list {
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.built-output-list dt {
+  font-weight: 700;
+}
+
+.built-output-list dd {
+  margin: 2px 0 0;
+  font-size: 0.93rem;
+  line-height: 1.7;
+}
+
+.built-role-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.built-role-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  line-height: 1.75;
+}
+
 .tool-card:hover,
 .app-item:hover,
 .notice-link:hover {
@@ -2086,6 +2280,11 @@ a.btn-danger:hover {
   .track-actions > *,
   .built-cta > * {
     width: 100%;
+  }
+
+  .built-grid,
+  .built-role-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .grid-2,

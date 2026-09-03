@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { PLAIN, TECH, techFacts } from '../../shared/about.js'
+import { PLAIN, TECH, techFacts, OVERRIDE_LOOP } from '../../shared/about.js'
 import { inlineParts } from '../lib/inline.js'
 import { useApi } from '../hooks/useApi.js'
 
@@ -96,6 +96,58 @@ function Plain() {
             </li>
           ))}
         </ol>
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">AI 판단 적용 후 운영 루프</h2>
+        </div>
+        <p>{OVERRIDE_LOOP.intro}</p>
+        <ol className="built-stages">
+          {OVERRIDE_LOOP.flow.map((s) => (
+            <li key={s.n}>
+              <span className="built-stage-n">{s.n}</span>
+              <div>
+                <strong>{s.title}</strong>
+                <Body text={s.body} className="" />
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <section className="card built-grid">
+        {OVERRIDE_LOOP.outputs.map((block) => (
+          <div key={block.title} className="built-output-box">
+            <h3 className="card-title">{block.title}</h3>
+            <dl className="built-output-list">
+              {block.items.map((item) => (
+                <div key={item.name}>
+                  <dt>{item.name}</dt>
+                  <dd>{item.desc}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+      </section>
+
+      <section className="card">
+        <div className="card-head">
+          <h2 className="card-title">역할 분담</h2>
+        </div>
+        <div className="built-role-grid">
+          {OVERRIDE_LOOP.roles.map((group) => (
+            <div key={group.title} className="built-point">
+              <strong>{group.title}</strong>
+              <ul className="built-role-list">
+                {group.items.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
       </section>
 
       <section className="card">
