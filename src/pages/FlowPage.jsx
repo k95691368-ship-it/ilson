@@ -421,7 +421,6 @@ function TryIt({ provenance, counts }) {
     return (
       <section className="tryit tryit-empty">
         <div className="tryit-head">
-          <span className="badge badge-accent">보러 오신 분께</span>
           <h2 className="tryit-title">{EMPTY_INVITE.title}</h2>
         </div>
         <p className="tryit-sub">{EMPTY_INVITE.why}</p>
@@ -483,17 +482,15 @@ function TryIt({ provenance, counts }) {
   return (
     <section className="tryit">
       <div className="tryit-head">
-        <span className="badge badge-accent">보러 오신 분께</span>
-        <h2 className="tryit-title">읽기만 하지 마시고 직접 눌러 보셔도 됩니다</h2>
         <span className="spacer" />
-        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen((v) => !v)}>
-          {open ? '접기' : '무엇을 해볼 수 있나'}
+        <button
+          type="button"
+          className="btn-ghost btn-sm"
+          onClick={() => setOpen((v) => !v)}
+        >
+          {open ? '접기' : '시작하기'}
         </button>
       </div>
-
-      <p className="tryit-sub">
-        로그인이 없습니다. 판정도, 반려도, 도구 실행도 지금 그대로 하실 수 있습니다.
-      </p>
 
       {open && (
         <>
