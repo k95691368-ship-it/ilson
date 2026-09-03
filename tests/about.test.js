@@ -119,12 +119,14 @@ describe('적어 둔 것이 실제로 그런가', () => {
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n')
 
-  it('"AI를 쓰지 않는다"가 사실이다', () => {
-    // 이 문장이 이 문서에서 가장 무겁다. 거짓이면 나머지가 다 무너진다.
-    expect(TECH.llm.inProduct.title).toContain('쓰지 않습니다')
-    expect(src).not.toContain('api.anthropic.com')
-    expect(src).not.toContain('CLAUDE_API_KEY')
-    expect(src).not.toContain('tool_choice')
+  it('"Claude Opus 5 분석 초안만 쓴다"가 사실이다', () => {
+    // 모델과 책임 경계를 글에만 적고 구현이 다르면 안 된다.
+    expect(TECH.llm.inProduct.title).toContain('분석 초안')
+    expect(TECH.llm.inProduct.body).toContain('claude-opus-5')
+    expect(src).toContain("const MODEL = 'claude-opus-5'")
+    expect(src).toContain('api.anthropic.com')
+    expect(src).toContain('CLAUDE_API_KEY')
+    expect(src).not.toContain('claude-sonnet')
   })
 
   it('"파일이 서버로 가지 않는다"가 사실이다', () => {
@@ -205,10 +207,11 @@ describe('LLM 이야기', () => {
     expect(TECH.llm.inBuilding.title).toContain('만드는 과정에서는')
   })
 
-  it('왜 안 썼는지를 적는다', () => {
-    // "안 썼습니다"만 적으면 못 쓴 것으로 읽힌다.
+  it('왜 초안으로만 쓰는지를 적는다', () => {
+    // 모델을 쓴다는 말만으로는 누가 최종 책임을 지는지 알 수 없다.
     expect(TECH.llm.inProduct.why).toContain('책임')
-    expect(TECH.llm.inProduct.body).toContain('8곳')
+    expect(TECH.llm.inProduct.body).toContain('3곳')
+    expect(TECH.llm.inProduct.body).toContain('사람이 결정')
   })
 
   it('어떻게 썼는지를 구체적으로 적는다', () => {

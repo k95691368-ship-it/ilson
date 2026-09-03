@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const APP = readFileSync(join(ROOT, 'src', 'App.jsx'), 'utf8')
+const OVERRIDE = readFileSync(join(ROOT, 'src', 'pages', 'OverridePage.jsx'), 'utf8')
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -52,9 +53,11 @@ function alwaysVisibleTargets() {
   for (const m of flow.matchAll(/<Link to="([^"]+)" className="btn-ghost btn-sm">/g)) {
     fromFlow.push(m[1])
   }
+  // 새 운영판의 사이드바에서 도입 이전 포트폴리오로 가는 문도 늘 보인다.
+  const fromOverride = [...OVERRIDE.matchAll(/<Link to="([^"]+)"/g)].map((m) => m[1])
   // 왼쪽 위 이름표가 첫 화면으로 돌아가는 문이다. 어느 화면에서나 보인다.
   const brand = /<Link to="\/" className="topbar-brand">/.test(APP) ? ['/'] : []
-  return new Set([...fromStages, ...fromFooter, ...fromTopbar, ...fromFlow, ...brand])
+  return new Set([...fromStages, ...fromFooter, ...fromTopbar, ...fromFlow, ...fromOverride, ...brand])
 }
 
 describe('화면마다 들어갈 문이 있는가', () => {
@@ -76,7 +79,7 @@ describe('화면마다 들어갈 문이 있는가', () => {
   // 사실은 링크를 안 놓은 것에 대한 변명이었다. 담당자와 부서가 같은 사이트를
   // 쓰는데, 부서 사람이 첫 화면에서 자기 부서를 못 찾으면 그런 화면이
   // 있다는 것 자체를 모른다.
-  const BY_ADDRESS = ['/t/:slug', '/record/:id', '/compare']
+  const BY_ADDRESS = ['/override', '/t/:slug', '/record/:id', '/compare']
 
   it('모든 화면에 늘 보이는 문이 있다', () => {
     const orphans = all.filter((r) => !always.has(r) && !BY_ADDRESS.includes(r))

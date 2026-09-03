@@ -49,6 +49,13 @@ const NOT_RESPONSE = new Set([
   'why',
   'alternatives',
   'unrequested',
+  // Anthropic로 보내는 요청과 감사 로그 내부 상세. 브라우저 응답이 아니다.
+  'max_tokens',
+  'messages',
+  'call_id',
+  'redirect',
+  'response_status',
+  'row_count',
 ])
 
 describe('아무도 안 읽는 값을 응답에 싣지 않는다', () => {

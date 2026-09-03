@@ -4,10 +4,10 @@ import react from '@vitejs/plugin-react'
 // 첫 화면 코드를 index 와 **동시에** 받아 오게 한다.
 //
 // 화면을 라우트 단위로 갈라 두면 좋은 점이 크지만, 첫 화면에는 대가가 있다.
-// 브라우저가 index.js 를 다 받아 실행해야 그제서야 "아, FlowPage 도
+// 브라우저가 index.js 를 다 받아 실행해야 그제서야 "아, OverridePage 도
 // 필요하구나"를 알고 그때 받으러 간다. 왕복이 두 번 쌓인다 —
 //
-//   index.html  →  index.js  →  FlowPage.js  →  그제서야 그림
+//   index.html  →  index.js  →  OverridePage.js  →  그제서야 그림
 //
 // 정적 import 로 바꾸면 이 왕복은 없어지지만, 부서가 직접 여는 도구
 // 화면(/t/:slug)까지 첫 화면 코드를 같이 받게 된다. 한 화면을 다른 화면과
@@ -28,7 +28,7 @@ function preloadHomeChunk() {
     apply: 'build',
     generateBundle(_options, bundle) {
       for (const [file, chunk] of Object.entries(bundle)) {
-        if (chunk.type === 'chunk' && chunk.facadeModuleId?.endsWith('FlowPage.jsx')) {
+        if (chunk.type === 'chunk' && chunk.facadeModuleId?.endsWith('OverridePage.jsx')) {
           homeFile = file
         }
       }

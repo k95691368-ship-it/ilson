@@ -4,6 +4,7 @@ import PageViewTracker from './components/PageViewTracker.jsx'
 import { STAGES } from './lib/stages.js'
 
 const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
+const OverridePage = lazy(() => import('./pages/OverridePage.jsx'))
 const ApplyPage = lazy(() => import('./pages/ApplyPage.jsx'))
 const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'))
 const AgreementPage = lazy(() => import('./pages/AgreementPage.jsx'))
@@ -63,6 +64,11 @@ function useBareLayout() {
   return path.startsWith('/t/') || path === '/track' || path.startsWith('/record/')
 }
 
+function useWorkspaceLayout() {
+  const path = useLocation().pathname
+  return path === '/' || path === '/override'
+}
+
 // 인쇄할 때는 접힌 것을 전부 편다.
 //
 // 기록 문서(/record)·조회 화면은 **종이가 결과물**이다. 파일 머리에
@@ -94,13 +100,14 @@ function usePrintUnfold() {
 
 export default function App() {
   const bare = useBareLayout()
+  const workspace = useWorkspaceLayout()
   usePrintUnfold()
 
   const navClass = ({ isActive }) => `topbar-link${isActive ? ' active' : ''}`
   const tabClass = ({ isActive }) => `app-tab-link${isActive ? ' active' : ''}`
 
   return (
-    <div className={`app-shell${bare ? ' app-shell-bare' : ''}`}>
+    <div className={`app-shell${bare ? ' app-shell-bare' : ''}${workspace ? ' app-shell-workspace' : ''}`}>
       {/* 주소가 바뀌어도 새 문서를 안 받아오므로, 화면 이동을 여기서 듣고
           직접 보낸다. 열쇠(접수번호·도구 주소·신청서 id)는 가려서 보낸다. */}
       <PageViewTracker />
@@ -108,7 +115,7 @@ export default function App() {
         본문으로 건너뛰기
       </a>
 
-      {!bare && (
+      {!bare && !workspace && (
         <nav className="app-tabbar" aria-label="하단 탭 메뉴">
           {BOTTOM_TABS.map((tab) => (
             <NavLink
@@ -124,7 +131,7 @@ export default function App() {
         </nav>
       )}
 
-      {!bare && (
+      {!bare && !workspace && (
         <header className="topbar">
           <div className="topbar-inner">
             <Link to="/" className="topbar-brand">
@@ -163,7 +170,7 @@ export default function App() {
         </header>
       )}
 
-      {bare && (
+      {bare && !workspace && (
         <header className="barebar">
           <Link to="/" className="barebar-brand" aria-label="일손 운영 홈으로">
             <span aria-hidden="true">IL</span>
@@ -182,14 +189,16 @@ export default function App() {
           약속이 뒷문으로 깨진다. 세 화면은 목차·꼬리말도 없이 여는 자리라
           bare 하나로 같이 잡힌다. */}
       <main
-        className={bare ? 'app-main app-main-bare' : 'app-main'}
+        className={workspace ? 'app-main app-main-workspace' : bare ? 'app-main app-main-bare' : 'app-main'}
         id="main"
         tabIndex="-1"
         data-clarity-mask={bare ? 'true' : undefined}
       >
         <Suspense fallback={<div className="page-loading">불러오는 중…</div>}>
           <Routes>
-            <Route path="/" element={<FlowPage />} />
+            <Route path="/" element={<OverridePage />} />
+            <Route path="/override" element={<OverridePage />} />
+            <Route path="/portfolio" element={<FlowPage />} />
             <Route path="/apply" element={<ApplyPage />} />
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/agreement" element={<AgreementPage />} />
@@ -214,7 +223,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      {!bare && (
+      {!bare && !workspace && (
         <footer className="app-footer">
           <div className="footer-grid">
             <div className="footer-col">
@@ -250,7 +259,7 @@ export default function App() {
           </div>
           <div className="footer-bottom">
             <span>
-              Cloudflare Pages Functions · D1 · 판정과 계산의 외부 AI 호출 0회
+              Cloudflare Pages Functions · Supabase 우선 · D1 fallback
             </span>
             <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>

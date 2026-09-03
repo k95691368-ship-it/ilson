@@ -79,7 +79,7 @@ describe('서버를 놀리지 않는가', () => {
 
   it('첫 화면이 부를 것을 미리 띄운다', () => {
     expect(html).toContain('__boot')
-    expect(html).toContain('/overview')
+    expect(html).toContain('/override')
   })
 
   it('미리 띄운 것이 실패해도 거절을 남기지 않는다', () => {
@@ -108,13 +108,13 @@ describe('첫 화면 코드를 기다렸다 받지 않는가', () => {
 
   it('빌드가 첫 화면 조각을 미리 받으라고 적어 준다', () => {
     expect(config).toContain('modulepreload')
-    expect(config).toContain('FlowPage.jsx')
+    expect(config).toContain('OverridePage.jsx')
   })
 
   it('이름을 손으로 적어 두지 않는다', () => {
     // 파일 이름에는 해시가 박혀 매 빌드마다 달라진다. 손으로 적으면 다음
     // 빌드에서 조용히 없는 파일을 가리킨다.
-    expect(config).not.toMatch(/FlowPage-[A-Za-z0-9_-]{6,}\.js/)
+    expect(config).not.toMatch(/OverridePage-[A-Za-z0-9_-]{6,}\.js/)
     expect(config).toContain('generateBundle')
   })
 

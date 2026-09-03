@@ -6,28 +6,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="사내 반복업무를 도구로 인수인계하는 시스템. 기준선을 실측해 봉인하고, 합격 시험을 통과한 도구만 주소를 받습니다."
+      content="AI 판단의 수정·거절·이관을 수집하고, 원인 판정부터 안전한 개선 실험과 재발 측정까지 연결하는 운영 시스템."
     />
     <meta name="theme-color" content="#f5f5f7" />
     <meta name="ilson-design" content="focus-2026" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ko_KR" />
-    <meta property="og:site_name" content="일손" />
-    <meta property="og:title" content="일손 — 반복 업무를 실제 도구로." />
+    <meta property="og:site_name" content="일손 · OverrideLoop" />
+    <meta property="og:title" content="OverrideLoop — AI가 틀린 순간을, 조직의 다음 결정으로." />
     <meta
       property="og:description"
-      content="신청부터 성과까지, 반복 업무를 검증된 도구로 바꾸는 여섯 단계."
+      content="현장의 수정·거절·이관을 증거로 남기고, 반복 문제를 안전한 개선 실험으로 바꿉니다."
     />
     <meta property="og:url" content="https://ilson.pages.dev/" />
     <meta property="og:image" content="https://ilson.pages.dev/og.png" />
     <meta property="og:image:width" content="1731" />
     <meta property="og:image:height" content="909" />
-    <meta property="og:image:alt" content="일손 — 반복 업무를 실제 도구로" />
+    <meta property="og:image:alt" content="OverrideLoop — AI가 틀린 순간을, 조직의 다음 결정으로" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="일손 — 반복 업무를 실제 도구로." />
+    <meta name="twitter:title" content="OverrideLoop — AI가 틀린 순간을, 조직의 다음 결정으로." />
     <meta
       name="twitter:description"
-      content="신청부터 성과까지, 반복 업무를 검증된 도구로 바꾸는 여섯 단계."
+      content="현장의 수정·거절·이관을 증거로 남기고, 반복 문제를 안전한 개선 실험으로 바꿉니다."
     />
     <meta name="twitter:image" content="https://ilson.pages.dev/og.png" />
     <!--
@@ -65,7 +65,7 @@
         href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
       />
     </noscript>
-    <title>일손 — 반복 업무를 실제 도구로.</title>
+    <title>OverrideLoop — AI가 틀린 순간을, 조직의 다음 결정으로.</title>
 
     <!-- Google tag (gtag.js) -->
     <!--
@@ -127,8 +127,8 @@
       뜨면서 서버를 부른다. 그때까지 서버는 놀고 있다. 이 파일은 맨 먼저
       도착하므로 여기서 걸어 두면 **받는 동안 서버가 같이 일한다.**
 
-      첫 화면에서만 쓰는 둘이다. 다른 주소로 들어온 사람에게는 헛일이 되는데,
-      GET 두 번이고 응답이 작아서 그만한 값은 한다.
+      첫 화면에서 쓰는 운영 데이터다. 다른 주소로 들어온 사람에게는 요청하지
+      않고, 루트 화면의 자바스크립트를 받는 동안 서버가 먼저 준비한다.
 
       src/api/client.js 가 이걸 한 번만 꺼내 쓴다. 두 번째부터는 새로 부른다 —
       다시 부르는 것은 값이 바뀌었을까 봐 부르는 것이라, 미리 받아 둔 옛 답을
@@ -137,7 +137,7 @@
     <script>
       if (location.pathname === '/') {
         window.__boot = {}
-        for (const p of ['/overview', '/reports']) {
+        for (const p of ['/override']) {
           // 실패하면 null 이 된다. 여기서 거절을 남기면 아무도 안 받는
           // 거절이 되어 브라우저 콘솔에 오류로 찍힌다. 화면은 null 을 보고
           // 그냥 제 손으로 다시 부른다.
