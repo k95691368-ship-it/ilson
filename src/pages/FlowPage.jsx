@@ -49,18 +49,40 @@ export default function FlowPage() {
     .map(([name]) => name)
 
   return (
-    <div className="stack">
-      <header className="page-head home-hero">
-        <span className="page-eyebrow">업무 자동화 포트폴리오</span>
-        <h1>반복 업무를 실제 도구로.</h1>
-        <p className="page-lede">
-          현업이 겪는 반복 업무를 함께 정의하고, 작동하는 도구로 만든 뒤 실제 효과를 확인합니다.
+    <div className="stack flow-home">
+      <header className="page-head home-hero apple-hero">
+        <span className="apple-eyebrow">일손</span>
+        <h1>반복 업무를<br />실제 도구로.</h1>
+        <p className="page-lede apple-lead">
+          함께 정의하고, 만들어 보고, 달라진 일을 확인합니다.
         </p>
-        <div className="page-head-actions">
+        <div className="page-head-actions apple-actions">
           <Link to="/apply" className="btn-primary">반복 업무 신청하기</Link>
           <a href="#process" className="btn-ghost">과정 보기</a>
         </div>
+        <div className="settlement-preview" aria-label="다섯 채널의 정산 파일을 표준화된 결과로 합치는 흐름">
+          <div className="settlement-sources">
+            {[
+              ['CSV', '자사몰', 'UTF-8'], ['XLSX', '오프라인', '병합 셀'],
+              ['CSV', '오픈마켓', 'CP949'], ['CSV', '해외 A', 'USD'], ['XLSX', '해외 B', 'JPY'],
+            ].map(([type, name, detail]) => <div className="source-document" key={name}><span className="source-file-type">{type}</span><strong>{name}</strong><small>{detail}</small><span className="source-file-lines" aria-hidden="true" /></div>)}
+          </div>
+          <div className="settlement-join" aria-hidden="true"><span /><span>↓</span><span /></div>
+          <div className="settlement-output">
+            <div className="settlement-output-title"><span className="output-mark" aria-hidden="true">↳</span><strong>하나로 정리된 정산</strong><span>원본까지 연결</span></div>
+            <div className="settlement-columns"><span>날짜</span><span>채널</span><span>상품</span><span>순매출</span><span>원본</span></div>
+            <div className="settlement-output-note">통화와 상품코드는 맞추고, 확인이 필요한 행은 따로 모읍니다.</div>
+          </div>
+        </div>
       </header>
+
+      <section className="apple-feature flow-feature">
+        <span className="apple-eyebrow">원본 근거</span>
+        <h2>합쳐진 숫자에도,<br />돌아갈 곳이 있도록.</h2>
+        <p>파일에서 시트, 행까지.<br />결과를 누르면 그 숫자가 만들어진 과정을 확인합니다.</p>
+        <Link to="/build" className="apple-feature-link">정산 도구 살펴보기 ›</Link>
+        <div className="provenance-path" aria-label="원본 추적 단계"><span>원본 파일</span><b aria-hidden="true">›</b><span>시트와 행</span><b aria-hidden="true">›</b><span>변환 규칙</span><b aria-hidden="true">›</b><span>정산 결과</span></div>
+      </section>
 
       {/* 예시를 넣은 다음 무엇을 눌러야 하는가.
           "예시 세 건 넣기"를 놨더니, 눌러 보면 접수함에 세

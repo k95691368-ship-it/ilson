@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
@@ -120,6 +120,19 @@ export default function OverridePage() {
   const [modal, setModal] = useState(null)
   const [busy, setBusy] = useState(false)
   const [aiDraft, setAiDraft] = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuToggleRef = useRef(null)
+
+  function closeMenu() {
+    setMenuOpen(false)
+    menuToggleRef.current?.focus()
+  }
+
+  function navigateView(next) {
+    if (menuOpen) closeMenu()
+    setView(next)
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
 
   useEffect(() => {
     if (!NAV.some((item) => item.key === view)) setView('overview')
@@ -174,79 +187,61 @@ export default function OverridePage() {
   }
 
   function open(type, entity = null) {
+    setMenuOpen(false)
     setModal({ type, entity })
   }
 
   return (
     <div className="ol-shell">
       <header className="ol-globalbar">
-        <button className="ol-wordmark" type="button" onClick={() => setView('overview')}>
-          <span className="ol-mark" aria-hidden="true"><span>O</span><span>L</span></span>
+        <button className="ol-wordmark" type="button" onClick={() => navigateView('overview')}>
           <span>OverrideLoop</span>
         </button>
         <nav className="ol-globalnav" aria-label="OverrideLoop 주요 메뉴">
-          {NAV.slice(0, 5).map((item) => (
+          {NAV.map((item) => (
             <button
               key={item.key}
               type="button"
               className={view === item.key ? 'active' : ''}
-              onClick={() => setView(item.key)}
+              aria-current={view === item.key ? 'page' : undefined}
+              onClick={() => navigateView(item.key)}
             >
               {item.label}
             </button>
           ))}
         </nav>
         <div className="ol-global-actions">
-          {data && (
-            <span className={`ol-environment ${data.demo_mode ? 'demo' : 'live'}`}>
-              <i aria-hidden="true" />
-              {data.demo_mode ? '시연 데이터' : '운영 데이터'}
-            </span>
-          )}
-          <label className="ol-role-select">
-            <span className="sr-only">시연 역할</span>
-            <select value={role} onChange={(event) => setRole(event.target.value)}>
-              {OVERRIDE_ROLES.map((item) => (
-                <option key={item.key} value={item.key}>{item.label}</option>
-              ))}
-            </select>
-          </label>
+          <button ref={menuToggleRef} className="ol-menu-toggle" type="button" aria-label="OverrideLoop 메뉴" aria-expanded={menuOpen} aria-controls="override-navigation" onKeyDown={(event) => { if (event.key === 'Escape' && menuOpen) closeMenu() }} onClick={() => setMenuOpen(!menuOpen)}>메뉴 <span aria-hidden="true">{menuOpen ? '−' : '+'}</span></button>
           <button className="ol-primary ol-compact" type="button" onClick={() => open('event')}>
             판단 기록
           </button>
         </div>
       </header>
+      {menuOpen && (
+        <nav className="ol-menu-tray" id="override-navigation" aria-label="OverrideLoop 전체 메뉴" onKeyDown={(event) => { if (event.key === 'Escape') closeMenu() }}>
+          {NAV.map((item) => <button key={item.key} type="button" aria-current={view === item.key ? 'page' : undefined} onClick={() => navigateView(item.key)}>{item.label}<span aria-hidden="true">›</span></button>)}
+        </nav>
+      )}
+
+      <div className="ol-context-bar">
+        <span>{data?.demo_mode ? '시연 데이터로 살펴보는 AI 운영' : 'AI 운영 워크스페이스'}</span>
+        <label className="ol-role-select">
+          <span>현재 역할</span>
+          <select aria-label="시연 역할" value={role} onChange={(event) => setRole(event.target.value)}>
+            {OVERRIDE_ROLES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
+          </select>
+        </label>
+      </div>
 
       <div className="ol-layout">
-        <aside className="ol-sidebar">
-          <div className="ol-side-kicker">AI 운영 시스템</div>
-          <nav aria-label="전체 메뉴">
-            {NAV.map((item, index) => (
-              <button
-                key={item.key}
-                type="button"
-                className={view === item.key ? 'active' : ''}
-                onClick={() => setView(item.key)}
-              >
-                <span className="ol-side-index">{String(index + 1).padStart(2, '0')}</span>
-                <span>{item.label}</span>
-              </button>
-            ))}
-          </nav>
-          <div className="ol-side-foot">
-            <span>일손 · 도입 이전 과정</span>
-            <Link to="/portfolio">신청부터 성과까지 보기 →</Link>
-          </div>
-        </aside>
-
-        <main className="ol-workspace" aria-live="polite">
+        <div className={`ol-workspace${view === 'overview' ? ' ol-workspace-home' : ''}`} aria-live="polite">
           {loading && !data && <WorkspaceSkeleton />}
           {error && !data && (
             <ErrorState message={error} onRetry={reload} />
           )}
           {data && (
             <>
-              {view === 'overview' && <OverviewView data={data} open={open} go={setView} />}
+              {view === 'overview' && <OverviewView data={data} open={open} go={navigateView} />}
               {view === 'events' && <EventsView data={data} open={open} askAi={askAi} />}
               {view === 'clusters' && <ClustersView data={data} open={open} askAi={askAi} />}
               {view === 'experiments' && <ExperimentsView data={data} open={open} />}
@@ -257,22 +252,14 @@ export default function OverridePage() {
               {view === 'audit' && <AuditView data={data} open={open} role={role} />}
             </>
           )}
-        </main>
+        </div>
       </div>
 
-      <nav className="ol-mobile-nav" aria-label="모바일 메뉴">
-        {NAV.slice(0, 5).map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            className={view === item.key ? 'active' : ''}
-            onClick={() => setView(item.key)}
-          >
-            <span aria-hidden="true">{NAV.findIndex((nav) => nav.key === item.key) + 1}</span>
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <footer className="ol-footer">
+        <div><strong>일손 · OverrideLoop</strong><p>업무를 바꾸는 과정과 그 이후의 기록.</p></div>
+        <nav aria-label="함께 살펴보기"><Link to="/portfolio">일손 전체 과정</Link><Link to="/tools">부서에 넘긴 도구</Link><button type="button" onClick={() => navigateView('audit')}>감사 기록</button><Link to="/built">기술 구현</Link></nav>
+        <small>{data?.demo_mode ? '가상의 회사·부서·데이터로 구성된 포트폴리오입니다.' : '판단의 근거와 변경 이력을 함께 기록합니다.'}</small>
+      </footer>
 
       {modal && (
         <Modal title={MODAL_TITLES[modal.type]} onClose={() => !busy && setModal(null)}>
@@ -352,20 +339,31 @@ function PageIntro({ eyebrow, title, copy, actions }) {
 
 function OverviewView({ data, open, go }) {
   const metrics = data.metrics
+  const featured = data.events.find((event) => Number(event.is_override)) ?? data.events[0]
   return (
-    <div className="ol-page">
-      <PageIntro
-        eyebrow="Today · AI in production"
-        title={<>AI가 틀린 순간을,<br />조직의 다음 결정으로.</>}
-        copy="수정 한 건을 학습 데이터로 넘기기 전에, 왜 바뀌었고 조직의 무엇을 고쳐야 하는지 확인합니다."
-        actions={
-          <>
-            <button className="ol-secondary" type="button" onClick={() => go('clusters')}>우선 문제 보기</button>
-            <button className="ol-primary" type="button" onClick={() => open('event')}>새 판단 기록</button>
-          </>
-        }
-      />
+    <div className="ol-page ol-overview">
+      <section className="apple-hero ol-hero">
+        <span className="apple-eyebrow">OverrideLoop</span>
+        <h1>AI의 답에,<br />사람의 판단을.</h1>
+        <p className="apple-lead">현장의 수정 기록을 모아, 다음 개선을 준비합니다.</p>
+        <div className="apple-actions">
+          <button className="ol-primary" type="button" onClick={() => go('events')}>판단 사건 살펴보기</button>
+          <button className="ol-secondary" type="button" onClick={() => open('event')}>새 판단 기록</button>
+        </div>
+        {featured && <div className="decision-preview" aria-label="최근 판단 사건 미리보기">
+          <div className="decision-preview-bar"><span className="preview-dots" aria-hidden="true"><i /><i /><i /></span><span>OverrideLoop · 판단 기록</span><span>{data.demo_mode ? '시연 사건' : '최근 사건'}</span></div>
+          <div className="decision-preview-heading"><span>{featured.product_name}</span><span>{featured.external_ref || featured.id}</span></div>
+          <div className="decision-preview-grid">
+            <div><span className="decision-preview-label">AI의 원안</span><p>{featured.ai_decision}</p></div>
+            <span className="decision-preview-arrow" aria-hidden="true">→</span>
+            <div className="decision-preview-human"><span className="decision-preview-label">사람의 최종 판단</span><p>{featured.human_decision}</p></div>
+          </div>
+          <div className="decision-preview-evidence"><span>판단의 근거</span><p>{featured.reason_detail}</p><Validity value={featured.validity} /></div>
+        </div>}
+      </section>
 
+      <section className="ol-measurements">
+      <div className="ol-section-head"><div><span className="ol-kicker">운영 현황</span><h2>지금, 확인할 것들.</h2></div><span>{data.demo_mode ? '시연 데이터 기준' : '저장된 기록 기준'}</span></div>
       <section className="ol-metrics" aria-label="핵심 운영 지표">
         <Metric label="반복 예외율" value={valueOrDash(metrics.recurring_exception_rate, '%')} note={`${metrics.overrides}건 / 적용 가능 사건`} />
         <Metric label="원인 확인" value={valueOrDash(metrics.root_cause_days, '일')} note="최초 발생부터 중앙 흐름" />
@@ -386,14 +384,15 @@ function OverviewView({ data, open, go }) {
           <Metric label="검증된 개선" value={`${metrics.verified_improvements}건`} note={`재작업 ${won(metrics.rework_cost_krw)}`} />
         </div>
       </details>
+      </section>
 
       <section className="ol-loop-card">
         <div className="ol-section-head">
           <div>
-            <span className="ol-kicker">One continuous loop</span>
-            <h2>판단에서 재측정까지</h2>
+            <span className="ol-kicker">개선 과정</span>
+            <h2>바꾸기 전에 시험하고.<br />바꾼 뒤에도 확인하고.</h2>
           </div>
-          <span className="ol-live"><i /> 운영 데이터 연결됨</span>
+          <button className="ol-text-button" type="button" onClick={() => go('experiments')}>개선 실험 보기 ›</button>
         </div>
         <div className="ol-loop" role="list" aria-label="OverrideLoop 전체 흐름">
           <LoopStep no="01" label="판단" text="승인 · 수정 · 거절 · 이관" active />
@@ -405,7 +404,7 @@ function OverviewView({ data, open, go }) {
         </div>
       </section>
 
-      <div className="ol-two-col">
+      <div className="ol-two-col ol-overview-panels">
         <section className="ol-panel">
           <div className="ol-section-head">
             <div>

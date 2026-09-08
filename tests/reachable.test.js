@@ -19,6 +19,7 @@ import { fileURLToPath } from 'node:url'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 const APP = readFileSync(join(ROOT, 'src', 'App.jsx'), 'utf8')
+const SITE_NAV = readFileSync(join(ROOT, 'src', 'components', 'SiteNav.jsx'), 'utf8')
 const OVERRIDE = readFileSync(join(ROOT, 'src', 'pages', 'OverridePage.jsx'), 'utf8')
 
 function walk(dir, out = []) {
@@ -44,8 +45,9 @@ function alwaysVisibleTargets() {
   const fromStages = [...stages.matchAll(/path:\s*'([^']+)'/g)].map((m) => m[1])
   const crosscut = APP.slice(APP.indexOf('export const CROSSCUT'), APP.indexOf('// 목차와 꼬리말'))
   const fromFooter = [...crosscut.matchAll(/to:\s*'([^']+)'/g)].map((m) => m[1])
-  // 상단 목차 옆에 직접 박아 둔 링크(기술 구현 보러가기 등)도 늘 보인다.
-  const fromTopbar = [...APP.matchAll(/<NavLink\s+to="([^"]+)"/g)].map((m) => m[1])
+  // 공통 내비게이션은 별도 컴포넌트에 있다. 모바일에서도 메뉴를 열어 접근한다.
+  const navLinks = SITE_NAV.slice(SITE_NAV.indexOf('const LINKS'), SITE_NAV.indexOf('export default'))
+  const fromTopbar = [...navLinks.matchAll(/\['([^']+)',/g)].map((m) => m[1])
   // 첫 화면에서 조건 없이 그려지는 링크들. 데이터가 없어도 보인다.
   const flow = readFileSync(join(ROOT, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
   const fromFlow = []
@@ -55,9 +57,7 @@ function alwaysVisibleTargets() {
   }
   // 새 운영판의 사이드바에서 도입 이전 포트폴리오로 가는 문도 늘 보인다.
   const fromOverride = [...OVERRIDE.matchAll(/<Link to="([^"]+)"/g)].map((m) => m[1])
-  // 왼쪽 위 이름표가 첫 화면으로 돌아가는 문이다. 어느 화면에서나 보인다.
-  const brand = /<Link to="\/" className="topbar-brand">/.test(APP) ? ['/'] : []
-  return new Set([...fromStages, ...fromFooter, ...fromTopbar, ...fromFlow, ...fromOverride, ...brand])
+  return new Set([...fromStages, ...fromFooter, ...fromTopbar, ...fromFlow, ...fromOverride])
 }
 
 describe('화면마다 들어갈 문이 있는가', () => {
@@ -95,6 +95,8 @@ describe('화면마다 들어갈 문이 있는가', () => {
     // 라우트를 하나도 못 읽으면 위 검사는 늘 통과한다.
     expect(all.length).toBeGreaterThan(15)
     expect(always.size).toBeGreaterThan(10)
+    expect(APP).toContain('<SiteNav />')
+    expect(always.has('/')).toBe(true) // 공통 메뉴의 OverrideLoop
     // 실제로 여섯 단계와 꼬리말 양쪽에서 읽고 있는지 확인한다.
     expect(always.has('/apply')).toBe(true) // 목차
     expect(always.has('/log')).toBe(true) // 꼬리말

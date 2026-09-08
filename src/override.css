@@ -9,12 +9,12 @@
 }
 
 .app-shell-workspace {
-  background: #f6f5f1;
+  background: var(--apple-parchment);
 }
 
 .ol-shell {
-  --ol-bg: #f6f5f1;
-  --ol-paper: #fffefa;
+  --ol-bg: var(--apple-parchment);
+  --ol-paper: var(--apple-paper);
   --ol-paper-strong: #ffffff;
   --ol-ink: #1d1d1f;
   --ol-copy: #4d4c49;
@@ -80,7 +80,7 @@
   background: transparent;
   color: var(--ol-ink);
   font-size: 0.94rem;
-  font-weight: 670;
+  font-weight: 600;
   letter-spacing: -0.025em;
 }
 
@@ -94,7 +94,7 @@
   background: var(--ol-ink);
   color: white;
   font-size: 0.63rem;
-  font-weight: 750;
+  font-weight: 600;
   letter-spacing: -0.08em;
   overflow: hidden;
 }
@@ -122,7 +122,7 @@
   background: transparent;
   color: #66635e;
   font-size: 0.78rem;
-  font-weight: 560;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -145,7 +145,7 @@
   gap: 6px;
   color: var(--ol-muted);
   font-size: 0.68rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ol-environment i {
@@ -181,7 +181,7 @@
   padding: 0 19px;
   border-radius: 999px;
   font-size: 0.88rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.015em;
   cursor: pointer;
   transition: transform 160ms ease, background 160ms ease, border-color 160ms ease;
@@ -228,7 +228,7 @@
   background: transparent;
   color: #8d3d27;
   font-size: 0.78rem;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
 }
 
@@ -258,7 +258,7 @@
   padding: 0 12px 16px;
   color: var(--ol-muted);
   font-size: 0.65rem;
-  font-weight: 680;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -291,7 +291,7 @@
 .ol-sidebar nav button.active {
   background: var(--ol-paper-strong);
   color: var(--ol-ink);
-  box-shadow: 0 1px 2px rgba(42, 38, 32, 0.07), 0 8px 24px rgba(42, 38, 32, 0.04);
+  box-shadow: none;
 }
 
 .ol-side-index {
@@ -318,7 +318,7 @@
 .ol-side-foot a {
   color: var(--ol-ink);
   font-size: 0.73rem;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .ol-workspace {
@@ -348,7 +348,7 @@
   display: block;
   color: var(--ol-accent);
   font-size: 0.67rem;
-  font-weight: 720;
+  font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
 }
@@ -359,7 +359,7 @@
   color: var(--ol-ink);
   font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Pretendard Variable', Pretendard, sans-serif;
   font-size: clamp(2.65rem, 5vw, 5.7rem);
-  font-weight: 660;
+  font-weight: 600;
   line-height: 0.98;
   letter-spacing: -0.066em;
 }
@@ -402,14 +402,14 @@
 .ol-metric > span {
   color: var(--ol-muted);
   font-size: 0.73rem;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .ol-metric > strong {
   margin-top: 14px;
   color: var(--ol-ink);
   font-size: clamp(1.7rem, 3vw, 2.5rem);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1;
   letter-spacing: -0.055em;
   font-variant-numeric: tabular-nums;
@@ -452,7 +452,7 @@
   padding: 0 18px;
   color: var(--ol-ink);
   font-size: 0.76rem;
-  font-weight: 650;
+  font-weight: 600;
   cursor: pointer;
   list-style: none;
 }
@@ -476,7 +476,7 @@
   margin-left: auto;
   color: var(--ol-faint);
   font-size: 0.66rem;
-  font-weight: 500;
+  font-weight: 600;
 }
 
 .ol-metric-detail-grid {
@@ -523,7 +523,7 @@
   margin-top: 4px;
   color: var(--ol-ink);
   font-size: clamp(1.25rem, 2vw, 1.7rem);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.14;
   letter-spacing: -0.045em;
 }
@@ -541,7 +541,7 @@
   border-radius: 999px;
   background: var(--ol-green-soft);
   color: #4b6339 !important;
-  font-weight: 620;
+  font-weight: 600;
 }
 
 .ol-live i,
@@ -560,7 +560,7 @@
   overflow: hidden;
   border: 1px solid var(--ol-line);
   border-radius: 20px;
-  background: #f4f2ec;
+  background: var(--apple-parchment);
 }
 
 .ol-loop-step {
@@ -585,7 +585,7 @@
   width: 14px;
   height: 24px;
   margin-top: -12px;
-  background: #f4f2ec;
+  background: var(--apple-parchment);
   color: #aaa49b;
   text-align: center;
 }
@@ -601,7 +601,7 @@
 .ol-loop-step > span {
   color: var(--ol-accent);
   font-size: 0.62rem;
-  font-weight: 720;
+  font-weight: 600;
 }
 
 .ol-loop-step > strong {
@@ -669,7 +669,7 @@
   background: var(--ol-wash);
   color: var(--ol-copy);
   font-size: 0.65rem;
-  font-weight: 760;
+  font-weight: 600;
 }
 
 .ol-priority-pill.danger {
@@ -684,7 +684,7 @@
 
 .ol-priority-pill.accent {
   background: var(--ol-accent-soft);
-  color: #9c3b24;
+  color: var(--apple-blue);
 }
 
 .ol-priority-copy {
@@ -711,7 +711,7 @@
 .ol-priority-number {
   color: var(--ol-ink);
   font-size: 1.18rem;
-  font-weight: 650;
+  font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
 
@@ -738,7 +738,7 @@
   gap: 10px;
   padding: 12px 13px;
   border-radius: 15px;
-  background: #f3f1eb;
+  background: var(--apple-parchment);
 }
 
 .ol-alert.critical {
@@ -792,7 +792,7 @@
   padding: 20px;
   border: 1px solid var(--ol-line);
   border-radius: 20px;
-  background: #f5f3ed;
+  background: var(--apple-parchment);
 }
 
 .ol-product-status {
@@ -801,14 +801,14 @@
   gap: 7px;
   color: var(--ol-green);
   font-size: 0.66rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ol-product-card h3 {
   margin-top: 18px;
   color: var(--ol-ink);
   font-size: 1.06rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.035em;
 }
 
@@ -829,7 +829,7 @@
 .ol-product-card > div strong {
   color: var(--ol-ink);
   font-size: 2.2rem;
-  font-weight: 640;
+  font-weight: 600;
   letter-spacing: -0.06em;
 }
 
@@ -918,14 +918,14 @@
   background: var(--ol-wash);
   color: var(--ol-copy);
   font-size: 0.64rem;
-  font-weight: 680;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .ol-action.action-modify,
 .ol-action.action-correct_after {
   background: var(--ol-accent-soft);
-  color: #9c3b24;
+  color: var(--apple-blue);
 }
 
 .ol-action.action-reject,
@@ -962,12 +962,12 @@
   padding: 16px;
   border: 1px solid var(--ol-line);
   border-radius: 16px;
-  background: #f5f3ed;
+  background: var(--apple-parchment);
 }
 
 .ol-decision-compare > div.human {
-  border-color: #d8b5a8;
-  background: #fff8f4;
+  border-color: var(--apple-focus);
+  background: var(--accent-bg);
 }
 
 .ol-decision-compare span,
@@ -979,7 +979,7 @@
 .ol-scenario-result > span {
   color: var(--ol-muted);
   font-size: 0.65rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ol-decision-compare p,
@@ -1063,7 +1063,7 @@
 .ol-cluster-list > button.active {
   border-color: var(--ol-line-strong);
   background: var(--ol-paper-strong);
-  box-shadow: 0 9px 28px rgba(45, 39, 31, 0.06);
+  box-shadow: none;
 }
 
 .ol-cluster-list > button > div {
@@ -1097,7 +1097,7 @@
 .ol-detail-head {
   padding: 29px;
   border-bottom: 1px solid var(--ol-line);
-  background: #fffdf8;
+  background: var(--apple-paper);
 }
 
 .ol-detail-head > div:first-child {
@@ -1111,7 +1111,7 @@
   margin-top: 14px;
   color: var(--ol-ink);
   font-size: clamp(1.55rem, 3.2vw, 2.8rem);
-  font-weight: 650;
+  font-weight: 600;
   line-height: 1.08;
   letter-spacing: -0.055em;
 }
@@ -1366,7 +1366,7 @@
   background: var(--ol-paper);
   color: var(--ol-muted);
   font-size: 0.68rem;
-  font-weight: 720;
+  font-weight: 600;
 }
 
 .ol-phase.passed > span {
@@ -1456,7 +1456,7 @@
   padding: 10px 13px;
   border-radius: 12px;
   background: var(--ol-amber-soft);
-  color: #76591d;
+  color: var(--warning-text);
   font-size: 0.68rem;
 }
 
@@ -1529,7 +1529,7 @@
   border-top: 0;
   color: var(--ol-muted);
   font-size: 0.62rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ol-fairness-table strong {
@@ -1555,7 +1555,7 @@
 .ol-scenario-result strong {
   color: var(--ol-ink);
   font-size: 2.4rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.06em;
 }
 
@@ -1614,7 +1614,7 @@
   margin-bottom: 3px;
   color: var(--ol-muted);
   font-size: 0.62rem;
-  font-weight: 670;
+  font-weight: 600;
 }
 
 .ol-graph-node {
@@ -1627,7 +1627,7 @@
   padding: 9px 11px;
   border: 1px solid var(--ol-line);
   border-radius: 13px;
-  background: #f6f4ee;
+  background: var(--apple-parchment);
   color: var(--ol-ink);
   font-size: 0.66rem;
   line-height: 1.35;
@@ -1657,7 +1657,7 @@
   top: 50%;
   right: -20px;
   color: var(--ol-faint);
-  font-weight: 500;
+  font-weight: 600;
   transform: translateY(-50%);
 }
 
@@ -1729,7 +1729,7 @@
   background: var(--ol-wash);
   color: var(--ol-muted);
   font-size: 0.58rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .ol-trend.surge,
@@ -1780,7 +1780,7 @@
   background: var(--ol-ink);
   color: white;
   font-size: 0.77rem;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .ol-integration-icon.policy {
@@ -2017,7 +2017,7 @@
   border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 30px;
   background: #fbfaf7;
-  box-shadow: 0 35px 100px rgba(28, 25, 20, 0.25);
+  box-shadow: none;
 }
 
 .ol-modal > header {
@@ -2036,7 +2036,7 @@
 .ol-modal > header span {
   color: var(--ol-accent);
   font-size: 0.62rem;
-  font-weight: 720;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -2044,7 +2044,7 @@
 .ol-modal > header h2 {
   color: var(--ol-ink);
   font-size: 1.25rem;
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: -0.035em;
 }
 
@@ -2092,7 +2092,7 @@
 .ol-field > span {
   color: var(--ol-ink);
   font-size: 0.72rem;
-  font-weight: 650;
+  font-weight: 600;
 }
 
 .ol-field > span b {
@@ -2309,7 +2309,7 @@
   border-radius: 50%;
   background: var(--ol-red-soft);
   color: var(--ol-red);
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .ol-error-state h1 {
@@ -2464,7 +2464,7 @@
     border: 1px solid rgba(255, 255, 255, 0.62);
     border-radius: 20px;
     background: rgba(36, 35, 33, 0.92);
-    box-shadow: 0 16px 50px rgba(28, 26, 23, 0.24);
+    box-shadow: none;
     backdrop-filter: blur(18px);
   }
 

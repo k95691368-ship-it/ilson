@@ -1,6 +1,7 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route, NavLink, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import PageViewTracker from './components/PageViewTracker.jsx'
+import SiteNav from './components/SiteNav.jsx'
 import { STAGES } from './lib/stages.js'
 
 const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
@@ -25,16 +26,6 @@ const PriorityPage = lazy(() => import('./pages/PriorityPage.jsx'))
 const BuiltPage = lazy(() => import('./pages/BuiltPage.jsx'))
 const BugPage = lazy(() => import('./pages/BugPage.jsx'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
-
-const BOTTOM_TABS = [
-  { to: '/', label: '홈', icon: '홈' },
-  ...STAGES.map((s) => ({
-    to: s.path,
-    label: s.label,
-    icon: `${s.no}`,
-  })),
-  { to: '/track', label: '조회', icon: '조회' },
-]
 
 // 여섯 단계 어디에도 안 들어가는 화면들. 단계를 가로로 지르며 본다.
 //
@@ -103,9 +94,6 @@ export default function App() {
   const workspace = useWorkspaceLayout()
   usePrintUnfold()
 
-  const navClass = ({ isActive }) => `topbar-link${isActive ? ' active' : ''}`
-  const tabClass = ({ isActive }) => `app-tab-link${isActive ? ' active' : ''}`
-
   return (
     <div className={`app-shell${bare ? ' app-shell-bare' : ''}${workspace ? ' app-shell-workspace' : ''}`}>
       {/* 주소가 바뀌어도 새 문서를 안 받아오므로, 화면 이동을 여기서 듣고
@@ -115,70 +103,30 @@ export default function App() {
         본문으로 건너뛰기
       </a>
 
+      {!bare && <SiteNav />}
       {!bare && !workspace && (
-        <nav className="app-tabbar" aria-label="하단 탭 메뉴">
-          {BOTTOM_TABS.map((tab) => (
-            <NavLink
-              key={tab.to}
-              to={tab.to}
-              className={tabClass}
-              end={tab.to === '/'}
-            >
-              <span aria-hidden="true" className="app-tab-icon">{tab.icon}</span>
-              <span className="app-tab-label">{tab.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-      )}
-
-      {!bare && !workspace && (
-        <header className="topbar">
-          <div className="topbar-inner">
-            <Link to="/" className="topbar-brand">
-              <span className="topbar-logo" aria-hidden="true">
-                IL
-              </span>
-              <span className="topbar-brand-copy">
-                <strong>일손</strong>
-                <span className="topbar-brand-sub">업무 자동화 포트폴리오</span>
-              </span>
-            </Link>
-
-            <nav className="topbar-nav" aria-label="여섯 단계">
-              {STAGES.map((s) => (
-                <NavLink key={s.key} to={s.path} className={navClass}>
-                  <span className="topbar-link-no" aria-hidden="true">
-                    {s.no}
-                  </span>
-                  <span className="topbar-link-copy">
-                    <strong>{s.label}</strong>
-                  </span>
-                </NavLink>
-              ))}
+        <header className="product-subnav">
+          <div className="product-subnav-inner">
+            <Link to="/portfolio" className="product-subnav-title">일손</Link>
+            <nav aria-label="일손 메뉴">
+              <Link to="/portfolio" className="product-subnav-link">전체 과정</Link>
+              <Link to="/tools" className="product-subnav-link">넘긴 도구</Link>
+              <Link to="/log" className="product-subnav-link">결정 기록</Link>
+              <Link to="/apply" className="btn-primary btn-sm">업무 신청</Link>
             </nav>
-
-            <div className="topbar-right">
-              <NavLink
-                to="/track"
-                className={({ isActive }) => `portal-link${isActive ? ' active' : ''}`}
-                aria-label="접수번호 조회"
-              >
-                접수 조회
-              </NavLink>
-            </div>
           </div>
         </header>
       )}
 
       {bare && !workspace && (
         <header className="barebar">
-          <Link to="/" className="barebar-brand" aria-label="일손 운영 홈으로">
+          <Link to="/portfolio" className="barebar-brand" aria-label="일손 전체 과정으로">
             <span aria-hidden="true">IL</span>
             <strong>일손</strong>
           </Link>
           <span className="barebar-context">부서 전용 화면</span>
           <span className="spacer" />
-          <Link to="/" className="barebar-back">전체 과정 보기 →</Link>
+          <Link to="/portfolio" className="barebar-back">전체 과정 보기 →</Link>
         </header>
       )}
 
