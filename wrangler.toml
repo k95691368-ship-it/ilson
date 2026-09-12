@@ -13,15 +13,11 @@ compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"
 
 [vars]
-DB_MAINTENANCE = "true"
+DB_MAINTENANCE = "false"
+SUPABASE_URL = "https://iobeygpmcrmdjhkgtkfg.supabase.co"
 
-# D1은 로컬 전용 혹은 긴급 fallback 용입니다.
-# 실서비스 API 실행은 wrangler.toml의 D1 바인딩보다 env.SUPABASE_*
-# 변수가 먼저 우선됩니다.
-[[d1_databases]]
-binding = "DB"
-database_name = "ilson"
-database_id = "5fb7c8cd-4138-4c11-9e07-b077e2c60284"
+# 운영 데이터베이스는 Supabase만 사용합니다. D1 바인딩은 없습니다.
+# SUPABASE_SERVICE_ROLE_KEY는 Pages Production의 암호화된 Secret에만 저장합니다.
 
 # R2 버킷(SOURCES)이 여기 있었다. 첨부 기능을 걷어내면서 뺐다.
 # 파일은 브라우저 안에서만 읽고 합친다 — 서버로 보내지 않으므로 보관할

@@ -180,7 +180,7 @@ export const TECH = {
   stack: [
     { k: '프런트', v: 'React 19 + Vite, react-router-dom 7 — 화면을 라우트 단위 lazy chunk로 분리' },
     { k: '서버', v: 'Cloudflare Pages Functions (Workers 런타임). 파일 경로 = URL 라우팅' },
-    { k: 'DB', v: 'Cloudflare D1 (SQLite). 마이그레이션 SQL로 스키마 버전 관리' },
+    { k: 'DB', v: 'Supabase PostgreSQL. 서버 전용 연결과 트랜잭션으로 데이터를 저장하고 마이그레이션 SQL로 스키마 관리' },
     {
       k: '파일 저장소',
       v: '없습니다. 첨부 기능을 걷어내면서 R2 바인딩까지 뺐습니다 — 파일을 서버로 보내지 않으므로 보관할 것이 없습니다',
