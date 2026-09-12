@@ -12,6 +12,9 @@ name = "ilson"
 compatibility_date = "2025-01-01"
 pages_build_output_dir = "dist"
 
+[vars]
+DB_MAINTENANCE = "true"
+
 # D1은 로컬 전용 혹은 긴급 fallback 용입니다.
 # 실서비스 API 실행은 wrangler.toml의 D1 바인딩보다 env.SUPABASE_*
 # 변수가 먼저 우선됩니다.

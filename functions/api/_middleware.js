@@ -28,6 +28,9 @@ const WINDOW_SECONDS = 600
 
 export async function onRequest(context) {
   const { request, next } = context
+  if (context.env?.DB_MAINTENANCE === 'true' && !['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+    return jsonError('데이터베이스 이전 중입니다. 잠시 후 다시 시도해주세요.', 503)
+  }
   if (!context.env?.DBBridgeApplied) {
     const db = await withDbBinding(context.env)
     if (db) {

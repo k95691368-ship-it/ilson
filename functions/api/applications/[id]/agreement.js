@@ -485,7 +485,7 @@ export async function onRequestPatch({ env, params, request }) {
     if (body.kind === 'criterion') {
       await env.DB.prepare(
         `UPDATE acceptance_criterion
-         SET confirmed_at = CASE WHEN ? THEN datetime('now') ELSE NULL END,
+         SET confirmed_at = CASE WHEN ? <> 0 THEN datetime('now') ELSE NULL END,
              is_required_safety = ?
          WHERE id = ? AND application_id = ?`
       )

@@ -116,6 +116,8 @@ const SCHEMA = [
 
 export async function ensureOverrideSchema(env) {
   if (!env?.DB) throw new Error('데이터베이스 연결이 없습니다.')
+  // Production schema is migrated explicitly, never DDL on a public request.
+  if (env.DB.provider === 'supabase') return true
   if (!schemaPromise) {
     schemaPromise = (async () => {
       for (const sql of SCHEMA) await env.DB.prepare(sql).run()

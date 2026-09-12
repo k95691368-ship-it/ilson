@@ -1,163 +1,120 @@
-// Database adapter bridge for optional Supabase backend.
-// Keeps route call shape unchanged: env.DB.prepare(...).bind(...).all()/first()/run()
+// Server-only Supabase bridge. Route handlers keep the D1 statement interface.
+const statementData = new WeakMap()
 
-const RPC_NAME = 'execute_sql'
-
-function hasValue(v) {
-  return typeof v === 'string' && v.trim().length > 0
-}
-
-function toText(v) {
-  if (v == null) return null
-  if (typeof v === 'string') return v
-  return String(v)
-}
-
-function unwrapPayload(payload) {
-  // Supabase can return scalar object or array with a named key.
-  if (Array.isArray(payload)) {
-    if (payload.length === 0) return null
-    if (payload.length === 1 && payload[0] && Object.keys(payload[0]).length === 1) {
-      const item = payload[0]
-      const only = item[RPC_NAME]
-      if (only !== undefined) return only
+function integerCasts(tokens) {
+  // SQLite truncates integer casts; PostgreSQL rounds. Preserve elapsed-time values.
+  for (let i = 0; i < tokens.length; i++) {
+    if (!/^CAST$/i.test(tokens[i])) continue
+    let open = i + 1
+    while (/^\s+$/.test(tokens[open] || '')) open++
+    if (tokens[open] !== '(') continue
+    let depth = 1, end = open + 1, as = -1
+    for (; end < tokens.length; end++) {
+      if (tokens[end] === '(') depth++
+      if (tokens[end] === ')') {
+        depth--
+        if (depth === 0) break
+      }
+      if (depth === 1 && /^AS$/i.test(tokens[end])) as = end
     }
-    return payload[0]
+    if (as < 0 || !/^\s*INTEGER\s*$/i.test(tokens.slice(as + 1, end).join(''))) continue
+    const expression = integerCasts(tokens.slice(open + 1, as)).join('')
+    tokens.splice(i, end - i + 1, `CAST(TRUNC((${expression})::numeric) AS BIGINT)`)
   }
-  return payload
+  return tokens
 }
 
-async function callRpc(url, key, sql, binds) {
-  const baseUrl = typeof url === 'string' && url.endsWith('/') ? url.slice(0, -1) : url
-  const endpoint = `${baseUrl}/rest/v1/rpc/${RPC_NAME}`
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      apikey: key,
-      'Content-Type': 'application/json',
-      Prefer: 'return=representation',
-    },
-    body: JSON.stringify({ p_sql: toText(sql), p_params: binds ?? [] }),
+function literal(value) {
+  if (value === null) return 'NULL'
+  if (typeof value === 'boolean') return value ? '1' : '0'
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value)
+  if (typeof value === 'bigint') return String(value)
+  if (typeof value !== 'string' || value.includes('\0')) throw new Error('Unsupported SQL parameter')
+  return "E'" + value.replaceAll('\\', '\\\\').replaceAll("'", "''") + "'"
+}
+
+export function compileSql(sql, binds = []) {
+  if (typeof sql !== 'string' || !sql.trim()) throw new Error('SQL statement is required')
+  // A question mark in a literal, identifier or comment is not a parameter.
+  const tokens = sql.match(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[a-z_][a-z_0-9]*|\s+|./gi) || []
+  let index = 0
+  const result = tokens.map(token => {
+    if (token === '?') {
+      if (index >= binds.length) throw new Error('Missing SQL parameter')
+      return literal(binds[index++])
+    }
+    if (/^REAL$/i.test(token)) return 'DOUBLE PRECISION'
+    return token
   })
-
-  const raw = await res.text()
-  let payload = null
-  try {
-    payload = raw ? JSON.parse(raw) : null
-  } catch {
-    payload = null
-  }
-
-  const data = unwrapPayload(payload)
-
-  if (!res.ok) {
-    const msg =
-      (data && typeof data === 'object' && (data.message || data.error || data.details)) ||
-      raw ||
-      `Supabase RPC request failed with ${res.status}`
-    throw new Error(msg)
-  }
-
-  return data
+  if (index !== binds.length) throw new Error('Extra SQL parameter')
+  return integerCasts(result).join('').trim().replace(/;\s*$/, '')
 }
 
-function toRowsResult(payload) {
-  const data = unwrapPayload(payload)
-  if (!data) return { results: [] }
-
-  if (data.rows && Array.isArray(data.rows)) return { results: data.rows }
-  if (data.result && Array.isArray(data.result)) return { results: data.result }
-  if (Array.isArray(data)) return { results: data }
-  return { results: [] }
-}
-
-function toRunResult(payload) {
-  const data = unwrapPayload(payload) || {}
-  const rows = toRowsResult(data).results
-
-  const countRaw = data.rowCount ?? data.row_count
-  const rowCount = Number.isFinite(Number(countRaw)) ? Number(countRaw) : rows.length
-
-  const lastRowId =
-    data.last_row_id ??
-    data.lastRowId ??
-    (rows.length > 0 && rows[0]?.id != null
-      ? Number(rows[0].id)
-      : null)
-
+function resultOf(data) {
+  if (!data || !Array.isArray(data.rows) || !Number.isFinite(Number(data.rowCount))) {
+    throw new Error('Invalid Supabase database response')
+  }
   return {
-    success: true,
-    meta: {
-      ...(rowCount >= 0 ? { row_count: rowCount, changes: rowCount } : {}),
-      ...(lastRowId == null ? {} : { last_row_id: Number.isFinite(Number(lastRowId)) ? Number(lastRowId) : lastRowId }),
-    },
+    success: true, results: data.rows,
+    meta: { changes: Number(data.rowCount), row_count: Number(data.rowCount),
+      ...(data.last_row_id == null ? {} : { last_row_id: Number(data.last_row_id) }) },
   }
 }
 
-function createSupabaseDb(url, key) {
-  const exec = async (sql, binds) => {
-    const data = await callRpc(url, key, sql, binds)
-    return {
-      rows: () => toRowsResult(data),
-      all: () => toRowsResult(data),
-      first: () => {
-        const rows = toRowsResult(data).results
-        return rows[0] ?? null
-      },
-      run: () => toRunResult(data),
+export function createSupabaseDb(url, key) {
+  const endpoint = new URL(url.trim())
+  if (endpoint.protocol !== 'https:' || !endpoint.hostname.endsWith('.supabase.co') || endpoint.username || endpoint.password) {
+    throw new Error('Invalid Supabase URL')
+  }
+  const rpc = async (name, body) => {
+    const response = await fetch(endpoint.origin + '/rest/v1/rpc/' + name, {
+      method: 'POST',
+      headers: { Authorization: 'Bearer ' + key.trim(), apikey: key.trim(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
+    })
+    if (!response.ok) {
+      // Never expose SQL, user data or service credentials through route errors.
+      let code = ''
+      try { code = (await response.json()).code || '' } catch { /* malformed upstream error */ }
+      throw new Error('Database request failed (' + response.status + (/^[A-Z0-9]+$/.test(code) ? '/' + code : '') + ')')
     }
+    return response.json()
   }
-
+  const owner = {}
+  const prepare = (sql, binds = []) => {
+    const statement = {
+      bind: (...values) => prepare(sql, values),
+      all: async () => resultOf(await rpc('ilson_execute', { p_sql: compileSql(sql, binds) })),
+      first: async column => {
+        const { results } = await statement.all()
+        return column === undefined ? (results[0] ?? null) : (results[0]?.[column] ?? null)
+      },
+      run: async () => statement.all(),
+    }
+    statementData.set(statement, { sql, binds, owner })
+    return statement
+  }
   return {
-    prepare(sql) {
-      const text = toText(sql)
-      if (text == null) {
-        throw new Error('SQL statement is required.')
-      }
-
-      const stmt = {
-        _binds: [],
-        bind(...binds) {
-          stmt._binds = binds
-          return stmt
-        },
-      }
-
-      stmt.all = async () => {
-        const r = await exec(text, stmt._binds)
-        return r.all()
-      }
-
-      stmt.first = async () => {
-        const r = await exec(text, stmt._binds)
-        return r.first()
-      }
-
-      stmt.run = async () => {
-        const r = await exec(text, stmt._binds)
-        return r.run()
-      }
-
-      return stmt
-    },
-
-    async batch(stmts = []) {
-      const out = []
-      for (const s of stmts) {
-        if (!s || typeof s.run !== 'function') continue
-        out.push(await s.run())
-      }
-      return out
+    provider: 'supabase', prepare,
+    async batch(statements) {
+      const sql = statements.map(statement => {
+        const data = statementData.get(statement)
+        if (!data || data.owner !== owner) throw new Error('Invalid batch statement')
+        return compileSql(data.sql, data.binds)
+      })
+      if (!sql.length) return []
+      // One RPC = one PostgreSQL transaction. Any failure rolls back the batch.
+      const data = await rpc('ilson_batch', { p_statements: sql })
+      if (!Array.isArray(data) || data.length !== sql.length) throw new Error('Invalid Supabase batch response')
+      return data.map(resultOf)
     },
   }
 }
 
 export async function withDbBinding(env) {
-  if (!env) return env
-
-  const useSupabase = hasValue(env.SUPABASE_URL) && hasValue(env.SUPABASE_SERVICE_ROLE_KEY)
-  if (!useSupabase) return env.DB
-
-  return createSupabaseDb(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  const hasUrl = Boolean(env?.SUPABASE_URL?.trim())
+  const hasKey = Boolean(env?.SUPABASE_SERVICE_ROLE_KEY?.trim())
+  if (hasUrl !== hasKey) throw new Error('Incomplete Supabase configuration')
+  if (hasUrl) return createSupabaseDb(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  return env?.DB // Local or pre-cutover binding only; production removes D1.
 }
