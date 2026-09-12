@@ -121,10 +121,9 @@ React 19 + Vite + react-router
 node --version        # v22 LTS (최소 v22.12.0)
 npm ci
 npm run dev          # 프런트만
-npm run db:migrate:local
 npm run dev:full     # Cloudflare Pages Functions + Supabase 연결
 
-npm test             # 전체 65개 테스트 파일
+npm test             # 전체 테스트
 npm run smoke        # 서버 라우트 + 화면 렌더 스모크
 npm run lint
 npm run build
@@ -134,9 +133,21 @@ pip install pandas openpyxl
 python seed/generate_sources.py
 ```
 
-`SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` 를 Cloudflare Pages 변수/시크릿에 넣고,
-`wrangler.toml`의 D1 바인딩은 로컬 마이그레이션 전용으로 둡니다.  
-프런트/라우트는 실행 시 런타임에서 Supabase를 우선 사용합니다.
+운영 DB는 Supabase PostgreSQL이며 Cloudflare Pages는 프런트와 API를 배포합니다.
+`SUPABASE_URL`은 `wrangler.toml`, `SUPABASE_SERVICE_ROLE_KEY`는 Pages Production의
+암호화된 Secret으로 설정합니다. 프런트 코드나 `VITE_*` 변수에 서버 키를 넣지 않습니다.
+운영 설정에는 D1 바인딩이 없으며 Supabase 설정이 불완전하면 연결을 거부합니다.
+
+로컬 API 실행에는 Git에서 제외되는 `.dev.vars`에 개발용 Supabase 연결 정보를
+설정합니다. 운영 프로젝트 대신 별도 개발 프로젝트를 사용합니다.
+빈 PostgreSQL DB에는 `supabase/migrations/`의 SQL을 파일명 순서대로 적용합니다.
+`0000_schema.sql`은 35개 테이블의 빈 스키마이며 사용자 데이터는 포함하지 않습니다.
+익명·일반 로그인 역할에는 SQL 실행 RPC 권한을 부여하지 않습니다.
+
+이전 중에는 `DB_MAINTENANCE=true`로 새 API 쓰기를 막은 배포를 먼저 적용하고,
+백업과 테이블별 건수·내용 대조 후 연결을 전환합니다. 이후 발생한 데이터가 있으므로
+오래된 D1 백업으로 단순 복귀하면 안 됩니다. 먼저 새 쓰기를 중지하고 Supabase의
+전환 후 변경분을 보존·대조해야 합니다.
 
 ---
 
