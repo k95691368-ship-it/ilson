@@ -11,6 +11,9 @@
 // 둘 다 if 문에 그대로 넣을 수 있고(0은 거짓), 이 번호를 release에 넘기면
 // 다른 사람 기록은 건드리지 않고 내 것만 지운다.
 export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
+  if (env.DB.claimRateLimit) return Number(await env.DB.claimRateLimit(bucket, maxHits, windowSeconds))
+  if (env.SUPABASE_URL) throw new Error('Atomic rate-limit migration is required')
+  // Legacy SQLite test adapter only; deployed Supabase always uses the locked RPC above.
   await env.DB.prepare(
     `DELETE FROM rate_limit_hits
      WHERE bucket = ? AND created_at < datetime('now', '-' || ? || ' seconds')`

@@ -1,9 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join as pathJoin } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullySignedIds } from '../functions/_lib/signoff.js'
-import { SIGNOFF_KIND } from '../shared/signoff.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../shared/join.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -105,12 +104,12 @@ describe('세 화면이 모두 그 판정을 쓴다', () => {
   const files = []
   const walk = (d) => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
-      const p = join(d, e.name)
+      const p = pathJoin(d, e.name)
       if (e.isDirectory()) walk(p)
       else if (p.endsWith('.js')) files.push(p)
     }
   }
-  walk(join(ROOT, 'functions', 'api'))
+  walk(pathJoin(ROOT, 'functions', 'api'))
 
   it('한 줄이라도 있으면 받은 것으로 세는 곳이 없다', () => {
     // SIGNOFF_KIND 를 세어 0보다 크면 서명으로 치던 자리들이다.
@@ -131,7 +130,7 @@ describe('세 화면이 모두 그 판정을 쓴다', () => {
       'functions/api/response.js',
       'functions/api/depts/[dept].js',
     ]) {
-      const src = readFileSync(join(ROOT, rel), 'utf8')
+      const src = readFileSync(pathJoin(ROOT, rel), 'utf8')
       expect(src, rel).toContain('fullySignedIds')
     }
   })

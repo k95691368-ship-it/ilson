@@ -1,4 +1,6 @@
 import { newId } from './ids.js'
+import { verifiedAccessEmail } from './access.js'
+import { atomicMutation, mutationFingerprint } from './atomicMutation.js'
 import { OVERRIDE_ROLES, roleCan } from '../../shared/override.js'
 
 // Pages Functions는 새 격리 프로세스가 뜰 때마다 파일을 다시 읽는다. 같은
@@ -139,13 +141,18 @@ function statement(env, sql, ...values) {
 }
 
 export function overrideDemoMode(env) {
-  return String(env?.OVERRIDE_DEMO_MODE ?? 'true').toLowerCase() !== 'false'
+  return env?.DEMO_WORKSPACE === true || env?.OVERRIDE_DEMO_MODE === 'true'
 }
 
 export async function seedOverrideWorkspace(env) {
   // 사내 운영 모드에는 시연 사건을 만들지 않는다. 공개 포트폴리오에서만
   // 재현 가능한 시작 데이터를 넣는다.
   if (!overrideDemoMode(env)) return false
+  if (env.DB.commitMutation && !env.SEED_STAGED) {
+    const response = await atomicMutation(env.DB, 'override-workspace-seed-v2', await mutationFingerprint('override-seed-v2'), async DB =>
+      Response.json({ seeded: await seedOverrideWorkspace({ ...env, DB, SEED_STAGED: true }) }))
+    return (await response.json()).seeded
+  }
   const marker = await env.DB.prepare(
     "SELECT id FROM override_audit WHERE action = 'workspace_seeded' LIMIT 1"
   ).first()
@@ -288,10 +295,10 @@ export async function seedOverrideWorkspace(env) {
   ])
 
   if (!(await hasRows('experiment_run'))) await env.DB.batch([
-    statement(env, `INSERT INTO experiment_run VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-10 days'))`, 'olr_01', 'olx_policy', 'historical', 'passed', 8.8, 3.1, 64.8, 42, 0, 980000, 370000, '과거 42건 재생', '한ML'),
-    statement(env, `INSERT INTO experiment_run VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-5 days'))`, 'olr_02', 'olx_policy', 'shadow', 'passed', 7.9, 4.2, 46.8, 260, 0, 840000, 510000, '운영 트래픽 복제', '한ML'),
-    statement(env, `INSERT INTO experiment_run VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-3 days'))`, 'olr_03', 'olx_segment', 'historical', 'passed', 3.4, 1.6, 52.9, 58, 0, 690000, 330000, '과다 보상 이력 재생', '최Data'),
-    statement(env, `INSERT INTO experiment_run VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-1 day'))`, 'olr_04', 'olx_segment', 'shadow', 'blocked', 3.1, 1.9, 38.7, 310, 1, 620000, 390000, '정당 보상 누락 1건으로 자동 차단', '최Data'),
+    statement(env, `INSERT INTO experiment_run (id,experiment_id,phase,status,control_value,variant_value,improvement_percent,sample_size,guardrail_breaches,cost_before_krw,cost_after_krw,notes,run_by,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-10 days'))`, 'olr_01', 'olx_policy', 'historical', 'passed', 8.8, 3.1, 64.8, 42, 0, 980000, 370000, '가상 예시: 과거 42건 재생', '한ML'),
+    statement(env, `INSERT INTO experiment_run (id,experiment_id,phase,status,control_value,variant_value,improvement_percent,sample_size,guardrail_breaches,cost_before_krw,cost_after_krw,notes,run_by,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-5 days'))`, 'olr_02', 'olx_policy', 'shadow', 'passed', 7.9, 4.2, 46.8, 260, 0, 840000, 510000, '가상 예시: 운영 트래픽 복제', '한ML'),
+    statement(env, `INSERT INTO experiment_run (id,experiment_id,phase,status,control_value,variant_value,improvement_percent,sample_size,guardrail_breaches,cost_before_krw,cost_after_krw,notes,run_by,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-3 days'))`, 'olr_03', 'olx_segment', 'historical', 'passed', 3.4, 1.6, 52.9, 58, 0, 690000, 330000, '가상 예시: 과다 보상 이력 재생', '최Data'),
+    statement(env, `INSERT INTO experiment_run (id,experiment_id,phase,status,control_value,variant_value,improvement_percent,sample_size,guardrail_breaches,cost_before_krw,cost_after_krw,notes,run_by,created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now', '-1 day'))`, 'olr_04', 'olx_segment', 'shadow', 'blocked', 3.1, 1.9, 38.7, 310, 1, 620000, 390000, '가상 예시: 정당 보상 누락 1건으로 중단 판정', '최Data'),
   ])
 
   const volumeRows = [
@@ -328,7 +335,7 @@ export async function seedOverrideWorkspace(env) {
 }
 
 export async function resolveOverrideActor(env, request, body = {}) {
-  const email = request?.headers?.get('CF-Access-Authenticated-User-Email')?.trim().toLowerCase()
+  const email = overrideDemoMode(env) ? null : await verifiedAccessEmail(env, request)
   if (email) {
     const actor = await env.DB.prepare(
       'SELECT email, display_name, role FROM override_actor WHERE email = ? AND active = 1'

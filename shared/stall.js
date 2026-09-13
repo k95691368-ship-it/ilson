@@ -128,6 +128,18 @@ const STAGE_NO = Object.fromEntries(STAGE_ORDER.map((s, i) => [s, i]))
 // 다시 올라왔는가.** 되돌아가 다시 만들었으면 그 뒤에 베타든 배포든 기록이
 // 또 붙는다. 메모는 거기서 끝나거나, 원래 자리보다 더 앞으로 가 버린다.
 function dropBackfilled(rows) {
+  // 각 줄 뒤에 어떤 단계가 남아 있는지를 비트로 미리 적어 둔다.
+  //
+  // 예전에는 내려간 줄을 만날 때마다 뒤쪽 배열을 새로 잘라 끝까지 다시
+  // 훑었다. 기록이 N개면 최악에는 N²번 보게 된다. 단계는 여덟 개로 고정돼
+  // 있으므로, 뒤에 남은 단계 집합을 한 번만 만들면 각 줄에서는 최대 여덟
+  // 칸만 확인하면 된다.
+  const laterStages = new Array(rows.length + 1).fill(0)
+  for (let i = rows.length - 1; i >= 0; i -= 1) {
+    const no = STAGE_NO[rows[i].stage]
+    laterStages[i] = laterStages[i + 1] | (1 << no)
+  }
+
   const out = []
   let peak = -1
   for (let i = 0; i < rows.length; i += 1) {
@@ -137,9 +149,14 @@ function dropBackfilled(rows) {
       peak = no
       continue
     }
-    const climbsBack = rows
-      .slice(i + 1)
-      .some((r) => STAGE_NO[r.stage] > no && STAGE_NO[r.stage] <= peak)
+    const mask = laterStages[i + 1]
+    let climbsBack = false
+    for (let stage = no + 1; stage <= peak; stage += 1) {
+      if (mask & (1 << stage)) {
+        climbsBack = true
+        break
+      }
+    }
     if (climbsBack) {
       out.push(rows[i])
       peak = no

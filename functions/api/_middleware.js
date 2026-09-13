@@ -1,23 +1,12 @@
-// API 로 들어오는 모든 요청이 지나는 문.
-//
-// 이 사이트에는 로그인이 없다. 그것은 설계로 고른 것이고 바꿀 생각도 없다 --
-// 현업 담당자에게 계정을 만들라고 하면 그 순간 사용률이 0 이 된다.
-//
-// 그런데 계정이 없다는 것은 **누가 얼마나 두드리는지 셀 근거도 없다**는 뜻이다.
-// 세어 보니 값을 쓰는 창구가 서른한 곳인데 그중 열다섯 곳에 아무 한도가
-// 없었다. 신청서·판정·신고·질문을 원하는 만큼 밀어 넣을 수 있었다는 뜻이다.
-// 화면은 멀쩡히 돌고 아무 기록도 안 남으므로, 그렇게 되고 있어도 모른다.
-//
-// 라우트마다 한 줄씩 붙이는 방법도 있지만 그러면 새 라우트를 만들 때마다
-// 잊는다. 실제로 열다섯 곳이 그렇게 빠졌다. 그래서 지나가는 길목에 둔다.
-//
-// 읽기(GET)는 막지 않는다. 보러 온 사람을 막을 이유가 없고, 읽기는 아무것도
-// 남기지 않는다. 막는 것은 **남기는 요청**뿐이다.
+// Public demonstrations use private visitor workspaces and same-origin writes.
+// Real deployments require signed Access identity for business reads and writes.
+// Rate limits are additional abuse protection, not a replacement for authentication.
 
 import { jsonError } from '../_lib/http.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
 import { withDbBinding } from '../_lib/dbBridge.js'
 import { workspaceEnabled, workspaceToken, workspaceDb, sameOrigin } from '../_lib/workspace.js'
+import { resolveOverrideActor } from '../_lib/override.js'
 
 // 한 사람이 십 분에 몇 번까지 쓸 수 있는가.
 //
@@ -78,6 +67,12 @@ export async function onRequest(context) {
     return privateResponse
   }
 
+  // Real deployments protect reads as well as writes. An email header is not authentication.
+  if (path !== '/api/health' && context.env.OVERRIDE_DEMO_MODE !== 'true') {
+    const actor = await resolveOverrideActor(context.env, request)
+    if (!actor) return jsonError('인증된 사내 계정이 필요합니다.', 401)
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !sameOrigin(request)) return jsonError('이 사이트에서 직접 요청해 주세요.', 403)
+  }
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
     return next()
   }

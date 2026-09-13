@@ -124,6 +124,7 @@ React 19 + Vite + react-router
 node --version        # v22 LTS (최소 v22.12.0)
 npm ci
 npm run dev          # 프런트만
+npm run dev:demo     # 외부 연결 없는 메모리 PostgreSQL + 실제 API, 5187 포트
 npm run dev:full     # Cloudflare Pages Functions + Supabase 연결
 
 npm test             # 전체 테스트
@@ -146,6 +147,11 @@ python seed/generate_sources.py
 빈 PostgreSQL DB에는 `supabase/migrations/`의 SQL을 파일명 순서대로 적용합니다.
 `0000_schema.sql`은 35개 테이블의 빈 스키마이며 사용자 데이터는 포함하지 않습니다.
 익명·일반 로그인 역할에는 SQL 실행 RPC 권한을 부여하지 않습니다.
+
+감사 지적 수정본은 `0004_audit_hardening.sql`의 RPC를 사용합니다. 운영 반영 전에는
+[감사 지적 수정·반영 절차](docs/audit-hardening-2026-09-13.md)를 확인합니다.
+공개 체험에서는 시작 버튼을 누를 때만 별도 공간을 만듭니다. 사내 운영 모드는
+서명된 Cloudflare Access JWT와 실제 역할 매핑을 요구하며 이메일 헤더만 신뢰하지 않습니다.
 
 이전 중에는 `DB_MAINTENANCE=true`로 새 API 쓰기를 막은 배포를 먼저 적용하고,
 백업과 테이블별 건수·내용 대조 후 연결을 전환합니다. 이후 발생한 데이터가 있으므로

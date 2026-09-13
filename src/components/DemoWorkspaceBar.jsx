@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { ensureWorkspace, resetWorkspace } from '../api/client.js'
+import { readWorkspace, resetWorkspace } from '../api/client.js'
 import '../journey.css'
 import { DRAFT_KEY } from '../lib/draft.js'
 
@@ -11,7 +11,7 @@ export default function DemoWorkspaceBar() {
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     let alive = true
-    ensureWorkspace().then(value => { if (alive) setState(value) }).catch(err => { if (alive) setError(err.message) })
+    readWorkspace().then(value => { if (alive) setState(value) }).catch(err => { if (alive) setError(err.message) })
     const onReset = event => { if (event.key === 'ilson:workspace-reset') window.location.reload() }
     window.addEventListener('storage', onReset)
     return () => { alive = false; window.removeEventListener('storage', onReset) }

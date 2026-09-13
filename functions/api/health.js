@@ -3,8 +3,7 @@
 // 화면이 뜨는 것과 백엔드가 도는 것은 다른 이야기다. 정적 파일은 DB 바인딩이
 // 없어도 200으로 나오므로, 무엇이 준비되고 무엇이 안 됐는지를 여기서 말한다.
 //
-// 준비가 덜 된 것도 200으로 답한다. 그래야 무엇이 없는지를 본문으로 읽을 수
-// 있다 — 503으로 끊으면 원인이 아니라 증상만 보인다.
+// 준비되지 않은 경우 JSON 설명과 HTTP 503을 함께 반환한다.
 
 import { jsonResponse } from '../_lib/http.js'
 
@@ -32,7 +31,7 @@ export async function onRequestGet({ env, data: requestData }) {
 
   if (!env.DB) {
     notes.push('데이터베이스 바인딩(DB)이 없습니다. wrangler.toml의 바인딩 또는 Supabase 설정을 확인해주세요.')
-    return jsonResponse({ ready: false, checks, tables, notes })
+    return jsonResponse({ ready: false, checks, tables, notes }, 503)
   }
 
   const isSupabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY)
@@ -65,16 +64,21 @@ export async function onRequestGet({ env, data: requestData }) {
 
     if (isSupabase) {
       notes.push('DB provider = Supabase')
+      const readiness = await env.DB.readiness()
+      checks.runtime = readiness.schemaReady === true
+      checks.capacity = env.DEMO_WORKSPACES !== 'true' || readiness.capacityAvailable === true
+      if (!checks.runtime) notes.push('운영 RPC 또는 0004 마이그레이션이 준비되지 않았습니다.')
+      if (!checks.capacity) notes.push('새 체험 공간 정원이 찼습니다. 소개 화면과 기존 체험 공간은 계속 사용할 수 있습니다.')
     }
   } catch (err) {
     notes.push(`DB를 읽지 못했습니다: ${String(err.message).slice(0, 140)}`)
   }
 
-  const ready = checks.db && checks.schema
+  const ready = checks.db && checks.schema && (!isSupabase || (checks.runtime === true && checks.capacity === true))
   return jsonResponse({
     ready,
     checks,
     tables,
     notes,
-  })
+  }, ready ? 200 : 503)
 }

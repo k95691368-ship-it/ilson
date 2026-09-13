@@ -1,5 +1,8 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
 import { newId } from '../_lib/ids.js'
+import { integrationConfig } from '../_lib/integrationConfig.js'
+import { overrideMetrics } from '../_lib/overrideMetrics.js'
+import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.js'
 import {
   ensureOverrideSchema,
   seedOverrideWorkspace,
@@ -19,13 +22,12 @@ import {
   causeByKey,
   compareDecision,
   evaluateExperimentRun,
+  validEvaluationPlan,
   priorityBand,
   priorityScore,
   recommendCluster,
-  recurringExceptionRate,
   safeJson,
   suggestCauses,
-  trendSignal,
 } from '../../shared/override.js'
 
 const ALLOWED_ACTIONS = new Set(DECISION_ACTIONS.map((item) => item.key))
@@ -84,97 +86,17 @@ function hydrateExperiment(row, runs, decisions) {
 }
 
 function daysBetween(start, end) {
-  const a = new Date(String(start).replace(' ', 'T') + 'Z').getTime()
-  const b = new Date(String(end).replace(' ', 'T') + 'Z').getTime()
+  const utc = value => { const normalized = String(value).replace(' ', 'T'); return /(?:Z|[+-]\d\d:\d\d)$/.test(normalized) ? normalized : normalized+'Z' }
+  const a = new Date(utc(start)).getTime()
+  const b = new Date(utc(end)).getTime()
   if (!Number.isFinite(a) || !Number.isFinite(b)) return null
   return Math.round(((b - a) / 86400000) * 10) / 10
 }
 
 function average(values) {
-  const usable = values.map(Number).filter(Number.isFinite)
+  const usable = values.filter(value => value !== null && value !== undefined && value !== '').map(Number).filter(Number.isFinite)
   if (usable.length === 0) return null
   return Math.round((usable.reduce((sum, value) => sum + value, 0) / usable.length) * 10) / 10
-}
-
-function buildFairness(events, volumes, products) {
-  const rows = new Map()
-  for (const volume of volumes) {
-    const key = `${volume.product_id}::${volume.segment}`
-    const current = rows.get(key) ?? {
-      product_id: volume.product_id,
-      segment: volume.segment,
-      applicable: 0,
-      overrides: 0,
-    }
-    current.applicable += Number(volume.applicable_cases) || 0
-    rows.set(key, current)
-  }
-  for (const event of events) {
-    if (!Number(event.is_override) || event.validity === 'invalid') continue
-    const key = `${event.product_id}::${event.segment || '미분류'}`
-    const current = rows.get(key) ?? {
-      product_id: event.product_id,
-      segment: event.segment || '미분류',
-      applicable: 0,
-      overrides: 0,
-    }
-    current.overrides += 1
-    rows.set(key, current)
-  }
-
-  const productNames = new Map(products.map((product) => [product.id, product.name]))
-  return [...rows.values()]
-    .map((row) => ({
-      ...row,
-      product_name: productNames.get(row.product_id) ?? row.product_id,
-      rate: recurringExceptionRate(row.overrides, row.applicable),
-    }))
-    .sort((a, b) => (b.rate ?? -1) - (a.rate ?? -1))
-}
-
-function buildPolicyImpact(events) {
-  const groups = new Map()
-  for (const event of events) {
-    for (const policy of event.policy_refs ?? []) {
-      const current = groups.get(policy) ?? {
-        policy,
-        events: 0,
-        products: new Set(),
-        high_risk: 0,
-        cost_krw: 0,
-      }
-      current.events += Number(event.is_override) || 0
-      current.products.add(event.product_id)
-      current.high_risk += Number(event.regulatory_risk_score) >= 4 ? 1 : 0
-      current.cost_krw += Number(event.operations_cost_krw) || 0
-      groups.set(policy, current)
-    }
-  }
-  return [...groups.values()]
-    .map((group) => ({ ...group, products: group.products.size }))
-    .sort((a, b) => b.events - a.events)
-}
-
-function buildCommonIssues(events, clusters, products) {
-  const productNames = new Map(products.map((product) => [product.id, product.name]))
-  const clusterMap = new Map(clusters.map((cluster) => [cluster.id, cluster]))
-  const groups = new Map()
-  for (const event of events) {
-    if (!event.cluster_id || !Number(event.is_override) || event.validity === 'invalid') continue
-    const cause = clusterMap.get(event.cluster_id)?.cause_code ?? 'unknown'
-    const current = groups.get(cause) ?? { cause_code: cause, events: 0, products: new Set() }
-    current.events += 1
-    current.products.add(productNames.get(event.product_id) ?? event.product_id)
-    groups.set(cause, current)
-  }
-  return [...groups.values()]
-    .map((group) => ({
-      ...group,
-      cause_label: causeByKey(group.cause_code).label,
-      products: [...group.products],
-    }))
-    .filter((group) => group.products.length > 1)
-    .sort((a, b) => b.events - a.events)
 }
 
 function buildGraph(products, events, clusters, experiments, decisions) {
@@ -229,7 +151,7 @@ function buildAlerts(clusters, experiments) {
     if (blocked) {
       alerts.push({
         level: 'critical',
-        title: `${experiment.title} 자동 중단`,
+        title: `${experiment.title} 중단 판정 기록`,
         body: `${blocked.phase}에서 가드레일 ${blocked.guardrail_breaches}건을 위반했습니다.`,
         entity_id: experiment.id,
       })
@@ -249,7 +171,7 @@ async function loadWorkspace(env) {
       ).all(),
       env.DB.prepare('SELECT * FROM issue_cluster ORDER BY priority_score DESC, last_seen_at DESC').all(),
       env.DB.prepare('SELECT * FROM change_experiment ORDER BY updated_at DESC').all(),
-      env.DB.prepare('SELECT * FROM experiment_run ORDER BY created_at').all(),
+      env.DB.prepare('SELECT * FROM experiment_run ORDER BY run_sequence').all(),
       env.DB.prepare('SELECT * FROM override_decision_record ORDER BY created_at DESC').all(),
       env.DB.prepare('SELECT * FROM override_volume ORDER BY measured_on DESC').all(),
       env.DB.prepare('SELECT * FROM override_integration ORDER BY created_at DESC').all(),
@@ -267,39 +189,9 @@ async function loadWorkspace(env) {
   )
   const volumes = volumeRows.results ?? []
 
-  const now = Date.now()
-  const clusters = rawClusters.map((cluster) => {
-    const related = events.filter(
-      (event) => event.cluster_id === cluster.id && Number(event.is_override) && event.validity !== 'invalid'
-    )
-    const recent = related.filter((event) => {
-      const at = new Date(String(event.occurred_at).replace(' ', 'T') + 'Z').getTime()
-      return Number.isFinite(at) && now - at <= 30 * 86400000
-    }).length
-    const previous = related.filter((event) => {
-      const at = new Date(String(event.occurred_at).replace(' ', 'T') + 'Z').getTime()
-      return Number.isFinite(at) && now - at > 30 * 86400000 && now - at <= 60 * 86400000
-    }).length
-    return { ...cluster, trend: trendSignal(recent, previous) }
-  })
-
-  const validOverrides = events.filter(
-    (event) => Number(event.is_override) && event.validity !== 'invalid'
-  )
-  const applicableCases = products.reduce(
-    (sum, product) => sum + (Number(product.applicable_cases) || 0),
-    0
-  )
-  const confirmedClusters = clusters.filter((cluster) => cluster.cause_confirmed_at)
-  const completeEvents = events.filter(
-    (event) =>
-      event.ai_decision &&
-      event.human_decision &&
-      event.reason_detail &&
-      event.model_version &&
-      event.prompt_version &&
-      event.policy_refs.length > 0
-  )
+  const analytics = await overrideMetrics(env.DB, products)
+  const clusters = rawClusters.map(cluster => ({ ...cluster, recurrence_count:analytics.clusterCounts.get(cluster.id)||0, trend: analytics.trends.get(cluster.id) }))
+  const confirmedClusters = clusters.filter(cluster => cluster.cause_confirmed_at)
 
   const workspace = {
     generated_at: new Date().toISOString(),
@@ -316,20 +208,14 @@ async function loadWorkspace(env) {
     integrations: integrationRows.results ?? [],
     audit: (auditRows.results ?? []).map((row) => ({ ...row, detail: safeJson(row.detail_json, {}) })),
     ai_calls: aiRows.results ?? [],
-    fairness: buildFairness(events, volumes, products),
-    policy_impact: buildPolicyImpact(events),
-    common_issues: buildCommonIssues(events, clusters, products),
-    graph: buildGraph(products, events, clusters, experiments, decisions),
+    fairness: analytics.fairness,
+    policy_impact: analytics.policy_impact,
+    common_issues: analytics.common_issues,
+    graph: buildGraph(products, analytics.edges, clusters, experiments, decisions),
+    event_list: { limit: 500, total: analytics.metrics.total_decisions, truncated: analytics.metrics.total_decisions > events.length },
+    execution: { mode: overrideDemoMode(env) ? 'simulation' : 'manual_evidence', external_rollout: false },
     metrics: {
-      total_decisions: events.length,
-      overrides: validOverrides.length,
-      recurring_exception_rate: recurringExceptionRate(validOverrides.length, applicableCases),
-      capture_completeness: events.length ? Math.round((completeEvents.length / events.length) * 1000) / 10 : null,
-      reason_confirmation_rate: events.length
-        ? Math.round((events.filter((event) => event.reason_detail).length / events.length) * 1000) / 10
-        : null,
-      average_recording_seconds: average(events.map((event) => event.recording_seconds)),
-      pending_validation: events.filter((event) => event.validity === 'pending').length,
+      ...analytics.metrics,
       active_clusters: clusters.filter((cluster) => !['resolved', 'accepted_exception'].includes(cluster.status)).length,
       p0_clusters: clusters.filter(
         (cluster) => priorityBand(cluster.priority_score) === 'P0' && cluster.status !== 'resolved'
@@ -345,23 +231,23 @@ async function loadWorkspace(env) {
         : null,
       in_experiment: experiments.filter((experiment) => ['approved', 'running'].includes(experiment.status)).length,
       guardrail_breaches: runs.reduce((sum, run) => sum + (Number(run.guardrail_breaches) || 0), 0),
-      verified_improvements: experiments.filter((experiment) => experiment.status === 'expanded').length,
-      rework_cost_krw: validOverrides.reduce(
-        (sum, event) => sum + (Number(event.operations_cost_krw) || 0),
-        0
-      ),
     },
   }
   workspace.alerts = buildAlerts(clusters, experiments)
   return workspace
 }
 
-export async function onRequestGet({ env, data: requestData }) {
+export async function onRequestGet({ env, data: requestData, request }) {
   env = requestData?.requestEnv ?? env
   try {
     await ensureOverrideSchema(env)
     await seedOverrideWorkspace(env)
     const workspace = await loadWorkspace(env)
+    if (!overrideDemoMode(env)) {
+      const actor = await resolveOverrideActor(env,request)
+      if (!actor) return jsonError('인증된 사내 계정이 필요합니다.',401)
+      workspace.current_actor = {role:actor.role,label:actor.label}
+    }
     return jsonResponse(workspace)
   } catch (error) {
     return failUnexpected(error, 'OverrideLoop 운영 자료를 불러오지 못했습니다.')
@@ -370,42 +256,23 @@ export async function onRequestGet({ env, data: requestData }) {
 
 async function refreshCluster(env, clusterId) {
   if (!clusterId) return
-  const stats = await env.DB.prepare(
-    `SELECT COUNT(*) AS n,
-            MIN(occurred_at) AS first_seen,
-            MAX(occurred_at) AS last_seen,
-            AVG(customer_impact_score) AS customer_score,
-            SUM(operations_cost_krw) AS cost_krw,
-            MAX(regulatory_risk_score) AS regulation_score
-     FROM override_event
-     WHERE cluster_id = ? AND is_override = 1 AND validity != 'invalid'`
-  )
-    .bind(clusterId)
-    .first()
-  if (!stats || Number(stats.n) === 0) return
-  const score = priorityScore({
-    customerImpact: stats.customer_score,
-    operationsCost: stats.cost_krw,
-    regulatoryRisk: stats.regulation_score,
-    recurrence: stats.n,
-  })
+  // Runs after the event write, in the same transaction; no read of staged data.
   await env.DB.prepare(
     `UPDATE issue_cluster
-     SET recurrence_count = ?, customer_impact_score = ?, operations_cost_krw = ?,
-         regulatory_risk_score = ?, priority_score = ?, first_seen_at = ?, last_seen_at = ?,
-         updated_at = datetime('now')
-     WHERE id = ?`
+     SET recurrence_count = s.n, customer_impact_score = s.customer,
+         operations_cost_krw = s.cost, regulatory_risk_score = s.regulation,
+         priority_score = round((least(5,greatest(0,s.customer))*5
+           + least(5,greatest(0,s.regulation))*6
+           + least(1,ln(s.n+1)/ln(2)/5)*25
+           + least(1,log((greatest(0,s.cost)+1)::numeric)/6)*20)::numeric,1),
+         first_seen_at = coalesce(s.first_seen,first_seen_at),
+         last_seen_at = coalesce(s.last_seen,last_seen_at), updated_at = datetime('now')
+     FROM (SELECT count(*) AS n, coalesce(avg(customer_impact_score),0) AS customer,
+       coalesce(sum(operations_cost_krw),0) AS cost, coalesce(max(regulatory_risk_score),0) AS regulation,
+       min(occurred_at) AS first_seen,max(occurred_at) AS last_seen FROM override_event
+       WHERE cluster_id=? AND is_override=1 AND validity='valid') s WHERE id=?`
   )
-    .bind(
-      Number(stats.n),
-      Number(stats.customer_score) || 0,
-      Number(stats.cost_krw) || 0,
-      Number(stats.regulation_score) || 0,
-      score,
-      stats.first_seen,
-      stats.last_seen,
-      clusterId
-    )
+    .bind(clusterId, clusterId)
     .run()
 }
 
@@ -446,7 +313,7 @@ async function captureEvent(env, actor, body) {
 
   if (action.isOverride) {
     const { results: openClusters } = await env.DB.prepare(
-      `SELECT * FROM issue_cluster WHERE status NOT IN ('resolved', 'accepted_exception')`
+      `SELECT * FROM issue_cluster WHERE status NOT IN ('resolved', 'accepted_exception') ORDER BY id`
     ).all()
     const hydrated = (openClusters ?? []).map(hydrateCluster)
     const recommendation = recommendCluster(
@@ -550,13 +417,6 @@ async function captureEvent(env, actor, body) {
     throw error
   }
 
-  await env.DB.prepare(
-    `UPDATE override_product
-     SET total_cases = total_cases + 1, applicable_cases = applicable_cases + 1,
-         updated_at = datetime('now') WHERE id = ?`
-  )
-    .bind(productId)
-    .run()
   await refreshCluster(env, clusterId)
   await auditOverride(env, actor, 'capture_event', 'override_event', id, {
     decision_action: decisionAction,
@@ -574,7 +434,7 @@ async function validateEvent(env, actor, body) {
   if (!eventId || !['valid', 'invalid', 'uncertain'].includes(validity) || !reason) {
     return failFields({ reason: '타당성 판정과 근거를 함께 적어주세요.' })
   }
-  const event = await env.DB.prepare('SELECT id, cluster_id FROM override_event WHERE id = ?')
+  const event = await env.DB.prepare('SELECT * FROM override_event WHERE id = ?')
     .bind(eventId)
     .first()
   if (!event) return jsonError('그 수정 사건을 찾지 못했습니다.', 404)
@@ -697,6 +557,9 @@ async function createExperiment(env, actor, body) {
   )
   const guardrails = list(body.guardrails)
   const stopConditions = list(body.stopConditions)
+  const plan = body.evaluationPlan
+  if (!validEvaluationPlan(plan)) fields.evaluationPlan = '지표 종류·단계별 최소 표본·측정 기간·선정 근거·데이터/모델/정책 버전을 모두 정해주세요.'
+  if (!['number','string'].includes(typeof body.targetImprovement) || !Number.isFinite(Number(body.targetImprovement)) || String(body.targetImprovement ?? '').trim() === '' || Number(body.targetImprovement)<=0) fields.targetImprovement = '목표 개선율은 0보다 큰 유한한 숫자여야 합니다.'
   if (!guardrails.length) fields.guardrails = '안전 가드레일을 한 개 이상 적어주세요.'
   if (!stopConditions.length) fields.stopConditions = '중단 조건을 한 개 이상 적어주세요.'
   if (Object.keys(fields).length) return failFields(fields)
@@ -709,8 +572,8 @@ async function createExperiment(env, actor, body) {
     `INSERT INTO change_experiment
      (id, cluster_id, title, change_target, hypothesis, scope, comparator, success_metric,
       metric_direction, target_improvement, guardrails_json, stop_conditions_json, approver,
-      rollback_plan, risk_level, current_phase, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'draft')`
+      rollback_plan, risk_level, current_phase, status, evaluation_plan_json, change_version)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'draft', 'draft', ?, ?)`
   )
     .bind(
       id,
@@ -722,12 +585,13 @@ async function createExperiment(env, actor, body) {
       text(body.comparator, 800),
       text(body.successMetric, 400),
       body.metricDirection === 'higher' ? 'higher' : 'lower',
-      number(body.targetImprovement, 0, 1000),
+      Number(body.targetImprovement),
       JSON.stringify(guardrails),
       JSON.stringify(stopConditions),
       text(body.approver, 120),
       text(body.rollbackPlan, 2000),
-      ['low', 'medium', 'high'].includes(body.riskLevel) ? body.riskLevel : 'medium'
+      ['low', 'medium', 'high'].includes(body.riskLevel) ? body.riskLevel : 'medium',
+      JSON.stringify(plan), newId('version')
     )
     .run()
   await env.DB.prepare(
@@ -751,15 +615,17 @@ async function approveExperiment(env, actor, body) {
     .bind(experimentId)
     .first()
   if (!experiment) return jsonError('그 실험을 찾지 못했습니다.', 404)
+  if (!['draft','held','stopped'].includes(experiment.status)) return jsonError('초안·보류·중단 상태에서만 새 시험 주기를 승인할 수 있습니다. 종료된 실험은 새 실험으로 이어주세요.', 409)
+  if (!validEvaluationPlan(safeJson(experiment.evaluation_plan_json))) return jsonError('사전 측정 계획이 없는 기존 실험입니다. 계획과 원본 버전을 지정한 후속 실험을 만들어주세요.', 409)
   if (experiment.risk_level === 'high' && !['policy', 'audit', 'executive'].includes(actor.role)) {
     return jsonError('고위험 실험은 정책·감사·사업 책임자만 승인할 수 있습니다.', 403)
   }
   await env.DB.prepare(
     `UPDATE change_experiment
-     SET status = 'approved', approved_by = ?, approved_at = datetime('now'),
-         updated_at = datetime('now') WHERE id = ?`
+     SET status = 'approved', approved_by = ?, approved_at = datetime('now'), approval_id = ?, current_phase = 'draft',
+         updated_at = datetime('now'), mutation_version = mutation_version + 1 WHERE id = ?`
   )
-    .bind(actor.label, experimentId)
+    .bind(actor.label, newId('approval'), experimentId)
     .run()
   await auditOverride(env, actor, 'approve_experiment', 'change_experiment', experimentId, { basis })
   return jsonResponse({ ok: true })
@@ -774,23 +640,33 @@ async function recordRun(env, actor, body) {
     .bind(experimentId)
     .first()
   if (!experiment) return jsonError('그 실험을 찾지 못했습니다.', 404)
-  if (!experiment.approved_at) return jsonError('사람의 승인을 받은 뒤에 실험을 시작할 수 있습니다.', 409)
-  if (['expanded', 'rolled_back'].includes(experiment.status)) {
-    return jsonError('이미 최종 결정된 실험에는 새 실행을 넣을 수 없습니다.', 409)
-  }
+  if (!experiment.approved_at || !experiment.approval_id || !['approved','running'].includes(experiment.status)) return jsonError('현재 상태에서는 결과를 추가할 수 없습니다. 중단·보류 후에는 새 시험 주기 승인이 필요합니다.', 409)
+  const plan = safeJson(experiment.evaluation_plan_json)
+  if (!validEvaluationPlan(plan)) return jsonError('사전 측정 계획이 없습니다. 새 실험을 작성해주세요.', 409)
+  if (['controlValue','variantValue','sampleSize','guardrailBreaches'].some(key => !['number','string'].includes(typeof body[key]) || String(body[key]).trim()==='')) return failFields({ sampleSize: '측정값·표본·위반 건수를 모두 입력해주세요.' })
+  const evidence = list(body.evidenceRefs)
+  const start = Date.parse(body.measurementStart), end = Date.parse(body.measurementEnd)
+  if (!evidence.length || !Number.isFinite(start) || !Number.isFinite(end) || end > Date.now()
+      || (end-start)/1000 < plan.minimumWindowSeconds) return failFields({ evidenceRefs: '원본 실행·데이터 근거와 사전에 정한 기간 이상의 측정 시작·종료 시각이 필요합니다.' })
+  if (['rate','count'].includes(plan.metricType) && [body.controlValue,body.variantValue].some(value =>
+      plan.metricType === 'rate' ? Number(value)>100 : !Number.isSafeInteger(Number(value)))) return failFields({ controlValue: '비율은 0~100, 건수는 0 이상의 정수로 입력해주세요.' })
 
   const phaseIndex = EXPERIMENT_PHASES.findIndex((item) => item.key === phase)
   if (phaseIndex > 0) {
     const prior = EXPERIMENT_PHASES[phaseIndex - 1].key
     const passed = await env.DB.prepare(
-      `SELECT id FROM experiment_run
-       WHERE experiment_id = ? AND phase = ? AND status = 'passed'
-       ORDER BY created_at DESC LIMIT 1`
+      `SELECT id,status FROM experiment_run
+       WHERE experiment_id = ? AND phase = ? AND approval_id = ? AND change_version = ?
+       ORDER BY run_sequence DESC LIMIT 1`
     )
-      .bind(experimentId, prior)
+      .bind(experimentId, prior, experiment.approval_id, experiment.change_version)
       .first()
-    if (!passed) return jsonError(`${EXPERIMENT_PHASES[phaseIndex - 1].label}를 먼저 통과해야 합니다.`, 409)
+    if (passed?.status !== 'passed') return jsonError(`현재 승인 주기의 최신 ${EXPERIMENT_PHASES[phaseIndex - 1].label}를 먼저 통과해야 합니다.`, 409)
   }
+  const laterPhases = EXPERIMENT_PHASES.slice(phaseIndex+1).map(item=>item.key)
+  const later = laterPhases.length ? await env.DB.prepare('SELECT id FROM experiment_run WHERE experiment_id=? AND approval_id=? AND phase IN (' + laterPhases.map(()=>'?').join(',') + ') LIMIT 1')
+    .bind(experimentId, experiment.approval_id, ...laterPhases).first() : null
+  if (later) return jsonError('후속 단계가 있는 상태에서 이전 결과를 덮어쓸 수 없습니다. 실험을 보류한 뒤 새 시험 주기를 승인해주세요.', 409)
 
   const evaluation = evaluateExperimentRun({
     direction: experiment.metric_direction,
@@ -799,28 +675,32 @@ async function recordRun(env, actor, body) {
     targetImprovement: experiment.target_improvement,
     guardrailBreaches: body.guardrailBreaches,
     sampleSize: body.sampleSize,
+    minimumSample: plan.minimumSamples[phase],
   })
+  if (evaluation.status === 'invalid') return failFields({ sampleSize: '측정값과 표본·위반 건수를 올바른 숫자로 입력해주세요.' })
   const id = newId('olr')
   await env.DB.prepare(
     `INSERT INTO experiment_run
      (id, experiment_id, phase, status, control_value, variant_value, improvement_percent,
-      sample_size, guardrail_breaches, cost_before_krw, cost_after_krw, notes, run_by)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      sample_size, guardrail_breaches, cost_before_krw, cost_after_krw, notes, run_by,
+      change_version, approval_id, evidence_refs_json, measurement_start, measurement_end, source_kind)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'manual')`
   )
     .bind(
       id,
       experimentId,
       phase,
       evaluation.status,
-      number(body.controlValue, -1000000000, 1000000000),
-      number(body.variantValue, -1000000000, 1000000000),
+      Number(body.controlValue),
+      Number(body.variantValue),
       evaluation.improvement,
-      number(body.sampleSize, 0, 1000000000),
+      Number(body.sampleSize),
       evaluation.guardrailBreaches,
       number(body.costBefore, 0),
       number(body.costAfter, 0),
       text(body.notes, 2000) || null,
-      actor.label
+      actor.label, experiment.change_version, experiment.approval_id, JSON.stringify(evidence),
+      new Date(start).toISOString(), new Date(end).toISOString()
     )
     .run()
 
@@ -832,7 +712,7 @@ async function recordRun(env, actor, body) {
         : 'running'
   await env.DB.prepare(
     `UPDATE change_experiment
-     SET current_phase = ?, status = ?, updated_at = datetime('now') WHERE id = ?`
+     SET current_phase = ?, status = ?, updated_at = datetime('now'), mutation_version = mutation_version + 1 WHERE id = ?`
   )
     .bind(phase, nextStatus, experimentId)
     .run()
@@ -864,7 +744,7 @@ async function decideExperiment(env, actor, body) {
     .first()
   if (!experiment) return jsonError('그 실험을 찾지 못했습니다.', 404)
   const { results: runs } = await env.DB.prepare(
-    'SELECT * FROM experiment_run WHERE experiment_id = ? ORDER BY created_at'
+    'SELECT * FROM experiment_run WHERE experiment_id = ? ORDER BY run_sequence'
   )
     .bind(experimentId)
     .all()
@@ -872,7 +752,7 @@ async function decideExperiment(env, actor, body) {
     const gate = canExpandExperiment(experiment, runs)
     if (!gate.ok) {
       return jsonError(
-        gate.needsApproval
+        !gate.stateAllowed ? '현재 상태에서 확대 결정을 내릴 수 없습니다.' : gate.needsPlan ? '사전 측정 계획이 없습니다.' : gate.needsApproval
           ? '고위험 변경 승인이 없습니다.'
           : gate.missing.length
             ? `${gate.missing.join(' · ')} 결과가 필요합니다.`
@@ -881,17 +761,32 @@ async function decideExperiment(env, actor, body) {
       )
     }
   }
+  if (['expanded','rolled_back'].includes(experiment.status)) return jsonError('이미 종료된 실험입니다. 기존 결정을 바꾸지 말고 후속 실험을 작성해주세요.', 409)
   if (experiment.risk_level === 'high' && !['policy', 'audit', 'executive'].includes(actor.role)) {
     return jsonError('고위험 변경의 최종 결정은 정책·감사·사업 책임자만 할 수 있습니다.', 403)
   }
 
   const id = newId('old')
   const snapshot = {
-    runs: runs.map((run) => ({
+    approval_id: experiment.approval_id,
+    change_version: experiment.change_version,
+    evaluation_plan: safeJson(experiment.evaluation_plan_json),
+    target_improvement: experiment.target_improvement,
+    metric_direction: experiment.metric_direction,
+    guardrails: safeJson(experiment.guardrails_json,[]),
+    runs: runs.filter(run=>run.approval_id === experiment.approval_id && run.change_version === experiment.change_version).map((run) => ({
+      id: run.id,
       phase: run.phase,
       status: run.status,
+      sample_size: run.sample_size,
+      control_value: run.control_value,
+      variant_value: run.variant_value,
       improvement_percent: run.improvement_percent,
       guardrail_breaches: run.guardrail_breaches,
+      evidence_refs: safeJson(run.evidence_refs_json,[]),
+      measurement_start: run.measurement_start,
+      measurement_end: run.measurement_end,
+      source_kind: run.source_kind,
     })),
     decided_at: new Date().toISOString(),
   }
@@ -908,7 +803,7 @@ async function decideExperiment(env, actor, body) {
   await env.DB.batch([
     env.DB.prepare(
       `UPDATE change_experiment
-       SET status = ?, current_phase = 'decided', updated_at = datetime('now') WHERE id = ?`
+       SET status = ?, current_phase = 'decided', updated_at = datetime('now'), mutation_version = mutation_version + 1 WHERE id = ?`
     ).bind(statusMap[decision], experimentId),
     env.DB.prepare(
       `UPDATE issue_cluster SET status = ?, updated_at = datetime('now') WHERE id = ?`
@@ -927,12 +822,16 @@ async function recordVolume(env, actor, body) {
   const productId = text(body.productId, 100)
   const measuredOn = text(body.measuredOn, 10)
   const segment = text(body.segment, 120) || '전체'
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(measuredOn)) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(measuredOn) || !Number.isFinite(Date.parse(measuredOn)) || new Date(measuredOn).toISOString().slice(0,10)!==measuredOn || measuredOn>new Date().toISOString().slice(0,10)) {
     return failFields({ measuredOn: '측정일을 YYYY-MM-DD 형식으로 적어주세요.' })
   }
-  const totalCases = number(body.totalCases, 0, 1000000000)
-  const applicableCases = number(body.applicableCases, 0, totalCases)
-  const id = newId('olv')
+  const totalCases = Number(body.totalCases), applicableCases = Number(body.applicableCases)
+  if ([body.totalCases,body.applicableCases].some(value=>!['number','string'].includes(typeof value) || String(value).trim()==='') || !Number.isSafeInteger(totalCases) || !Number.isSafeInteger(applicableCases) || totalCases<0 || applicableCases<0 || applicableCases>totalCases) return failFields({ applicableCases:'전체·적용 가능 건수는 0 이상의 정수이며 적용 가능 건수가 전체를 초과할 수 없습니다.' })
+  const product = await env.DB.prepare('SELECT id FROM override_product WHERE id=?').bind(productId).first()
+  if (!product) return jsonError('그 제품을 찾지 못했습니다.',404)
+  const existingRows = (await env.DB.prepare('SELECT * FROM override_volume WHERE product_id=? AND measured_on=? ORDER BY id').bind(productId,measuredOn).all()).results
+  if (existingRows.some(row=>row.segment!==segment && (row.segment==='전체' || segment==='전체'))) return failFields({segment:'같은 제품·날짜에 전체와 세부 고객군의 분모를 중복 등록할 수 없습니다.'})
+  const id = existingRows.find(row=>row.segment===segment)?.id || newId('olv')
   await env.DB.prepare(
     `INSERT INTO override_volume
      (id, product_id, measured_on, segment, total_cases, applicable_cases)
@@ -962,11 +861,14 @@ async function saveIntegration(env, actor, body) {
   if (!kind || !name || !isSafeIntegrationUrl(endpointUrl)) {
     return failFields({ endpointUrl: '공개 HTTPS 주소와 연동 종류·이름을 확인해주세요.' })
   }
-  if (secretBinding && !/^[A-Z][A-Z0-9_]{2,99}$/.test(secretBinding)) {
+  if (secretBinding && !/^OVERRIDE_INTEGRATION_[A-Z0-9_]+_TOKEN$/.test(secretBinding)) {
     return failFields({ secretBinding: '시크릿 값이 아니라 Cloudflare 바인딩 이름만 적어주세요.' })
   }
+  if (!overrideDemoMode(env) && !integrationConfig(env, { kind, endpoint_url: endpointUrl, secret_binding: secretBinding })) {
+    return failFields({ endpointUrl: '서버에서 허용한 주소·전용 자격 증명·중복 방지 지원 설정과 일치해야 합니다.' })
+  }
   const id = text(body.integrationId, 100) || newId('oli')
-  const existing = await env.DB.prepare('SELECT id FROM override_integration WHERE id = ?')
+  const existing = await env.DB.prepare('SELECT * FROM override_integration WHERE id = ?')
     .bind(id)
     .first()
   if (existing) {
@@ -1017,58 +919,39 @@ async function integrationPayload(env, integration) {
   return { kind: integration.kind === 'ticket' ? 'improvement_tickets' : 'override_summary', rows: results }
 }
 
-async function syncIntegration(env, actor, body) {
+async function syncIntegration(env, actor, body, requestId, fingerprint) {
   requireOverridePermission(actor, 'sync_integration')
-  const id = text(body.integrationId, 100)
-  const integration = await env.DB.prepare('SELECT * FROM override_integration WHERE id = ?')
-    .bind(id)
-    .first()
-  if (!integration) return jsonError('그 연동을 찾지 못했습니다.', 404)
-  if (!isSafeIntegrationUrl(integration.endpoint_url)) return jsonError('안전하지 않은 연동 주소입니다.', 400)
-  const payload = await integrationPayload(env, integration)
-  const headers = { 'Content-Type': 'application/json', 'User-Agent': 'OverrideLoop/1.0' }
-  if (integration.secret_binding) {
-    const secret = env[integration.secret_binding]
-    if (!secret) return jsonError('연동용 Cloudflare 시크릿 바인딩이 없습니다.', 409)
-    headers.Authorization = `Bearer ${secret}`
-  }
-  let response
-  try {
-    response = await fetch(integration.endpoint_url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      redirect: 'error',
-      signal: AbortSignal.timeout(12000),
-    })
-  } catch (error) {
-    await env.DB.prepare(
-      `UPDATE override_integration
-       SET status = 'error', last_sync_at = datetime('now'), last_result = ?,
-           updated_at = datetime('now') WHERE id = ?`
-    )
-      .bind(text(error.message, 180), id)
-      .run()
-    await auditOverride(env, actor, 'sync_integration_failed', 'override_integration', id, {
-      error: text(error.message, 180),
-    })
-    return jsonError('연동 대상이 요청을 받지 못했습니다.', 502)
-  }
-  const result = `${response.status} ${response.statusText}`.trim()
-  await env.DB.prepare(
-    `UPDATE override_integration
-     SET status = ?, last_sync_at = datetime('now'), last_result = ?,
-         updated_at = datetime('now') WHERE id = ?`
-  )
-    .bind(response.ok ? 'healthy' : 'error', result, id)
-    .run()
-  await auditOverride(env, actor, 'sync_integration', 'override_integration', id, {
-    kind: integration.kind,
-    response_status: response.status,
-    row_count: payload.rows?.length ?? 0,
+  const prior = await env.DB.mutationReceipt(requestId, fingerprint)
+  if (prior) return Response.json(prior.body, { status: prior.status })
+  const intentKey = 'intent_' + await mutationFingerprint(requestId)
+  const intent = await atomicMutation(env.DB, intentKey, fingerprint, async DB => {
+    const scoped = { ...env, DB }
+    const integration = await DB.prepare('SELECT * FROM override_integration WHERE id = ?').bind(text(body.integrationId,100)).first()
+    if (!integration) return jsonError('그 연동을 찾지 못했습니다.',404)
+    if (!integrationConfig(env,integration)) return jsonError('허용된 연동 설정과 중복 방지 계약이 필요합니다.',409)
+    const payload = await integrationPayload(scoped,integration)
+    await auditOverride(scoped,actor,'sync_integration_requested','override_integration',integration.id,{ request_id: requestId, row_count: payload.rows.length })
+    return jsonResponse({ integration, payload })
   })
-  if (!response.ok) return jsonError(`연동 대상이 ${response.status}로 거절했습니다.`, 502)
-  return jsonResponse({ ok: true, result, sent: payload.rows?.length ?? 0 })
+  if (!intent.ok) return intent
+  const { integration, payload } = await intent.json()
+  const config = integrationConfig(env,integration)
+  if (!config) return jsonError('연동 설정이 변경되었습니다. 관리자 확인이 필요합니다.',409)
+  let status = 0, ok = false
+  try {
+    const response = await fetch(config.endpointUrl, { method:'POST', redirect:'error', signal:AbortSignal.timeout(12000),
+      headers: { 'Content-Type':'application/json', Authorization: `Bearer ${env[config.secretBinding]}`, 'Idempotency-Key':requestId },
+      body:JSON.stringify(payload) })
+    status = response.status; ok = response.ok
+  } catch { /* The durable intent remains. Retrying uses the identical remote idempotency key. */ }
+  if (!status) return jsonError('외부 전송 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도해주세요.',502)
+  return atomicMutation(env.DB,requestId,fingerprint,async DB => {
+    await DB.prepare(`UPDATE override_integration SET status=?,last_sync_at=datetime('now'),last_result=?,updated_at=datetime('now') WHERE id=?`)
+      .bind(ok?'healthy':'error',String(status),integration.id).run()
+    await auditOverride({...env,DB},actor,ok?'sync_integration':'sync_integration_failed','override_integration',integration.id,
+      {request_id:requestId,response_status:status,row_count:payload.rows.length})
+    return ok ? jsonResponse({ok:true,result:String(status),sent:payload.rows.length}) : jsonError(`연동 대상이 ${status}로 거절했습니다.`,502)
+  },{commitError:true})
 }
 
 async function saveActor(env, actor, body) {
@@ -1104,9 +987,17 @@ export async function onRequestPost({ env, data: requestData, request }) {
     await seedOverrideWorkspace(env)
     const actor = await resolveOverrideActor(env, request, body)
     const action = text(body.action, 80)
-    if (env.DEMO_WORKSPACE && ['sync_integration', 'save_actor'].includes(action)) {
+    if (overrideDemoMode(env) && ['sync_integration', 'save_actor'].includes(action)) {
       return jsonError('개인 체험에서는 외부 전송과 실제 계정 설정을 실행하지 않습니다.', 403)
     }
+    const suppliedId = request.headers.get('X-Idempotency-Key')
+    if (!overrideDemoMode(env) && !suppliedId) return jsonError('중복 방지 요청 번호가 필요합니다.',400)
+    const requestId = suppliedId || crypto.randomUUID()
+    if (!/^[a-zA-Z0-9_-]{16,100}$/.test(requestId)) return jsonError('요청 식별자가 올바르지 않습니다.', 400)
+    const fingerprint = await mutationFingerprint({ body, actor })
+    if (action === 'sync_integration') return await syncIntegration(env,actor,body,requestId,fingerprint)
+    return await atomicMutation(env.DB, requestId, fingerprint, async DB => {
+    env = { ...env, DB, MUTATION_ID: requestId }
     // 각 작업의 비동기 오류까지 이 try/catch 안에서 JSON 응답으로 바꾼다.
     // await 없이 Promise를 그대로 반환하면 권한 오류 같은 reject가 catch 바깥으로
     // 빠져 Cloudflare가 HTML 500을 만들어 버린다.
@@ -1120,10 +1011,12 @@ export async function onRequestPost({ env, data: requestData, request }) {
     if (action === 'decide_experiment') return await decideExperiment(env, actor, body)
     if (action === 'record_volume') return await recordVolume(env, actor, body)
     if (action === 'save_integration') return await saveIntegration(env, actor, body)
-    if (action === 'sync_integration') return await syncIntegration(env, actor, body)
     if (action === 'save_actor') return await saveActor(env, actor, body)
     return jsonError('지원하지 않는 작업입니다.', 400)
+    })
   } catch (error) {
+    if (error.message?.includes('/40001')) return jsonError('다른 요청으로 기록이 변경되었습니다. 새로고침 후 다시 확인해 주세요.', 409)
+    if (error.message?.includes('/23505')) return jsonError('이미 저장된 기록입니다. 새로고침해서 확인해 주세요.', 409)
     if (error?.status) return jsonError(error.message, error.status)
     return failUnexpected(error, 'OverrideLoop 작업을 저장하지 못했습니다.')
   }

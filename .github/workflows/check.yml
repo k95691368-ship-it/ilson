@@ -22,27 +22,41 @@ on:
   # 않아도 된다.
   workflow_dispatch:
 
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version-file: .node-version
           cache: npm
 
       - name: 의존성 설치
+        id: install
         run: npm ci
 
       # 셋을 따로 둔다. 하나로 묶으면 먼저 넘어진 것 뒤는 안 돌아서,
       # "린트가 깨졌나 시험이 깨졌나"를 알려면 두 번 돌려야 한다.
       - name: 린트
-        run: npx oxlint src shared functions
-
-      - name: 시험
-        run: npm test
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run lint
 
       - name: 빌드
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
+
+      # 빌드 결과의 해시 파일·modulepreload까지 검사하는 시험이 있다. 깨끗한
+      # 체크아웃에는 dist가 없으므로 빌드 뒤에 돌려야 그 검사가 건너뛰지 않는다.
+      - name: 시험
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm test

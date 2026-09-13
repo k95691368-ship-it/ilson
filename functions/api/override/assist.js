@@ -1,7 +1,9 @@
 import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { atomicMutation, mutationFingerprint } from '../../_lib/atomicMutation.js'
 import { newId } from '../../_lib/ids.js'
 import {
   ensureOverrideSchema,
+  overrideDemoMode,
   resolveOverrideActor,
   requireOverridePermission,
   auditOverride,
@@ -62,6 +64,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
   }
 
   try {
+    if (overrideDemoMode(env)) return jsonError('개인 체험에서는 외부 AI 호출을 실행하지 않습니다.',403)
     await ensureOverrideSchema(env)
     const actor = await resolveOverrideActor(env, request, body)
     requireOverridePermission(actor, 'ai_assist')
@@ -72,110 +75,45 @@ export async function onRequestPost({ env, data: requestData, request }) {
     const kind = ['event', 'cluster', 'experiment'].includes(body.kind) ? body.kind : 'event'
     const context = redactSensitive(JSON.stringify(body.context ?? {}))
     if (context.length < 8) return jsonError('분석할 사건이나 문제 내용을 넣어주세요.', 400)
+    const requestId = request.headers.get('X-Idempotency-Key')
+    if (!requestId || !/^[a-zA-Z0-9_-]{16,100}$/.test(requestId)) return jsonError('중복 방지 요청 번호가 필요합니다.',400)
+    const fingerprint = await mutationFingerprint({body,actor})
+    const prior = await env.DB.mutationReceipt(requestId,fingerprint)
+    if (prior) return Response.json(prior.body,{status:prior.status})
+    const intentKey = 'ai_intent_' + await mutationFingerprint(requestId)
+    const claim = await atomicMutation(env.DB,intentKey,fingerprint,async DB=>{
+      const id = newId('olai')
+      await DB.prepare(`INSERT INTO override_ai_call (id,purpose,entity_kind,entity_id,model,prompt_version,ok,fail_reason,actor_label)
+        VALUES (?,?,?,?,?,?,0,'응답 확인 대기',?)`).bind(id,kind,body.entityKind??null,body.entityId??null,MODEL,PROMPT_VERSION,actor.label).run()
+      await auditOverride({...env,DB},actor,'ai_assist_requested',body.entityKind??kind,body.entityId??null,{call_id:id,request_id:requestId,model:MODEL})
+      return jsonResponse({id})
+    })
+    // Do not bill a second generation when an earlier result is still unknown.
+    if (claim.headers.get('X-Idempotency-Replayed') === '1') return jsonError('이 요청은 이미 시작되었습니다. 결과가 불명확해 자동 재호출하지 않습니다. 감사 기록을 확인해주세요.',409)
+    const {id:callId} = await claim.json()
     const started = Date.now()
-    let response
+    let response, payload, draft, failure = null
     try {
-      response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': env.CLAUDE_API_KEY,
-          'anthropic-version': '2023-06-01',
-        },
-        body: JSON.stringify({
-          model: MODEL,
-          max_tokens: 1600,
-          messages: [{ role: 'user', content: promptFor(kind, context) }],
-        }),
-        signal: AbortSignal.timeout(45000),
+      response = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',headers:{'Content-Type':'application/json','x-api-key':env.CLAUDE_API_KEY,'anthropic-version':'2023-06-01'},
+        body:JSON.stringify({model:MODEL,max_tokens:1600,messages:[{role:'user',content:promptFor(kind,context)}]}),
+        signal:AbortSignal.timeout(45000)
       })
-    } catch (error) {
-      await env.DB.prepare(
-        `INSERT INTO override_ai_call
-         (id, purpose, entity_kind, entity_id, model, prompt_version, duration_ms, ok,
-          fail_reason, actor_label)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-      )
-        .bind(
-          newId('olai'),
-          kind,
-          body.entityKind ?? null,
-          body.entityId ?? null,
-          MODEL,
-          PROMPT_VERSION,
-          Date.now() - started,
-          String(error.message ?? '').slice(0, 180),
-          actor.label
-        )
-        .run()
-      throw error
-    }
-
-    const payload = await response.json().catch(() => null)
-    if (!response.ok) {
-      const message = payload?.error?.message ?? `Claude API ${response.status}`
-      await env.DB.prepare(
-        `INSERT INTO override_ai_call
-         (id, purpose, entity_kind, entity_id, model, prompt_version, input_tokens,
-          output_tokens, duration_ms, ok, fail_reason, actor_label)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`
-      )
-        .bind(
-          newId('olai'),
-          kind,
-          body.entityKind ?? null,
-          body.entityId ?? null,
-          MODEL,
-          PROMPT_VERSION,
-          Number(payload?.usage?.input_tokens) || 0,
-          Number(payload?.usage?.output_tokens) || 0,
-          Date.now() - started,
-          String(message).slice(0, 180),
-          actor.label
-        )
-        .run()
-      return jsonError('Claude Opus 5가 분석 초안을 만들지 못했습니다.', 502)
-    }
-
-    const answer = payload?.content?.find((block) => block.type === 'text')?.text
-    let draft
-    try {
-      draft = parseJsonText(answer)
-    } catch {
-      return jsonError('AI 응답을 구조화된 초안으로 읽지 못했습니다.', 502)
-    }
-    const callId = newId('olai')
-    await env.DB.prepare(
-      `INSERT INTO override_ai_call
-       (id, purpose, entity_kind, entity_id, model, prompt_version, input_tokens,
-        output_tokens, duration_ms, ok, actor_label)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)`
-    )
-      .bind(
-        callId,
-        kind,
-        body.entityKind ?? null,
-        body.entityId ?? null,
-        MODEL,
-        PROMPT_VERSION,
-        Number(payload?.usage?.input_tokens) || 0,
-        Number(payload?.usage?.output_tokens) || 0,
-        Date.now() - started,
-        actor.label
-      )
-      .run()
-    await auditOverride(env, actor, 'ai_assist', body.entityKind ?? kind, body.entityId ?? null, {
-      call_id: callId,
-      model: MODEL,
-      prompt_version: PROMPT_VERSION,
-    })
-    return jsonResponse({
-      draft,
-      model: MODEL,
-      prompt_version: PROMPT_VERSION,
-      sensitive_values_redacted: true,
-      requires_human_confirmation: true,
-    })
+      payload = await response.json().catch(()=>null)
+      if (!response.ok) failure = `AI 제공자 응답 ${response.status}`
+      else {
+        try { draft = parseJsonText(payload?.content?.find(block=>block.type==='text')?.text) }
+        catch { failure = 'AI 응답 JSON 형식 오류' }
+        if (!draft || typeof draft !== 'object' || Array.isArray(draft)) failure = 'AI 초안 객체 형식 오류'
+      }
+    } catch { failure = 'AI 요청 결과 확인 실패' }
+    return await atomicMutation(env.DB,requestId,fingerprint,async DB=>{
+      await DB.prepare(`UPDATE override_ai_call SET input_tokens=?,output_tokens=?,duration_ms=?,ok=?,fail_reason=? WHERE id=?`)
+        .bind(Number(payload?.usage?.input_tokens)||0,Number(payload?.usage?.output_tokens)||0,Date.now()-started,failure?0:1,failure,callId).run()
+      await auditOverride({...env,DB},actor,failure?'ai_assist_failed':'ai_assist',body.entityKind??kind,body.entityId??null,
+        {call_id:callId,model:MODEL,prompt_version:PROMPT_VERSION,result:failure||'초안 생성'})
+      return failure ? jsonError(failure,502) : jsonResponse({draft,model:MODEL,prompt_version:PROMPT_VERSION,sensitive_values_redacted:true,requires_human_confirmation:true})
+    },{commitError:true})
   } catch (error) {
     if (error?.status) return jsonError(error.message, error.status)
     return failUnexpected(error, 'AI 분석 초안을 만들지 못했습니다.')

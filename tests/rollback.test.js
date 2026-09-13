@@ -1,15 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import {
-  rollbackState,
-  rollbackHeadline,
-  rollbackWhatNow,
-  STALE_DAYS,
-  RESTORE_KIND,
-  validateRestore,
-} from '../shared/rollback.js'
+import { rollbackState, rollbackHeadline, rollbackWhatNow } from '../shared/rollback.js'
 import { buildTodo } from '../shared/todo.js'
 
 // 담당자가 도구를 내리면 조회 화면에는 "문제가 있어 잠시 내렸습니다" 한 줄이

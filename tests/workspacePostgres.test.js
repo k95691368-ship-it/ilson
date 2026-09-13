@@ -19,7 +19,8 @@ const rpc = async (name, args) => {
 }
 beforeAll(async () => {
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-  for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql']) {
+  for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql']) {
+    if (file === '0004_audit_hardening.sql') await rpc('ilson_workspace_open',{p_token:'f'.repeat(64),p_applications:seed})
     await pg.exec(readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8'))
   }
   vi.stubGlobal('fetch', (url, options) => {
@@ -42,6 +43,12 @@ const a = createSupabaseDb('https://test.supabase.co', 'local-test', tokenA)
 const b = createSupabaseDb('https://test.supabase.co', 'local-test', tokenB)
 
 describe.sequential('isolated PostgreSQL workspaces', () => {
+  it('upgrades an existing private schema without dropping its application records',async()=>{
+    const existing=createSupabaseDb('https://test.supabase.co','local-test','f'.repeat(64))
+    expect((await existing.prepare('SELECT count(*) AS n FROM application').first()).n).toBe(3)
+    expect(await existing.readiness()).toMatchObject({schemaReady:true,ready:true})
+    expect((await existing.prepare('SELECT approval_id,mutation_version FROM change_experiment').all()).results).toEqual([])
+  })
   it('creates two spaces with identical fixtures but no production rows', async () => {
     await root.workspaceOpen(tokenA, seed)
     await root.workspaceOpen(tokenB, seed)

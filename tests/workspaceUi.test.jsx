@@ -5,14 +5,14 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import WorkspaceGate from '../src/components/WorkspaceGate.jsx'
 import DemoWorkspaceBar from '../src/components/DemoWorkspaceBar.jsx'
 import JourneyPage from '../src/pages/JourneyPage.jsx'
-import { ensureWorkspace, resetWorkspace, api } from '../src/api/client.js'
+import { ensureWorkspace, readWorkspace, resetWorkspace, api } from '../src/api/client.js'
 import { useApi } from '../src/hooks/useApi.js'
 import { DRAFT_KEY } from '../src/lib/draft.js'
 
-vi.mock('../src/api/client.js', () => ({ ensureWorkspace: vi.fn(), resetWorkspace: vi.fn(), api: { post: vi.fn() } }))
+vi.mock('../src/api/client.js', () => ({ ensureWorkspace: vi.fn(), readWorkspace: vi.fn(), resetWorkspace: vi.fn(), api: { post: vi.fn() } }))
 vi.mock('../src/hooks/useApi.js', () => ({ useApi: vi.fn() }))
 afterEach(() => { cleanup(); vi.restoreAllMocks(); localStorage.clear() })
-beforeEach(() => { vi.clearAllMocks() })
+beforeEach(() => { vi.clearAllMocks(); readWorkspace.mockResolvedValue({enabled:true,active:false}) })
 
 describe('workspace and journey UI', () => {
   it('does not render business screens before workspace initialization', async () => {
@@ -20,19 +20,23 @@ describe('workspace and journey UI', () => {
     ensureWorkspace.mockReturnValue(new Promise(done => { resolve = done }))
     render(<WorkspaceGate><p>업무 화면</p></WorkspaceGate>)
     expect(screen.queryByText('업무 화면')).toBeNull()
+    expect(ensureWorkspace).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button',{name:'개인 체험 시작'}))
     resolve({ enabled: true, active: true })
     await waitFor(() => expect(screen.queryByText('업무 화면')).not.toBeNull())
   })
   it('fails closed and offers retry when initialization fails', async () => {
     ensureWorkspace.mockRejectedValueOnce(new Error('연결 실패')).mockResolvedValue({ enabled: true, active: true })
     render(<WorkspaceGate><p>업무 화면</p></WorkspaceGate>)
+    fireEvent.click(screen.getByRole('button',{name:'개인 체험 시작'}))
     await screen.findByRole('alert')
     expect(screen.queryByText('업무 화면')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
+    expect(screen.getByRole('heading',{name:/업무의 변화에/})).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: '개인 체험 시작' }))
     await screen.findByText('업무 화면')
   })
   it('requires the second reset click and clears only ILSON local state', async () => {
-    ensureWorkspace.mockResolvedValue({ enabled: true, active: true })
+    readWorkspace.mockResolvedValue({ enabled: true, active: true })
     resetWorkspace.mockResolvedValue({ reset: true })
     const navigate = vi.spyOn(window.location, 'assign').mockImplementation(() => {})
     localStorage.setItem(DRAFT_KEY, 'draft')

@@ -106,6 +106,18 @@ export function createSupabaseDb(url, key, workspaceToken = null) {
     workspace: Boolean(workspaceToken),
     workspaceOpen: (token, applications) => rpc('ilson_workspace_open', { p_token: token, p_applications: applications }),
     workspaceReset: (token, applications, newToken) => rpc('ilson_workspace_reset', { p_token: token, p_applications: applications, p_new_token: newToken }),
+    claimRateLimit: (bucket, maxHits, windowSeconds) => rpc('ilson_claim_rate_limit', {
+      p_token: workspaceToken, p_bucket: bucket, p_max: maxHits, p_window: windowSeconds,
+    }),
+    readiness: () => rpc('ilson_readiness', { p_token: workspaceToken }),
+    mutationReceipt: (requestId, fingerprint) => rpc('ilson_mutation_receipt', {
+      p_token: workspaceToken, p_request_id: requestId, p_fingerprint: fingerprint,
+    }),
+    commitMutation: (requestId, fingerprint, reads, writes, response) => rpc('ilson_commit_mutation', {
+      p_token: workspaceToken, p_request_id: requestId, p_fingerprint: fingerprint,
+      p_reads: reads.map(row => ({ sql: scopedSql(compileSql(row.sql, row.binds)), rows: row.rows })),
+      p_writes: writes.map(row => scopedSql(compileSql(row.sql, row.binds))), p_response: response,
+    }),
     async batch(statements) {
       const sql = statements.map(statement => {
         const data = statementData.get(statement)

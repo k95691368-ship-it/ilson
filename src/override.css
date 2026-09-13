@@ -436,69 +436,8 @@
   border-color: #bfd0b2;
   background: var(--ol-green-soft);
 }
-
-.ol-metric-details {
-  margin: -2px 0 18px;
-  border: 1px solid var(--ol-line);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.55);
-}
-
-.ol-metric-details summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  min-height: 52px;
-  padding: 0 18px;
-  color: var(--ol-ink);
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
-  list-style: none;
-}
-
-.ol-metric-details summary::-webkit-details-marker {
-  display: none;
-}
-
-.ol-metric-details summary::after {
-  content: '+';
-  margin-left: 12px;
-  color: var(--ol-faint);
-  font-size: 1rem;
-}
-
-.ol-metric-details[open] summary::after {
-  content: '−';
-}
-
-.ol-metric-details summary span {
-  margin-left: auto;
-  color: var(--ol-faint);
-  font-size: 0.66rem;
-  font-weight: 600;
-}
-
-.ol-metric-detail-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  padding: 0 10px 10px;
-}
-
-.ol-metric-detail-grid .ol-metric {
-  min-height: 116px;
-  border-radius: 15px;
-  background: var(--ol-wash);
-}
-
-.ol-metric-detail-grid .ol-metric > strong {
-  font-size: 1.65rem;
-}
-
 .ol-loop-card,
 .ol-panel,
-.ol-product-strip,
 .ol-detail-panel,
 .ol-experiment-detail,
 .ol-api-card {
@@ -543,9 +482,7 @@
   color: #4b6339 !important;
   font-weight: 600;
 }
-
 .ol-live i,
-.ol-product-status i,
 .ol-connection-state i {
   width: 6px;
   height: 6px;
@@ -629,35 +566,6 @@
   padding: 26px;
 }
 
-.ol-priority-list {
-  display: grid;
-  margin-top: 18px;
-}
-
-.ol-priority-list > button {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 14px 2px;
-  border: 0;
-  border-top: 1px solid var(--ol-line);
-  border-radius: 0;
-  background: transparent;
-  color: var(--ol-copy);
-  text-align: left;
-  cursor: pointer;
-}
-
-.ol-priority-list > button:first-child {
-  border-top: 0;
-}
-
-.ol-priority-list > button:hover .ol-priority-copy strong {
-  color: var(--ol-accent);
-}
-
 .ol-priority-pill {
   display: inline-flex;
   align-items: center;
@@ -685,157 +593,6 @@
 .ol-priority-pill.accent {
   background: var(--ol-accent-soft);
   color: var(--apple-blue);
-}
-
-.ol-priority-copy {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
-.ol-priority-copy strong {
-  overflow: hidden;
-  color: var(--ol-ink);
-  font-size: 0.86rem;
-  font-weight: 630;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  transition: color 140ms ease;
-}
-
-.ol-priority-copy small {
-  color: var(--ol-muted);
-  font-size: 0.67rem;
-}
-
-.ol-priority-number {
-  color: var(--ol-ink);
-  font-size: 1.18rem;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-}
-
-.ol-count-bubble {
-  display: grid;
-  place-items: center;
-  min-width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--ol-red-soft);
-  color: var(--ol-red) !important;
-  font-weight: 700;
-}
-
-.ol-alert-list {
-  display: grid;
-  gap: 10px;
-  margin-top: 18px;
-}
-
-.ol-alert {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 10px;
-  padding: 12px 13px;
-  border-radius: 15px;
-  background: var(--apple-parchment);
-}
-
-.ol-alert.critical {
-  background: var(--ol-red-soft);
-}
-
-.ol-alert.warning {
-  background: var(--ol-amber-soft);
-}
-
-.ol-alert-dot {
-  width: 7px;
-  height: 7px;
-  margin-top: 5px;
-  border-radius: 50%;
-  background: var(--ol-red);
-}
-
-.ol-alert.warning .ol-alert-dot {
-  background: var(--ol-amber);
-}
-
-.ol-alert strong {
-  display: block;
-  color: var(--ol-ink);
-  font-size: 0.78rem;
-}
-
-.ol-alert p {
-  margin-top: 3px;
-  color: var(--ol-muted);
-  font-size: 0.68rem;
-  line-height: 1.4;
-}
-
-.ol-product-strip {
-  padding: 28px;
-}
-
-.ol-product-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 20px;
-}
-
-.ol-product-card {
-  display: flex;
-  flex-direction: column;
-  min-height: 210px;
-  padding: 20px;
-  border: 1px solid var(--ol-line);
-  border-radius: 20px;
-  background: var(--apple-parchment);
-}
-
-.ol-product-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  color: var(--ol-green);
-  font-size: 0.66rem;
-  font-weight: 600;
-}
-
-.ol-product-card h3 {
-  margin-top: 18px;
-  color: var(--ol-ink);
-  font-size: 1.06rem;
-  font-weight: 600;
-  letter-spacing: -0.035em;
-}
-
-.ol-product-card > p,
-.ol-product-card > small {
-  margin-top: 5px;
-  color: var(--ol-muted);
-  font-size: 0.68rem;
-}
-
-.ol-product-card > div {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin-top: auto;
-}
-
-.ol-product-card > div strong {
-  color: var(--ol-ink);
-  font-size: 2.2rem;
-  font-weight: 600;
-  letter-spacing: -0.06em;
-}
-
-.ol-product-card > div span {
-  color: var(--ol-muted);
-  font-size: 0.69rem;
 }
 
 .ol-toolbar {
@@ -2408,10 +2165,6 @@
     grid-template-columns: repeat(2, 1fr);
   }
 
-  .ol-metric-detail-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .ol-two-col,
   .ol-audit-layout,
   .ol-api-card {
@@ -2434,14 +2187,6 @@
     overflow-x: auto;
     max-height: none;
     padding-bottom: 5px;
-  }
-
-  .ol-product-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .ol-product-card {
-    min-height: 170px;
   }
 
   .ol-toolbar {
@@ -2550,14 +2295,8 @@
     padding: 16px;
     border-radius: 19px;
   }
-
-  .ol-metric-details summary span {
-    display: none;
-  }
-
-  .ol-loop-card,
-  .ol-panel,
-  .ol-product-strip {
+.ol-loop-card,
+.ol-panel {
     padding: 20px;
     border-radius: 23px;
   }
@@ -2738,3 +2477,4 @@
     transition-duration: 0.01ms !important;
   }
 }
+.ol-evidence-json { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; max-width: 100%; }

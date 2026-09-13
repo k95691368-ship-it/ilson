@@ -77,7 +77,9 @@ describe('늦게 온 응답이 최신 화면을 덮어쓰지 않는다', () => {
     })
     expect(container.textContent).toBe('B')
 
-    root.unmount()
+    await act(async () => {
+      root.unmount()
+    })
   })
 
   it('이 검사가 헛돌지 않는다 — 순서대로 오면 최신이 그려진다', async () => {
@@ -90,7 +92,9 @@ describe('늦게 온 응답이 최신 화면을 덮어쓰지 않는다', () => {
       resolvers['/track/C']?.({ who: 'C' })
     })
     expect(container.textContent).toBe('C')
-    root.unmount()
+    await act(async () => {
+      root.unmount()
+    })
   })
 })
 

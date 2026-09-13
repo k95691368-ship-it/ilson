@@ -12,6 +12,7 @@ import {
   causeByKey,
   priorityBand,
   roleCan,
+  safeJson,
 } from '../../shared/override.js'
 
 const NAV = [
@@ -72,9 +73,9 @@ function roleLabel(key) {
 
 function runLabel(status) {
   return {
-    passed: '통과',
+    passed: '입력 기준 충족',
     failed: '미달',
-    blocked: '자동 중단',
+    blocked: '중단 판정',
     insufficient: '근거 부족',
   }[status] ?? status
 }
@@ -92,11 +93,11 @@ function statusLabel(value) {
     expanded: '확대',
     held: '보류',
     stopped: '중단',
-    rolled_back: '롤백',
+    rolled_back: '롤백 결정 기록',
     expand: '적용 범위 확대',
     hold: '보류',
     stop: '중단',
-    rollback: '즉시 롤백',
+    rollback: '롤백 결정',
   }[value] ?? value
 }
 
@@ -116,7 +117,8 @@ export default function OverridePage() {
   const { data, error, loading, reload } = useApi('/override')
   const toast = useToast()
   const [view, setView] = useState(() => window.location.hash.replace('#', '') || 'overview')
-  const [role, setRole] = useState(() => localStorage.getItem('override-role') || 'product')
+  const [demoRole, setRole] = useState(() => localStorage.getItem('override-role') || 'product')
+  const role = data?.demo_mode === false ? data.current_actor?.role || 'reviewer' : demoRole
   const [modal, setModal] = useState(null)
   const [busy, setBusy] = useState(false)
   const [aiDraft, setAiDraft] = useState(null)
@@ -140,8 +142,8 @@ export default function OverridePage() {
   }, [view])
 
   useEffect(() => {
-    localStorage.setItem('override-role', role)
-  }, [role])
+    localStorage.setItem('override-role', demoRole)
+  }, [demoRole])
 
   async function mutate(action, payload = {}, success = '저장했습니다.') {
     setBusy(true)
@@ -225,12 +227,14 @@ export default function OverridePage() {
 
       <div className="ol-context-bar">
         <span>{data?.demo_mode ? '시연 데이터로 살펴보는 AI 운영' : 'AI 운영 워크스페이스'}</span>
-        <label className="ol-role-select">
+        {data?.execution && <span>{data.execution.mode === 'simulation' ? '가상 자료' : '수동 근거 기록'} · {data.execution.external_rollout ? '외부 실행 연결' : '외부 배포 제어 미연결'}</span>}
+        {data?.current_actor && <span>{data.current_actor.label} · {roleLabel(data.current_actor.role)}</span>}
+        {data?.demo_mode && <label className="ol-role-select">
           <span>현재 역할</span>
           <select aria-label="시연 역할" value={role} onChange={(event) => setRole(event.target.value)}>
             {OVERRIDE_ROLES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}
           </select>
-        </label>
+        </label>}
       </div>
 
       <div className="ol-layout">
@@ -338,7 +342,6 @@ function PageIntro({ eyebrow, title, copy, actions }) {
 }
 
 function OverviewView({ data, open, go }) {
-  const metrics = data.metrics
   const featured = data.events.find((event) => Number(event.is_override)) ?? data.events[0]
   return (
     <div className="ol-page ol-overview">
@@ -362,29 +365,6 @@ function OverviewView({ data, open, go }) {
         </div>}
       </section>
 
-      <section className="ol-measurements">
-      <div className="ol-section-head"><div><span className="ol-kicker">운영 현황</span><h2>지금, 확인할 것들.</h2></div><span>{data.demo_mode ? '시연 데이터 기준' : '저장된 기록 기준'}</span></div>
-      <section className="ol-metrics" aria-label="핵심 운영 지표">
-        <Metric label="반복 예외율" value={valueOrDash(metrics.recurring_exception_rate, '%')} note={`${metrics.overrides}건 / 적용 가능 사건`} />
-        <Metric label="원인 확인" value={valueOrDash(metrics.root_cause_days, '일')} note="최초 발생부터 중앙 흐름" />
-        <Metric label="검토 대기" value={`${metrics.pending_validation}건`} note="사람의 수정도 다시 검증" tone={metrics.pending_validation ? 'warning' : undefined} />
-        <Metric label="안전 위반" value={`${metrics.guardrail_breaches}건`} note="1건이면 즉시 중단" tone={metrics.guardrail_breaches ? 'danger' : 'success'} />
-      </section>
-
-      <details className="ol-metric-details">
-        <summary>전체 운영 측정 보기 <span>기록 품질 · 책임 배정 · 실험 전환</span></summary>
-        <div className="ol-metric-detail-grid">
-          <Metric label="전체 판단" value={`${metrics.total_decisions}건`} note="승인 포함 저장 사건" />
-          <Metric label="기록 완결성" value={valueOrDash(metrics.capture_completeness, '%')} note="판단·근거·버전·정책 포함" />
-          <Metric label="이유 기록률" value={valueOrDash(metrics.reason_confirmation_rate, '%')} note="수정 근거가 있는 사건" />
-          <Metric label="평균 기록 시간" value={valueOrDash(metrics.average_recording_seconds, '초')} note="현업 입력 부담" />
-          <Metric label="열린 반복 문제" value={`${metrics.active_clusters}건`} note={`P0 ${metrics.p0_clusters}건`} />
-          <Metric label="책임 조직 배정" value={valueOrDash(metrics.assigned_rate, '%')} note="담당 조직이 있는 군집" />
-          <Metric label="실험 전환" value={valueOrDash(metrics.experiment_conversion_rate, '%')} note={`현재 실험 ${metrics.in_experiment}건`} />
-          <Metric label="검증된 개선" value={`${metrics.verified_improvements}건`} note={`재작업 ${won(metrics.rework_cost_krw)}`} />
-        </div>
-      </details>
-      </section>
 
       <section className="ol-loop-card">
         <div className="ol-section-head">
@@ -404,73 +384,6 @@ function OverviewView({ data, open, go }) {
         </div>
       </section>
 
-      <div className="ol-two-col ol-overview-panels">
-        <section className="ol-panel">
-          <div className="ol-section-head">
-            <div>
-              <span className="ol-kicker">Needs a decision</span>
-              <h2>지금 봐야 할 문제</h2>
-            </div>
-            <button className="ol-text-button" type="button" onClick={() => go('clusters')}>전체 보기 →</button>
-          </div>
-          <div className="ol-priority-list">
-            {data.clusters.slice(0, 4).map((cluster) => (
-              <button key={cluster.id} type="button" onClick={() => { go('clusters'); window.setTimeout(() => { window.location.hash = `clusters:${cluster.id}` }, 0) }}>
-                <PriorityPill score={cluster.priority_score} band={cluster.priority_band} />
-                <span className="ol-priority-copy">
-                  <strong>{cluster.title}</strong>
-                  <small>{causeByKey(cluster.cause_code).label} · {cluster.owner_team}</small>
-                </span>
-                <span className="ol-priority-number">{Math.round(Number(cluster.priority_score))}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className="ol-panel ol-alert-panel">
-          <div className="ol-section-head">
-            <div>
-              <span className="ol-kicker">Guardrails</span>
-              <h2>안전 신호</h2>
-            </div>
-            <span className="ol-count-bubble">{data.alerts.length}</span>
-          </div>
-          <div className="ol-alert-list">
-            {data.alerts.length === 0 && <p className="ol-empty-copy">지금 확인할 안전 신호가 없습니다.</p>}
-            {data.alerts.slice(0, 4).map((alert) => (
-              <div key={`${alert.entity_id}-${alert.title}`} className={`ol-alert ${alert.level}`}>
-                <span className="ol-alert-dot" aria-hidden="true" />
-                <div><strong>{alert.title}</strong><p>{alert.body}</p></div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
-      <section className="ol-product-strip">
-        <div className="ol-section-head">
-          <div>
-            <span className="ol-kicker">Across products</span>
-            <h2>운영 중인 AI</h2>
-          </div>
-          <button className="ol-text-button" type="button" onClick={() => open('product')}>제품 추가 +</button>
-        </div>
-        <div className="ol-product-grid">
-          {data.products.map((product) => {
-            const count = data.events.filter((event) => event.product_id === product.id && Number(event.is_override)).length
-            return (
-              <article key={product.id} className="ol-product-card">
-                <span className="ol-product-status"><i /> {product.status}</span>
-                <h3>{product.name}</h3>
-                <p>{product.domain} · {product.owner_team}</p>
-                <div><strong>{count}</strong><span>최근 수정 사건</span></div>
-                <small>누적 {Number(product.total_cases).toLocaleString('ko-KR')}건 · 적용 가능 {Number(product.applicable_cases).toLocaleString('ko-KR')}건</small>
-                <small>{product.model_name} · {product.model_version}</small>
-              </article>
-            )
-          })}
-        </div>
-      </section>
     </div>
   )
 }
@@ -526,6 +439,8 @@ function EventsView({ data, open, askAi }) {
         copy="AI의 원안과 사람의 최종 판단을 버전·정책·업무 결과와 함께 보존합니다. 사람의 수정은 검토 전까지 정답으로 쓰지 않습니다."
         actions={<button className="ol-primary" type="button" onClick={() => open('event')}>판단 기록</button>}
       />
+
+      {data.event_list?.truncated && <p className="ol-gate-copy">전체 {data.event_list.total.toLocaleString('ko-KR')}건 중 최근 {data.event_list.limit}건을 표시합니다. 검색·내보내기는 이 목록 범위이며, 조직 집계는 전체 기록을 사용합니다.</p>}
 
       <div className="ol-toolbar">
         <label className="ol-search"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="사건·근거·제품 검색" /></label>
@@ -684,13 +599,14 @@ function ExperimentsView({ data, open }) {
   const selected = data.experiments.find((experiment) => experiment.id === selectedId) ?? data.experiments[0]
   const cluster = data.clusters.find((item) => item.id === selected?.cluster_id)
   const gate = selected ? canExpandExperiment(selected, selected.runs) : null
+  const plan = safeJson(selected?.evaluation_plan_json)
 
   return (
     <div className="ol-page">
       <PageIntro
         eyebrow="Safe change experiments"
         title="배포 전에 틀릴 기회"
-        copy="과거 사건 재생, Shadow Test, 제한 배포를 차례로 통과해야 합니다. 가드레일이 한 건이라도 깨지면 자동으로 멈춥니다."
+        copy="과거 사건 재생, Shadow Test, 제한 배포의 측정 근거를 순서대로 기록합니다. 위반 입력 시 중단으로 판정하지만 외부 시스템을 직접 중단하거나 롤백하지는 않습니다."
       />
       <div className="ol-experiment-board">
         <aside className="ol-experiment-list">
@@ -714,12 +630,12 @@ function ExperimentsView({ data, open }) {
 
             <div className="ol-phase-track">
               {EXPERIMENT_PHASES.map((phase, index) => {
-                const run = [...selected.runs].reverse().find((item) => item.phase === phase.key)
+                const run = [...selected.runs].sort((a,b)=>Number(b.run_sequence)-Number(a.run_sequence)).find((item) => item.phase === phase.key && selected.approval_id && item.approval_id === selected.approval_id && item.change_version === selected.change_version)
                 return (
                   <div key={phase.key} className={`ol-phase ${run?.status ?? ''}`}>
                     <span>{run ? (run.status === 'passed' ? '✓' : '!') : index + 1}</span>
                     <strong>{phase.label}</strong>
-                    <small>{run ? `${runLabel(run.status)} · ${run.improvement_percent}%` : '아직 실행 전'}</small>
+                    <small>{run ? `${runLabel(run.status)} · ${run.improvement_percent}%` : '현재 승인 주기 기록 없음'}</small>
                   </div>
                 )
               })}
@@ -728,10 +644,24 @@ function ExperimentsView({ data, open }) {
             <div className="ol-experiment-grid">
               <section><span>변경 대상</span><p>{selected.change_target}</p></section>
               <section><span>비교 대상</span><p>{selected.comparator}</p></section>
-              <section><span>성공 지표</span><p>{selected.success_metric} · {selected.target_improvement}% 개선</p></section>
+              <section><span>성공 지표</span><p>{selected.success_metric} · {selected.target_improvement}% {selected.metric_direction === 'higher' ? '증가' : '감소'}</p></section>
               <section><span>적용 범위</span><p>{selected.scope}</p></section>
             </div>
 
+            {plan && <section className="ol-safety-box" aria-label="사전 측정 계획">
+              <div><span>표본·기간 선정 근거</span><p>{plan.rationale}</p></div>
+              <div><span>최소 표본 · 측정 시간</span><p>{EXPERIMENT_PHASES.map(phase=>`${phase.label} ${plan.minimumSamples[phase.key]}건`).join(' · ')} / {plan.minimumWindowSeconds}초</p></div>
+              <div><span>데이터 · 모델 · 정책 버전</span><p>{plan.datasetVersion} · {plan.modelVersion} · {plan.policyVersion}</p></div>
+            </section>}
+            {selected.runs.length>0 && <details className="ol-decision-records"><summary>전체 결과·원본 근거 {selected.runs.length}건</summary>
+              {selected.runs.map(run=><article key={run.id}>
+                <strong>{run.phase} · {runLabel(run.status)}</strong>
+                <p>{run.approval_id === selected.approval_id && run.approval_id ? '현재 승인 주기' : '이전 참고 기록'} · {run.source_kind === 'manual' ? '수동 입력' : '참고 자료'}</p>
+                <p>표본 {run.sample_size}건 · 대조군 {run.control_value} / 변경군 {run.variant_value} · 위반 {run.guardrail_breaches}건</p>
+                <p>{run.measurement_start || '기간 미기록'} ~ {run.measurement_end || '기간 미기록'}</p>
+                <p>{safeJson(run.evidence_refs_json,[]).join(' · ') || '원본 근거 미등록'} · {run.notes}</p>
+              </article>)}
+            </details>}
             <div className="ol-safety-box">
               <div><span>안전 가드레일</span><ul>{selected.guardrails.map((item) => <li key={item}>{item}</li>)}</ul></div>
               <div><span>즉시 중단 조건</span><ul>{selected.stop_conditions.map((item) => <li key={item}>{item}</li>)}</ul></div>
@@ -745,6 +675,7 @@ function ExperimentsView({ data, open }) {
                   <article key={decision.id}>
                     <div><strong>{statusLabel(decision.decision)}</strong><span>{fmtDate(decision.created_at, true)} · {decision.decided_by}</span></div>
                     <p>{decision.basis}</p>
+                    <details><summary>결정 당시 측정 근거</summary><pre className="ol-evidence-json">{JSON.stringify(decision.metrics_snapshot,null,2)}</pre></details>
                     <small>
                       {decision.metrics_snapshot.runs?.length ?? 0}개 단계 · 실험 {decision.experiment_id}
                     </small>
@@ -754,12 +685,14 @@ function ExperimentsView({ data, open }) {
             )}
 
             <div className="ol-card-actions ol-experiment-actions">
-              {!selected.approved_at && <button className="ol-secondary" type="button" onClick={() => open('approve', selected)}>사람 승인</button>}
-              <button className="ol-primary" type="button" onClick={() => open('run', selected)}>실험 결과 입력</button>
-              <button className="ol-secondary" type="button" onClick={() => open('decision', selected)}>최종 결정</button>
+              {['draft','held','stopped'].includes(selected.status) && selected.evaluation_plan_json && <button className="ol-secondary" type="button" onClick={() => open('approve', selected)}>사람 승인</button>}
+              <button className="ol-primary" type="button" disabled={!selected.evaluation_plan_json || !selected.approval_id || !['approved','running'].includes(selected.status)} onClick={() => open('run', selected)}>실험 결과 입력</button>
+              <button className="ol-secondary" type="button" disabled={['expanded','rolled_back'].includes(selected.status)} onClick={() => open('decision', selected)}>최종 결정</button>
             </div>
+            <p className="ol-gate-copy">수동 입력 근거의 기준 충족 여부를 기록합니다. 실제 AI 배포·중단·롤백은 실행하지 않습니다.</p>
+            {!selected.evaluation_plan_json && <p className="ol-gate-copy">이전 참고 기록입니다. 사전 측정 계획이 없어 추가 시험·확대 승인을 할 수 없습니다. 반복 문제에서 새 개선 실험을 만들어 주세요.</p>}
             {gate && !gate.ok && (
-              <p className="ol-gate-copy">확대 전 확인 · {gate.needsApproval ? '고위험 승인 필요' : gate.missing.length ? `${gate.missing.join(' → ')} 필요` : `${gate.blocked.join(' · ')} 재검토 필요`}</p>
+              <p className="ol-gate-copy">확대 전 확인 · {gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 필요' : gate.missing.length ? `${gate.missing.join(' → ')} 필요` : `${gate.blocked.join(' · ')} 재검토 필요`}</p>
             )}
           </article>
         ) : <Empty title="아직 만든 개선 실험이 없습니다." />}
@@ -799,12 +732,12 @@ function IntelligenceView({ data }) {
         eyebrow="Organization intelligence"
         title="한 제품 밖에서 보이는 것"
         copy="정책 영향, 고객군 격차, 제품 간 공통 원인과 투자 우선순위를 같은 증거 위에서 봅니다."
-        actions={<button className="ol-secondary" type="button" onClick={downloadDataset}>검증된 모델 오류 내보내기</button>}
+        actions={<button className="ol-secondary" type="button" onClick={downloadDataset}>현재 목록의 모델 오류 내보내기</button>}
       />
 
       <div className="ol-insight-grid">
         <section className="ol-panel ol-span-2">
-          <div className="ol-section-head"><div><span className="ol-kicker">Fairness</span><h2>고객군별 수정률</h2></div><span>분모가 있는 값만 계산</span></div>
+          <div className="ol-section-head"><div><span className="ol-kicker">Fairness</span><h2>고객군별 수정률</h2></div><span>최근 30일 · 같은 날짜·고객군의 분모 필요</span></div>
           <div className="ol-fairness-table">
             <div className="head"><span>AI 제품</span><span>고객군</span><span>수정 / 적용 가능</span><span>수정률</span></div>
             {data.fairness.map((row) => (
@@ -1086,7 +1019,10 @@ function ClusterForm({ cluster, busy, onSubmit }) {
 function ExperimentForm({ cluster, busy, onSubmit, onAssist }) {
   if (!cluster) return <Empty title="먼저 반복 문제를 선택해주세요." />
   return (
-    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), clusterId: cluster.id }) }}>
+    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); const values = formObject(event.currentTarget); onSubmit({ ...values, clusterId: cluster.id,
+      evaluationPlan: { metricType: values.metricType, rationale: values.sampleRationale, minimumWindowSeconds: Number(values.minimumWindowSeconds),
+        minimumSamples: {historical:Number(values.historicalSample),shadow:Number(values.shadowSample),limited:Number(values.limitedSample)},
+        datasetVersion:values.datasetVersion,modelVersion:values.modelVersion,policyVersion:values.policyVersion } }) }}>
       <div className="ol-form-context"><span>해결할 문제</span><strong>{cluster.title}</strong><button className="ol-text-button" type="button" onClick={onAssist}>Claude로 초안 만들기</button></div>
       <div className="ol-form-grid">
         <Field label="실험 이름" wide required><input name="title" required placeholder="무엇을 어느 수준까지 바꾸는가" /></Field>
@@ -1096,7 +1032,14 @@ function ExperimentForm({ cluster, busy, onSubmit, onAssist }) {
         <Field label="비교 대상" required><input name="comparator" required placeholder="현재 버전 또는 대조군" /></Field>
         <Field label="성공 지표" required><input name="successMetric" required placeholder="동일 원인 수정률" /></Field>
         <Field label="좋아지는 방향"><select name="metricDirection" defaultValue="lower"><option value="lower">낮을수록 좋음</option><option value="higher">높을수록 좋음</option></select></Field>
-        <Field label="목표 개선폭(%)"><input name="targetImprovement" type="number" min="0" step="0.1" defaultValue="20" /></Field>
+        <Field label="목표 개선폭(%)"><input name="targetImprovement" type="number" required min="0.1" step="0.1" defaultValue="20" /></Field>
+        <Field label="측정값 단위" required><select name="metricType"><option value="rate">비율 (%)</option><option value="count">건수</option><option value="duration">소요 시간</option><option value="amount">금액</option></select></Field>
+        {['historical','shadow','limited'].map((phase,index)=><Field key={phase} label={`${EXPERIMENT_PHASES[index].label} 최소 표본`} required><input name={`${phase}Sample`} type="number" min="2" step="1" required /></Field>)}
+        <Field label="최소 측정 시간(초)" required><input name="minimumWindowSeconds" type="number" min="1" step="1" required /></Field>
+        <Field label="표본·기간 선정 근거" wide required><textarea name="sampleRationale" required placeholder="대상군, 관측 변동성, 허용 오차와 운영 주기를 고려한 이유" /></Field>
+        <Field label="데이터셋 버전" required><input name="datasetVersion" required /></Field>
+        <Field label="모델·프롬프트 버전" required><input name="modelVersion" required /></Field>
+        <Field label="정책 버전" required><input name="policyVersion" required /></Field>
         <Field label="안전 가드레일" wide required hint="줄바꿈 또는 쉼표로 구분"><textarea name="guardrails" rows="3" required defaultValue={'중대한 정책 위반 0건\n승인 없는 고위험 변경 0건'} /></Field>
         <Field label="즉시 중단 조건" wide required><textarea name="stopConditions" rows="3" required defaultValue={'정책 위반 1건\n권한 없는 개인정보 열람 1건'} /></Field>
         <Field label="승인자" required><input name="approver" required placeholder="역할 또는 책임자" /></Field>
@@ -1113,25 +1056,28 @@ function ApproveForm({ experiment, busy, onSubmit }) {
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), experimentId: experiment.id }) }}>
       <div className="ol-form-context"><span>{experiment.risk_level === 'high' ? '고위험 변경' : '변경 실험'}</span><strong>{experiment.title}</strong></div>
       <Field label="승인 근거" required><textarea name="basis" rows="6" required placeholder="범위·지표·가드레일·롤백을 검토한 근거" /></Field>
-      <SubmitBar busy={busy} label="사람 승인 기록" note={experiment.risk_level === 'high' ? '고위험 실험은 정책·감사·사업 책임자 역할만 승인할 수 있습니다.' : '승인 전에는 어떤 실험 단계도 실행할 수 없습니다.'} />
+      <SubmitBar busy={busy} label="사람 승인 기록" note={experiment.risk_level === 'high' ? '고위험 실험은 정책·감사·사업 책임자 역할만 승인할 수 있습니다.' : '승인 전에는 실험 결과를 등록할 수 없습니다.'} />
     </form>
   )
 }
 
 function RunForm({ experiment, busy, onSubmit }) {
-  const completed = new Set(experiment.runs.filter((run) => run.status === 'passed').map((run) => run.phase))
+  const completed = new Set(experiment.runs.filter((run) => run.status === 'passed' && run.approval_id === experiment.approval_id && run.change_version === experiment.change_version).map((run) => run.phase))
   const suggested = EXPERIMENT_PHASES.find((phase, index) => index === 0 ? !completed.has(phase.key) : completed.has(EXPERIMENT_PHASES[index - 1].key) && !completed.has(phase.key))?.key ?? 'limited'
   return (
-    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), experimentId: experiment.id }) }}>
+    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); const values = formObject(event.currentTarget); onSubmit({ ...values, measurementStart:new Date(values.measurementStart).toISOString(), measurementEnd:new Date(values.measurementEnd).toISOString(), experimentId: experiment.id }) }}>
       <div className="ol-form-context"><span>실험</span><strong>{experiment.title}</strong></div>
       <div className="ol-form-grid">
         <Field label="실행 단계" required><select name="phase" defaultValue={suggested}>{EXPERIMENT_PHASES.map((phase) => <option key={phase.key} value={phase.key}>{phase.label}</option>)}</select></Field>
-        <Field label="표본 수" required><input name="sampleSize" type="number" min="0" defaultValue="100" required /></Field>
-        <Field label="대조군 값" required><input name="controlValue" type="number" step="0.01" defaultValue="10" required /></Field>
-        <Field label="변경군 값" required><input name="variantValue" type="number" step="0.01" defaultValue="7" required /></Field>
-        <Field label="가드레일 위반 건수" required><input name="guardrailBreaches" type="number" min="0" defaultValue="0" required /></Field>
+        <Field label="표본 수" required><input name="sampleSize" type="number" min="0" required /></Field>
+        <Field label="대조군 값" required><input name="controlValue" type="number" min="0" step="0.01" required /></Field>
+        <Field label="변경군 값" required><input name="variantValue" type="number" min="0" step="0.01" required /></Field>
+        <Field label="가드레일 위반 건수" required><input name="guardrailBreaches" type="number" min="0" required /></Field>
         <Field label="기존 업무 비용(원)"><input name="costBefore" type="number" min="0" defaultValue="0" /></Field>
         <Field label="변경 후 비용(원)"><input name="costAfter" type="number" min="0" defaultValue="0" /></Field>
+        <Field label="측정 시작 시각" required><input name="measurementStart" type="datetime-local" required /></Field>
+        <Field label="측정 종료 시각" required><input name="measurementEnd" type="datetime-local" required /></Field>
+        <Field label="원본 실행·데이터 근거" wide required><textarea name="evidenceRefs" required placeholder="원본 실행 ID 또는 검토 가능한 자료 주소 (줄바꿈 구분)" /></Field>
         <Field label="실행 근거·관찰" wide><textarea name="notes" rows="4" placeholder="데이터셋 버전, 트래픽 범위, 예상 밖의 변화" /></Field>
       </div>
       <SubmitBar busy={busy} label="결과 판정" note={`목표는 ${experiment.success_metric} ${experiment.target_improvement}% 개선입니다. 위반 1건이면 성과와 관계없이 차단합니다.`} />
@@ -1143,8 +1089,8 @@ function DecisionForm({ experiment, busy, onSubmit }) {
   const gate = canExpandExperiment(experiment, experiment.runs)
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), experimentId: experiment.id }) }}>
-      <div className={`ol-gate ${gate.ok ? 'ok' : 'blocked'}`}><strong>{gate.ok ? '확대 조건 충족' : '확대 조건 미충족'}</strong><p>{gate.ok ? '세 단계와 모든 가드레일을 통과했습니다.' : gate.needsApproval ? '고위험 승인 기록이 없습니다.' : gate.missing.length ? `${gate.missing.join(' → ')} 결과가 없습니다.` : `${gate.blocked.join(' · ')} 단계가 통과하지 못했습니다.`}</p></div>
-      <Field label="결정" required><select name="decision" defaultValue={gate.ok ? 'expand' : 'hold'}><option value="expand" disabled={!gate.ok}>적용 범위 확대</option><option value="hold">보류 및 추가 실험</option><option value="stop">중단</option><option value="rollback">즉시 롤백</option></select></Field>
+      <div className={`ol-gate ${gate.ok ? 'ok' : 'blocked'}`}><strong>{gate.ok ? '확대 조건 충족' : '확대 조건 미충족'}</strong><p>{gate.ok ? '현재 승인 주기의 수동 입력값이 세 단계의 사전 기준을 충족했습니다. 통계적 유의성이나 실제 배포 완료를 뜻하지 않습니다.' : gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 기록이 없습니다.' : gate.missing.length ? `${gate.missing.join(' → ')} 결과가 없습니다.` : `${gate.blocked.join(' · ')} 단계가 통과하지 못했습니다.`}</p></div>
+      <Field label="결정" required><select name="decision" defaultValue={gate.ok ? 'expand' : 'hold'}><option value="expand" disabled={!gate.ok}>적용 범위 확대</option><option value="hold">보류 및 추가 실험</option><option value="stop">중단</option><option value="rollback">롤백 결정 기록</option></select></Field>
       <Field label="결정 근거" required><textarea name="basis" rows="6" required placeholder="어떤 지표와 안전 근거로 이 결정을 내렸는지" /></Field>
       <SubmitBar busy={busy} label="결정 기록" note="결정 당시의 모든 실험 결과가 스냅샷으로 함께 보존됩니다." />
     </form>
@@ -1164,7 +1110,7 @@ function VolumeForm({ data, busy, onSubmit }) {
 function IntegrationForm({ busy, onSubmit }) {
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit(formObject(event.currentTarget)) }}>
-      <div className="ol-form-grid"><Field label="연동 종류" required><select name="kind" defaultValue="ticket"><option value="mlops">MLOps</option><option value="policy">정책 저장소</option><option value="ticket">업무 티켓</option><option value="evaluation">평가 파이프라인</option><option value="webhook">일반 Webhook</option></select></Field><Field label="연동 이름" required><input name="name" required placeholder="예: Jira AI 개선 보드" /></Field><Field label="HTTPS Endpoint" wide required><input name="endpointUrl" type="url" required placeholder="https://…" /></Field><Field label="Cloudflare 시크릿 바인딩" wide hint="토큰 값이 아니라 환경 변수 이름만"><input name="secretBinding" placeholder="OVERRIDE_JIRA_TOKEN" pattern="[A-Z][A-Z0-9_]{2,99}" /></Field></div>
+      <div className="ol-form-grid"><Field label="연동 종류" required><select name="kind" defaultValue="ticket"><option value="mlops">MLOps</option><option value="policy">정책 저장소</option><option value="ticket">업무 티켓</option><option value="evaluation">평가 파이프라인</option><option value="webhook">일반 Webhook</option></select></Field><Field label="연동 이름" required><input name="name" required placeholder="예: Jira AI 개선 보드" /></Field><Field label="HTTPS Endpoint" wide required><input name="endpointUrl" type="url" required placeholder="https://…" /></Field><Field label="Cloudflare 시크릿 바인딩" wide hint="서버 허용 목록에 등록한 전용 환경 변수 이름만"><input name="secretBinding" placeholder="OVERRIDE_INTEGRATION_JIRA_TOKEN" pattern="OVERRIDE_INTEGRATION_[A-Z0-9_]+_TOKEN" /></Field></div>
       <SubmitBar busy={busy} label="연동 설정 저장" note="localhost·사설 IP·HTTP 주소는 서버가 거절합니다. 전송할 때마다 응답 상태를 감사로그에 남깁니다." />
     </form>
   )

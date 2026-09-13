@@ -114,7 +114,9 @@ describe('모든 화면이 한 번은 그려진다', () => {
       }
 
       try {
-        root.unmount()
+        await act(async () => {
+          root.unmount()
+        })
       } catch {
         // 이미 터진 뒤라 정리가 안 될 수 있다. 여기서 또 터뜨리면 원인이 가린다.
       }
@@ -150,7 +152,9 @@ describe('이 검사가 헛돌지 않는다', () => {
       thrown = err
     }
     try {
-      root.unmount()
+      await act(async () => {
+        root.unmount()
+      })
     } catch {
       // 터진 뒤 정리는 실패해도 상관없다.
     }

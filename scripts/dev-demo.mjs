@@ -8,7 +8,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { onRequest } from '../functions/api/_middleware.js'
 const pg = new PGlite()
 await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql']) {
+for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql']) {
   await pg.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'))
 }
 let queue = Promise.resolve()
@@ -17,7 +17,7 @@ globalThis.fetch = (url, options) => {
   const run = queue.then(async () => {
     try {
       const name = new URL(url).pathname.split('/').at(-1)
-      if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset))$/.test(name)) throw new Error('Unsupported RPC')
+      if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|readiness)$/.test(name)) throw new Error('Unsupported RPC')
       const args = Object.values(JSON.parse(options.body))
       await pg.exec('SET ROLE service_role')
       const result = await pg.query(`SELECT public.${name}(${args.map((_, i) => '$' + (i + 1)).join(',')}) AS data`, args)

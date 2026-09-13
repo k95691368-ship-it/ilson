@@ -120,19 +120,22 @@ describe('개선 실험 가드레일', () => {
   })
 
   it('세 단계를 모두 통과하고 고위험 승인을 받아야 확대할 수 있다', () => {
+    const experiment = {risk_level:'high',status:'running',approval_id:'approval-1',change_version:'v1',approved_at:'2026-09-03',
+      evaluation_plan_json:JSON.stringify({metricType:'rate',minimumWindowSeconds:60,minimumSamples:{historical:10,shadow:10,limited:10},rationale:'사전 계획',datasetVersion:'d1',modelVersion:'m1',policyVersion:'p1'})}
     const passedRuns = ['historical', 'shadow', 'limited'].map((phase) => ({
       phase,
       status: 'passed',
       guardrail_breaches: 0,
+      approval_id:'approval-1',change_version:'v1',run_sequence:1,
     }))
     expect(canExpandExperiment({ risk_level: 'high' }, passedRuns)).toMatchObject({
       ok: false,
       needsApproval: true,
     })
     expect(
-      canExpandExperiment({ risk_level: 'high', approved_at: '2026-09-03' }, passedRuns).ok
+      canExpandExperiment(experiment, passedRuns).ok
     ).toBe(true)
-    expect(canExpandExperiment({ risk_level: 'low' }, passedRuns.slice(0, 2)).missing).toEqual([
+    expect(canExpandExperiment({ ...experiment, risk_level: 'low' }, passedRuns.slice(0, 2)).missing).toEqual([
       '제한 배포',
     ])
   })
@@ -144,7 +147,8 @@ describe('개선 실험 가드레일', () => {
   })
 
   it('사내 운영 모드에는 시연 데이터를 넣지 않는다', () => {
-    expect(overrideDemoMode({})).toBe(true)
+    expect(overrideDemoMode({})).toBe(false)
+    expect(overrideDemoMode({OVERRIDE_DEMO_MODE:'true'})).toBe(true)
     expect(overrideDemoMode({ OVERRIDE_DEMO_MODE: 'false' })).toBe(false)
   })
 })

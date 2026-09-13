@@ -228,12 +228,17 @@ export function evaluateExperimentRun({
   targetImprovement = 0,
   guardrailBreaches = 0,
   sampleSize = 0,
+  minimumSample = 2,
 } = {}) {
-  const control = Number(controlValue) || 0
-  const variant = Number(variantValue) || 0
-  const threshold = Math.max(0, Number(targetImprovement) || 0)
-  const sample = Math.max(0, Number(sampleSize) || 0)
-  const breaches = Math.max(0, Number(guardrailBreaches) || 0)
+  const numeric = value => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) ? Number(value) : NaN
+  const [control, variant, threshold, sample, breaches, required] =
+    [controlValue, variantValue, targetImprovement, sampleSize, guardrailBreaches, minimumSample].map(numeric)
+  if (![control,variant,threshold,sample,breaches,required].every(Number.isFinite)
+      || !['higher','lower'].includes(direction) || control < 0 || variant < 0 || threshold <= 0
+      || !Number.isSafeInteger(sample) || sample < 0 || !Number.isSafeInteger(breaches) || breaches < 0
+      || !Number.isSafeInteger(required) || required < 2) {
+    return { status: 'invalid', improvement: null, guardrailBreaches: null }
+  }
   const improvement =
     control === 0
       ? 0
@@ -241,7 +246,8 @@ export function evaluateExperimentRun({
         ? ((variant - control) / Math.abs(control)) * 100
         : ((control - variant) / Math.abs(control)) * 100
 
-  const status = breaches > 0 ? 'blocked' : sample <= 0 ? 'insufficient' : improvement >= threshold ? 'passed' : 'failed'
+  const status = breaches > 0 ? 'blocked' : sample < required || control === 0 ? 'insufficient' : improvement >= threshold ? 'passed' : 'failed'
+  if (!Number.isFinite(improvement)) return { status:'invalid',improvement:null,guardrailBreaches:null }
   return {
     status,
     improvement: Math.round(improvement * 10) / 10,
@@ -251,20 +257,35 @@ export function evaluateExperimentRun({
 
 export function canExpandExperiment(experiment, runs = []) {
   const latestByPhase = new Map()
-  for (const run of runs) latestByPhase.set(run.phase, run)
+  const currentRuns = runs.filter(run => experiment?.approval_id && run.approval_id === experiment.approval_id && run.change_version === experiment.change_version)
+  for (const run of [...currentRuns].sort((a,b) => Number(a.run_sequence)-Number(b.run_sequence))) latestByPhase.set(run.phase, run)
   const missing = EXPERIMENT_PHASES.filter((phase) => !latestByPhase.has(phase.key)).map(
     (phase) => phase.label
   )
   const blocked = [...latestByPhase.values()].filter(
     (run) => run.status !== 'passed' || Number(run.guardrail_breaches ?? run.guardrailBreaches) > 0
   )
-  const needsApproval = experiment?.risk_level === 'high' && !experiment?.approved_at
+  const needsApproval = !experiment?.approved_at || !experiment?.approval_id
+  const needsPlan = !validEvaluationPlan(safeJson(experiment?.evaluation_plan_json))
+  const stateAllowed = ['approved','running'].includes(experiment?.status)
   return {
-    ok: missing.length === 0 && blocked.length === 0 && !needsApproval,
+    ok: stateAllowed && missing.length === 0 && blocked.length === 0 && !needsApproval && !needsPlan,
     missing,
     blocked: blocked.map((run) => run.phase),
     needsApproval,
+    needsPlan,
+    stateAllowed,
   }
+}
+
+export function validEvaluationPlan(plan) {
+  return Boolean(plan && ['count','rate','duration','amount'].includes(plan.metricType)
+    && typeof plan.rationale === 'string' && plan.rationale.trim()
+    && Number.isSafeInteger(plan.minimumWindowSeconds) && plan.minimumWindowSeconds > 0
+    && EXPERIMENT_PHASES.every(phase => Number.isSafeInteger(plan.minimumSamples?.[phase.key]) && plan.minimumSamples[phase.key] >= 2)
+    && typeof plan.datasetVersion === 'string' && plan.datasetVersion.trim()
+    && typeof plan.modelVersion === 'string' && plan.modelVersion.trim()
+    && typeof plan.policyVersion === 'string' && plan.policyVersion.trim())
 }
 
 export function trendSignal(current, previous) {
