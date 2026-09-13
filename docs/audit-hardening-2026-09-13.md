@@ -10,6 +10,12 @@
 
 운영 PostgreSQL의 service_role로 저장 RPC·동일 요청 재호출·요청 제한 RPC를 실행하고 트랜잭션을 롤백했다. 별도 조회로 시험 영수증과 시험 쓰기가 0건임을 확인했다. `ilson_readiness`는 `ready=true`, `schemaReady=true`, `activeWorkspaces=1`, `capacityAvailable=true`를 반환했다. RPC 4개는 anon·authenticated 실행 불가, service_role 실행 가능이다. 결과 조회 도중 브라우저 연결 시간 초과로 점검 시간이 길어졌으며, 새 연결에서 권한·롤백·데이터 보존 대조를 끝냈다.
 
+### 배포 묶음 검증
+
+수정 커밋 `4129aba`의 GitHub 검사 [34749239513](https://github.com/k95691368-ship-it/ilson/actions/runs/34749239513)는 성공했다. Cloudflare 첫 빌드는 작업 접수 실패였고 재시도는 성공했지만, API 실행 파일 없이 정적 파일만 배포되어 `/api/health`가 HTML을 반환했다. 점검 배포 뒤 상대 출력 경로도 `..\\..\\dist`로 남아 있어 API로 `dist`로 복원했다. Git 연결 자체는 변경하지 않았다.
+
+`npm run build`에 `wrangler pages functions build --outdir dist/_worker.js`를 포함해 Git 빌드와 명령줄 배포가 같은 API 실행 파일을 사용하도록 했다. 생성된 Worker에 직접 요청하는 `tests/deployArtifact.test.js`에서 health의 JSON 503, 체험 공간 없는 업무 접근의 JSON 428, 정적 페이지 전달 3건이 통과했다. 사용자의 화면 제어 중단 요청 이후 배포·점검에는 명령줄과 API만 사용한다.
+
 ## 지적과 수정 근거
 
 | 지적 | 수정 | 코드와 검사 |

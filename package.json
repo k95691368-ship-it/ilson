@@ -10,7 +10,7 @@
     "dev": "vite",
     "dev:full": "wrangler pages dev -- npm run dev",
     "dev:demo": "node scripts/dev-demo.mjs",
-    "build": "vite build",
+    "build": "vite build && wrangler pages functions build --outdir dist/_worker.js",
     "lint": "oxlint --deny-warnings src shared functions tests vite.config.js vitest.config.js",
     "test": "vitest run --exclude tests/scale.test.js && vitest run tests/scale.test.js --no-file-parallelism",
     "smoke": "vitest run tests/handlerSmoke.test.js tests/pageRender.test.jsx",
