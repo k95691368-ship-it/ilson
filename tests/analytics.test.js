@@ -13,6 +13,10 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 // 남의 신청서를 여는 열쇠가 목록으로 쌓인다.
 
 describe('주소에서 열쇠를 가린다', () => {
+  it('통합 이력의 신청서 식별자도 가린다', () => {
+    expect(redactPath('/journey/demo_application_1')).toBe('/journey/:id')
+    expect(redactPath('/journey/app_12345678')).toBe('/journey/:id')
+  })
   it('접수번호를 안 보낸다', () => {
     // 이게 이 파일에서 가장 무거운 검사다. 접수번호는 이 사이트의 유일한
     // 열쇠라, 새 나가면 로그인 비밀번호가 새는 것과 같다.
@@ -92,7 +96,8 @@ describe('화면 녹화는 가릴 데를 가리는가', () => {
     expect(app).toContain('data-clarity-mask')
     // 가리는 조건이 목차 없이 여는 세 화면(bare)과 같아야 한다. 따로 적으면
     // 화면이 하나 늘 때 한쪽만 고쳐진다.
-    expect(app).toMatch(/data-clarity-mask=\{bare \? 'true' : undefined\}/)
+    expect(app).toMatch(/data-clarity-mask=\{bare \|\| privateJourney \? 'true' : undefined\}/)
+    expect(app).toContain("pathname.startsWith('/journey')")
   })
 
   it('가리는 화면이 실제로 그 셋이다', () => {

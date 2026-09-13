@@ -22,7 +22,8 @@ function medianLead(rows) {
   return { count: days.length, medianDays: Math.round(mid * 10) / 10 }
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   try {
     const ticket = String(params.ticket ?? '').trim().toUpperCase()
     const mine = await env.DB.prepare(

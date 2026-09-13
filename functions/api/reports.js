@@ -7,7 +7,8 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/htt
 import { logDecision } from '../_lib/decisions.js'
 import { toReports, openReports, REPORT_KIND, REPORT_FIX } from '../../shared/report.js'
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const { results } = await env.DB.prepare(
       `SELECT d.id, d.application_id, d.title, d.what, d.why, d.link_kind, d.link_id, d.created_at,
@@ -66,7 +67,8 @@ export async function onRequestGet({ env }) {
 }
 
 // 담당자가 "이렇게 고쳤습니다"를 남긴다.
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

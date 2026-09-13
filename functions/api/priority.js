@@ -93,7 +93,8 @@ async function load(env) {
   return { applications, hours, picks }
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const { applications, hours, picks } = await load(env)
     const board = boardItems({ applications, joins: hours })
@@ -115,7 +116,8 @@ export async function onRequestGet({ env }) {
   }
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

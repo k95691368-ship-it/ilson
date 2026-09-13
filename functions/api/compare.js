@@ -24,7 +24,8 @@ async function findOne(env, key) {
     .first()
 }
 
-export async function onRequestGet({ env, request }) {
+export async function onRequestGet({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const url = new URL(request.url)
   const aKey = url.searchParams.get('a')
   const bKey = url.searchParams.get('b')
@@ -115,7 +116,8 @@ function pairKey(x, y) {
 // 묶는 길만 내고 푸는 길을 안 내면, 한 번 잘못 누른 것을 되돌릴 방법이
 // 없다. 그러면 담당자는 무서워서 아예 안 묶는다. 실제로 그랬다 — 진행이
 // 앞선 신청서를 접수만 된 것에 묶어 버렸고, 되돌릴 수가 없었다.
-export async function onRequestDelete({ env, request }) {
+export async function onRequestDelete({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()
@@ -184,7 +186,8 @@ export async function onRequestDelete({ env, request }) {
   }
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

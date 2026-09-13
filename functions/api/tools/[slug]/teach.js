@@ -12,7 +12,8 @@ import { logDecision } from '../../../_lib/decisions.js'
 import { validateTeach } from '../../../../shared/teach.js'
 import { SKU_BY_CODE } from '../../../../shared/master.js'
 
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const allowed = await checkRateLimit(env, `teach:${ip}`, 60, 600)
   if (!allowed) {

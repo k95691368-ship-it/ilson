@@ -76,6 +76,7 @@ export default function RecordPage() {
           ← {backLabel}
         </Link>
         <span className="spacer" />
+        <Link to={`/journey/${encodeURIComponent(id)}`} className="btn-ghost btn-sm">운영까지 통합 이력</Link>
         <button type="button" className="btn-ghost btn-sm" onClick={download}>
           텍스트로 내려받기
         </button>

@@ -10,7 +10,8 @@
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const { results } = await env.DB.prepare(
       `SELECT id, application_id, link_kind, link_id FROM decision_log

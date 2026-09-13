@@ -68,7 +68,8 @@ async function load(env, ticket) {
   return { app, review, records: rows, decisions: bulkRows.results }
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const loaded = await load(env, String(params.ticket ?? '').trim().toUpperCase())
   if (!loaded) return jsonError('그 접수번호를 찾지 못했습니다.', 404)
   return jsonResponse({
@@ -81,7 +82,8 @@ export async function onRequestGet({ env, params }) {
   })
 }
 
-export async function onRequestPost({ env, request, params }) {
+export async function onRequestPost({ env, data: requestData, request, params }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `holdlift:${ip}`, 10, 3600)
   if (!ticket) return jsonError('알림은 시간당 10회까지 가능합니다.', 429)

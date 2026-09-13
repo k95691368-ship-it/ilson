@@ -16,7 +16,8 @@ import {
 
 const PAGE_LIMIT = 200
 
-export async function onRequestGet({ env, request }) {
+export async function onRequestGet({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const url = new URL(request.url)
   const dept = url.searchParams.get('dept')
   const status = url.searchParams.get('status')
@@ -130,7 +131,8 @@ export async function onRequestGet({ env, request }) {
   }
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
 
   // 한 사람이 같은 내용을 반복 제출하는 것만 막는다. 진짜 신청을 막지 않도록

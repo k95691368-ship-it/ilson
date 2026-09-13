@@ -52,7 +52,8 @@ function parseJsonText(value) {
   return JSON.parse(unfenced)
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

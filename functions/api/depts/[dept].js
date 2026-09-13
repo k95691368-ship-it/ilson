@@ -21,7 +21,8 @@ import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
 const STALE_HOURS = 24
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const dept = decodeURIComponent(params.dept ?? '').trim()
   if (!dept) return jsonError('부서를 알려주세요.', 400)
 

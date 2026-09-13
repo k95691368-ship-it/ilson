@@ -20,7 +20,8 @@ import {
   URGENT_CODES,
 } from '../../../../shared/report.js'
 
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const allowed = await checkRateLimit(env, `report:${ip}`, 20, 600)
   if (!allowed) {

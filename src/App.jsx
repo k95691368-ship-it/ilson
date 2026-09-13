@@ -2,9 +2,11 @@ import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import SiteNav from './components/SiteNav.jsx'
+import DemoWorkspaceBar from './components/DemoWorkspaceBar.jsx'
 import { STAGES } from './lib/stages.js'
 
 const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
+const JourneyPage = lazy(() => import('./pages/JourneyPage.jsx'))
 const OverridePage = lazy(() => import('./pages/OverridePage.jsx'))
 const ApplyPage = lazy(() => import('./pages/ApplyPage.jsx'))
 const ReviewPage = lazy(() => import('./pages/ReviewPage.jsx'))
@@ -33,6 +35,7 @@ const NotFoundPage = lazy(() => import('./pages/NotFoundPage.jsx'))
 // 것을 보고, 넘긴 것이 잘 도는지 보고, 그다음 기록과 못 한 것을 본다.
 // 부서용 두 개(접수번호 조회)는 맨 뒤에 둔다.
 export const CROSSCUT = [
+  { to: '/journey', label: '통합 이력', note: '신청에서 운영 사건과 개선 실험까지' },
   { to: '/priority', label: '먼저 할 것', note: '무엇부터 할지 정하는 자리' },
   { to: '/stall', label: '막힌 곳', note: '어느 단계에서 멈춰 있나' },
   { to: '/tools', label: '넘긴 뒤', note: '부서에 넘긴 도구가 실제로 쓰이나' },
@@ -92,6 +95,7 @@ function usePrintUnfold() {
 export default function App() {
   const bare = useBareLayout()
   const workspace = useWorkspaceLayout()
+  const privateJourney = useLocation().pathname.startsWith('/journey')
   usePrintUnfold()
 
   return (
@@ -104,6 +108,7 @@ export default function App() {
       </a>
 
       {!bare && <SiteNav />}
+      <DemoWorkspaceBar />
       {!bare && !workspace && (
         <header className="product-subnav">
           <div className="product-subnav-inner">
@@ -112,6 +117,7 @@ export default function App() {
               <Link to="/portfolio" className="product-subnav-link">전체 과정</Link>
               <Link to="/tools" className="product-subnav-link">넘긴 도구</Link>
               <Link to="/log" className="product-subnav-link">결정 기록</Link>
+              <Link to="/journey" className="product-subnav-link">통합 이력</Link>
               <Link to="/apply" className="btn-primary btn-sm">업무 신청</Link>
             </nav>
           </div>
@@ -140,13 +146,15 @@ export default function App() {
         className={workspace ? 'app-main app-main-workspace' : bare ? 'app-main app-main-bare' : 'app-main'}
         id="main"
         tabIndex="-1"
-        data-clarity-mask={bare ? 'true' : undefined}
+        data-clarity-mask={bare || privateJourney ? 'true' : undefined}
       >
         <Suspense fallback={<div className="page-loading">불러오는 중…</div>}>
           <Routes>
             <Route path="/" element={<OverridePage />} />
             <Route path="/override" element={<OverridePage />} />
             <Route path="/portfolio" element={<FlowPage />} />
+            <Route path="/journey" element={<JourneyPage />} />
+            <Route path="/journey/:id" element={<JourneyPage />} />
             <Route path="/apply" element={<ApplyPage />} />
             <Route path="/review" element={<ReviewPage />} />
             <Route path="/agreement" element={<AgreementPage />} />
@@ -207,7 +215,7 @@ export default function App() {
           </div>
           <div className="footer-bottom">
             <span>
-              Cloudflare Pages Functions · Supabase 우선 · D1 fallback
+              Cloudflare Pages Functions · Supabase
             </span>
             <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
           </div>

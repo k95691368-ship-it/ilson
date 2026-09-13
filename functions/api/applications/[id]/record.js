@@ -24,7 +24,8 @@ import { OUTCOME_KIND } from '../../../../shared/accept.js'
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   try {
     // 접수번호로도 열리게 한다. 담당자는 id를 모르고 접수번호만 안다.
     const app = await q(

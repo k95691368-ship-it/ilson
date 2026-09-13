@@ -14,6 +14,7 @@ pages_build_output_dir = "dist"
 
 [vars]
 DB_MAINTENANCE = "false"
+DEMO_WORKSPACES = "true"
 SUPABASE_URL = "https://iobeygpmcrmdjhkgtkfg.supabase.co"
 
 # 운영 데이터베이스는 Supabase만 사용합니다. D1 바인딩은 없습니다.

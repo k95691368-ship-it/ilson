@@ -14,7 +14,8 @@ import { annualHours } from '../../_lib/applications.js'
 
 const MAX_TEXT = 4000
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

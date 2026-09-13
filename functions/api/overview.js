@@ -16,7 +16,8 @@ import { PICK_KIND, UNPICK_KIND } from '../../shared/priority.js'
 import { unrankedPressure } from '../../shared/waitline.js'
 import { provenanceOf } from '../../shared/provenance.js'
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const [
       apps,

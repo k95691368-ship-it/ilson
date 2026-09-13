@@ -9,7 +9,8 @@
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { stallBoard, boardLine } from '../../shared/stall.js'
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const [apps, logs] = await Promise.all([
       env.DB.prepare(

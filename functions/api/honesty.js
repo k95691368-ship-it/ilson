@@ -21,7 +21,8 @@ import { unprovenList } from '../../shared/unproven.js'
 // 단언하는 동안 그런 신청서는 한 건도 없었다. 그래서 아래에서 셋을 세어
 // shared/unproven.js 에 넘기고, 문장은 그 숫자를 보고 골라진다.
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const [
       refused,

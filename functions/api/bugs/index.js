@@ -19,7 +19,8 @@ import { validateFiledReport, REPORT_KIND, REPORT_BY_CODE } from '../../../share
 //
 // 넘긴 것만 고르게 하면 만드는 중인 것은 신고할 수 없다. 판정을 받아
 // 실제로 만들기 시작한 것부터 고를 수 있게 한다.
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const { results } = await env.DB.prepare(
       `SELECT a.id, a.ticket_no, a.dept, a.title, a.status, h.slug
@@ -46,7 +47,8 @@ export async function onRequestGet({ env }) {
   }
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const allowed = await checkRateLimit(env, `bug:${ip}`, 20, 600)
   if (!allowed) {

@@ -7,7 +7,8 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../_lib/http.js'
 import { validateBulk, partition, resultText, BULK_BY_CODE } from '../../../shared/bulk.js'
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

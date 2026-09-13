@@ -12,7 +12,8 @@ import { DEPT_KINDS, PROXY_KINDS, sideTally, sideLine } from '../../shared/side.
 
 const STAGES = ['신청서', '검토', '협의안', '제작', '베타테스트', '사용법서', '배포', '성과']
 
-export async function onRequestGet({ env, request }) {
+export async function onRequestGet({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const url = new URL(request.url)
   const stage = url.searchParams.get('stage')
   const dept = url.searchParams.get('dept')

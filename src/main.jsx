@@ -8,13 +8,14 @@ import './apple-design.css'
 import App from './App.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { ToastProvider } from './context/ToastContext.jsx'
+import WorkspaceGate from './components/WorkspaceGate.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
       <ToastProvider>
         <BrowserRouter>
-          <App />
+          <WorkspaceGate><App /></WorkspaceGate>
         </BrowserRouter>
       </ToastProvider>
     </ErrorBoundary>

@@ -23,7 +23,8 @@ import { toReports, trustLevel, REPORT_KIND, REPORT_FIX } from '../../../shared/
 // 사흘로 잡으면 정상인 도구가 전부 "안 쓰임"으로 찍힌다.
 const RECENT_DAYS = 7
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const [tools, uses, fails] = await Promise.all([
       env.DB.prepare(

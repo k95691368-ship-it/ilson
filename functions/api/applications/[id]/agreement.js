@@ -36,7 +36,8 @@ async function findApplication(env, id) {
     .first()
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
@@ -123,7 +124,8 @@ export async function onRequestGet({ env, params }) {
 }
 
 // 무엇을 추가할지는 kind로 정한다.
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
@@ -388,7 +390,8 @@ export async function onRequestPost({ env, params, request }) {
 }
 
 // 요구 판단, 충돌 판정, 합격 기준 확정.
-export async function onRequestPatch({ env, params, request }) {
+export async function onRequestPatch({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
@@ -531,7 +534,8 @@ const TABLE_BY_KIND = {
   shadow_run: 'shadow_run',
 }
 
-export async function onRequestDelete({ env, params, request }) {
+export async function onRequestDelete({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 

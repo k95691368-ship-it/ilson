@@ -30,7 +30,8 @@ async function findBySlug(env, slug) {
 }
 
 // 화면이 대목마다 무슨 표시를 붙일지 물어본다.
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const app = await findBySlug(env, params.slug)
   if (!app) return jsonError('그런 도구가 없습니다.', 404)
 
@@ -47,7 +48,8 @@ export async function onRequestGet({ env, params }) {
   }
 }
 
-export async function onRequestPost({ env, request, params }) {
+export async function onRequestPost({ env, data: requestData, request, params }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   // 넉넉하게 둔다. 여기서 막으면 짚기를 그만두게 되고, 그러면 문서는
   // 영영 그대로다.

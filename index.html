@@ -135,7 +135,7 @@
       주면 새로고침이 안 되는 화면이 된다.
     -->
     <script>
-      if (location.pathname === '/') {
+      if (location.pathname === '/' && document.documentElement.dataset.sharedDemoPrefetch === 'true') {
         window.__boot = {}
         for (const p of ['/override']) {
           // 실패하면 null 이 된다. 여기서 거절을 남기면 아무도 안 받는

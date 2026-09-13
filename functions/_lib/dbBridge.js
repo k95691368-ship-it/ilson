@@ -61,7 +61,7 @@ function resultOf(data) {
   }
 }
 
-export function createSupabaseDb(url, key) {
+export function createSupabaseDb(url, key, workspaceToken = null) {
   const endpoint = new URL(url.trim())
   if (endpoint.protocol !== 'https:' || !endpoint.hostname.endsWith('.supabase.co') || endpoint.username || endpoint.password) {
     throw new Error('Invalid Supabase URL')
@@ -80,11 +80,18 @@ export function createSupabaseDb(url, key) {
     }
     return response.json()
   }
+  const scopedSql = sql => workspaceToken
+    ? sql.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|E?'(?:''|\\.|[^'])*'|"(?:""|[^"])*"|\b(datetime|julianday|group_concat)\s*\(/gi,
+      (match, name) => name ? `public.${name}(` : match)
+    : sql
+  const queryRpc = (sql) => workspaceToken
+    ? rpc('ilson_workspace_query', { p_token: workspaceToken, p_sql: scopedSql(sql) })
+    : rpc('ilson_execute', { p_sql: sql })
   const owner = {}
   const prepare = (sql, binds = []) => {
     const statement = {
       bind: (...values) => prepare(sql, values),
-      all: async () => resultOf(await rpc('ilson_execute', { p_sql: compileSql(sql, binds) })),
+      all: async () => resultOf(await queryRpc(compileSql(sql, binds))),
       first: async column => {
         const { results } = await statement.all()
         return column === undefined ? (results[0] ?? null) : (results[0]?.[column] ?? null)
@@ -96,6 +103,9 @@ export function createSupabaseDb(url, key) {
   }
   return {
     provider: 'supabase', prepare,
+    workspace: Boolean(workspaceToken),
+    workspaceOpen: (token, applications) => rpc('ilson_workspace_open', { p_token: token, p_applications: applications }),
+    workspaceReset: (token, applications, newToken) => rpc('ilson_workspace_reset', { p_token: token, p_applications: applications, p_new_token: newToken }),
     async batch(statements) {
       const sql = statements.map(statement => {
         const data = statementData.get(statement)
@@ -104,7 +114,9 @@ export function createSupabaseDb(url, key) {
       })
       if (!sql.length) return []
       // One RPC = one PostgreSQL transaction. Any failure rolls back the batch.
-      const data = await rpc('ilson_batch', { p_statements: sql })
+      const data = workspaceToken
+        ? await rpc('ilson_workspace_batch', { p_token: workspaceToken, p_statements: sql.map(scopedSql) })
+        : await rpc('ilson_batch', { p_statements: sql })
       if (!Array.isArray(data) || data.length !== sql.length) throw new Error('Invalid Supabase batch response')
       return data.map(resultOf)
     },

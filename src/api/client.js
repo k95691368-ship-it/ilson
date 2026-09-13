@@ -5,6 +5,41 @@
 //   2) 폼 검증 실패는 다른 오류와 구분해서 넘긴다 (칸마다 다른 문구를 붙여야 하므로)
 
 const BASE = '/api'
+let workspaceReady
+
+export function ensureWorkspace() {
+  if (!workspaceReady) {
+    const open = async () => {
+      const response = await fetch(`${BASE}/demo/workspace`, { cache: 'no-store', credentials: 'same-origin' })
+      if (!response.ok) throw new Error('체험 공간을 확인하지 못했습니다.')
+      const state = await response.json()
+      if (!state.enabled || state.active) return state
+      const opened = await fetch(`${BASE}/demo/workspace`, {
+        method: 'POST', headers: { 'X-Ilson-Request': '1' }, credentials: 'same-origin',
+      })
+      const body = await opened.json()
+      if (!opened.ok) throw new Error(body.error || '체험 공간을 열지 못했습니다.')
+      return body
+    }
+    // Coordinate first visits across tabs of the same browser profile.
+    workspaceReady = (typeof navigator !== 'undefined' && navigator.locks
+      ? navigator.locks.request('ilson-workspace-open', open)
+      : open()).catch(error => { workspaceReady = null; throw error })
+  }
+  return workspaceReady
+}
+
+export async function resetWorkspace() {
+  const response = await fetch(`${BASE}/demo/workspace`, {
+    method: 'DELETE', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Ilson-Request': '1' },
+    body: JSON.stringify({ confirm: 'reset-my-workspace' }),
+  })
+  const body = await response.json()
+  if (!response.ok) throw new Error(body.error || '초기화하지 못했습니다.')
+  workspaceReady = null
+  return body
+}
 
 // 서버는 실패할 때 { error, fields? } 를 준다. fields가 있으면 폼 검증 실패다.
 class ApiError extends Error {
@@ -42,6 +77,9 @@ function takeBooted(path, options) {
 async function send(path, options = {}) {
   let res
   try {
+    const headers = new Headers(options.headers)
+    headers.set('X-Ilson-Request', '1')
+    options = { ...options, headers, credentials: 'same-origin', cache: 'no-store' }
     // 미리 띄워 둔 것이 있으면 그것을 쓴다. 그것이 실패했으면 null 이 오고,
     // 그때는 아무 일 없었던 것처럼 지금 부른다.
     const booted = takeBooted(path, options)

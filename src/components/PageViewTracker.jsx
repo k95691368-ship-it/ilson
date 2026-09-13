@@ -3,7 +3,10 @@ import { useLocation } from 'react-router-dom'
 import { trackPageView } from '../lib/analytics.js'
 
 const TITLES = {
-  '/': '반복 업무를 실제 도구로',
+  '/': 'OverrideLoop 운영판',
+  '/override': 'OverrideLoop 운영판',
+  '/portfolio': '반복 업무를 실제 도구로',
+  '/journey': '신청부터 운영까지 통합 이력',
   '/apply': '병목 해결 신청서',
   '/review': '신청서 검토와 판정',
   '/agreement': '협의안과 합격 기준',
@@ -26,6 +29,7 @@ export function titleForPath(pathname) {
   if (TITLES[pathname]) return TITLES[pathname]
   if (pathname.startsWith('/t/')) return '부서 도구'
   if (pathname.startsWith('/record/')) return '신청 기록 문서'
+  if (pathname.startsWith('/journey/')) return '신청부터 운영까지 통합 이력'
   if (pathname.startsWith('/dept/')) return '부서별 기록'
   return '찾을 수 없는 화면'
 }

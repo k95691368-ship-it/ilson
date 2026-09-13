@@ -85,7 +85,8 @@ async function pick(env, sql = PICK) {
   return results
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const rows = await pick(env)
     const all = await pick(env, PICK_ALL)
@@ -107,7 +108,8 @@ export async function onRequestGet({ env }) {
   }
 }
 
-export async function onRequestDelete({ env, request }) {
+export async function onRequestDelete({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   // 몸이 없으면 ①이다. 여태 그렇게 불러 왔으므로 그 동작을 안 바꾼다.
   let body = {}
   try {

@@ -24,7 +24,8 @@ import { HOLD_LIFT_KIND } from '../../shared/holdlift.js'
 // "물어봤다"의 기준은 **그 자리가 화면에 실제로 떴을 때**다. 기준이 아직
 // 확정 전이면 서명을 부탁한 적이 없는 것이고, 그걸 미응답으로 세면 부서가
 // 안 해준 것처럼 보인다.
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const [signoff, accept, outcome, beta, hold] = await Promise.all([
       // ① 합격 기준을 봐 달라 — 기준이 전부 확정된 건에만 부탁한다.

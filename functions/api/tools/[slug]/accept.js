@@ -55,7 +55,8 @@ async function load(env, slug) {
   return { handover: h, records }
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const loaded = await load(env, params.slug)
   if (!loaded) return jsonError('그런 도구가 없습니다.', 404)
 
@@ -69,7 +70,8 @@ export async function onRequestGet({ env, params }) {
   })
 }
 
-export async function onRequestPost({ env, request, params }) {
+export async function onRequestPost({ env, data: requestData, request, params }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `accept:${ip}`, 10, 3600)
   if (!ticket) return jsonError('확인은 시간당 10회까지 가능합니다.', 429)

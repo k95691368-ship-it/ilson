@@ -7,7 +7,8 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_l
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateAsk, ASK_KIND } from '../../../../shared/thread.js'
 
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()

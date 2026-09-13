@@ -7,7 +7,8 @@
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { annualHours } from '../../../_lib/applications.js'
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const id = params.id
 
   try {
@@ -61,4 +62,3 @@ export async function onRequestGet({ env, params }) {
     return jsonError(`신청서를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
   }
 }
-

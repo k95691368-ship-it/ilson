@@ -24,7 +24,8 @@ const CORE_TABLES = [
   'rate_limit_hits',
 ]
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   const checks = { db: false, schema: false, provider: false }
   const notes = []
   let tables = []
@@ -77,4 +78,3 @@ export async function onRequestGet({ env }) {
     notes,
   })
 }
-

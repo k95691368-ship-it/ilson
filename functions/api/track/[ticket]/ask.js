@@ -27,7 +27,8 @@ const TICKET = /^AX-[A-Z0-9]{3}-[A-Z0-9]{3}$/
 // 한다.
 const MAX_OPEN = 5
 
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const ticket = String(params.ticket ?? '').trim().toUpperCase()
   if (!TICKET.test(ticket)) {
     return jsonError('접수번호 모양이 맞지 않습니다. AX-000-000 형태로 적어주세요.', 400)

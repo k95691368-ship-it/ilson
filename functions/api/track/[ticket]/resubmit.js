@@ -48,7 +48,8 @@ async function loadPrevious(env, ticket) {
 }
 
 // 이 건을 다시 낼 수 있는지, 낸다면 무엇을 바꾸면 되는지.
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const prev = await loadPrevious(env, String(params.ticket ?? '').trim().toUpperCase())
   if (!prev) return jsonError('그 접수번호를 찾지 못했습니다.', 404)
 
@@ -78,7 +79,8 @@ export async function onRequestGet({ env, params }) {
   })
 }
 
-export async function onRequestPost({ env, request, params }) {
+export async function onRequestPost({ env, data: requestData, request, params }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `resubmit:${ip}`, 6, 3600)
   if (!ticket) return jsonError('다시 내기는 시간당 6회까지 가능합니다.', 429)

@@ -53,7 +53,8 @@ const STAGES = [
   '성과',
 ]
 
-export async function onRequestGet({ env, params, request }) {
+export async function onRequestGet({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = String(params.ticket ?? '').trim().toUpperCase()
 

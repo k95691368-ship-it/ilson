@@ -34,7 +34,8 @@ async function findHandover(env, slug) {
     .first()
 }
 
-export async function onRequestGet({ env, params, request }) {
+export async function onRequestGet({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const h = await findHandover(env, params.slug)
   if (!h) return jsonError('그런 도구가 없습니다. 주소를 확인해주세요.', 404)
 
@@ -291,7 +292,8 @@ export async function onRequestGet({ env, params, request }) {
 }
 
 // 브라우저에서 계산이 끝난 뒤 결과를 기록한다.
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const h = await findHandover(env, params.slug)
   if (!h) return jsonError('그런 도구가 없습니다.', 404)
   if (h.rolled_back_at) return jsonError('이 도구는 잠시 내려가 있습니다.', 409)

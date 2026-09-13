@@ -29,7 +29,8 @@ async function findApplication(env, id) {
     .first()
 }
 
-export async function onRequestGet({ env, params, request }) {
+export async function onRequestGet({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
@@ -86,7 +87,8 @@ export async function onRequestGet({ env, params, request }) {
   }
 }
 
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 

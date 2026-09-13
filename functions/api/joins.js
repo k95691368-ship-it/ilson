@@ -9,7 +9,8 @@
 import { jsonResponse, jsonError } from '../_lib/http.js'
 import { JOIN_KIND, UNJOIN_KIND, joinCounts } from '../../shared/join.js'
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     const { results } = await env.DB.prepare(
       `SELECT id, application_id, title, what, why, alternatives, link_kind, link_id FROM decision_log

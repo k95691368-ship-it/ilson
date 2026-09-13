@@ -356,7 +356,8 @@ async function loadWorkspace(env) {
   return workspace
 }
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     await ensureOverrideSchema(env)
     await seedOverrideWorkspace(env)
@@ -1090,7 +1091,8 @@ async function saveActor(env, actor, body) {
   return jsonResponse({ ok: true })
 }
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   let body
   try {
     body = await request.json()
@@ -1102,6 +1104,9 @@ export async function onRequestPost({ env, request }) {
     await seedOverrideWorkspace(env)
     const actor = await resolveOverrideActor(env, request, body)
     const action = text(body.action, 80)
+    if (env.DEMO_WORKSPACE && ['sync_integration', 'save_actor'].includes(action)) {
+      return jsonError('개인 체험에서는 외부 전송과 실제 계정 설정을 실행하지 않습니다.', 403)
+    }
     // 각 작업의 비동기 오류까지 이 try/catch 안에서 JSON 응답으로 바꾼다.
     // await 없이 Promise를 그대로 반환하면 권한 오류 같은 reject가 catch 바깥으로
     // 빠져 Cloudflare가 HTML 500을 만들어 버린다.

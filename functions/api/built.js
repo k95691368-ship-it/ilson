@@ -12,13 +12,14 @@
 
 import { jsonResponse, jsonError } from '../_lib/http.js'
 
-export async function onRequestGet({ env }) {
+export async function onRequestGet({ env, data: requestData }) {
+  env = requestData?.requestEnv ?? env
   try {
     // 실제로 만들어져 있는 표를 센다. 스키마가 부분 적용된 환경이면
     // 그만큼 적게 나오고, 그게 사실이다.
     const tables = await env.DB.prepare(
       env.DB.provider === 'supabase'
-        ? `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`
+        ? `SELECT COUNT(*) AS n FROM information_schema.tables WHERE table_schema = current_schema() AND table_type = 'BASE TABLE'`
         : `SELECT COUNT(*) AS n FROM sqlite_master
            WHERE type = 'table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '_cf%'`
     ).first()

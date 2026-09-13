@@ -11,7 +11,8 @@ import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { validateReview, statusFromVerdict, REFUSE_LABELS } from '../../../../shared/review.js'
 import { newId } from '../../../_lib/ids.js'
 
-export async function onRequestPost({ env, params, request }) {
+export async function onRequestPost({ env, data: requestData, params, request }) {
+  env = requestData?.requestEnv ?? env
   const id = params.id
 
   let body

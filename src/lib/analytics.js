@@ -46,6 +46,7 @@ function looksLikeKey(segment) {
 const KNOWN = [
   [/^\/t\/[^/]+$/, '/t/:slug'],
   [/^\/record\/[^/]+$/, '/record/:id'],
+  [/^\/journey\/[^/]+$/, '/journey/:id'],
   // 부서 이름은 사람을 특정하지 않지만 조직 안쪽 정보다. 어느 부서 화면을
   // 몇 번 봤는지까지 남의 계정에 쌓을 이유가 없다.
   [/^\/dept\/[^/]+$/, '/dept/:dept'],

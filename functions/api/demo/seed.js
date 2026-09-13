@@ -11,7 +11,8 @@ import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { DEMO_APPLICATIONS } from '../../_lib/demoApplications.js'
 
-export async function onRequestPost({ env, request }) {
+export async function onRequestPost({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `demo-seed:${ip}`, 8, 3600)
   if (!ticket) {
@@ -86,7 +87,8 @@ export async function onRequestPost({ env, request }) {
 // **결정 기록은 아니다** — 여섯 단계를 관통하려고 일부러 신청서에 매달지
 // 않고 만든 표라, 신청서를 지워도 그대로 남는다. 그러면 결정 기록 화면에
 // 없는 신청서를 가리키는 줄이 남는다. 손으로 같이 지운다.
-export async function onRequestDelete({ env, request }) {
+export async function onRequestDelete({ env, data: requestData, request }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `demo-seed:${ip}`, 8, 3600)
   if (!ticket) return jsonError('시간당 8회까지 가능합니다.', 429)

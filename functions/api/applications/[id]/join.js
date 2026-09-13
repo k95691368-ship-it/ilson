@@ -75,7 +75,8 @@ export async function loadJoins(env, applicationId) {
     })
 }
 
-export async function onRequestGet({ env, params }) {
+export async function onRequestGet({ env, data: requestData, params }) {
+  env = requestData?.requestEnv ?? env
   const app = await findApplication(env, params.id)
   if (!app) return jsonError('그런 신청서가 없습니다.', 404)
 
@@ -93,7 +94,8 @@ export async function onRequestGet({ env, params }) {
   }
 }
 
-export async function onRequestPost({ env, request, params }) {
+export async function onRequestPost({ env, data: requestData, request, params }) {
+  env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `join:${ip}`, 10, 3600)
   if (!ticket) return jsonError('손들기는 시간당 10회까지 가능합니다.', 429)
