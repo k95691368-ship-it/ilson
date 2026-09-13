@@ -167,29 +167,18 @@ describe('서버가 브라우저 몫까지 지고 뜨지 않는가', () => {
   })
 })
 
-describe('서버 묶음을 압축하려던 시도', () => {
-  // 결론부터: 못 한다. 되돌렸다.
-  //
-  // 재 보니 Cloudflare Pages 는 functions/ 를 묶기만 하고 압축하지 않는다.
-  // 473KB 에 한글 주석 682줄이 그대로 배포되고, Workers 는 깰 때마다 그것을
-  // 다시 편다. 직접 압축해서 dist/_worker.js 로 내놓으면 311KB 가 된다.
-  //
-  // 그런데 Pages 는 functions/ 와 _worker.js 를 같이 두는 것을 받지 않는다.
-  // 두 번 올려 두 번 다 배포가 Failure 로 끝났고, 그동안 라이브는 옛 배포를
-  // 계속 돌고 있었다. 사이트가 죽지 않아서 더 늦게 알았다.
-  //
-  // 그래서 빌드는 vite build 하나로 되돌렸다. 압축을 다시 하려면 functions/
-  // 를 통째로 안 쓰는 구조로 옮겨야 하는데, 그건 라우팅 전체를 바꾸는 일이라
-  // 지금 얻는 것(콜드 스타트 몇 밀리초)에 비해 잃을 것이 크다.
+describe('배포용 API 묶음', () => {
+  // 이전 배포 실패를 근거로 Worker 부재를 고정하면 API가 빠진 배포도 통과한다.
+  // 공식 outdir 형식으로 라우팅과 미들웨어를 함께 컴파일한다. 실제 요청 동작은
+  // deployArtifact.test.js, 운영 JSON 응답은 배포 후 별도로 확인한다.
+  // https://developers.cloudflare.com/pages/functions/advanced-mode/
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 
-  it('빌드를 단순하게 되돌려 뒀다', () => {
-    // 이 줄이 다시 복잡해지면, 위에 적어 둔 이유를 먼저 읽고 손대라는 뜻이다.
-    expect(pkg.scripts.build).toBe('vite build')
+  it('프런트와 API를 같은 빌드에서 생성한다', () => {
+    expect(pkg.scripts.build).toBe('vite build && wrangler pages functions build --outdir dist/_worker.js --output-routes-path dist/_routes.json')
   })
 
-  it('빌드 결과에 _worker.js 가 없다', () => {
-    // 있으면 Pages 가 functions/ 와 충돌해 배포가 통째로 실패한다.
-    expect(existsSync(join(ROOT, 'dist', '_worker.js'))).toBe(false)
+  it('배포 디렉터리에 실행 가능한 Worker 모듈이 있다', () => {
+    expect(existsSync(join(ROOT, 'dist', '_worker.js', 'index.js'))).toBe(true)
   })
 })

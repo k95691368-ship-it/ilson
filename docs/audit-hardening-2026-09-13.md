@@ -2,7 +2,7 @@
 
 ## 상태와 범위
 
-사용자 승인 후 운영 Supabase에 0004를 적용했다. public과 기존 체험 스키마 2곳의 새 구조, RPC 4개의 service_role 전용 권한, 준비 상태를 확인했다. GitHub 푸시와 최종 사이트 검증 결과는 아래 배포 기록에 추가한다. 대상 저장소는 `k95691368-ship-it/ilson`, Pages 프로젝트는 `ilson`, Supabase 프로젝트는 `iobeygpmcrmdjhkgtkfg`이다. `portfolio` 저장소·Pages 프로젝트와 다른 데이터베이스는 대상이 아니다.
+사용자 승인 후 운영 Supabase에 0004를 적용하고 `ilson/main`에 커밋·푸시했다. public과 기존 체험 스키마 2곳의 새 구조, RPC 4개의 service_role 전용 권한, 준비 상태를 확인했다. 명령줄 배포와 운영 API 검증 결과는 아래에 기록한다. 대상 저장소는 `k95691368-ship-it/ilson`, Pages 프로젝트는 `ilson`, Supabase 프로젝트는 `iobeygpmcrmdjhkgtkfg`이다. `portfolio` 저장소·Pages 프로젝트와 다른 데이터베이스는 대상이 아니다.
 
 ### 운영 DB 반영 기록
 
@@ -14,7 +14,15 @@
 
 수정 커밋 `4129aba`의 GitHub 검사 [34749239513](https://github.com/k95691368-ship-it/ilson/actions/runs/34749239513)는 성공했다. Cloudflare 첫 빌드는 작업 접수 실패였고 재시도는 성공했지만, API 실행 파일 없이 정적 파일만 배포되어 `/api/health`가 HTML을 반환했다. 점검 배포 뒤 상대 출력 경로도 `..\\..\\dist`로 남아 있어 API로 `dist`로 복원했다. Git 연결 자체는 변경하지 않았다.
 
-`npm run build`에 `wrangler pages functions build --outdir dist/_worker.js`를 포함해 Git 빌드와 명령줄 배포가 같은 API 실행 파일을 사용하도록 했다. 생성된 Worker에 직접 요청하는 `tests/deployArtifact.test.js`에서 health의 JSON 503, 체험 공간 없는 업무 접근의 JSON 428, 정적 페이지 전달 3건이 통과했다. 사용자의 화면 제어 중단 요청 이후 배포·점검에는 명령줄과 API만 사용한다.
+`npm run build`에 `wrangler pages functions build --outdir dist/_worker.js --output-routes-path dist/_routes.json`를 포함해 Git 빌드와 명령줄 배포가 같은 API 실행 파일을 사용하도록 했다. `/api/*`만 Worker를 호출해 정적 자산까지 불필요하게 실행하지 않는다. 생성된 Worker에 직접 요청하는 `tests/deployArtifact.test.js`는 HTTP 응답·경로와 실제 메모리 PostgreSQL을 연결한 체험 생성·승인·근거 저장·동일 요청 재사용·두 공간 격리·초기화를 검사한다. 메모리 DB를 닫아 시험 자료를 남기지 않는다. 사용자의 화면 제어 중단 요청 이후 배포·점검에는 명령줄과 API만 사용한다.
+
+2026-09-13 18:29 KST에 빌드→린트→전체 시험을 순차 실행해 **78개 파일·1,376개 시험**이 통과했다. 앞선 실행에서는 기존 빌드 방식의 부재를 고정한 검사 2건과 시간 측정 검사 1건의 실패를 확인했다. 빌드 검사는 실행 파일 존재와 실제 요청 검사로 대체했고, 시간 측정 기준은 바꾸지 않은 채 다른 빌드 작업 없이 전체 검사를 재실행했다. 이때 동작 검사 1,370건 및 시간 측정 6건이 모두 통과했다. 현재 공식 [Advanced mode 문서](https://developers.cloudflare.com/pages/functions/advanced-mode/)와 실제 배포 결과를 기준으로 예전 `_worker.js` 부재 가정을 제거했다.
+
+### 운영 사이트 확인 및 남은 제한
+
+커밋 `9b3dd68027901874985b6d67b35f00ff44abd7f0`를 Wrangler CLI로 Pages `ilson`에 배포했다. 해당 배포 ID는 `ebcf2503-ba21-4c54-b07c-d5f865aa1413`이며 `/api/health`가 HTTP 200 JSON, `ready=true`, `provider=supabase`, `runtime=true`, `capacity=true`를 반환했다. 최초 방문의 `/api/demo/workspace`는 `active=false`, 쿠키 없는 업무 API는 428로 응답했다. 백업 73개 테이블·97개 행은 보존됐고, 운영 DB 검증 쓰기는 롤백했다.
+
+Cloudflare Git 빌드의 `unable to submit build job` 오류는 재시도에서도 발생했다. Git 연결을 해제하거나 다른 프로젝트로 전환하지 않고, 승인된 명령줄 배포 경로를 사용했다. 이 플랫폼 작업 접수 문제를 코드 수정으로 해결했다고 주장하지 않는다. 운영 사이트에서 신규 체험 공간을 생성해 끝까지 저장하는 시험은 재배포 후 반복하지 않았다. 대신 같은 배포 Worker의 전체 쓰기 경로는 메모리 PostgreSQL에서 실행하고, 운영 DB에서는 롤백 가능한 RPC 검증을 수행했다. 실제 AI 호출·외부 롤백 제어·다중 연결 부하 시험은 이번 범위에 포함하지 않는다.
 
 ## 지적과 수정 근거
 
