@@ -78,7 +78,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
         requiredDepts: await requiredDeptsOf(env, app.id, app.dept),
       }),
     })
-  } catch (err) {
+  } catch {
     return jsonError('베타 기록을 불러오지 못했습니다.', 503)
   }
 }
@@ -119,7 +119,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         )
         .run()
       return jsonResponse({ ok: true, id }, 201)
-    } catch (err) {
+    } catch {
       return jsonError('저장하지 못했습니다.', 500)
     }
   }
@@ -133,7 +133,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         .bind(t(body.resolution) || null, t(body.id), app.id)
         .run()
       return jsonResponse({ ok: true })
-    } catch (err) {
+    } catch {
       return jsonError('저장하지 못했습니다.', 500)
     }
   }
@@ -271,7 +271,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
       { ok: true, round_id: roundId, seq, overall: s.overall, summary: s, overruled },
       201
     )
-  } catch (err) {
+  } catch {
     return jsonError('채점 결과를 저장하지 못했습니다.', 500)
   }
 }

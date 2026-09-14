@@ -58,7 +58,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       review: review ?? null,
       decisions: decisions.results,
     })
-  } catch (err) {
+  } catch {
     return jsonError('신청서를 불러오지 못했습니다.', 503)
   }
 }

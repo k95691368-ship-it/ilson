@@ -126,7 +126,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
         limit: PAGE_LIMIT,
       },
     })
-  } catch (err) {
+  } catch {
     return jsonError('신청서를 불러오지 못했습니다.', 503)
   }
 }
@@ -189,7 +189,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
         await hashIp(ip)
       )
       .run()
-  } catch (err) {
+  } catch {
     await releaseRateLimit(env, `apply:${ip}`, ticket)
     return jsonError('신청서를 저장하지 못했습니다.', 500)
   }

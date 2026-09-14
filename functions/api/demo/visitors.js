@@ -103,7 +103,7 @@ export async function onRequestGet({ env, data: requestData }) {
       // 문장을 안 읽는다 — shared/tryit.js 에 적힌 것을 쓴다. 같은 말을 두
       // 군데 두면 한쪽만 고치는 날 서로 다른 말을 하게 된다.
     })
-  } catch (err) {
+  } catch {
     return jsonError('세지 못했습니다.', 503)
   }
 }
@@ -195,7 +195,7 @@ export async function onRequestDelete({ env, data: requestData, request }) {
           ? `만져 보신 것까지 ${ids.length}건을 지웠습니다. 처음 화면으로 돌아갔습니다.`
           : `${ids.length}건을 지웠지만 ${left.length}건이 남았습니다.`,
     })
-  } catch (err) {
+  } catch {
     return jsonError('지우지 못했습니다.', 503)
   }
 }

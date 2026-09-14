@@ -67,7 +67,7 @@ export async function onRequestGet({ env, data: requestData }) {
     // 이 저장소의 시험은 전부 순수 함수 시험이다.
     const summary = joinCounts({ joinsByApp, apps: apps.results, requirementsByApp })
     return jsonResponse({ summary, applicationIds: summary.repriorityIds })
-  } catch (err) {
+  } catch {
     return jsonError('손든 부서를 세지 못했습니다.', 503)
   }
 }

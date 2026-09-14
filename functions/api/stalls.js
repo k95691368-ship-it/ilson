@@ -40,7 +40,7 @@ export async function onRequestGet({ env, data: requestData }) {
       ...board,
       line: boardLine(board.summary),
     })
-  } catch (err) {
+  } catch {
     return jsonError('막힌 곳을 세지 못했습니다.', 503)
   }
 }

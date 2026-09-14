@@ -405,7 +405,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       contact: manual?.contact ?? null,
       needs,
     })
-  } catch (err) {
+  } catch {
     return jsonError('조회하지 못했습니다.', 503)
   }
 }

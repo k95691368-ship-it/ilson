@@ -385,7 +385,7 @@ export async function onRequestGet({ env, data: requestData }) {
       unrequestedCount: unrequestedAll?.n ?? 0,
       recent: items.slice(0, 6).map((a) => ({ ...a, stage: stageOf(a) })),
     })
-  } catch (err) {
+  } catch {
     return jsonError('현황을 불러오지 못했습니다.', 503)
   }
 }

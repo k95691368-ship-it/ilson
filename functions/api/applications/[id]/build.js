@@ -82,7 +82,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       quarantine,
       aliases,
     })
-  } catch (err) {
+  } catch {
     return jsonError('제작 기록을 불러오지 못했습니다.', 503)
   }
 }
@@ -126,7 +126,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         )
         .run()
       return jsonResponse({ ok: true, external_code: external, canonical_code: canonical }, 201)
-    } catch (err) {
+    } catch {
       return jsonError('저장하지 못했습니다.', 500)
     }
   }
@@ -286,7 +286,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
       .catch(() => {})
 
     return jsonResponse({ ok: true, run_id: runId, seq }, 201)
-  } catch (err) {
+  } catch {
     // 머리글은 들어갔는데 줄에서 엎어지면 "N줄 처리함"이라고 적힌 채 되짚을
     // 줄이 하나도 없는 실행이 남는다. 화면은 그 머리글을 읽으니 처리 건수는
     // 멀쩡해 보이고, 눌러 봐야 빈다 — 실제로 라이브에서 그런 실행이 하나

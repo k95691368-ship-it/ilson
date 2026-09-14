@@ -39,7 +39,7 @@ export async function onRequestGet({ env, data: requestData }) {
       },
       applicationIds: [...apps],
     })
-  } catch (err) {
+  } catch {
     return jsonError('부서 이의를 세지 못했습니다.', 503)
   }
 }

@@ -35,7 +35,7 @@ export async function onRequestGet({ env, data: requestData }) {
         shared: null,
       },
     })
-  } catch (err) {
+  } catch {
     return jsonError('세지 못했습니다.', 503)
   }
 }

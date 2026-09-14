@@ -125,7 +125,7 @@ export async function onRequestGet({ env, data: requestData }) {
       line: responseLine(rate),
       note: responseNote(rate),
     })
-  } catch (err) {
+  } catch {
     return jsonError('부서 응답을 세지 못했습니다.', 503)
   }
 }

@@ -89,7 +89,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       summary,
       line: joinLine(summary),
     })
-  } catch (err) {
+  } catch {
     return jsonError('손든 부서를 불러오지 못했습니다.', 503)
   }
 }

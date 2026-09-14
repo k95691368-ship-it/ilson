@@ -102,7 +102,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       // 언제쯤인가. 첫 화면과 같은 방식으로 낸 가운데값을 쓴다.
       lead: leadGuess(medianLead(leads.results)),
     })
-  } catch (err) {
+  } catch {
     return jsonError('차례를 계산하지 못했습니다.', 503)
   }
 }
