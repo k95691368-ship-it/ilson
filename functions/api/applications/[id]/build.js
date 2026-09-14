@@ -83,7 +83,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       aliases,
     })
   } catch (err) {
-    return jsonError(`제작 기록을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('제작 기록을 불러오지 못했습니다.', 503)
   }
 }
 
@@ -127,7 +127,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         .run()
       return jsonResponse({ ok: true, external_code: external, canonical_code: canonical }, 201)
     } catch (err) {
-      return jsonError(`저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+      return jsonError('저장하지 못했습니다.', 500)
     }
   }
 
@@ -299,7 +299,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         .run()
         .catch(() => {})
     }
-    return jsonError(`제작 기록을 저장하지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
+    return jsonError('제작 기록을 저장하지 못했습니다.', 500)
   }
 }
 

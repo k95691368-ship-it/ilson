@@ -131,7 +131,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       saved: saved ?? null,
     })
   } catch (err) {
-    return jsonError(`성과를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('성과를 불러오지 못했습니다.', 503)
   }
 }
 
@@ -262,6 +262,6 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
     return jsonError('무엇을 저장할지 알 수 없습니다.', 400)
   } catch (err) {
-    return jsonError(`저장하지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
+    return jsonError('저장하지 못했습니다.', 500)
   }
 }

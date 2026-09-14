@@ -4,7 +4,26 @@
 // 라우트마다 응답 모양이 다르면 화면에서 매번 다르게 풀어야 하고, 그러다
 // 어느 한 곳을 빠뜨리면 사용자에게 빈 화면이 뜬다.
 
-const JSON_HEADERS = { 'Content-Type': 'application/json; charset=utf-8' }
+const JSON_HEADERS = {
+  'Content-Type': 'application/json; charset=utf-8',
+  'Cache-Control': 'private, no-store',
+  'X-Content-Type-Options': 'nosniff',
+  'Referrer-Policy': 'no-referrer',
+}
+
+// Static _headers rules do not cover Pages Function responses.
+export function privateResponse(response) {
+  const result = new Response(response.body, response)
+  for (const name of ['Cache-Control', 'X-Content-Type-Options', 'Referrer-Policy']) {
+    result.headers.set(name, JSON_HEADERS[name])
+  }
+  const vary = new Set((result.headers.get('Vary') || '').split(',').map(value => value.trim()).filter(Boolean))
+  for (const name of ['Cookie', 'Authorization']) {
+    if (![...vary].some(value => value.toLowerCase() === name.toLowerCase())) vary.add(name)
+  }
+  result.headers.set('Vary', [...vary].join(', '))
+  return result
+}
 
 export function ok(data, status = 200, extraHeaders = {}) {
   return new Response(JSON.stringify(data), {
@@ -25,11 +44,9 @@ export function failFields(fields, message = '적어 주신 내용을 확인해�
   return ok({ error: message, fields }, 400)
 }
 
-// 예상 못 한 오류를 사용자 문장으로 바꾼다. 원인은 짧게만 덧붙인다 —
-// 아무 단서도 없으면 무엇을 고쳐야 할지 알 수 없고, 전부 노출하면 위험하다.
-export function failUnexpected(err, what) {
-  const hint = String(err?.message ?? '').slice(0, 160)
-  return fail(`${what} (${hint})`, 503)
+// Exception messages can contain SQL, credentials, or user data even when truncated.
+export function failUnexpected(_err, what) {
+  return fail(what, 503)
 }
 
 export const jsonResponse = ok

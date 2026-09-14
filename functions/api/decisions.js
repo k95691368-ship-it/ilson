@@ -138,6 +138,6 @@ export async function onRequestGet({ env, data: requestData, request }) {
       sideLine: sideLine(sideTally(allKinds.results)),
     })
   } catch (err) {
-    return jsonError(`결정 기록을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('결정 기록을 불러오지 못했습니다.', 503)
   }
 }

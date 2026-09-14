@@ -41,6 +41,6 @@ export async function onRequestGet({ env, data: requestData }) {
       line: boardLine(board.summary),
     })
   } catch (err) {
-    return jsonError(`막힌 곳을 세지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('막힌 곳을 세지 못했습니다.', 503)
   }
 }

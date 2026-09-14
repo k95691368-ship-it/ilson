@@ -25,6 +25,15 @@
 const SIG_EOCD = 0x06054b50 // 중앙 목록의 끝 표시
 const SIG_CENTRAL = 0x02014b50 // 중앙 목록의 항목 하나
 const SIG_LOCAL = 0x04034b50 // 실제 파일 앞에 붙는 머리말
+const MAX_ARCHIVE_BYTES = 10 * 1024 * 1024
+const MAX_ENTRY_BYTES = 16 * 1024 * 1024
+const MAX_EXPANDED_BYTES = 64 * 1024 * 1024
+const MAX_ENTRIES = 1024
+const MAX_ROWS = 100000
+const MAX_COLUMNS = 1024
+const MAX_CELLS = 2000000
+const limitError = () => new Error('엑셀 처리 한도를 초과했습니다. 파일이나 시트를 나누어 다시 시도해주세요.')
+const invalidZip = () => new Error('엑셀 파일이 손상됐거나 지원하지 않는 압축 형식입니다.')
 
 // zip은 파일 목록이 뒤쪽에 있다. 그래서 끝에서부터 거꾸로 찾는다.
 function findEndOfCentralDirectory(view, bytes) {
@@ -36,13 +45,32 @@ function findEndOfCentralDirectory(view, bytes) {
   return -1
 }
 
-async function inflateRaw(bytes) {
+async function inflateRaw(bytes, limit) {
   const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('deflate-raw'))
-  return new Uint8Array(await new Response(stream).arrayBuffer())
+  const reader = stream.getReader()
+  const chunks = []
+  let size = 0
+  try {
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+      size += value.byteLength
+      if (size > limit) throw limitError()
+      chunks.push(value)
+    }
+  } catch (error) {
+    await reader.cancel().catch(() => {})
+    throw error
+  } finally { reader.releaseLock() }
+  const result = new Uint8Array(size)
+  let offset = 0
+  for (const chunk of chunks) { result.set(chunk, offset); offset += chunk.byteLength }
+  return result
 }
 
 // zip 안의 파일들을 { 경로: 내용(bytes) } 로 돌려준다.
 async function unzip(buffer) {
+  if (buffer.byteLength > MAX_ARCHIVE_BYTES) throw limitError()
   const bytes = new Uint8Array(buffer)
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
 
@@ -50,20 +78,26 @@ async function unzip(buffer) {
   if (eocd < 0) throw new Error('엑셀 파일이 아니거나 파일이 손상됐습니다.')
 
   const count = view.getUint16(eocd + 10, true)
+  if (count > MAX_ENTRIES) throw limitError()
   let offset = view.getUint32(eocd + 16, true)
 
-  const files = {}
+  const files = Object.create(null)
+  let expanded = 0
   const decoder = new TextDecoder('utf-8')
 
   for (let i = 0; i < count; i++) {
-    if (view.getUint32(offset, true) !== SIG_CENTRAL) break
+    if (offset + 46 > eocd || view.getUint32(offset, true) !== SIG_CENTRAL) throw invalidZip()
 
     const method = view.getUint16(offset + 10, true)
     const compressedSize = view.getUint32(offset + 20, true)
+    const declaredSize = view.getUint32(offset + 24, true)
+    if (declaredSize > Math.min(MAX_ENTRY_BYTES, MAX_EXPANDED_BYTES - expanded)) throw limitError()
+    if ((view.getUint16(offset + 8, true) & 1) || ![0, 8].includes(method)) throw invalidZip()
     const nameLength = view.getUint16(offset + 28, true)
     const extraLength = view.getUint16(offset + 30, true)
     const commentLength = view.getUint16(offset + 32, true)
     const localOffset = view.getUint32(offset + 42, true)
+    if (offset + 46 + nameLength + extraLength + commentLength > eocd || localOffset + 30 > bytes.length) throw invalidZip()
     const name = decoder.decode(bytes.subarray(offset + 46, offset + 46 + nameLength))
 
     // 실제 내용은 다른 자리에 있고, 그 앞 머리말의 길이가 여기와 다를 수 있다.
@@ -71,9 +105,15 @@ async function unzip(buffer) {
       const localNameLength = view.getUint16(localOffset + 26, true)
       const localExtraLength = view.getUint16(localOffset + 28, true)
       const dataStart = localOffset + 30 + localNameLength + localExtraLength
+      if (dataStart + compressedSize > bytes.length || Object.hasOwn(files, name)) throw invalidZip()
       const raw = bytes.subarray(dataStart, dataStart + compressedSize)
-      files[name] = method === 0 ? raw : await inflateRaw(raw)
-    }
+      const remaining = Math.min(MAX_ENTRY_BYTES, MAX_EXPANDED_BYTES - expanded)
+      if (method === 0 && raw.byteLength > remaining) throw limitError()
+      const content = method === 0 ? raw : await inflateRaw(raw, remaining)
+      if (content.byteLength !== declaredSize) throw invalidZip()
+      expanded += content.byteLength
+      files[name] = content
+    } else throw invalidZip()
 
     offset += 46 + nameLength + extraLength + commentLength
   }
@@ -184,8 +224,10 @@ export function excelSerialToISO(serial) {
   return d.toISOString().slice(0, 10)
 }
 
-function parseSheet(xml, sharedStrings, dateStyles) {
+function parseSheet(xml, sharedStrings, dateStyles, budget) {
   const rows = new Map()
+  let maxRow = 0
+  let visited = 0
 
   // 셀 하나: <c r="A1" s="3" t="s"><v>12</v></c>
   const cellRe = /<c\s+([^>]*?)(\/>|>([\s\S]*?)<\/c>)/g
@@ -196,6 +238,9 @@ function parseSheet(xml, sharedStrings, dateStyles) {
 
     const ref = /r="([A-Z]+\d+)"/.exec(attrs)?.[1]
     if (!ref) continue
+    const r = rowNumber(ref)
+    const column = columnIndex(ref)
+    if (!Number.isSafeInteger(r) || r < 1 || r > MAX_ROWS || !Number.isSafeInteger(column) || column < 0 || column >= MAX_COLUMNS || ++visited > MAX_CELLS) throw limitError()
     const type = /t="([^"]*)"/.exec(attrs)?.[1] ?? 'n'
     const styleIndex = Number(/s="(\d+)"/.exec(attrs)?.[1] ?? -1)
 
@@ -223,9 +268,14 @@ function parseSheet(xml, sharedStrings, dateStyles) {
       }
     }
 
-    const r = rowNumber(ref)
     if (!rows.has(r)) rows.set(r, [])
-    rows.get(r)[columnIndex(ref)] = value
+    const row = rows.get(r)
+    // Count materialized empty cells too; a sparse far-right cell is not cheap.
+    budget.cells += Math.max(0, column + 1 - row.length)
+    budget.rows += Math.max(0, r - maxRow)
+    if (budget.cells > MAX_CELLS || budget.rows > MAX_ROWS) throw limitError()
+    row[column] = value
+    maxRow = Math.max(maxRow, r)
   }
 
   // 병합된 칸. 제목 줄을 찾아 건너뛸 때 쓴다.
@@ -233,7 +283,6 @@ function parseSheet(xml, sharedStrings, dateStyles) {
     (s) => /ref="([^"]+)"/.exec(s)[1]
   )
 
-  const maxRow = rows.size === 0 ? 0 : Math.max(...rows.keys())
   const out = []
   for (let r = 1; r <= maxRow; r++) {
     const row = rows.get(r) ?? []
@@ -262,7 +311,7 @@ export async function readXlsx(buffer) {
 
   // 시트 이름이 실제로 어느 파일인지는 관계 파일에 적혀 있다.
   const rels = textOf(files['xl/_rels/workbook.xml.rels'])
-  const relMap = {}
+  const relMap = Object.create(null)
   for (const tag of rels.match(/<Relationship[^>]*\/>/g) || []) {
     const id = /Id="([^"]+)"/.exec(tag)?.[1]
     const target = /Target="([^"]+)"/.exec(tag)?.[1]
@@ -270,13 +319,14 @@ export async function readXlsx(buffer) {
   }
 
   const sheets = []
+  const budget = { cells: 0, rows: 0 }
   sheetTags.forEach((tag, i) => {
     const name = unescapeXml(/name="([^"]*)"/.exec(tag)?.[1] ?? `시트${i + 1}`)
     const rid = /r:id="([^"]+)"/.exec(tag)?.[1]
     const path = relMap[rid] ?? `xl/worksheets/sheet${i + 1}.xml`
     const xml = textOf(files[path])
     if (!xml) return
-    const { rows, merges } = parseSheet(xml, sharedStrings, dateStyles)
+    const { rows, merges } = parseSheet(xml, sharedStrings, dateStyles, budget)
     sheets.push({ name, rows, merges })
   })
 

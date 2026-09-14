@@ -40,6 +40,6 @@ export async function onRequestGet({ env, data: requestData }) {
       applicationIds: [...apps],
     })
   } catch (err) {
-    return jsonError(`부서 이의를 세지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('부서 이의를 세지 못했습니다.', 503)
   }
 }

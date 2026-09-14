@@ -103,6 +103,6 @@ export async function onRequestGet({ env, data: requestData, params }) {
       lead: leadGuess(medianLead(leads.results)),
     })
   } catch (err) {
-    return jsonError(`차례를 계산하지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('차례를 계산하지 못했습니다.', 503)
   }
 }

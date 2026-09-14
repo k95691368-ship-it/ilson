@@ -79,7 +79,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       }),
     })
   } catch (err) {
-    return jsonError(`베타 기록을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('베타 기록을 불러오지 못했습니다.', 503)
   }
 }
 
@@ -120,7 +120,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         .run()
       return jsonResponse({ ok: true, id }, 201)
     } catch (err) {
-      return jsonError(`저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+      return jsonError('저장하지 못했습니다.', 500)
     }
   }
 
@@ -134,7 +134,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         .run()
       return jsonResponse({ ok: true })
     } catch (err) {
-      return jsonError(`저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+      return jsonError('저장하지 못했습니다.', 500)
     }
   }
 
@@ -272,7 +272,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
       201
     )
   } catch (err) {
-    return jsonError(`채점 결과를 저장하지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
+    return jsonError('채점 결과를 저장하지 못했습니다.', 500)
   }
 }
 

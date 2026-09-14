@@ -30,6 +30,22 @@ describe('deployable Pages Worker', () => {
     expect(await response.text()).toBe('static-asset')
   })
 
+  it('protects early responses and enforces streamed body limits in the actual compiled Worker', async () => {
+    const DB = { claimRateLimit: async () => 1, prepare: vi.fn() }
+    const env = { ASSETS: assets, DB, DBBridgeApplied: true, OVERRIDE_DEMO_MODE: 'true' }
+    const request = new Request('https://ilson.test/api/override', {
+      method: 'POST', body: ' '.repeat(1024 * 1024) + '{}', headers: { 'Content-Type': 'application/json' },
+    })
+    const response = await worker.fetch(request, env, context)
+    expect(response.status).toBe(413)
+    expect(DB.prepare).not.toHaveBeenCalled()
+    expect(response.headers.get('Cache-Control')).toBe('private, no-store')
+    expect(response.headers.get('X-Content-Type-Options')).toBe('nosniff')
+    const denied = await worker.fetch(new Request('https://ilson.test/api/override'), { ASSETS: assets, DEMO_WORKSPACES: 'true' }, context)
+    expect(denied.status).toBe(428)
+    expect(denied.headers.get('Cache-Control')).toBe('private, no-store')
+  })
+
   it('runs isolated workspace, approval, evidence, replay and reset through the built Worker', async () => {
     const pg = new PGlite()
     const env = { ASSETS: assets, DEMO_WORKSPACES: 'true', SUPABASE_URL: 'https://artifact-test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'local-only' }

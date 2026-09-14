@@ -74,7 +74,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
       total: all[0]?.n ?? 0,
     })
   } catch (err) {
-    return jsonError(`시연 데이터를 심지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
+    return jsonError('시연 데이터를 심지 못했습니다.', 500)
   }
 }
 
@@ -120,6 +120,6 @@ export async function onRequestDelete({ env, data: requestData, request }) {
       message: `시연 신청서 ${targets.length}건과 거기 딸린 결정 기록을 지웠습니다.`,
     })
   } catch (err) {
-    return jsonError(`지우지 못했습니다. (${String(err.message).slice(0, 200)})`, 500)
+    return jsonError('지우지 못했습니다.', 500)
   }
 }

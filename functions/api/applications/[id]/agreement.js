@@ -119,7 +119,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       baseline: baseline ?? null,
     })
   } catch (err) {
-    return jsonError(`협의안을 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('협의안을 불러오지 못했습니다.', 503)
   }
 }
 
@@ -385,7 +385,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         return jsonError('무엇을 추가할지 알 수 없습니다.', 400)
     }
   } catch (err) {
-    return jsonError(`저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+    return jsonError('저장하지 못했습니다.', 500)
   }
 }
 
@@ -521,7 +521,7 @@ export async function onRequestPatch({ env, data: requestData, params, request }
 
     return jsonError('무엇을 고칠지 알 수 없습니다.', 400)
   } catch (err) {
-    return jsonError(`고치지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+    return jsonError('고치지 못했습니다.', 500)
   }
 }
 
@@ -555,7 +555,7 @@ export async function onRequestDelete({ env, data: requestData, params, request 
       .run()
     return jsonResponse({ ok: true })
   } catch (err) {
-    return jsonError(`지우지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+    return jsonError('지우지 못했습니다.', 500)
   }
 }
 

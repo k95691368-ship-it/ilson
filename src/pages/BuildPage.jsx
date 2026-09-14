@@ -6,6 +6,7 @@ import { api } from '../api/client.js'
 import { krw, num, ms, ago } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { SKUS } from '../../shared/master.js'
+import { readLocalFiles } from '../lib/readFiles.js'
 
 // 시연용 파일 다섯 장이 여기 박혀 있었다. 카드도 버튼도 실물 파일도 지웠다.
 // 이 화면은 이제 넣은 파일만 처리한다.
@@ -101,11 +102,11 @@ function Build({ id }) {
   }
 
   async function runUploaded(fileList) {
-    const files = await Promise.all(
-      [...fileList].map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() }))
-    )
-    if (files.length === 0) return
-    await runWith(files)
+    try {
+      const files = await readLocalFiles(fileList)
+      if (files.length === 0) return
+      await runWith(files)
+    } catch (error) { toast.error(error.message) }
   }
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>

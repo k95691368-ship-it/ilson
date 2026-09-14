@@ -126,7 +126,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
   try {
     await env.DB.batch(statements)
   } catch (err) {
-    return jsonError(`판정을 저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+    return jsonError('판정을 저장하지 못했습니다.', 500)
   }
 
   return jsonResponse({

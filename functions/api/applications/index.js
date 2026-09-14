@@ -127,7 +127,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
       },
     })
   } catch (err) {
-    return jsonError(`신청서를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('신청서를 불러오지 못했습니다.', 503)
   }
 }
 
@@ -191,7 +191,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
       .run()
   } catch (err) {
     await releaseRateLimit(env, `apply:${ip}`, ticket)
-    return jsonError(`신청서를 저장하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+    return jsonError('신청서를 저장하지 못했습니다.', 500)
   }
 
   return jsonResponse(

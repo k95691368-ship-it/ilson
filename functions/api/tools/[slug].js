@@ -287,7 +287,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       taught: aliases.results,
     })
   } catch (err) {
-    return jsonError(`도구를 불러오지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('도구를 불러오지 못했습니다.', 503)
   }
 }
 
@@ -342,6 +342,6 @@ export async function onRequestPost({ env, data: requestData, params, request })
     const remaining = await remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS)
     return jsonResponse({ ok: true, id, remainingToday: remaining }, 201)
   } catch (err) {
-    return jsonError(`기록하지 못했습니다. (${String(err.message).slice(0, 160)})`, 500)
+    return jsonError('기록하지 못했습니다.', 500)
   }
 }

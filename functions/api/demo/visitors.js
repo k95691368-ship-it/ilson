@@ -104,7 +104,7 @@ export async function onRequestGet({ env, data: requestData }) {
       // 군데 두면 한쪽만 고치는 날 서로 다른 말을 하게 된다.
     })
   } catch (err) {
-    return jsonError(`세지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('세지 못했습니다.', 503)
   }
 }
 
@@ -196,6 +196,6 @@ export async function onRequestDelete({ env, data: requestData, request }) {
           : `${ids.length}건을 지웠지만 ${left.length}건이 남았습니다.`,
     })
   } catch (err) {
-    return jsonError(`지우지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('지우지 못했습니다.', 503)
   }
 }

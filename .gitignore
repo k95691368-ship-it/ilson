@@ -17,6 +17,10 @@ dist-ssr
 .wrangler
 .dev.vars
 .dev.vars.*
+.env
+.env.*
+!.env.example
+!.env.*.example
 
 # R2에서 내려받은 객체가 작업 트리에 떨어지는 경로.
 # `wrangler r2 object get portfolio/applications/...` 는 R2 키를 그대로 상대

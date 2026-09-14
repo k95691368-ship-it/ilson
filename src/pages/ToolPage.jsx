@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { readLocalFiles } from '../lib/readFiles.js'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
@@ -83,9 +84,7 @@ export default function ToolPage() {
 
     setRunning(true)
     try {
-      const files = await Promise.all(
-        picked.map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() }))
-      )
+      const files = await readLocalFiles(picked)
       // 사람이 알려 준 상품코드를 함께 넘긴다. 이게 없으면 알려주고 나서도
       // 그대로 또 밀려나고, 부서는 그 뒤로 아무것도 안 알려준다.
       const r = await runPipeline({ files, aliases: data.aliases ?? {} })

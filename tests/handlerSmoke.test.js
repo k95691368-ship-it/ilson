@@ -70,6 +70,7 @@ const ANY_ROW = new Proxy(
       if (k === 'id' || k.endsWith('_id')) return 'app_x'
       if (k === 'status' || k === 'verdict') return '수용'
       if (k === 'ticket_no') return 'AX-XXX-000'
+      if (k === 'detail_json') return '{}'
       return '값'
     },
     has: () => true,
@@ -177,6 +178,7 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
 
         const body = await res.text()
         const hit = RUNTIME_ERROR.find((sig) => body.includes(sig))
+        if (res.status >= 500 && !rel.endsWith('/health.js')) problems.push(`${rel} — HTTP ${res.status}`)
         if (hit) {
           // try/catch에 잡혀 503으로 나오는 경우. 화면에서는 그냥 안 열린다.
           problems.push(`${rel} (${label}) — 실행하다 터졌습니다: ${body.slice(0, 160)}`)
@@ -267,6 +269,7 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
         }
         const text = await res.text()
         const hit = RUNTIME_ERROR.find((sig) => text.includes(sig))
+        if (res.status >= 500 && !rel.endsWith('/health.js')) problems.push(`${rel} — HTTP ${res.status}`)
         if (hit) problems.push(`${rel} (${label}) — 실행하다 터졌습니다: ${text.slice(0, 160)}`)
       }
     }
@@ -312,6 +315,7 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
         }
         const text = await res.text()
         const hit = RUNTIME_ERROR.find((sig) => text.includes(sig))
+        if (res.status >= 500 && !rel.endsWith('/health.js')) problems.push(`${rel} — HTTP ${res.status}`)
         if (hit) problems.push(`${rel} (${label}) — 실행하다 터졌습니다: ${text.slice(0, 160)}`)
       }
     }
@@ -369,6 +373,7 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
           }
           const text = await res.text()
           const hit = RUNTIME_ERROR.find((sig) => text.includes(sig))
+          if (res.status >= 500 && !rel.endsWith('/health.js')) problems.push(`${rel} — HTTP ${res.status}`)
           if (hit) problems.push(`${rel} ${method} (${label}) — 실행하다 터졌습니다: ${text.slice(0, 160)}`)
         }
       }

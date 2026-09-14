@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { readLocalFiles } from '../lib/readFiles.js'
 import { useSearchParams } from 'react-router-dom'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
@@ -84,9 +85,7 @@ function Beta({ id }) {
     try {
       setProgress('파일을 읽는 중…')
       const [files, aliasData] = await Promise.all([
-        Promise.all(
-          picked.map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() }))
-        ),
+        readLocalFiles(picked),
         api.get(`/applications/${id}/build`),
       ])
       // 정답표는 없다. 없으면 없는 대로 넘긴다 — 대조할 정답이 없는 기준은

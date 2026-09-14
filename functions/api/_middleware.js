@@ -2,7 +2,8 @@
 // Real deployments require signed Access identity for business reads and writes.
 // Rate limits are additional abuse protection, not a replacement for authentication.
 
-import { jsonError } from '../_lib/http.js'
+import { jsonError, failUnexpected, privateResponse } from '../_lib/http.js'
+import { boundRequestBody } from '../_lib/requestBody.js'
 import { checkRateLimit } from '../_lib/rateLimit.js'
 import { withDbBinding } from '../_lib/dbBridge.js'
 import { workspaceEnabled, workspaceToken, workspaceDb, sameOrigin } from '../_lib/workspace.js'
@@ -17,6 +18,28 @@ const WRITES_PER_WINDOW = 60
 const WINDOW_SECONDS = 600
 
 export async function onRequest(context) {
+  let body
+  let response
+  try {
+    body = boundRequestBody(context.request)
+    if (!body.exceeded) {
+      const next = context.next
+      context.request = body.request
+      // Pages must pass the bounded stream to the downstream handler, not the
+      // original request captured when the middleware chain was constructed.
+      context.next = () => next(body.request)
+      response = await handleRequest(context)
+    }
+  } catch (error) {
+    response = failUnexpected(error, '요청을 처리하지 못했습니다. 잠시 후 다시 시도해주세요.')
+  }
+  // Authentication/maintenance may return without reading a body at all.
+  if (body?.request.body && !body.request.body.locked) void body.request.body.cancel().catch(() => {})
+  if (body?.exceeded) response = jsonError('요청 데이터가 너무 큽니다. 파일이나 결과를 나누어 다시 시도해주세요.', 413)
+  return privateResponse(response)
+}
+
+async function handleRequest(context) {
   // Never mutate the reusable platform env with a visitor-specific DB binding.
   context.env = { ...context.env }
   // Pages next() constructs a NEW context using the original bindings, while
@@ -60,11 +83,7 @@ export async function onRequest(context) {
       // A demonstration must not use real integration or model credentials.
       if (path === '/api/override/assist') return jsonError('개인 체험에서는 외부 AI 호출을 실행하지 않습니다.', 403)
     }
-    const response = await next()
-    const privateResponse = new Response(response.body, response)
-    privateResponse.headers.set('Cache-Control', 'private, no-store')
-    privateResponse.headers.append('Vary', 'Cookie')
-    return privateResponse
+    return next()
   }
 
   // Real deployments protect reads as well as writes. An email header is not authentication.

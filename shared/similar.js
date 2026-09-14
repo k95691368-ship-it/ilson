@@ -140,12 +140,19 @@ export function tokenParts(text) {
 // 가볍게 친다. 목록을 미리 정해 두지 않고 실제 데이터가 정하게 하는 것이라
 // 회사마다 쓰는 말이 달라도 알아서 맞는다.
 export function corpusOf(items) {
+  return corpusOfPrepared((items ?? []).map(prepareFields))
+}
+
+function prepareFields(item) {
+  return Object.fromEntries(Object.keys(FIELD_WEIGHT).map(field => [field, tokenParts(item?.[field])]))
+}
+
+function corpusOfPrepared(list) {
   const df = new Map()
-  const list = items ?? []
   for (const it of list) {
     const seen = new Set()
     for (const field of Object.keys(FIELD_WEIGHT)) {
-      for (const t of tokenParts(it?.[field]).all) seen.add(t)
+      for (const t of it[field].all) seen.add(t)
     }
     for (const t of seen) df.set(t, (df.get(t) ?? 0) + 1)
   }
@@ -159,9 +166,12 @@ const MIN_CORPUS = 4
 
 function weightOf(token, corpus) {
   if (!corpus || corpus.n < MIN_CORPUS) return 1
+  if (corpus.weights?.has(token)) return corpus.weights.get(token)
   const d = corpus.df.get(token) ?? 0
   // 모든 신청서에 다 나오면 0에 가깝고, 한 건에만 나오면 1에 가깝다.
-  return Math.log((corpus.n + 1) / (d + 1)) / Math.log(corpus.n + 1)
+  const weight = Math.log((corpus.n + 1) / (d + 1)) / Math.log(corpus.n + 1)
+  corpus.weights?.set(token, weight)
+  return weight
 }
 
 // 겹친 무게가 이만큼은 돼야 "비슷하다"고 말할 근거가 선다.
@@ -225,13 +235,17 @@ export const SIMILAR_THRESHOLD = 0.34
 const SAME_THRESHOLD = 0.55
 
 export function similarity(draft, other, corpus) {
+  return preparedSimilarity(draft, other, corpus, prepareFields(draft), prepareFields(other))
+}
+
+function preparedSimilarity(draft, other, corpus, draftFields, otherFields) {
   let weighted = 0
   let totalWeight = 0
   const all = []
 
   for (const [field, weight] of Object.entries(FIELD_WEIGHT)) {
-    const a = tokenParts(draft?.[field])
-    const b = tokenParts(other?.[field])
+    const a = draftFields[field]
+    const b = otherFields[field]
     // 한쪽이 비어 있으면 그 칸은 아예 안 센다. 0점으로 치면 아직 다 적지
     // 않은 신청서가 무조건 안 비슷한 것으로 나온다.
     if (a.all.size === 0 || b.all.size === 0) continue
@@ -290,12 +304,15 @@ export function similarity(draft, other, corpus) {
 // 회사에서 얼마나 흔한가"의 근거가 될 수 없다.
 export function findSimilar(draft, others, { threshold = SIMILAR_THRESHOLD, limit = 3 } = {}) {
   const list = others ?? []
-  const corpus = corpusOf(list)
+  // Request-local only: tokenize each field once, with no cross-workspace cache.
+  const prepared = list.map(prepareFields)
+  const draftFields = prepareFields(draft)
+  const corpus = { ...corpusOfPrepared(prepared), weights: new Map() }
   const hits = []
-  for (const other of list) {
+  for (const [index, other] of list.entries()) {
     // 자기 자신은 뺀다. 검토 화면에서 쓸 때 필요하다.
     if (draft?.id && other?.id === draft.id) continue
-    const { score, shared } = similarity(draft, other, corpus)
+    const { score, shared } = preparedSimilarity(draft, other, corpus, draftFields, prepared[index])
     if (score >= threshold) hits.push({ ...other, score, shared, same: score >= SAME_THRESHOLD })
   }
   hits.sort((a, b) => b.score - a.score || String(a.created_at).localeCompare(String(b.created_at)))

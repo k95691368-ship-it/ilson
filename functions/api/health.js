@@ -70,8 +70,8 @@ export async function onRequestGet({ env, data: requestData }) {
       if (!checks.runtime) notes.push('운영 RPC 또는 0004 마이그레이션이 준비되지 않았습니다.')
       if (!checks.capacity) notes.push('새 체험 공간 정원이 찼습니다. 소개 화면과 기존 체험 공간은 계속 사용할 수 있습니다.')
     }
-  } catch (err) {
-    notes.push(`DB를 읽지 못했습니다: ${String(err.message).slice(0, 140)}`)
+  } catch {
+    notes.push('DB를 읽지 못했습니다. 서버 연결 설정과 데이터베이스 상태를 확인해주세요.')
   }
 
   const ready = checks.db && checks.schema && (!isSupabase || (checks.runtime === true && checks.capacity === true))

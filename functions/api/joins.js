@@ -68,6 +68,6 @@ export async function onRequestGet({ env, data: requestData }) {
     const summary = joinCounts({ joinsByApp, apps: apps.results, requirementsByApp })
     return jsonResponse({ summary, applicationIds: summary.repriorityIds })
   } catch (err) {
-    return jsonError(`손든 부서를 세지 못했습니다. (${String(err.message).slice(0, 160)})`, 503)
+    return jsonError('손든 부서를 세지 못했습니다.', 503)
   }
 }
