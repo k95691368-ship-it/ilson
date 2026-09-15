@@ -8,7 +8,7 @@ import { PGlite } from '@electric-sql/pglite'
 import { onRequest } from '../functions/api/_middleware.js'
 const pg = new PGlite()
 await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql']) {
+for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql']) {
   await pg.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'))
 }
 let queue = Promise.resolve()

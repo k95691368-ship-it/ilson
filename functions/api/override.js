@@ -1,6 +1,7 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
 import { newId } from '../_lib/ids.js'
 import { integrationConfig } from '../_lib/integrationConfig.js'
+import { createFeedbackCase } from '../_lib/fieldFeedback.js'
 import { overrideMetrics } from '../_lib/overrideMetrics.js'
 import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.js'
 import {
@@ -417,6 +418,7 @@ async function captureEvent(env, actor, body) {
     throw error
   }
 
+  if (action.isOverride) await createFeedbackCase(env,actor,id)
   await refreshCluster(env, clusterId)
   await auditOverride(env, actor, 'capture_event', 'override_event', id, {
     decision_action: decisionAction,

@@ -50,13 +50,13 @@ export default function FlowPage() {
 
   return (
     <div className="stack flow-home">
-      <header className="page-head home-hero apple-hero">
-        <span className="apple-eyebrow">일손</span>
+      <header className="page-head home-hero ms-hero">
+        <span className="ms-eyebrow">일손</span>
         <h1>반복 업무를<br />실제 도구로.</h1>
-        <p className="page-lede apple-lead">
+        <p className="page-lede ms-lead">
           함께 정의하고, 만들어 보고, 달라진 일을 확인합니다.
         </p>
-        <div className="page-head-actions apple-actions">
+        <div className="page-head-actions ms-actions">
           <Link to="/apply" className="btn-primary">반복 업무 신청하기</Link>
           <a href="#process" className="btn-ghost">과정 보기</a>
         </div>
@@ -76,11 +76,11 @@ export default function FlowPage() {
         </div>
       </header>
 
-      <section className="apple-feature flow-feature">
-        <span className="apple-eyebrow">원본 근거</span>
+      <section className="ms-feature flow-feature">
+        <span className="ms-eyebrow">원본 근거</span>
         <h2>합쳐진 숫자에도,<br />돌아갈 곳이 있도록.</h2>
         <p>파일에서 시트, 행까지.<br />결과를 누르면 그 숫자가 만들어진 과정을 확인합니다.</p>
-        <Link to="/build" className="apple-feature-link">정산 도구 살펴보기 ›</Link>
+        <Link to="/build" className="ms-feature-link">정산 도구 살펴보기 ›</Link>
         <div className="provenance-path" aria-label="원본 추적 단계"><span>원본 파일</span><b aria-hidden="true">›</b><span>시트와 행</span><b aria-hidden="true">›</b><span>변환 규칙</span><b aria-hidden="true">›</b><span>정산 결과</span></div>
       </section>
 

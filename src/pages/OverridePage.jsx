@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
+import FieldFeedbackView from '../components/FieldFeedbackView.jsx'
 import {
   CAUSES,
   DECISION_ACTIONS,
@@ -20,6 +21,8 @@ const NAV = [
   { key: 'events', label: '판단 사건' },
   { key: 'clusters', label: '반복 문제' },
   { key: 'experiments', label: '개선 실험' },
+  { key: 'feedback', label: '내 피드백' },
+  { key: 'quality', label: '현장 점검' },
   { key: 'intelligence', label: '조직 인사이트' },
   { key: 'integrations', label: '연동' },
   { key: 'audit', label: '감사 기록' },
@@ -250,6 +253,7 @@ export default function OverridePage() {
               {view === 'clusters' && <ClustersView data={data} open={open} askAi={askAi} />}
               {view === 'experiments' && <ExperimentsView data={data} open={open} />}
               {view === 'intelligence' && <IntelligenceView data={data} />}
+              {['feedback','quality'].includes(view) && <FieldFeedbackView key={`${role}:${view}`} mode={view} role={role} products={data.products ?? []} onCapture={() => open('event')} />}
               {view === 'integrations' && (
                 <IntegrationsView data={data} open={open} mutate={mutate} role={role} busy={busy} />
               )}
@@ -345,16 +349,16 @@ function OverviewView({ data, open, go }) {
   const featured = data.events.find((event) => Number(event.is_override)) ?? data.events[0]
   return (
     <div className="ol-page ol-overview">
-      <section className="apple-hero ol-hero">
-        <span className="apple-eyebrow">OverrideLoop</span>
+      <section className="ms-hero ol-hero">
+        <span className="ms-eyebrow">OverrideLoop</span>
         <h1>AI의 답에,<br />사람의 판단을.</h1>
-        <p className="apple-lead">현장의 수정 기록을 모아, 다음 개선을 준비합니다.</p>
-        <div className="apple-actions">
+        <p className="ms-lead">현장의 수정 기록을 모아, 다음 개선을 준비합니다.</p>
+        <div className="ms-actions">
           <button className="ol-primary" type="button" onClick={() => go('events')}>판단 사건 살펴보기</button>
           <button className="ol-secondary" type="button" onClick={() => open('event')}>새 판단 기록</button>
         </div>
         {featured && <div className="decision-preview" aria-label="최근 판단 사건 미리보기">
-          <div className="decision-preview-bar"><span className="preview-dots" aria-hidden="true"><i /><i /><i /></span><span>OverrideLoop · 판단 기록</span><span>{data.demo_mode ? '시연 사건' : '최근 사건'}</span></div>
+          <div className="decision-preview-bar"><span>OverrideLoop · 판단 기록</span><span>{data.demo_mode ? '시연 사건' : '최근 사건'}</span></div>
           <div className="decision-preview-heading"><span>{featured.product_name}</span><span>{featured.external_ref || featured.id}</span></div>
           <div className="decision-preview-grid">
             <div><span className="decision-preview-label">AI의 원안</span><p>{featured.ai_decision}</p></div>
