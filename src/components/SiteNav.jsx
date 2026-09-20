@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, useLocation } from 'react-router-dom'
 
 const LINKS = [
-  ['/portfolio', '일손'], ['/apply', '신청'], ['/review', '검토'],
+  ['/', 'AI 운영'], ['/apply', '신청'], ['/review', '검토'],
   ['/agreement', '협의'], ['/build', '제작'], ['/beta', '베타'],
-  ['/result', '성과'], ['/', 'OverrideLoop'],
+  ['/result', '성과'],
 ]
 
 export default function SiteNav() {
@@ -21,10 +21,11 @@ export default function SiteNav() {
       }
     }}>
       <div className="site-nav-inner">
-        <Link className="site-mark" to="/portfolio" aria-label="일손 전체 과정">
+        <Link className="site-mark" to="/" aria-label="OverrideLoop 운영판">
           <svg viewBox="0 0 28 28" width="22" height="22" fill="none" aria-hidden="true">
             <path d="M7 5v18M16 5v18h7" stroke="currentColor" strokeWidth="3" />
           </svg>
+          <strong>OverrideLoop</strong>
         </Link>
         <nav className={`site-nav-links${expanded ? ' is-open' : ''}`} id="site-navigation" aria-label="전체 사이트">
           {LINKS.map(([path, label]) => (

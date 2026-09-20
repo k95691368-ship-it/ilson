@@ -40,7 +40,7 @@ export default function BuiltPage() {
   const facts = techFacts(data?.counts)
 
   return (
-    <div className="stack">
+    <div className="stack built-page">
       <header className="page-head">
         <h1>기능·구현 정보</h1>
       </header>

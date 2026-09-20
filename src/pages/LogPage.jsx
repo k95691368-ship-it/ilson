@@ -48,7 +48,7 @@ export default function LogPage() {
   const t = data?.totals
 
   return (
-    <div className="stack">
+    <div className="stack log-page">
       <header className="page-head">
         <h1>결정 기록</h1>
       </header>

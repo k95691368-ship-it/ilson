@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { useOverrideEvents } from '../hooks/useOverrideEvents.js'
@@ -209,7 +209,7 @@ export default function OverridePage() {
     <div className="ol-shell">
       <header className="ol-globalbar">
         <button className="ol-wordmark" type="button" onClick={() => navigateView('overview')}>
-          <span>OverrideLoop</span>
+          <span>AI 운영</span>
         </button>
         <nav className="ol-globalnav" aria-label="OverrideLoop 주요 메뉴">
           {NAV.map((item) => (
@@ -271,12 +271,6 @@ export default function OverridePage() {
           )}
         </div>
       </div>
-
-      <footer className="ol-footer">
-        <div><strong>일손 · OverrideLoop</strong></div>
-        <nav aria-label="함께 살펴보기"><Link to="/portfolio">일손 전체 과정</Link><Link to="/tools">부서에 넘긴 도구</Link><button type="button" onClick={() => navigateView('audit')}>감사 기록</button><Link to="/built">기술 구현</Link></nav>
-        {data?.demo_mode && <small>가상의 회사·부서·데이터로 구성된 포트폴리오입니다.</small>}
-      </footer>
 
       {modal && (
         <Modal title={MODAL_TITLES[modal.type]} onClose={() => !busy && setModal(null)}>

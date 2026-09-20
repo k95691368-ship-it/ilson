@@ -5,7 +5,7 @@ import { trackPageView } from '../lib/analytics.js'
 const TITLES = {
   '/': 'OverrideLoop 운영판',
   '/override': 'OverrideLoop 운영판',
-  '/portfolio': '반복 업무를 실제 도구로',
+  '/portfolio': 'OverrideLoop 운영판',
   '/journey': '신청부터 운영까지 통합 이력',
   '/apply': '병목 해결 신청서',
   '/review': '신청서 검토와 판정',

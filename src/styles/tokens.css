@@ -1,0 +1,88 @@
+/* One design source: ndroussi/design-md-for-ai · microsoft/DESIGN.md.
+   These tokens are the foundation, not an override of a previous theme. */
+:root {
+  color-scheme: light;
+  --ms-white: #ffffff;
+  --ms-gray-050: #f5f5f5;
+  --ms-gray-100: #f2f2f2;
+  --ms-ink: #1a1a1a;
+  --ms-muted: #616161;
+  --ms-blue: #0067b8;
+  --ms-blue-bright: #0078d4;
+  --ms-teal: #00b7c3;
+  --ms-green: #107c10;
+  --ms-violet: #8661c5;
+  --ms-border: #d1d1d1;
+  --ms-surface: #fafafa;
+  --ms-focus: rgba(0, 120, 212, .18);
+  --font-sans: 'Segoe UI Variable', 'Segoe UI', 'Malgun Gothic', 'Helvetica Neue', Arial, system-ui, sans-serif;
+  --font-display: 'Segoe UI Variable Display', 'Segoe UI Variable', 'Segoe UI', 'Malgun Gothic', system-ui, sans-serif;
+  --font-mono: 'Cascadia Code', 'Cascadia Mono', Consolas, monospace;
+  --space-2: 4px;
+  --space-3: 8px;
+  --space-4: 12px;
+  --space-5: 16px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 48px;
+  --space-9: 64px;
+  --radius-card: 20px;
+  --radius-input: 12px;
+  --radius-pill: 999px;
+  --shadow-soft: 0 8px 20px rgba(0, 0, 0, .05);
+  --shadow-card: 0 16px 32px rgba(0, 0, 0, .08);
+  --page-pad: 48px;
+  --page-max: 1600px;
+  --site-nav-height: 64px;
+  --success-text: #0b6410;
+  --success-bg: #edf7ed;
+  --success-border: #9bc59d;
+  --warning-text: #765100;
+  --warning-bg: #fff7df;
+  --warning-border: #dbc37b;
+  --danger-text: #a4262c;
+  --danger-bg: #fdf0f0;
+  --danger-border: #dea9ac;
+
+  /* Semantic compatibility for data-driven JSX, all pointing to this system. */
+  --text: var(--ms-ink);
+  --text-h: var(--ms-ink);
+  --text-muted: var(--ms-muted);
+  --text-dim: var(--ms-muted);
+  --bg: var(--ms-gray-050);
+  --surface: var(--ms-white);
+  --surface-muted: var(--ms-gray-100);
+  --surface-raised: var(--ms-white);
+  --surface-subtle: var(--ms-surface);
+  --card: var(--ms-white);
+  --border: var(--ms-border);
+  --line: var(--ms-border);
+  --btn-line: var(--ms-border);
+  --accent: var(--ms-blue);
+  --accent-hover: var(--ms-blue-bright);
+  --accent-bg: #edf5fc;
+  --accent-border: #8cbbde;
+  --on-accent: var(--ms-white);
+  --success: var(--success-text);
+  --danger: var(--danger-text);
+  --warning: var(--warning-text);
+  --draft: #67419b;
+  --draft-bg: #f5f0fb;
+  --draft-border: #b8a2d4;
+  --human-border: var(--ms-blue);
+  --overlay: rgba(0, 0, 0, .42);
+  --code-bg: var(--ms-gray-100);
+  --sans: var(--font-sans);
+  --heading: var(--font-display);
+  --mono: var(--font-mono);
+  --radius: var(--radius-card);
+  --radius-sm: var(--radius-input);
+  --radius-full: var(--radius-pill);
+}
+
+@media (max-width: 1023px) {
+  :root { --page-pad: 32px; }
+}
+@media (max-width: 767px) {
+  :root { --page-pad: 20px; --site-nav-height: 64px; }
+}

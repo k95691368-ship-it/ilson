@@ -32,7 +32,7 @@ describe('workspace and journey UI', () => {
     fireEvent.click(await screen.findByRole('button',{name:'개인 체험 시작'}))
     await screen.findByRole('alert')
     expect(screen.queryByText('업무 화면')).toBeNull()
-    expect(screen.getByRole('heading',{name:'일손 체험'})).toBeTruthy()
+    expect(screen.getByRole('heading',{name:'개인 체험',level:1})).toBeTruthy()
     fireEvent.click(screen.getByRole('button', { name: '개인 체험 시작' }))
     await screen.findByText('업무 화면')
   })

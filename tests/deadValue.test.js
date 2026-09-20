@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { onRequestGet as readOverview } from '../functions/api/overview.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
@@ -72,13 +73,27 @@ const RETAINED_OVERRIDE_FIELDS = new Set([
   'verified_improvements', 'rework_cost_krw',
 ])
 
+// /portfolio와 FlowPage는 의도적으로 폐기했지만, 이번 변경은 UI 교체다.
+// 그 화면에서만 읽던 아래 7개 필드는 기존 /api/overview 응답 계약으로
+// 보존한다. 다른 API의 동명 필드나 이후 추가하는 필드는 면제하지 않는다.
+const RETAINED_OVERVIEW_FIELDS = new Set([
+  'refuseRate', 'refuseMix', 'fastest', 'slowest',
+  'handedOver', 'recentDecisions', 'unrequestedCount',
+])
+const OVERVIEW_FILE = join(ROOT, 'functions', 'api', 'overview.js')
+
+function retainedResponseField(file, key) {
+  return (file === join(ROOT, 'functions', 'api', 'override.js') && RETAINED_OVERRIDE_FIELDS.has(key))
+    || (file === OVERVIEW_FILE && RETAINED_OVERVIEW_FIELDS.has(key))
+}
+
 describe('아무도 안 읽는 값을 응답에 싣지 않는다', () => {
   it('서버가 만든 이름은 화면이나 shared 에 닿는다', () => {
     const dead = []
     for (const f of apiFiles) {
       for (const key of responseKeys(readFileSync(f, 'utf8'))) {
         if (NOT_RESPONSE.has(key)) continue
-        if (f === join(ROOT, 'functions', 'api', 'override.js') && RETAINED_OVERRIDE_FIELDS.has(key)) continue
+        if (retainedResponseField(f, key)) continue
         if (!readerText.includes(key)) {
           dead.push(`${f.slice(ROOT.length)} — ${key}`)
         }
@@ -96,5 +111,43 @@ describe('아무도 안 읽는 값을 응답에 싣지 않는다', () => {
     for (const gone of ['rowsProcessed', 'quarantineLiveTools', 'toolsAffected', 'awaitingAccept', 'noManual']) {
       expect(readerText.includes(gone), gone).toBe(false)
     }
+  })
+})
+
+describe('폐기한 업무 현황 화면의 기존 API 계약', () => {
+  it('기존 7개 키만 overview에 한정하여 보존한다', () => {
+    expect([...RETAINED_OVERVIEW_FIELDS]).toEqual([
+      'refuseRate', 'refuseMix', 'fastest', 'slowest',
+      'handedOver', 'recentDecisions', 'unrequestedCount',
+    ])
+    const emitted = responseKeys(readFileSync(OVERVIEW_FILE, 'utf8'))
+    for (const key of RETAINED_OVERVIEW_FIELDS) {
+      expect(emitted, key).toContain(key)
+      expect(retainedResponseField(OVERVIEW_FILE, key), key).toBe(true)
+      for (const file of apiFiles.filter(file => file !== OVERVIEW_FILE)) {
+        expect(retainedResponseField(file, key), `${file} — ${key}`).toBe(false)
+      }
+    }
+    expect(retainedResponseField(OVERVIEW_FILE, 'newUnusedOverviewField')).toBe(false)
+    expect(retainedResponseField(OVERVIEW_FILE, 'priority_band')).toBe(false)
+  })
+
+  it('실제 GET 응답은 비어 있는 기록에서도 7개 필드의 위치와 빈 값 계약을 유지한다', async () => {
+    const statement = {
+      bind() { return this },
+      all: async () => ({ results: [] }),
+      first: async () => ({ n: 0 }),
+    }
+    const response = await readOverview({ env: { DB: { prepare: () => statement } } })
+    expect(response.status).toBe(200)
+    const body = await response.json()
+    expect(body).toMatchObject({
+      refuseRate: null,
+      refuseMix: [],
+      lead: { fastest: null, slowest: null },
+      tools: { handedOver: 0 },
+      recentDecisions: [],
+      unrequestedCount: 0,
+    })
   })
 })

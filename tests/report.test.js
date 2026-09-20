@@ -261,15 +261,8 @@ describe('못 쓰겠다는 이유가 담당자에게 오는가', () => {
   })
 })
 
-// 중앙값만 보이면 폭이 안 보인다.
-//
-// 셋 다 열흘쯤 걸린 것과, 사흘짜리 하나에 스무날짜리 하나가 섞여 중앙이
-// 열흘인 것은 완전히 다른 이야기인데 화면에서는 같은 숫자였다. 서버는
-// 최단·최장을 계산해 내려보내는데 읽는 곳이 없었다.
-//
-// 이 사이트는 다른 자리에서 "못 한 것을 숨기지 않는다"고 말한다. 오래 걸린
-// 건을 가려 놓고 그 말을 할 수는 없다.
-describe('접수에서 넘기기까지 걸린 폭', () => {
+// 업무 현황 UI만 제거한다. 원본 지표와 개별 기록 내보내기는 유지한다.
+describe('업무 현황 제거 후 소요일과 기록 내보내기 보존', () => {
   const ROOT2 = fileURLToPath(new URL('..', import.meta.url))
 
   it('서버가 어느 건이었는지까지 준다', () => {
@@ -282,19 +275,22 @@ describe('접수에서 넘기기까지 걸린 폭', () => {
     expect(block).toContain('dept: h.dept')
   })
 
-  it('화면이 최단·최장을 실제로 그린다', () => {
-    const page = readFileSync(join(ROOT2, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
-    expect(page).toContain('lead.fastest')
-    expect(page).toContain('lead.slowest')
-    expect(page).toContain('가장 빨랐던 것과 가장 오래 걸린 것')
-    // 그 기록으로 갈 수 있어야 한다.
-    expect(page).toContain('/record/${lead.fastest.ticket_no}')
+  it('집계 페이지가 없어도 API의 최단·최장과 빈 값 계약은 남는다', () => {
+    const route = readFileSync(join(ROOT2, 'functions', 'api', 'overview.js'), 'utf8')
+    expect(route).toContain('fastest: leadDays[0] ?? null')
+    expect(route).toContain('slowest: leadDays[leadDays.length - 1] ?? null')
+    expect(route).toContain('count: leadDays.length')
+    expect(route).toContain('medianDays: medianLead')
   })
 
-  it('한 건뿐이면 폭을 말하지 않는다', () => {
-    // 최단과 최장이 같은 건이면 두 번 적는 꼴이 된다.
-    const page = readFileSync(join(ROOT2, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
-    expect(page).toContain('data.lead.count > 1')
+  it('개별 기록의 주소·인쇄·문서 다운로드가 남는다', () => {
+    const app = readFileSync(join(ROOT2, 'src', 'App.jsx'), 'utf8')
+    const record = readFileSync(join(ROOT2, 'src', 'pages', 'RecordPage.jsx'), 'utf8')
+    expect(app).toContain('<Route path="/record/:id" element={<RecordPage />} />')
+    expect(record).toContain('dossierText(rec)')
+    expect(record).toContain('dossierFilename(rec.application)')
+    expect(record).toContain('window.print()')
+    expect(record).toContain('onClick={download}')
   })
 })
 

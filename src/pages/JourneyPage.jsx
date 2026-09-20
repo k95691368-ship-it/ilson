@@ -3,7 +3,6 @@ import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../api/client.js'
 import { dateTimeLabel } from '../lib/format.js'
-import '../journey.css'
 
 export default function JourneyPage() {
   const { id } = useParams()

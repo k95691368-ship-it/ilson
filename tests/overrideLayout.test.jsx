@@ -33,7 +33,7 @@ describe('간소화한 OverrideLoop 첫 화면', () => {
     expect(screen.queryByText(/바꾸기 전에 시험하고/)).toBeNull()
     expect(screen.getByRole('heading', { name: '운영판' })).toBeTruthy()
     expect(screen.getByRole('button', { name: '개선 실험 보기' })).toBeTruthy()
-    expect(screen.getByText('가상의 회사·부서·데이터로 구성된 포트폴리오입니다.')).toBeTruthy()
+    expect(screen.getByText('시연 데이터')).toBeTruthy()
   })
 
   it('최근 사건의 원문·판단 근거·시연 표시를 유지한다', () => {

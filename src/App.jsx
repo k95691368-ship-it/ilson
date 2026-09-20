@@ -1,10 +1,10 @@
 import { Suspense, lazy, useEffect } from 'react'
-import { Routes, Route, Link, useLocation } from 'react-router-dom'
+import { Routes, Route, Link, Navigate, useLocation } from 'react-router-dom'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import SiteNav from './components/SiteNav.jsx'
 import DemoWorkspaceBar from './components/DemoWorkspaceBar.jsx'
+import { DEPTS } from '../shared/depts.js'
 
-const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
 const JourneyPage = lazy(() => import('./pages/JourneyPage.jsx'))
 const OverridePage = lazy(() => import('./pages/OverridePage.jsx'))
 const ApplyPage = lazy(() => import('./pages/ApplyPage.jsx'))
@@ -121,12 +121,12 @@ export default function App() {
 
       {bare && !workspace && (
         <header className="barebar">
-          <Link to="/portfolio" className="barebar-brand" aria-label="일손 전체 과정으로">
+          <Link to="/" className="barebar-brand" aria-label="OverrideLoop 운영판">
             <span aria-hidden="true">IL</span>
-            <strong>일손</strong>
+            <strong>OverrideLoop</strong>
           </Link>
           <span className="spacer" />
-          <Link to="/portfolio" className="barebar-back">전체 과정 보기 →</Link>
+          <Link to="/" className="barebar-back">운영판으로 →</Link>
         </header>
       )}
 
@@ -146,7 +146,7 @@ export default function App() {
           <Routes>
             <Route path="/" element={<OverridePage />} />
             <Route path="/override" element={<OverridePage />} />
-            <Route path="/portfolio" element={<FlowPage />} />
+            <Route path="/portfolio" element={<Navigate to="/" replace />} />
             <Route path="/journey" element={<JourneyPage />} />
             <Route path="/journey/:id" element={<JourneyPage />} />
             <Route path="/apply" element={<ApplyPage />} />
@@ -173,7 +173,7 @@ export default function App() {
         </Suspense>
       </main>
 
-      {!bare && !workspace && (
+      {!bare && (
         <footer className="app-footer">
           <details className="footer-menu">
             <summary>운영 메뉴</summary>
@@ -187,6 +187,11 @@ export default function App() {
                 ))}
                 <span> · <Link to="/bug">버그 신고</Link></span>
               </div>
+            </nav>
+            <nav className="footer-departments" aria-label="부서별 기록">
+              {DEPTS.map((dept) => (
+                <Link key={dept} to={`/dept/${encodeURIComponent(dept)}`}>{dept}</Link>
+              ))}
             </nav>
           </details>
         </footer>

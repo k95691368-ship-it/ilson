@@ -56,7 +56,7 @@ export default function BugPage() {
   const doneTools = tools.filter((t) => t.open === 0)
 
   return (
-    <div className="stack">
+    <div className="stack bug-page">
       <header className="page-head">
         <h1>버그 신고</h1>
       </header>

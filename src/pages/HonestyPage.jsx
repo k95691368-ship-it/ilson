@@ -27,7 +27,7 @@ export default function HonestyPage() {
   const s = data.summary
 
   return (
-    <div className="stack">
+    <div className="stack honesty-page">
       <header className="page-head">
         <h1>미처리·미검증 항목</h1>
       </header>

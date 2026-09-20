@@ -56,7 +56,7 @@ describe('글꼴이 첫 그림을 막지 않는가', () => {
     expect(html).not.toContain('fonts.googleapis.com')
     expect(html).not.toContain('data-ilson-font')
     expect(html).toContain('defer src="/bootstrap.js"')
-    const design = readFileSync(join(ROOT, 'src', 'microsoft-design.css'), 'utf8')
+    const design = readFileSync(join(ROOT, 'src', 'styles', 'tokens.css'), 'utf8')
     expect(design).toContain("'Segoe UI Variable'")
     expect(design).toContain("'Malgun Gothic'")
   })
@@ -64,8 +64,8 @@ describe('글꼴이 첫 그림을 막지 않는가', () => {
   it('글꼴이 안 와도 한글이 깨지지 않는다', () => {
     // 바꿔 다는 방식은 대체 글꼴로 먼저 그린다는 뜻이다. 그 대체가 없으면
     // 첫 그림이 엉뚱한 글꼴이 된다.
-    const css = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8')
-    const stack = css.match(/--sans:([^;]+);/)?.[1] ?? ''
+    const css = readFileSync(join(ROOT, 'src', 'styles', 'tokens.css'), 'utf8')
+    const stack = css.match(/--font-sans:([^;]+);/)?.[1] ?? ''
     expect(stack).toContain('system-ui')
     expect(stack).toContain('sans-serif')
   })

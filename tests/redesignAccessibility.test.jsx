@@ -27,7 +27,7 @@ describe('단일 테마 리디자인 계약', () => {
   it('실제 앱 진입점에는 테마 전환 기능이 없다', () => {
     const app = readFileSync(join(ROOT, 'src', 'App.jsx'), 'utf8')
     const main = readFileSync(join(ROOT, 'src', 'main.jsx'), 'utf8')
-    const themeCss = readFileSync(join(ROOT, 'src', 'index.css'), 'utf8')
+    const themeCss = readFileSync(join(ROOT, 'src', 'styles', 'tokens.css'), 'utf8')
 
     expect(app).not.toContain('ThemeToggle')
     expect(main).not.toContain('ThemeProvider')

@@ -1,10 +1,11 @@
 // @vitest-environment node
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
-const design = read('src/microsoft-design.css')
-const token = name => design.match(new RegExp('--' + name + ':\\s*(#[a-f0-9]{6})', 'i'))?.[1]
+const files = ['tokens', 'base', 'shell', 'workflows', 'records', 'operations'].map(name => `src/styles/${name}.css`)
+const tokens = read(files[0])
+const token = name => tokens.match(new RegExp('--' + name + ':\\s*(#[a-f0-9]{6})', 'i'))?.[1]
 function luminance(hex) {
   const rgb = hex.slice(1).match(/../g).map(part => parseInt(part, 16) / 255)
     .map(value => value <= .04045 ? value / 12.92 : ((value + .055) / 1.055) ** 2.4)
@@ -15,41 +16,64 @@ function contrast(a, b) {
   return (light + .05) / (dark + .05)
 }
 
-describe('shared Microsoft-style design contract', () => {
+describe('single Microsoft design foundation', () => {
+  it('uses the colors and spacing of the selected Microsoft document', () => {
+    expect(token('ms-blue')).toBe('#0067b8')
+    expect(token('ms-blue-bright')).toBe('#0078d4')
+    expect(token('ms-ink')).toBe('#1a1a1a')
+    expect(token('ms-border')).toBe('#d1d1d1')
+    expect(tokens).toContain('--space-6: 24px')
+    expect(tokens).toContain('--radius-card: 20px')
+    expect(tokens).toContain('--radius-input: 12px')
+  })
   it.each([
-    ['ms-ink', 'ms-paper'], ['ms-muted', 'ms-parchment'], ['ms-paper', 'ms-blue'],
+    ['ms-ink', 'ms-white'], ['ms-muted', 'ms-gray-050'], ['ms-white', 'ms-blue'],
     ['success-text', 'success-bg'], ['warning-text', 'warning-bg'], ['danger-text', 'danger-bg'],
-  ])('keeps normal text contrast for %s on %s', (foreground, background) => {
+  ])('keeps readable normal text for %s on %s', (foreground, background) => {
     expect(contrast(token(foreground), token(background))).toBeGreaterThanOrEqual(4.5)
   })
-  it('uses the readable warning token in shared OverrideLoop badges', () => {
-    expect(design).toContain('--ol-amber: var(--warning-text)')
+  it('replaces the legacy stylesheets instead of cascading another theme over them', () => {
+    const entry = read('src/main.jsx')
+    const imports = [...entry.matchAll(/import '\.\/(.+\.css)'/g)].map(match => `src/${match[1]}`)
+    expect(imports).toEqual(files)
+    for (const old of ['index', 'App', 'redesign', 'override', 'journey', 'microsoft-design']) {
+      expect(existsSync(new URL(`../src/${old}.css`, import.meta.url)), old).toBe(false)
+    }
+    for (const file of files) {
+      const source = read(file)
+      expect(source).not.toMatch(/--apple-|SF Pro|Pretendard|backdrop-filter/)
+    }
   })
-  it('does not leave undefined Apple variables or a second heading font in active styles', () => {
-    const override = read('src/override.css')
-    expect(override).not.toContain('--apple-')
-    expect(override).not.toMatch(/font-family:.*(?:SF Pro|Pretendard)/)
-    expect(design).toContain("'Segoe UI Variable'")
-    expect(design).toContain("'Malgun Gothic'")
+  it('defines every custom property used by the new system', () => {
+    const source = files.map(read).join('\n')
+    const definitions = new Set([...source.matchAll(/(--[a-zA-Z0-9-]+)\s*:/g)].map(match => match[1]))
+    for (const [, name] of source.matchAll(/var\((--[a-zA-Z0-9-]+)/g)) expect(definitions.has(name), name).toBe(true)
   })
-  it('keeps metadata at least 12px with the 16px root', () => {
-    for (const file of ['src/index.css', 'src/redesign.css', 'src/override.css']) {
-      for (const match of read(file).matchAll(/font(?:-size)?:[^;{}\n]*?(0\.\d+)rem/g)) {
-        expect(Number(match[1]), file + ': ' + match[0]).toBeGreaterThanOrEqual(.75)
+  it('uses Segoe with Korean fallbacks and readable text sizes', () => {
+    expect(tokens).toContain("'Segoe UI Variable'")
+    expect(tokens).toContain("'Malgun Gothic'")
+    const base = read(files[1])
+    expect(base).toContain('400 16px/1.6 var(--font-sans)')
+    expect(base).toContain('font-size: 36px')
+    for (const file of files) {
+      for (const match of read(file).matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)) {
+        expect(Number(match[1]), `${file}: ${match[0]}`).toBeGreaterThanOrEqual(12)
       }
     }
   })
-  it('loads the common design after the structural styles', () => {
-    const entry = read('src/main.jsx')
-    expect(entry.indexOf("'./microsoft-design.css'")).toBeGreaterThan(entry.indexOf("'./override.css'"))
-    expect(read('src/journey.css')).toContain('var(--ms-blue)')
+  it('preserves focus, motion preferences and touch-sized controls', () => {
+    const base = read(files[1])
+    expect(base).toContain(':focus-visible')
+    expect(base).toContain('prefers-reduced-motion: reduce')
+    expect(base).toContain('min-height: 44px')
+    expect(base).toContain('[hidden] { display: none !important; }')
   })
-  it('uses the available workspace width without stretching introductory prose', () => {
-    expect(design).toMatch(/--page-max:\s*100%;/)
-    expect(design).toContain('.ol-page, .ol-skeleton { width: 100%; }')
-    expect(design).toMatch(/\.site-nav-inner\s*\{[^}]*var\(--page-max\)/)
-    expect(design).toMatch(/\.app-main\s*\{[^}]*var\(--page-max\)/)
-    expect(design).toMatch(/\.stage-head \.page-sub\s*\{[^}]*max-width:\s*760px/)
-    expect(read('src/override.css')).toMatch(/\.ol-page-intro p\s*\{[^}]*max-width:\s*660px/)
+  it('keeps workspaces fluid while giving the entry a complete responsive layout', () => {
+    const shell = read(files[2])
+    expect(tokens).toContain('--page-max: 1600px')
+    expect(shell).toContain('.app-main { width: 100%; max-width: var(--page-max); margin-inline: auto;')
+    expect(shell).toContain('max-width: 1080px')
+    expect(shell).toContain('.workspace-entry-panel { grid-template-columns: minmax(0, 1fr); }')
+    expect(shell).toContain('.workspace-entry-actions > button { width: 100%; }')
   })
 })

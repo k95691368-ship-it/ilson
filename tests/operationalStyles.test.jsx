@@ -3,10 +3,14 @@ import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, expect, it } from 'vitest'
 
 const read = path => readFileSync(new URL('../' + path, import.meta.url), 'utf8')
+const styleFiles = ['tokens', 'base', 'shell', 'workflows', 'records', 'operations']
+  .map(name => `src/styles/${name}.css`)
+const activeStyles = () => styleFiles.map(read).join('\n')
 let style, fixture
 beforeEach(() => {
+  window.happyDOM.setInnerWidth(1280)
   style = document.createElement('style')
-  style.textContent = read('src/microsoft-design.css')
+  style.textContent = activeStyles()
   document.head.append(style)
   fixture = document.createElement('div')
   fixture.innerHTML = `<section class="payoff"><div class="payoff-row"><div><span class="payoff-value">91원 추가 비용</span><span class="card-note">성공 확인 없음</span></div></div></section>
@@ -34,6 +38,16 @@ it('keeps actor and acceptance inputs in labeled groups', () => {
   expect(css('.accept-head').display).toBe('grid')
   expect(css('.accept-reject label').display).toBe('grid')
 })
+it('keeps visually hidden file inputs from widening build and tool pages', () => {
+  fixture.insertAdjacentHTML('beforeend', '<label class="dropzone"><input class="sr-only" type="file" /></label>')
+  const hiddenFile = css('.dropzone input[type="file"]')
+  expect(hiddenFile.position).toBe('absolute')
+  expect(hiddenFile.width).toBe('1px')
+  expect(hiddenFile.height).toBe('1px')
+  expect(hiddenFile.minWidth).toBe('0')
+  expect(hiddenFile.minHeight).toBe('0')
+  expect(hiddenFile.padding).toBe('0px')
+})
 it('distinguishes pass, safety block and evidence without importing the retired stylesheet', () => {
   expect(css('.verdict-passed').backgroundColor).not.toBe(css('.verdict-blocked').backgroundColor)
   expect(css('.verdict-blocked .verdict-head').fontWeight).toBe('600')
@@ -43,8 +57,6 @@ it('distinguishes pass, safety block and evidence without importing the retired 
   expect(read('src/main.jsx')).not.toContain("'./App.css'")
 })
 it('distributes the review list and detail into usable desktop columns', () => {
-  // Include the real preceding structural styles to catch cascade regressions.
-  style.textContent = ['src/index.css', 'src/redesign.css', 'src/override.css', 'src/microsoft-design.css'].map(read).join('\n')
   expect(css('.review-layout').display).toBe('grid')
   expect(css('.review-layout').gridTemplateColumns).toBe('minmax(280px, 360px) minmax(0, 1fr)')
   expect(css('.review-layout').gap).toBe('24px')
@@ -55,7 +67,6 @@ it('distributes the review list and detail into usable desktop columns', () => {
   expect(css('.review-list-item').textAlign).toBe('left')
 })
 it('keeps department columns and compared values aligned in the active stylesheet', () => {
-  style.textContent = ['src/index.css', 'src/redesign.css', 'src/override.css', 'src/microsoft-design.css'].map(read).join('\n')
   fixture.insertAdjacentHTML('beforeend', `<div class="dept-grid"><div class="stack"><section>신청 목록</section></div><div class="stack"><section>후속 요청</section></div></div><div class="cmp-heads"><div class="cmp-head">왼쪽</div><div class="cmp-head">오른쪽</div></div><div class="cmp-texts"><blockquote class="cmp-text">내용 A</blockquote><blockquote class="cmp-text">내용 B</blockquote></div><div class="cmp-value-pair"><span>10분</span><span class="cmp-vs">≠</span><span>20분</span></div><div class="track-actions"><h2>다음 행동</h2><ol></ol></div>`)
   expect(css('.dept-grid').display).toBe('grid')
   expect(css('.dept-grid').gridTemplateColumns).toBe('minmax(0, 1.35fr) minmax(0, 1fr)')
@@ -68,4 +79,13 @@ it('keeps department columns and compared values aligned in the active styleshee
   fixture.insertAdjacentHTML('beforeend', '<div class="dept-grid empty-sidebar"><div class="stack"><section>신청 목록만 있음</section></div><div class="stack"></div></div>')
   expect(css('.empty-sidebar').gridTemplateColumns).toBe('minmax(0, 1fr)')
   expect(css('.empty-sidebar > .stack:last-child').display).toBe('none')
+})
+
+it('stacks work, department and comparison layouts at a 390px viewport', () => {
+  fixture.insertAdjacentHTML('beforeend', `<div class="grid-side"></div><div class="dept-grid"><div class="stack"><section>목록</section></div><div class="stack"><section>상세</section></div></div><div class="cmp-heads"><div></div><div></div></div><div class="cmp-value"><div></div><div></div></div><div class="field-row"><label></label><label></label></div><div class="board-wrap"><svg></svg><ul></ul></div><div class="score-row"><button class="score-btn"></button><button class="score-btn"></button><button class="score-btn"></button><button class="score-btn"></button><button class="score-btn"></button></div>`)
+  window.happyDOM.setInnerWidth(390)
+  for (const selector of ['.review-layout', '.grid-side', '.dept-grid', '.cmp-heads', '.cmp-value', '.field-row', '.board-wrap']) {
+    expect(css(selector).gridTemplateColumns, selector).toBe('minmax(0, 1fr)')
+  }
+  expect(css('.score-row').gridTemplateColumns).toBe('repeat(2, minmax(0, 1fr))')
 })

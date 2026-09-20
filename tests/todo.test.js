@@ -516,12 +516,8 @@ describe('도구 할 일이 어느 카드인지 알려주는가', () => {
   })
 })
 
-// 중앙값만 보이면 폭이 안 보인다.
-//
-// 셋 다 열흘쯤 걸린 것과, 사흘짜리 하나에 스무날짜리 하나가 섞여 중앙이
-// 열흘인 것은 완전히 다른 이야기인데 화면에서는 같은 숫자다. 서버는
-// 최단·최장을 계산해 내려보내는데 읽는 곳이 없었다.
-describe('접수부터 넘기기까지의 폭', () => {
+// 업무 현황 UI 제거가 원본 기록이나 할 일의 실제 목적지를 지우지 않는다.
+describe('업무 현황 제거 후 기존 기록과 할 일 목적지', () => {
   it('서버가 어느 건이었는지까지 준다', () => {
     // 숫자만 놓으면 "그래서 뭐"로 끝난다. 그 기록으로 갈 수 있어야
     // "이건 왜 스무날이나 걸렸지"를 눌러 볼 수 있다.
@@ -530,17 +526,26 @@ describe('접수부터 넘기기까지의 폭', () => {
     expect(src).toContain('a.ticket_no')
   })
 
-  it('화면이 최단·최장을 그린다', () => {
-    const page = readFileSync(join(ROOT, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
-    expect(page).toContain('lead.fastest')
-    expect(page).toContain('lead.slowest')
-    expect(page).toContain('가장 빨랐던 것과 가장 오래 걸린 것')
+  it('할 일 계산 결과가 제거된 화면이 아닌 기존 업무 라우트를 가리킨다', () => {
+    const app = readFileSync(join(ROOT, 'src', 'App.jsx'), 'utf8')
+    const paths = [...app.matchAll(/<Route path="([^"]+)"/g)].map(match => match[1])
+    const items = buildTodo(full)
+    expect(items.length).toBeGreaterThan(3)
+    for (const item of items) {
+      const path = item.to.split('?')[0]
+      expect(path).not.toBe('/portfolio')
+      expect(paths).toContain(path)
+    }
   })
 
-  it('한 건뿐이면 폭을 말하지 않는다', () => {
-    // 최단과 최장이 같은 건이면 두 번 적는 것이 된다.
-    const page = readFileSync(join(ROOT, 'src', 'pages', 'FlowPage.jsx'), 'utf8')
-    expect(page).toContain('data.lead.count > 1')
+  it('기존 도구 화면은 할 일의 특정 신청서 주소를 계속 받는다', () => {
+    const id = 'app_부서/검증'
+    const items = buildTodo({ tools: { summary: { rejected: 1, rejectedIds: [id] } } })
+    const target = items.find(item => item.key === 'tool_rejected').to
+    expect(target).toBe(`/tools?id=${encodeURIComponent(id)}`)
+    const page = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+    expect(page).toMatch(/params\.get\('id'\)/)
+    expect(page).toContain('scrollIntoView')
   })
 })
 
