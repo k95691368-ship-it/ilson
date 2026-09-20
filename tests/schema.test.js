@@ -62,6 +62,16 @@ function readSchema() {
       if (cols) tables.set(to, cols)
     }
   }
+  // Production now evolves in PostgreSQL migrations, including dynamic DDL
+  // applied to public and existing visitor schemas. Read declared columns from
+  // those ALTER statements rather than keeping a hand-maintained allowlist.
+  const pgDir = join(ROOT,'supabase','migrations')
+  const pgSql = readdirSync(pgDir).filter(file=>file.endsWith('.sql')).sort()
+    .map(file=>readFileSync(join(pgDir,file),'utf8')).join('\n')
+  for (const match of pgSql.matchAll(/ALTER TABLE (?:public|%I)\.([a-z_]+)([^;]*?)(?:',target\)|;)/g)) {
+    if (!tables.has(match[1])) continue
+    for (const column of match[2].matchAll(/ADD COLUMN(?: IF NOT EXISTS)? ([a-z_]+)\s/gi)) tables.get(match[1]).add(column[1])
+  }
   return tables
 }
 

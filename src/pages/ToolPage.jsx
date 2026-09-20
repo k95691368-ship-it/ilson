@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { readLocalFiles } from '../lib/readFiles.js'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
@@ -13,6 +13,7 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { krw, num, ms, ago, dateTimeLabel } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
+import { pendingToolRun, keepToolRun, forgetToolRun, subscribeToolRuns } from '../lib/pendingToolRuns.js'
 
 // 부서에 넘긴 도구.
 //
@@ -22,6 +23,19 @@ import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 // 계산은 이 브라우저에서 돈다. 파일이 서버로 올라가지 않는다.
 export default function ToolPage() {
   const { slug } = useParams()
+  const query = useApi(`/tools/${slug}`)
+  // A -> B -> A creates three lifetimes; old work cannot become current again.
+  return <ToolSession key={`${slug}:${query.data?.runScope ?? ''}`} slug={slug} {...query} />
+}
+
+function ToolSession({ slug, data, error, loading, reload }) {
+  const runScope = data?.runScope
+  const whoStorageKey = runScope ? `ilson:who:v2:${runScope}:${slug}` : null
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
   // 대목마다 무슨 표시를 붙일지. 짚고 나서 아무 표시가 없으면
   // "말해 봐야 소용없다"가 되고, 그 뒤로는 아무도 안 짚는다.
   // 누가 돌렸는가.
@@ -44,69 +58,129 @@ export default function ToolPage() {
     loadNotes()
   }, [loadNotes])
 
-  // data 를 이 아래에서 선언해 놓고, 바로 위 useEffect 의 의존성 배열에서
-  // 먼저 읽고 있었다. 의존성 배열은 **렌더 도중에** 평가되므로 선언 전
-  // 접근이 되어 ReferenceError 가 나고, /t/:slug 화면 전체가 안 열렸다.
-  //
-  // 부서가 이 사이트에서 받는 주소가 딱 이것 하나다. 담당자 화면은 멀쩡하고
-  // API 도 200 이라, 담당자 쪽에서는 아무 이상이 없어 보인다. 이 저장소가
-  // 서버에서 한 번 겪은 사고(선언 전 참조로 라우트가 통째로 503)와 같은
-  // 모양이 화면에서 난 것이다.
-  const { data, error, loading, reload } = useApi(`/tools/${slug}`)
-
-  // 이 브라우저에서 이 도구를 돌린 사람. 한 번 적으면 다음부터 안 묻는다.
+  // Remember a name only within the current account/workspace and tool.
+  // The old unscoped key cannot safely be attributed to any current account.
   useEffect(() => {
     if (whoRan) return
     let saved = null
     try {
-      saved = window.localStorage.getItem(`ilson:who:${slug}`)
+      saved = whoStorageKey ? window.localStorage.getItem(whoStorageKey) : null
     } catch {
       // 사생활 보호 모드면 저장소를 못 쓴다. 그때는 매번 적으시게 된다.
     }
     setWhoRan(saved || data?.handedTo?.person || '')
-  }, [slug, data, whoRan])
+  }, [whoStorageKey, data, whoRan])
 
   const toast = useToast()
   const [result, setResult] = useState(null)
   const [running, setRunning] = useState(false)
+  const [savingRecord, setSavingRecord] = useState(false)
+  const busy = useRef(false)
+  const saveBusy = useRef(false)
   const fileInput = useRef(null)
 
+  // A remounted screen also observes acknowledgements from an older request,
+  // but its snapshot can only expose this account/workspace and tool.
+  const pendingRecord = useSyncExternalStore(subscribeToolRuns,
+    () => pendingToolRun(runScope, slug), () => null)
+  const observedPending = useRef(pendingRecord?.payload.run_id ?? null)
+  const ownedClear = useRef(null)
+  const refreshedRun = useRef(null)
+  const refreshRecordedRun = useCallback(async runId => {
+    if (!mounted.current || refreshedRun.current === runId) return
+    refreshedRun.current = runId
+    try { await reload() } catch { if (mounted.current) toast.error('기록은 저장했지만 최신 상태를 다시 불러오지 못했습니다.') }
+  }, [reload, toast])
+  useEffect(() => {
+    const previous = observedPending.current
+    observedPending.current = pendingRecord?.payload.run_id ?? null
+    if (!previous || pendingRecord) return
+    // Own saves already refresh below. A restored session must also refresh
+    // its quota/history when an older request confirms the shared queue.
+    if (ownedClear.current === previous) { ownedClear.current = null; return }
+    if (!saveBusy.current) refreshRecordedRun(previous)
+  }, [pendingRecord, refreshRecordedRun])
+
+  async function saveRecord(payload) {
+    if (saveBusy.current || !mounted.current || !runScope || payload.run_scope !== runScope) return
+    const existing = pendingToolRun(runScope, slug)
+    if (existing && existing.payload.run_id !== payload.run_id) return
+    const scope = payload.run_scope
+    saveBusy.current = true
+    keepToolRun(scope, slug, { payload, error: null })
+    setSavingRecord(true)
+    let saved = false
+    try {
+      await api.post(`/tools/${slug}`, payload)
+      saved = true
+      if (mounted.current) ownedClear.current = payload.run_id
+      forgetToolRun(scope, slug, payload.run_id)
+      if (mounted.current) toast.success(payload.ok ? '실행 기록을 저장했습니다.' : '실패 기록을 저장했습니다. 성공 횟수에는 포함하지 않습니다.')
+    } catch (err) {
+      // The calculation result is not a storage acknowledgement. Retry the same
+      // run identity; never create a second, fictitious calculation failure.
+      // A different session may already have confirmed this same run. A late
+      // failure must not recreate its queue or overwrite a newer run.
+      if (pendingToolRun(scope, slug)?.payload.run_id === payload.run_id) {
+        keepToolRun(scope, slug, { payload, error: err.message })
+        if (mounted.current) toast.error(`실행 기록 저장을 확인하지 못했습니다. ${err.message}`)
+      }
+    } finally {
+      saveBusy.current = false
+      if (mounted.current) setSavingRecord(false)
+    }
+    // An older request may confirm this run while our retry is still pending.
+    // Refresh once even if that retry subsequently loses its response.
+    if (mounted.current && (saved || !pendingToolRun(scope, slug))) await refreshRecordedRun(payload.run_id)
+  }
+
   async function run(fileList) {
+    if (!mounted.current || busy.current || saveBusy.current || !runScope || pendingToolRun(runScope, slug) || error || !data || data.limits.remainingToday <= 0) return
     const picked = [...fileList]
     if (picked.length === 0) return
 
     // 걸리는 것을 한꺼번에 짚어 준다. 하나만 말하면 고치고 나서 또 걸린다.
-    const problems = checkFiles(picked, { maxFileMb: data.limits.maxFileMb })
+    const problems = checkFiles(picked, { maxFileMb: data.limits.maxFileMb, maxFiles: 200 })
     if (problems.length > 0) {
       toast.error(problems.join(' '))
       return
     }
 
+    busy.current = true
     setRunning(true)
+    setResult(null)
+    const started = performance.now()
+    const identity = { run_id: crypto.randomUUID(), run_scope: runScope, actor_label: whoRan }
+    let payload
     try {
       const files = await readLocalFiles(picked)
+      if (!mounted.current) return
       // 사람이 알려 준 상품코드를 함께 넘긴다. 이게 없으면 알려주고 나서도
       // 그대로 또 밀려나고, 부서는 그 뒤로 아무것도 안 알려준다.
       const r = await runPipeline({ files, aliases: data.aliases ?? {} })
+      if (!mounted.current) return
       setResult(r)
 
-      await api.post(`/tools/${slug}`, {
+      payload = {
+        ...identity,
+        ok: true,
         files: r.files.map((f) => ({ name: f.name, channel: f.channel, rowsOut: f.rowsOut })),
         rows_out: r.rows.length,
         quarantined: r.quarantine.length,
         duration_ms: r.stats.durationMs,
-        actor_label: whoRan,
-      })
+      }
 
       toast.success(`${num(r.rows.length)}줄을 합쳤습니다.`)
-      await reload()
     } catch (err) {
+      if (!mounted.current) return
       toast.error(err.message)
-      await api
-        .post(`/tools/${slug}`, { ok: false, fail_reason: err.message, actor_label: whoRan })
-        .catch(() => {})
+      payload = { ...identity, ok: false, fail_reason: err.message, duration_ms: Math.max(0, Math.round(performance.now() - started)) }
+    }
+    try {
+      await saveRecord(payload)
     } finally {
-      setRunning(false)
+      busy.current = false
+      if (mounted.current) setRunning(false)
     }
   }
 
@@ -139,11 +213,12 @@ export default function ToolPage() {
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
 
-  if (error) {
+  if (error && !data) {
     return (
       <div className="empty">
-        <div className="empty-title">이 주소에는 도구가 없습니다</div>
+        <div className="empty-title">도구를 불러오지 못했습니다</div>
         <div className="empty-sub">{error}</div>
+        <button type="button" className="btn-primary" onClick={reload}>다시 불러오기</button>
       </div>
     )
   }
@@ -154,6 +229,7 @@ export default function ToolPage() {
         <div className="notice-title">{data.title} — 잠시 내려가 있습니다</div>
         <p>{data.message}</p>
         {data.reason && <p className="card-note">사유: {data.reason}</p>}
+        {pendingRecord && <PendingRunNotice record={pendingRecord} saving={savingRecord} hasResult={false} retry={() => saveRecord(pendingRecord.payload)} />}
       </div>
     )
   }
@@ -162,6 +238,10 @@ export default function ToolPage() {
 
   return (
     <div className="stack">
+      {error && <div className="notice notice-warn" role="alert">
+        <p>최신 실행 기록과 남은 횟수를 확인하지 못했습니다. 계산 결과는 아래에 유지됩니다. {error}</p>
+        <button type="button" className="btn-ghost" onClick={reload}>상태 다시 확인</button>
+      </div>}
       <header className="page-head">
         <h1>{data.title}</h1>
         {data.manual?.intro && <p className="page-sub">{data.manual.intro}</p>}
@@ -232,18 +312,18 @@ export default function ToolPage() {
       {data.payoff && (
         <section className="card payoff">
           <div className="card-head">
-            <h2 className="card-title">이 도구가 지금까지 아껴 드린 것</h2>
-            <span className="card-note">{data.payoff.runs}번 돌린 기록으로 계산했습니다</span>
+            <h2 className="card-title">이 도구를 쓴 뒤 시간·비용 변화</h2>
+            <span className="card-note">총 {data.payoff.attemptCount}회 시도 · 성공 {data.payoff.successCount} · 실패 {data.payoff.failedCount} · 미확인 {data.payoff.unknownCount}</span>
           </div>
           <div className="payoff-row">
             <div>
-              <span className="payoff-value">{num(data.payoff.savedMinutes)}분</span>
-              <span className="card-note">
-                한 번에 {num(data.payoff.perRunMinutes)}분씩
-              </span>
+              <span className="payoff-value">{num(Math.abs(data.payoff.savedMinutes))}분 {data.payoff.savedMinutes < 0 ? '추가 소요' : '순절감'}</span>
+              {data.payoff.perRunMinutes !== null && <span className="card-note">
+                성공 업무 1회당 {num(data.payoff.perRunMinutes)}분 (실패 비용 포함)
+              </span>}
             </div>
             <div>
-              <span className="payoff-value">{num(data.payoff.savedKrw)}원</span>
+              <span className="payoff-value">{num(Math.abs(data.payoff.savedKrw))}원 {data.payoff.savedKrw < 0 ? '추가 비용' : '순절감'}</span>
               <span className="card-note">{data.payoff.label}</span>
             </div>
           </div>
@@ -251,7 +331,7 @@ export default function ToolPage() {
               안 밝히면 부서는 "그만큼 안 줄었는데"라고 느끼고 이 숫자를
               안 믿는다. 실제로 겪은 사람이 제일 먼저 알아챈다. */}
           <p className="card-note">
-            사람이 하던 시간에서 <strong>도구가 돈 시간과 그 뒤에 확인하신 시간
+            성공한 업무의 기준 시간에서 <strong>성공·실패를 포함한 도구 실행과 그 뒤에 확인하신 시간
             {data.payoff.reworkMinutes > 0 && ', 다시 하신 시간'}</strong>을 빼고 낸 값입니다
             {data.payoff.reviewMinutes > 0 &&
               ` — 확인에 ${num(data.payoff.reviewMinutes)}분`}
@@ -287,7 +367,7 @@ export default function ToolPage() {
             onChange={(e) => {
               setWhoRan(e.target.value)
               try {
-                window.localStorage.setItem(`ilson:who:${slug}`, e.target.value)
+                if (whoStorageKey) window.localStorage.setItem(whoStorageKey, e.target.value)
               } catch {
                 // 저장소를 못 써도 이번 실행에는 실려 간다.
               }
@@ -321,7 +401,7 @@ export default function ToolPage() {
             type="button"
             className="btn-primary"
             onClick={() => fileInput.current?.click()}
-            disabled={running || data.limits.remainingToday <= 0}
+            disabled={running || savingRecord || Boolean(pendingRecord) || Boolean(error) || !runScope || data.limits.remainingToday <= 0}
           >
             {running ? '합치는 중…' : '정산서 파일 넣기'}
           </button>
@@ -330,6 +410,8 @@ export default function ToolPage() {
 
         <Quota limits={data.limits} />
       </section>
+
+      {pendingRecord && <PendingRunNotice record={pendingRecord} saving={savingRecord} hasResult={Boolean(result)} retry={() => saveRecord(pendingRecord.payload)} />}
 
       {result && (
         <>
@@ -561,7 +643,7 @@ function MyReports({ reports }) {
               </div>
             ) : (
               <div className="myreports-open card-note">
-                담당자 할 일 목록에 올라가 있습니다. 고치면 이 자리에 무엇을 고쳤는지 뜹니다.
+                처리 대기 · 수정 내용은 여기에 표시됩니다.
               </div>
             )}
           </li>
@@ -655,6 +737,17 @@ function RunHistory({ runs }) {
 // 헛기다린다.
 //
 // 넉넉할 때는 조용히 둔다. 늘 경고가 떠 있으면 아무도 안 읽는다.
+function PendingRunNotice({ record, saving, hasResult, retry }) {
+  return <section className="notice notice-warn" aria-label="실행 기록 저장 상태" aria-live="polite">
+    <div className="notice-title">{saving ? '실행 기록을 저장하는 중입니다' : '실행 기록 저장을 확인하지 못했습니다'}</div>
+    <p>{record.payload.ok ? '계산은 끝났습니다. 성과·사용 횟수 반영 여부는 아직 확인되지 않았습니다.' : '계산 실패 기록의 저장 여부가 확인되지 않았습니다.'} 다시 저장해도 같은 실행으로 처리합니다.</p>
+    <p>{hasResult ? '아래 계산 결과는 내려받으실 수 있습니다.' : '계산 결과 파일은 화면 이동 시 보존하지 않습니다. 원래 실행의 기록만 다시 확인할 수 있습니다.'}</p>
+    {record.error && <p>{record.error}</p>}
+    <p className="card-note">이 탭을 닫거나 새로고침하기 전에 저장을 다시 시도해 주십시오. 새 계산은 이 기록을 확인한 뒤 실행할 수 있습니다.</p>
+    <button type="button" className="btn-primary" disabled={saving} onClick={retry}>{saving ? '저장 중…' : '같은 실행 기록 다시 저장'}</button>
+  </section>
+}
+
 function Quota({ limits }) {
   const state = quotaState({ remaining: limits.remainingToday, limit: limits.dailyLimit })
   const nextFree = nextFreeText(limits.nextFreeAt)
@@ -664,7 +757,7 @@ function Quota({ limits }) {
     <div className={`tool-quota${state.loud ? ' loud' : ''}`}>
       <div className="tool-limits">
         <span>
-          최근 {limits.windowHours ?? 24}시간 안에 <strong>{state.remaining}</strong> /{' '}
+          최근 {limits.windowHours ?? 24}시간의 성공 실행 한도 <strong>{state.remaining}</strong> /{' '}
           {state.limit}회 남았습니다
         </span>
         <span>파일 하나당 {limits.maxFileMb}MB까지</span>
@@ -845,11 +938,6 @@ function AcceptBox({ slug }) {
         </p>
       )}
 
-      <p className="card-note">
-        한 번 돌려 보시고 판단해주세요. <strong>안 맞으면 안 맞는다고 해주셔야</strong> 고칠 수
-        있습니다. 그냥 두시면 저희는 잘 쓰고 계신 줄 압니다.
-      </p>
-
       <Field label="받으시는 분" required error={errors.by}>
         <input value={by} onChange={(e) => setBy(e.target.value)} placeholder={data.handedTo.person} />
       </Field>
@@ -860,7 +948,6 @@ function AcceptBox({ slug }) {
             label="쓰지 못하는 이유"
             required
             error={errors.reason}
-            hint="이 한 줄이면 고칠 수 있습니다."
           >
             <textarea
               rows={2}

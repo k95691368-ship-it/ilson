@@ -123,6 +123,8 @@ export async function onRequestGet({ env, data: requestData }) {
                   b.median_seconds, b.people, b.sample_n, b.sealed_at,
                   o.dev_hours, o.ops_cost_krw, o.amortize_months, o.dept_confirmed_at,
                   (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) AS run_count,
+                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id AND u.ok = 1) AS success_count,
+                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id AND u.ok = 0) AS failed_count,
                   -- 실제로 잰 값을 넘겨야 한다. 0으로 지어내면 "검수 시간을
                   -- 안 쟀습니다"라는 반박이 없는데도 붙는다. 실제로 그랬다.
                   (SELECT COALESCE(SUM(u.duration_ms), 0) FROM tool_use u
@@ -198,6 +200,8 @@ export async function onRequestGet({ env, data: requestData }) {
         baseline: r,
         runs: runsFromTotals({
           count: r.run_count,
+          successCount: r.success_count,
+          failedCount: r.failed_count,
           durationMs: r.duration_total_ms,
           reviewSeconds: r.review_total_seconds,
           reworkSeconds: r.rework_total_seconds,

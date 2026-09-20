@@ -160,7 +160,7 @@ function Stakeholders({ data, send, toast, openBy }) {
               <div className="stake-body">
                 <strong>{s.person_label}</strong>
                 <span className="card-note"> · {s.role_label}</span>
-                <div className="item-body" style={{ fontSize: 14 }}>
+                <div className="item-body">
                   {s.wants}
                 </div>
               </div>
@@ -260,7 +260,7 @@ function Meetings({ data, send, toast, openBy }) {
                 defaultValue={m.minutes_text ?? ''}
                 id={`minutes-${m.id}`}
                 aria-label={`${m.title} 회의록`}
-                style={{ width: '100%', marginTop: 8, fontFamily: 'var(--mono)', fontSize: 13 }}
+                style={{ width: '100%', marginTop: 8, fontFamily: 'var(--mono)' }}
               />
               <button
                 type="button"
@@ -582,7 +582,7 @@ function RequirementCard({ r, send, toast, editable }) {
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             aria-label={`${r.dept} 요구사항 기각 사유`}
-            placeholder="왜 기각하는지 — 회의에서 나온 말을 이유 없이 접으면 그 부서는 다음부터 말하지 않습니다"
+            placeholder="기각 사유"
             style={{ width: '100%' }}
           />
           <button
@@ -669,8 +669,8 @@ function Objections({ id, toast, openBy }) {
         <span className="spacer" />
         <span className="card-note">
           {state.binding
-            ? '이 기준으로 통과를 말해도 근거가 있습니다'
-            : '지금 통과를 말하면 그 통과에 단서가 붙습니다'}
+            ? '부서 확인 완료'
+            : '부서 확인 또는 이의 처리 필요'}
         </span>
       </summary>
       <p className="card-note">{state.headline}</p>
@@ -812,8 +812,7 @@ function PendingJoins({ pending, send, toast }) {
               aria-label={`${p.dept} 요구 내용`}
             />
             <small className="card-note">
-              적어 주신 것은 <strong>사정</strong>입니다. 무엇을 요구하시는지로 바꿔 올리세요.
-              올린 뒤에는 본문을 못 고칩니다 — 수정채택으로 덮거나 지우고 다시 올려야 합니다.
+              요청할 변경 내용을 적어 주세요. 등록 후 본문 수정은 수정채택 또는 삭제 후 재등록으로 처리합니다.
             </small>
 
             <div className="row">
@@ -826,7 +825,7 @@ function PendingJoins({ pending, send, toast }) {
                 {busy === p.join_id ? '올리는 중…' : '협의안에 올리기'}
               </button>
               {untouched && (
-                <span className="card-note">사정 문장 그대로입니다 — 요구로 읽히십니까?</span>
+                <span className="card-note">참여 시 작성한 원문입니다.</span>
               )}
             </div>
           </div>

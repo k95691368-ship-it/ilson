@@ -4,7 +4,7 @@
 // 신청하지 않고, 그러면 이 시스템에 들어오는 것이 없다. 대신 접수번호를 주고
 // 남용은 IP 단위 호출 한도로 막는다.
 
-import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { checkRateLimit, releaseRateLimit } from '../../_lib/rateLimit.js'
 import { newId, newTicketNo, hashIp } from '../../_lib/ids.js'
 import {
@@ -42,7 +42,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
         `SELECT a.id, a.ticket_no, a.dept, a.applicant_label, a.title, a.bottleneck,
                 a.problem, a.wish, a.impact_if_wrong,
                 a.current_minutes, a.current_people, a.current_frequency, a.is_measured,
-                a.status, a.created_at,
+                a.status, a.created_at, a.review_revision,
                 CAST((julianday('now') - julianday(a.created_at)) * 24 AS INTEGER) AS hours_since,
               -- 아직 답 못 받은 질문. 이게 있으면 지금 멈춰 있는 이유가
               -- 부서 쪽에 있다는 뜻이라, 담당자 할 일로 세면 안 된다.
@@ -126,8 +126,8 @@ export async function onRequestGet({ env, data: requestData, request }) {
         limit: PAGE_LIMIT,
       },
     })
-  } catch {
-    return jsonError('신청서를 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '신청서를 불러오지 못했습니다.')
   }
 }
 
@@ -153,6 +153,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
   const fields = Object.fromEntries(
     [...form.entries()].filter(([, v]) => typeof v === 'string')
   )
+  if (env.AUTH_ACTOR) fields.applicant_label = env.AUTH_ACTOR.label
 
   const check = validateApplication(fields)
   if (!check.ok) {
@@ -169,8 +170,8 @@ export async function onRequestPost({ env, data: requestData, request }) {
       `INSERT INTO application
          (id, ticket_no, dept, applicant_label, contact, title, bottleneck, problem, wish,
           current_minutes, current_people, current_frequency, impact_if_wrong,
-          status, source_ip_hash)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '접수', ?)`
+          status, source_ip_hash, owner_email)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '접수', ?, ?)`
     )
       .bind(
         id,
@@ -186,12 +187,13 @@ export async function onRequestPost({ env, data: requestData, request }) {
         v.current_people,
         v.current_frequency,
         v.impact_if_wrong,
-        await hashIp(ip)
+        await hashIp(ip),
+        env.AUTH_ACTOR?.email ?? null
       )
       .run()
-  } catch {
+  } catch (error) {
     await releaseRateLimit(env, `apply:${ip}`, ticket)
-    return jsonError('신청서를 저장하지 못했습니다.', 500)
+    return failUnexpected(error, '신청서를 저장하지 못했습니다.', 500)
   }
 
   return jsonResponse(

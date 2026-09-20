@@ -6,7 +6,8 @@
 //
 // 규칙은 shared/resubmit.js가 정한다. 화면과 서버가 그 파일 하나를 같이 쓴다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
+import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.js'
 import { newId, newTicketNo } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { logDecision } from '../../../_lib/decisions.js'
@@ -22,7 +23,7 @@ import {
 async function loadPrevious(env, ticket) {
   const app = await env.DB.prepare(
     `SELECT id, ticket_no, dept, applicant_label, contact, title, bottleneck, problem, wish,
-            current_minutes, current_people, current_frequency, impact_if_wrong, status
+            current_minutes, current_people, current_frequency, impact_if_wrong, status, review_revision
      FROM application WHERE ticket_no = ?`
   )
     .bind(ticket)
@@ -31,7 +32,7 @@ async function loadPrevious(env, ticket) {
 
   const [review, again] = await Promise.all([
     env.DB.prepare(
-      'SELECT verdict, refuse_code, refuse_alternative FROM review WHERE application_id = ?'
+      'SELECT verdict, verdict_reason, refuse_code, refuse_alternative FROM review WHERE application_id = ?'
     )
       .bind(app.id)
       .first(),
@@ -52,10 +53,17 @@ export async function onRequestGet({ env, data: requestData, params }) {
   env = requestData?.requestEnv ?? env
   const prev = await loadPrevious(env, String(params.ticket ?? '').trim().toUpperCase())
   if (!prev) return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+  const previous = {
+    ticket_no: prev.app.ticket_no, title: prev.app.title, dept: prev.app.dept,
+    status: prev.app.status, review_revision: Number(prev.app.review_revision),
+    verdict: prev.review?.verdict ?? null,
+  }
 
-  if (prev.review?.verdict !== '반려') {
+  if (prev.review?.verdict !== '반려' || prev.app.status !== '반려') {
     return jsonResponse({
       eligible: false,
+      previous,
+      review: prev.review,
       // 반려가 아닌 건에까지 "다시 내기"를 띄우면, 진행 중인 건을 새로 내는
       // 일이 생긴다. 그러면 같은 일이 두 줄이 된다.
       why: '반려된 신청서만 고쳐서 다시 내실 수 있습니다.',
@@ -64,11 +72,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
 
   return jsonResponse({
     eligible: true,
-    previous: {
-      ticket_no: prev.app.ticket_no,
-      title: prev.app.title,
-      dept: prev.app.dept,
-    },
+    previous,
+    review: prev.review,
     plan: retryPlan({
       refuseCode: prev.review.refuse_code,
       refuseAlternative: prev.review.refuse_alternative,
@@ -82,25 +87,26 @@ export async function onRequestGet({ env, data: requestData, params }) {
 export async function onRequestPost({ env, data: requestData, request, params }) {
   env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
-  const ticket = await checkRateLimit(env, `resubmit:${ip}`, 6, 3600)
-  if (!ticket) return jsonError('다시 내기는 시간당 6회까지 가능합니다.', 429)
-
   let body
   try {
     body = await request.json()
   } catch {
-    await releaseRateLimit(env, `resubmit:${ip}`, ticket)
     return jsonError('보내주신 내용을 읽지 못했습니다.', 400)
   }
+  if (!validReviewRevision(body?.expectedRevision)) return reviewConflict()
+  let rateTicket = null
+  const response = await reviewMutation(env.DB, request, `resubmit:${String(params.ticket).trim().toUpperCase()}`, body, async DB => {
+  const stagedEnv = { ...env, DB }
+  rateTicket = await checkRateLimit(env, `resubmit:${ip}`, 6, 3600)
+  if (!rateTicket) return jsonError('다시 내기는 시간당 6회까지 가능합니다.', 429)
 
-  const prev = await loadPrevious(env, String(params.ticket ?? '').trim().toUpperCase())
+  const prev = await loadPrevious(stagedEnv, String(params.ticket ?? '').trim().toUpperCase())
   if (!prev) {
-    await releaseRateLimit(env, `resubmit:${ip}`, ticket)
     return jsonError('그 접수번호를 찾지 못했습니다.', 404)
   }
+  if (Number(prev.app.review_revision) !== body.expectedRevision) return reviewConflict()
 
-  if (prev.review?.verdict !== '반려') {
-    await releaseRateLimit(env, `resubmit:${ip}`, ticket)
+  if (prev.review?.verdict !== '반려' || prev.app.status !== '반려') {
     return jsonError('반려된 신청서만 고쳐서 다시 내실 수 있습니다.', 409)
   }
 
@@ -112,7 +118,6 @@ export async function onRequestPost({ env, data: requestData, request, params })
     timesResubmitted: prev.times,
   })
   if (!plan.canRetry) {
-    await releaseRateLimit(env, `resubmit:${ip}`, ticket)
     return jsonError(`${plan.headline}. ${plan.change}`, 409)
   }
 
@@ -120,7 +125,6 @@ export async function onRequestPost({ env, data: requestData, request, params })
   const draft = { ...carryOver(prev.app), ...body }
   const errors = validateResubmit(draft)
   if (Object.keys(errors).length > 0) {
-    await releaseRateLimit(env, `resubmit:${ip}`, ticket)
     return failFields(errors, '적어 주신 내용을 확인해주세요.')
   }
 
@@ -133,8 +137,8 @@ export async function onRequestPost({ env, data: requestData, request, params })
     times,
   })
 
-  try {
-    await env.DB.prepare(
+  await lockReviewRevision(DB, prev.app)
+    await DB.prepare(
       `INSERT INTO application
          (id, ticket_no, dept, applicant_label, contact, title, bottleneck, problem, wish,
           current_minutes, current_people, current_frequency, impact_if_wrong, status)
@@ -164,7 +168,7 @@ export async function onRequestPost({ env, data: requestData, request, params })
     // 앞 신청서 쪽 — 부서가 조회 화면으로 앞 접수번호를 다시 볼 때, 그 뒤에
     //   어떻게 됐는지가 거기 있어야 한다. 없으면 반려에서 이야기가 끊긴다.
     await Promise.all([
-      logDecision(env, {
+      logDecision(stagedEnv, {
         applicationId: id,
         stage: '신청서',
         title: '반려된 신청서를 고쳐서 다시 냈다',
@@ -173,7 +177,7 @@ export async function onRequestPost({ env, data: requestData, request, params })
         linkKind: RESUBMIT_KIND,
         linkId: prev.app.id,
       }),
-      logDecision(env, {
+      logDecision(stagedEnv, {
         applicationId: prev.app.id,
         stage: '신청서',
         title: `고쳐서 다시 내셨습니다 — ${ticketNo}`,
@@ -182,7 +186,7 @@ export async function onRequestPost({ env, data: requestData, request, params })
         linkKind: RESUBMIT_BACK_KIND,
         linkId: id,
       }),
-    ]).catch(() => {})
+    ])
 
     return jsonResponse(
       {
@@ -195,8 +199,7 @@ export async function onRequestPost({ env, data: requestData, request, params })
       },
       201
     )
-  } catch (err) {
-    await releaseRateLimit(env, `resubmit:${ip}`, ticket)
-    return failUnexpected(err, '다시 내지 못했습니다.')
-  }
+  }, '다시 내지 못했습니다.')
+  if (rateTicket && (!response.ok || response.headers.get('X-Idempotency-Replayed') === '1')) await releaseRateLimit(env, `resubmit:${ip}`, rateTicket)
+  return response
 }

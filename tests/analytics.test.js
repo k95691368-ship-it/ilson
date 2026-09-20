@@ -52,7 +52,7 @@ describe('주소에서 열쇠를 가린다', () => {
 })
 
 describe('태그를 켜 둔 방식', () => {
-  const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+  const html = readFileSync(join(ROOT, 'public', 'bootstrap.js'), 'utf8')
 
   it('첫 화면을 태그가 스스로 보내지 않는다', () => {
     // 켜 두면 태그가 주소 표시줄 그대로(접수번호가 든 채로) 한 번 먼저
@@ -81,7 +81,7 @@ describe('태그를 켜 둔 방식', () => {
 })
 
 describe('화면 녹화는 가릴 데를 가리는가', () => {
-  const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+  const html = readFileSync(join(ROOT, 'public', 'bootstrap.js'), 'utf8')
   const app = readFileSync(join(ROOT, 'src', 'App.jsx'), 'utf8')
 
   it('태그가 붙어 있다', () => {

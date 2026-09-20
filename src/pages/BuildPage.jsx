@@ -526,8 +526,7 @@ function Lineage({ row }) {
 
       {row.duplicate_of && (
         <div className="notice notice-warn" style={{ marginTop: 10 }}>
-          {row.duplicate_of} 줄과 내용이 같습니다. 진짜 중복일 수도, 같은 상품을 두 번 산 것일
-          수도 있어 지우지 않고 표시만 했습니다.
+          {row.duplicate_of} 줄과 내용이 같습니다. 별도 주문일 수 있어 삭제하지 않았습니다.
         </div>
       )}
     </div>

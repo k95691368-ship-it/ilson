@@ -7,7 +7,7 @@
 // 여기서 그 서랍을 연다. 없는 순서를 지어내지는 않는다 — 담당자가 아직
 // 아무것도 안 정했으면 "아직 안 정했습니다"가 정직한 답이다.
 
-import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
 import { waitLine, leadGuess } from '../../../../shared/waitline.js'
 import { PICK_KIND, UNPICK_KIND } from '../../../../shared/priority.js'
 
@@ -102,7 +102,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       // 언제쯤인가. 첫 화면과 같은 방식으로 낸 가운데값을 쓴다.
       lead: leadGuess(medianLead(leads.results)),
     })
-  } catch {
-    return jsonError('차례를 계산하지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '차례를 계산하지 못했습니다.')
   }
 }

@@ -52,15 +52,13 @@ describe('두 번째 방문에 다시 안 받게 해 뒀는가', () => {
 describe('글꼴이 첫 그림을 막지 않는가', () => {
   const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
 
-  it('스타일시트로 곧장 걸어 두지 않는다', () => {
-    // 그냥 걸면 남의 도메인에서 그 파일이 올 때까지 아무것도 안 그린다.
-    // preload 로 받아 두었다가 다 받은 뒤에 바꿔 단다.
-    expect(html).toMatch(/rel="preload"\s+as="style"/)
-    expect(html).toContain("this.rel='stylesheet'")
-  })
-
-  it('자바스크립트를 끈 브라우저에도 글꼴이 간다', () => {
-    expect(html).toContain('<noscript>')
+  it('외부 글꼴을 받지 않고 시스템 글꼴을 사용한다', () => {
+    expect(html).not.toContain('fonts.googleapis.com')
+    expect(html).not.toContain('data-ilson-font')
+    expect(html).toContain('defer src="/bootstrap.js"')
+    const design = readFileSync(join(ROOT, 'src', 'microsoft-design.css'), 'utf8')
+    expect(design).toContain("'Segoe UI Variable'")
+    expect(design).toContain("'Malgun Gothic'")
   })
 
   it('글꼴이 안 와도 한글이 깨지지 않는다', () => {
@@ -74,7 +72,7 @@ describe('글꼴이 첫 그림을 막지 않는가', () => {
 })
 
 describe('서버를 놀리지 않는가', () => {
-  const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+  const html = readFileSync(join(ROOT, 'public', 'bootstrap.js'), 'utf8')
   const client = readFileSync(join(ROOT, 'src', 'api', 'client.js'), 'utf8')
 
   it('첫 화면이 부를 것을 미리 띄운다', () => {
@@ -154,9 +152,9 @@ describe('서버가 브라우저 몫까지 지고 뜨지 않는가', () => {
     }
   })
 
-  it('세는 함수는 따로 떼어 둔 것을 쓴다', () => {
-    // 떼어 놓고 안 쓰면 아무 의미가 없다.
-    expect(serverSrc).toContain("shared/tally.js'")
+  it('베타 서버는 파일 채점 엔진 대신 경량 입력 검증과 원자 DB 판정을 사용한다', () => {
+    expect(serverSrc.includes("_lib/betaRound.js'")).toBe(true)
+    expect(serverSrc.includes('recordBetaRound(')).toBe(true)
     expect(existsSync(join(ROOT, 'shared', 'tally.js'))).toBe(true)
   })
 

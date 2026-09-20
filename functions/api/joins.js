@@ -6,7 +6,7 @@
 // 판정 전인 건과 협의 중인 건을 갈라 센다. 한 신청서가 두 줄에 동시에
 // 뜨면 목록이 두 배로 길어 보이고, 그러면 아무도 안 읽는다.
 
-import { jsonResponse, jsonError } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { JOIN_KIND, UNJOIN_KIND, joinCounts } from '../../shared/join.js'
 
 export async function onRequestGet({ env, data: requestData }) {
@@ -67,7 +67,7 @@ export async function onRequestGet({ env, data: requestData }) {
     // 이 저장소의 시험은 전부 순수 함수 시험이다.
     const summary = joinCounts({ joinsByApp, apps: apps.results, requirementsByApp })
     return jsonResponse({ summary, applicationIds: summary.repriorityIds })
-  } catch {
-    return jsonError('손든 부서를 세지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '손든 부서를 세지 못했습니다.')
   }
 }

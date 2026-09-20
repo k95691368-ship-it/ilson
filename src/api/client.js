@@ -4,16 +4,20 @@
 //   1) 실패했을 때 사용자에게 보여 줄 한국어 문장을 만든다
 //   2) 폼 검증 실패는 다른 오류와 구분해서 넘긴다 (칸마다 다른 문구를 붙여야 하므로)
 
+import { accessBlocked, getAccessSession, revokeAccess, subscribeAccessSession } from '../lib/accessSession.js'
+
 const BASE = '/api'
 let workspaceReady
+subscribeAccessSession(() => { workspaceReady = null })
 
-export async function readWorkspace() {
-  const response = await fetch(`${BASE}/demo/workspace`, { cache: 'no-store', credentials: 'same-origin' })
+export async function readWorkspace({ signal } = {}) {
+  const response = await fetch(`${BASE}/demo/workspace`, { cache: 'no-store', credentials: 'same-origin', signal })
   if (!response.ok) throw new Error('체험 공간을 확인하지 못했습니다. 소개는 계속 보실 수 있습니다.')
   return response.json()
 }
 
-export function ensureWorkspace() {
+export function ensureWorkspace({ fresh = false } = {}) {
+  if (fresh) workspaceReady = null
   if (!workspaceReady) {
     const open = async () => {
       const state = await readWorkspace()
@@ -34,24 +38,22 @@ export function ensureWorkspace() {
 }
 
 export async function resetWorkspace() {
-  const response = await fetch(`${BASE}/demo/workspace`, {
-    method: 'DELETE', credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json', 'X-Ilson-Request': '1' },
-    body: JSON.stringify({ confirm: 'reset-my-workspace' }),
-  })
-  const body = await response.json()
-  if (!response.ok) throw new Error(body.error || '초기화하지 못했습니다.')
+  // Reset must target the space shown by this tab, not a replacement cookie
+  // from another tab. Use the same session precondition as business writes.
+  const body = await send('/demo/workspace', withJson('DELETE', { confirm: 'reset-my-workspace' }))
   workspaceReady = null
   return body
 }
 
 // 서버는 실패할 때 { error, fields? } 를 준다. fields가 있으면 폼 검증 실패다.
 class ApiError extends Error {
-  constructor(message, { status, fields }) {
+  constructor(message, { status, fields, code, notSaved }) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.fields = fields ?? null
+    this.code = typeof code === 'string' ? code : null
+    this.notSaved = notSaved === true
   }
 }
 
@@ -79,9 +81,18 @@ function takeBooted(path, options) {
 }
 
 const pendingMutations = new Map()
+const changedSession = () => new ApiError('접근 상태가 바뀌었습니다. 권한을 다시 확인한 뒤 저장 기록을 확인해주세요.', { status: 409, code: 'ACCESS_CHANGED' })
 async function send(path, options = {}) {
+  const access = getAccessSession()
+  const generation = options.sessionGeneration ?? access.generation
+  const sessionProbe = options.sessionProbe === true && path === '/session' && !options.method
+  if (generation !== access.generation) throw changedSession()
+  if ((accessBlocked(access) || access.status !== 'active') && !sessionProbe) {
+    throw new ApiError(access.error || '접근 권한을 다시 확인해 주세요.', { status: 401, code: 'ACCESS_REVOKED' })
+  }
+  const current = () => generation === getAccessSession().generation && !options.signal?.aborted
   let res
-  const identity = options.method && options.method !== 'GET' && typeof options.body === 'string' ? `${options.method}:${path}:${options.body}` : null
+  const identity = options.method && options.method !== 'GET' && typeof options.body === 'string' ? `${access.scope ?? 'unverified'}:${options.method}:${path}:${options.body}` : null
   let key
   if (identity) {
     const prior = pendingMutations.get(identity)
@@ -92,19 +103,27 @@ async function send(path, options = {}) {
   try {
     const headers = new Headers(options.headers)
     headers.set('X-Ilson-Request', '1')
+    if (!sessionProbe) headers.set('X-Ilson-Scope', access.scope)
+    else headers.delete('X-Ilson-Scope')
     if (key) headers.set('X-Idempotency-Key', key)
-    options = { ...options, headers, credentials: 'same-origin', cache: 'no-store' }
+    const { sessionProbe: _probe, sessionGeneration: _generation, ...requestOptions } = options
+    options = { ...requestOptions, headers, credentials: 'same-origin', cache: 'no-store' }
     // 미리 띄워 둔 것이 있으면 그것을 쓴다. 그것이 실패했으면 null 이 오고,
     // 그때는 아무 일 없었던 것처럼 지금 부른다.
     const booted = takeBooted(path, options)
     res = (booted && (await booted)) || (await fetch(`${BASE}${path}`, options))
-  } catch {
+  } catch (error) {
+    if (options.signal?.aborted) throw error
+    if (!current()) throw changedSession()
     // 인터넷이 끊겼거나 서버가 아예 안 뜬 경우. 상태 코드조차 없다.
     throw new ApiError('서버에 닿지 못했습니다. 인터넷 연결을 확인해주세요.', { status: 0 })
   }
 
   // 본문이 비어 있거나 JSON이 아닐 수 있다(예: 배포 중 정적 페이지가 대신 응답).
   const body = await res.json().catch(() => null)
+  // JSON parsing itself is asynchronous. Never return an earlier session's
+  // body or let its late denial invalidate a subsequently verified session.
+  if (!current()) throw changedSession()
   if (res.ok && (!body || typeof body !== 'object')) {
     // The server may have committed even when its response was lost or truncated.
     // Preserve the mutation key so a manual retry cannot duplicate that write.
@@ -112,14 +131,27 @@ async function send(path, options = {}) {
   }
 
   if (!res.ok) {
-    if (res.status < 500) pendingMutations.delete(identity)
+    if (res.status < 500 && pendingMutations.get(identity)?.key === key) pendingMutations.delete(identity)
+    const scopeChanged = (res.status === 409 && body?.code === 'SESSION_SCOPE_CHANGED')
+      || (res.status === 400 && body?.code === 'SESSION_SCOPE_INVALID')
+    if (!sessionProbe && ([401, 428].includes(res.status) || scopeChanged)) {
+      revokeAccess(generation, body?.error || '접근 권한을 다시 확인해 주세요.')
+    }
     throw new ApiError(body?.error ?? '요청에 실패했습니다.', {
       status: res.status,
       fields: body?.fields,
+      code: body?.code,
+      notSaved: body?.notSaved,
     })
   }
-  pendingMutations.delete(identity)
+  if (pendingMutations.get(identity)?.key === key) pendingMutations.delete(identity)
   return body
+}
+
+// Only this protected, read-only probe may run while the business UI is locked.
+// Its response still has to pass the gate's schema and generation checks.
+export function readAccessSession(generation, { signal } = {}) {
+  return send('/session', { signal, sessionProbe: true, sessionGeneration: generation })
 }
 
 function withJson(method, body) {
@@ -131,7 +163,7 @@ function withJson(method, body) {
 }
 
 export const api = {
-  get: (path) => send(path),
+  get: (path, { signal } = {}) => send(path, { signal }),
   post: (path, body) => send(path, withJson('POST', body)),
   put: (path, body) => send(path, withJson('PUT', body)),
   patch: (path, body) => send(path, withJson('PATCH', body)),

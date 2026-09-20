@@ -52,9 +52,14 @@ function round(n, digits = 0) {
 // 이 함수를 여기 두는 이유는 쓰는 곳이 둘이기 때문이다. 각자 복사해 두면
 // 한쪽만 고쳐지고, 그러면 두 화면이 같은 건을 두고 다른 말을 한다 —
 // 이 저장소에서 실제로 네 번 일어난 일이다.
-export function runsFromTotals({ count, durationMs, reviewSeconds, reworkSeconds } = {}) {
-  const n = Math.max(0, Number(count) || 0)
+export function runsFromTotals({ count, successCount, failedCount, durationMs, reviewSeconds, reworkSeconds } = {}) {
+  const validCount = value => Number.isSafeInteger(Number(value)) && Number(value) >= 0 ? Number(value) : 0
+  const n = validCount(count)
+  const successes = Math.min(n, validCount(successCount))
+  const failures = Math.min(n - successes, validCount(failedCount))
   return Array.from({ length: n }, (_, i) => ({
+    // Missing status is unknown, never an inferred successful completion.
+    ok: i < successes ? 1 : i < successes + failures ? 0 : null,
     duration_ms: i === 0 ? Number(durationMs) || 0 : 0,
     human_review_seconds: i === 0 ? Number(reviewSeconds) || 0 : 0,
     rework_seconds: i === 0 ? Number(reworkSeconds) || 0 : 0,
@@ -63,7 +68,7 @@ export function runsFromTotals({ count, durationMs, reviewSeconds, reworkSeconds
 
 export function computeOutcome({
   baseline, // 3단계에서 봉인한 값 { median_seconds, sample_n, people, frequency, hourly_wage_krw }
-  runs = [], // 실제 실행 기록 [{ duration_ms, human_review_seconds, rework_seconds }]
+  runs = [], // 실제 실행 기록 [{ ok, duration_ms, human_review_seconds, rework_seconds }]
   devHours = 0, // 만드는 데 든 시간
   opsCostKrw = 0, // 운영비 (있으면)
   amortizeMonths = 24, // 제작 공수를 몇 달에 나눠 볼 것인가
@@ -78,6 +83,9 @@ export function computeOutcome({
   const wage = baseline.hourly_wage_krw || HOURLY_WAGE_KRW
   const people = baseline.people || 1
   const runCount = runs.length
+  const successCount = runs.filter(run => [1, '1', true].includes(run.ok)).length
+  const failedCount = runs.filter(run => [0, '0', false].includes(run.ok)).length
+  const unknownCount = runCount - successCount - failedCount
 
   if (runCount === 0) {
     return {
@@ -88,7 +96,8 @@ export function computeOutcome({
   }
 
   // 사람이 하던 시간
-  const manualSeconds = baseline.median_seconds * people * runCount
+  // Only completed work replaces manual work; failed/unknown attempts still cost time.
+  const manualSeconds = baseline.median_seconds * people * successCount
 
   // 자동화 뒤에 실제로 든 시간
   const autoSeconds = runs.reduce((a, r) => a + (r.duration_ms ?? 0) / 1000, 0)
@@ -122,21 +131,25 @@ export function computeOutcome({
   //
   // "아직 본전"이라고만 하면 담당자는 그게 곧 넘어설 것인지 영영 아닌지를
   // 알 수 없다. 지금 속도로 몇 번인지까지 말해야 판단이 된다.
-  const perRunKrw = savedKrw / runCount
+  const perRunKrw = successCount > 0 ? savedKrw / successCount : null
   const shortfall = Math.max(0, devKrw + opsCostKrw - savedKrw)
   const breakEven = {
     done: netKrw > 0,
     shortfallKrw: round(shortfall),
-    perRunKrw: round(perRunKrw),
+    perRunKrw: perRunKrw == null ? null : round(perRunKrw),
     // 한 번 돌려서 아끼는 것이 0 이하면 영영 못 뽑는다. 그때는 횟수를
     // 내놓지 않는다 — 큰 수를 적어 두면 언젠가 된다는 뜻으로 읽힌다.
     runsNeeded: perRunKrw > 0 && shortfall > 0 ? Math.ceil(shortfall / perRunKrw) : null,
-    neverAtThisRate: perRunKrw <= 0,
+    neverAtThisRate: perRunKrw == null || perRunKrw <= 0,
   }
 
   return {
     status: netKrw > 0 ? '인정' : '아직본전',
     runCount,
+    attemptCount: runCount,
+    successCount,
+    failedCount,
+    unknownCount,
     baselineSeconds: baseline.median_seconds,
     baselineSampleN: baseline.sample_n,
     people,
@@ -164,17 +177,17 @@ export function computeOutcome({
 
     // 계산식을 그대로 돌려준다. 화면에 항상 펼쳐 두기 위해서다.
     formula: [
-      { label: '사람이 하던 시간', value: manualSeconds, note: `${Math.round(baseline.median_seconds / 60)}분 × ${people}명 × ${runCount}회` },
+      { label: '성공한 업무의 기준선 시간', value: manualSeconds, note: `${Math.round(baseline.median_seconds / 60)}분 × ${people}명 × 성공 ${successCount}회` },
       { label: '− 자동 실행 시간', value: -autoSeconds },
       { label: '− 사람이 검토한 시간', value: -reviewSeconds },
       { label: '− 다시 한 시간', value: -reworkSeconds },
-      { label: '= 아낀 시간', value: savedSeconds, strong: true },
+      { label: savedSeconds < 0 ? '= 추가로 든 시간' : '= 아낀 시간', value: savedSeconds, strong: true },
     ],
     moneyFormula: [
       {
-        label: '아낀 시간을 돈으로',
+        label: '업무 시간 변화를 돈으로',
         value: savedKrw,
-        note: `시급 ${wage.toLocaleString()}원 · 지금까지 ${runCount}회를 다 더한 값`,
+        note: `시급 ${wage.toLocaleString()}원 · 성공 ${successCount}회 기준선에서 전체 ${runCount}회 시도 비용을 뺀 값`,
       },
       {
         label: `− 만든 공수 (${devHours}시간)`,
@@ -208,9 +221,15 @@ export const CHALLENGE_RULES = [
   {
     code: 'few_runs',
     title: '실제로 몇 번 안 돌았습니다',
-    applies: ({ outcome }) => (outcome.runCount ?? 0) < 4,
+    applies: ({ outcome }) => (outcome.successCount ?? 0) < 4,
     body: ({ outcome }) =>
-      `아직 ${outcome.runCount}번 돌았습니다. 이 정도로는 "매주 이만큼 아낀다"고 말하기 이릅니다. 몇 주 더 쌓인 뒤에 다시 계산하세요.`,
+      `전체 ${outcome.runCount}회 시도 중 성공 확인은 ${outcome.successCount ?? 0}회입니다. 이 정도로는 "매주 이만큼 아낀다"고 말하기 이릅니다. 성공 기록을 더 확인한 뒤에 다시 계산하세요.`,
+  },
+  {
+    code: 'unsuccessful_runs',
+    title: '실패하거나 성공 여부가 확인되지 않은 실행이 있습니다',
+    applies: ({ outcome }) => (outcome.failedCount ?? 0) + (outcome.unknownCount ?? 0) > 0,
+    body: ({ outcome }) => `실패 ${outcome.failedCount ?? 0}회, 성공 미확인 ${outcome.unknownCount ?? 0}회에는 절감 기준선을 인정하지 않았습니다. 이 시도의 실행·검토·재작업 비용은 모두 계산에 남아 있습니다.`,
   },
   {
     code: 'no_review_time',
@@ -240,7 +259,7 @@ export const CHALLENGE_RULES = [
     // 돌릴수록 손해가 커지는 상태다. 반드시 따로 말해야 한다.
     applies: ({ outcome }) => (outcome.savedSeconds ?? 0) <= 0 && (outcome.runCount ?? 0) > 0,
     body: ({ outcome }) =>
-      `사람이 하던 시간보다 자동 실행·검토·재작업을 더한 시간이 더 깁니다(${Math.abs(outcome.savedSeconds)}초 더 듦). 돌릴수록 손해입니다. 검토 시간이 왜 이렇게 드는지부터 보셔야 합니다.`,
+      `성공한 업무에 인정한 기준선 시간보다 전체 시도의 실행·검토·재작업 시간이 더 깁니다(${Math.abs(outcome.savedSeconds)}초 더 듦). 실패 비용과 검토 시간을 확인해야 합니다.`,
   },
   {
     code: 'seasonality',
@@ -368,6 +387,7 @@ export function liveChallenges(context = {}) {
 // 그것도 정직하지 않다.
 export function labelForOutcome(outcome, unresolvedCount) {
   if (outcome.status === '산정불가') return { label: '산정 불가', tone: 'muted' }
+  if (!(outcome.successCount > 0)) return { label: '성공 확인 없음', tone: 'warn', note: '절감으로 인정할 성공 기록이 없습니다. 실패·미확인 시도에 기록된 비용은 그대로 반영합니다.' }
   if (unresolvedCount > 0) {
     return {
       label: '보수적 추정',
@@ -390,17 +410,17 @@ export function labelForOutcome(outcome, unresolvedCount) {
 // 그래서 뺀 것과 안 뺀 것을 따로 준다. 하나로 합치지 않는 이유는, 첫 해와
 // 그다음 해가 실제로 다르기 때문이다 — 만든 공수는 첫 해에 한 번만 든다.
 export function annualize(outcome, frequency, { devKrw = 0, opsCostKrw = 0 } = {}) {
-  if (outcome.status === '산정불가' || !frequency) return null
+  if (outcome.status === '산정불가' || !frequency || !(outcome.successCount > 0)) return null
   const perYear = RUNS_PER_YEAR[frequency]
   if (!perYear) return null
 
-  const perRunSaved = outcome.savedSeconds / outcome.runCount
+  const perRunSaved = outcome.savedSeconds / outcome.successCount
   const seconds = perRunSaved * perYear
   const grossKrw = (seconds / 3600) * outcome.wage
 
   // 지금까지 쓴 운영비를 회당으로 나눠 연 횟수만큼 다시 곱한다. 운영비는
   // 돌릴 때마다 드는 것이라 해마다 든다.
-  const opsPerYear = (opsCostKrw / outcome.runCount) * perYear
+  const opsPerYear = (opsCostKrw / outcome.successCount) * perYear
   const dev = devKrw || outcome.devKrw || 0
 
   return {
@@ -413,7 +433,7 @@ export function annualize(outcome, frequency, { devKrw = 0, opsCostKrw = 0 } = {
     firstYearKrw: round(grossKrw - dev - opsPerYear),
     // 그다음 해부터 — 만든 공수는 다시 안 든다.
     laterYearKrw: round(grossKrw - opsPerYear),
-    note: `지금까지 ${outcome.runCount}번 돌린 평균으로 연 ${perYear}회를 곱한 값입니다. 실제로 그만큼 돌지 않으면 이 숫자는 틀립니다.`,
+    note: `전체 ${outcome.runCount}회 시도의 비용을 성공 ${outcome.successCount}회에 나눈 평균으로 연 ${perYear}회 업무 완료를 가정했습니다. 성공률·비용·완료 횟수가 달라지면 이 추정도 달라집니다.`,
     caveat:
       dev > 0
         ? '첫 해에는 만든 공수가 들어갑니다. 그다음 해부터는 안 듭니다 — 그래서 두 해를 따로 적었습니다.'

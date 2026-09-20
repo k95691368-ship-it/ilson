@@ -43,8 +43,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
       if (note) bySection[s.key] = note
     }
     return jsonResponse({ notes: bySection, summary: board.summary })
-  } catch {
-    return jsonError('짚힌 곳을 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '짚힌 곳을 불러오지 못했습니다.')
   }
 }
 

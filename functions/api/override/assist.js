@@ -95,7 +95,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
     let response, payload, draft, failure = null
     try {
       response = await fetch('https://api.anthropic.com/v1/messages',{
-        method:'POST',headers:{'Content-Type':'application/json','x-api-key':env.CLAUDE_API_KEY,'anthropic-version':'2023-06-01'},
+        method:'POST',redirect:'manual',headers:{'Content-Type':'application/json','x-api-key':env.CLAUDE_API_KEY,'anthropic-version':'2023-06-01'},
         body:JSON.stringify({model:MODEL,max_tokens:1600,messages:[{role:'user',content:promptFor(kind,context)}]}),
         signal:AbortSignal.timeout(45000)
       })

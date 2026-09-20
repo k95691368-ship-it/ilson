@@ -122,11 +122,12 @@ describe('개선 실험 가드레일', () => {
   it('세 단계를 모두 통과하고 고위험 승인을 받아야 확대할 수 있다', () => {
     const experiment = {risk_level:'high',status:'running',approval_id:'approval-1',change_version:'v1',approved_at:'2026-09-03',
       evaluation_plan_json:JSON.stringify({metricType:'rate',minimumWindowSeconds:60,minimumSamples:{historical:10,shadow:10,limited:10},rationale:'사전 계획',datasetVersion:'d1',modelVersion:'m1',policyVersion:'p1'})}
-    const passedRuns = ['historical', 'shadow', 'limited'].map((phase) => ({
+    const passedRuns = ['historical', 'shadow', 'limited'].map((phase,index) => ({
       phase,
       status: 'passed',
       guardrail_breaches: 0,
       approval_id:'approval-1',change_version:'v1',run_sequence:1,
+      measurement_start:`2026-09-03T00:0${index}:00Z`,measurement_end:`2026-09-03T00:0${index+1}:00Z`,
     }))
     expect(canExpandExperiment({ risk_level: 'high' }, passedRuns)).toMatchObject({
       ok: false,

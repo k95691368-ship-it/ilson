@@ -19,7 +19,7 @@ const rpc = async (name, args) => {
 }
 beforeAll(async () => {
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql']) {
+for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql']) {
     if (file === '0004_audit_hardening.sql') await rpc('ilson_workspace_open',{p_token:'f'.repeat(64),p_applications:seed})
     await pg.exec(readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8'))
   }
@@ -75,7 +75,7 @@ describe.sequential('isolated PostgreSQL workspaces', () => {
   it('preserves isolation through the actual Pages next-context binding contract', async () => {
     const bindings = { DEMO_WORKSPACES: 'true', SUPABASE_URL: 'https://test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'local-test' }
     const data = {}
-    const request = new Request('https://ilson.test/api/applications', { headers: { Cookie: `ilson_workspace=${tokenB}` } })
+    const request = new Request('https://ilson.test/api/applications', { headers: { Cookie: `ilson_workspace=${tokenB}`, 'X-Ilson-Scope': await createSupabaseDb('https://test.supabase.co', 'local-test', tokenB).toolRunScope() } })
     const response = await middleware({ env: bindings, data, request,
       next: () => applications({ env: bindings, data, request }) })
     expect(response.status).toBe(200)

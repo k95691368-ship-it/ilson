@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import { createElement, act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { useApi } from '../src/hooks/useApi.js'
+import { beginAccessCheck, completeAccessCheck } from '../src/lib/accessSession.js'
 
 const ROOT = process.cwd()
 
@@ -23,6 +24,8 @@ let container = null
 let resolvers = {}
 
 beforeEach(() => {
+  // Mounting Probe directly bypasses the production gate, not its prerequisite.
+  expect(completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'access', scope: 'a'.repeat(64) })).toBe(true)
   container = document.createElement('div')
   document.body.appendChild(container)
   resolvers = {}
@@ -104,11 +107,13 @@ describe('조회 화면이 번호가 바뀌면 다시 찾는다', () => {
   it('한 번만 찾고 마는 의존성이 아니다', () => {
     // [] 였다. 그래서 화면 안의 다른 접수번호 링크를 눌러도 주소만 바뀌고
     // 앞 신청서가 그대로 남았다.
-    expect(page).toMatch(/const askedNo = params\.get\('no'\)/)
+    expect(page).toContain("const askedNo = String(params.get('no') ?? '').trim().toUpperCase()")
+    expect(page).toContain('useApi(askedNo ? `/track/${encodeURIComponent(askedNo)}` : null)')
     expect(page).toMatch(/\}, \[askedNo\]\)/)
   })
 
   it('요청 순서를 지키는 훅을 쓴다', () => {
+    // 실제 TrackPage 역순 응답·A→B→A·하위 폼 회귀는 trackRequestIdentityUi에서 실행한다.
     const hook = readFileSync(join(ROOT, 'src', 'hooks', 'useApi.js'), 'utf8')
     expect(hook).toContain('seq')
     // alive 만으로는 같은 화면에서 주소가 바뀌는 경우를 못 막는다.

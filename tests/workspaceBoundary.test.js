@@ -2,14 +2,16 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { onRequest } from '../functions/api/_middleware.js'
 import { workspaceToken, workspaceCookie } from '../functions/_lib/workspace.js'
 import { onRequestPost, onRequestDelete } from '../functions/api/demo/workspace.js'
+import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 vi.mock('../functions/_lib/rateLimit.js', () => ({ checkRateLimit: vi.fn(async () => 1) }))
 afterEach(() => vi.unstubAllGlobals())
 const token = 'd'.repeat(64)
+const scope = await createSupabaseDb('https://test.supabase.co', 'test-only', token).toolRunScope()
 const makeEnv = () => ({ DEMO_WORKSPACES: 'true', SUPABASE_URL: 'https://test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-only', DBBridgeApplied: true, DB: { original: true } })
-const request = (path, method = 'GET', headers = {}, body) => new Request('https://ilson.test/api' + path, { method, headers, ...(body ? { body: JSON.stringify(body) } : {}) })
+const request = (path, method = 'GET', headers = {}, body) => new Request('https://ilson.test/api' + path, { method, headers: { 'X-Ilson-Scope': scope, ...headers }, ...(body ? { body: JSON.stringify(body) } : {}) })
 describe('workspace HTTP boundary', () => {
   it('every Pages API handler receives the request-scoped environment', () => {
     const walk = directory => readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(join(directory, entry.name)) : join(directory, entry.name))
@@ -55,7 +57,16 @@ describe('workspace HTTP boundary', () => {
     vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: '28000' }, { status: 400 })))
     const next = vi.fn()
     const result = await onRequest({ env: makeEnv(), request: request('/applications', 'GET', { Cookie: `ilson_workspace=${token}` }), next })
-    expect(result.status).toBe(428)
+    expect(result.status).toBe(401)
+    expect(await result.json()).toMatchObject({ code: 'ACCESS_REVOKED' })
+    expect(next).not.toHaveBeenCalled()
+  })
+  it('keeps temporary workspace database failures distinct from expired access', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ code: '53300', message: 'PRIVATE DATABASE DETAIL' }, { status: 503 })))
+    const next = vi.fn()
+    const result = await onRequest({ env: makeEnv(), request: request('/applications', 'GET', { Cookie: `ilson_workspace=${token}` }), next })
+    expect(result.status).toBe(503)
+    expect(await result.json()).toEqual({ error: '체험 공간에 연결하지 못했습니다.' })
     expect(next).not.toHaveBeenCalled()
   })
   it('sets the capability only in an HttpOnly cookie, never the JSON response', async () => {

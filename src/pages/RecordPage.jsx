@@ -106,9 +106,8 @@ export default function RecordPage() {
               ))}
             </div>
             <p className="record-progress-note">
-              여섯 단계 중 <strong>{p.count}단계</strong>까지 기록이 남아 있습니다.
-              {p.skipped.length > 0 && ` 건너뛴 단계: ${p.skipped.join(', ')}.`} 빈 단계는 숨기지
-              않고 그대로 적습니다.
+              6단계 중 <strong>{p.count}단계</strong> 기록됨.
+              {p.skipped.length > 0 && ` 건너뛴 단계: ${p.skipped.join(', ')}.`}
             </p>
           </div>
         </header>
@@ -297,7 +296,7 @@ export default function RecordPage() {
           {rec.criteria.length > 0 && (
             <Sub
               title={`합격 기준 ${rec.criteria.length}개`}
-              note="만들기 전에 정했습니다. 결과를 보고 기준을 움직이지 않기 위해서입니다."
+              note="제작 전 확정한 기준"
             >
               <ol className="record-list numbered">
                 {rec.criteria.map((c) => (
@@ -395,7 +394,7 @@ export default function RecordPage() {
           {rec.betaFeedback.length > 0 && (
             <Sub
               title={`실제로 써 본 사람이 한 말 ${rec.betaFeedback.length}건`}
-              note="기계 채점이 통과여도 사람이 못 쓰겠다고 하면 못 쓰는 것입니다."
+              note="자동 채점과 별도로 확인한 사용 의견"
             >
               <ul className="record-list">
                 {rec.betaFeedback.map((f) => (
@@ -484,7 +483,7 @@ export default function RecordPage() {
                   `${dateTimeLabel(rec.handover.accepted_at)} · ${rec.handover.accepted_by ?? ''}`
                 ) : (
                   <span className="record-aside">
-                    아직 확인하지 않았습니다 — 넘겼다고 받은 것이 아닙니다
+                    인수 확인 대기
                   </span>
                 )}
               </dd>
@@ -531,7 +530,7 @@ export default function RecordPage() {
                     </>
                   ) : (
                     <span className="record-aside">
-                      아직 확인받지 못했습니다 — 만든 사람만 아는 성과는 성과가 아닙니다
+                      부서 확인 대기
                     </span>
                   )}
                 </dd>
@@ -545,7 +544,7 @@ export default function RecordPage() {
 
               {rec.challenges.length > 0 && (
                 <Sub
-                  title={`이 숫자를 의심해보세요 — 자기 반박 ${rec.challenges.length}건`}
+                  title={`성과 검증 ${rec.challenges.length}건`}
                   note={`미해소 ${rec.challenges.filter((c) => !c.resolved_at).length}건`}
                 >
                   <ul className="record-list">

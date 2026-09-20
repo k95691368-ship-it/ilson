@@ -8,7 +8,7 @@
 // 여기가 낮으면 나머지 기록이 아무리 촘촘해도 혼자 만든 것이다. 낮을 때
 // 숨기지 않는 것이 이 사이트가 부서에게 요구하는 태도와 같다.
 
-import { jsonResponse, jsonError } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { responseRate, responseLine, responseNote } from '../../shared/response.js'
 import {
   ACCEPT_KIND,
@@ -125,7 +125,7 @@ export async function onRequestGet({ env, data: requestData }) {
       line: responseLine(rate),
       note: responseNote(rate),
     })
-  } catch {
-    return jsonError('부서 응답을 세지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '부서 응답을 세지 못했습니다.')
   }
 }

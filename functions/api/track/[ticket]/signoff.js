@@ -20,6 +20,7 @@ import {
   OBJECTION_KIND,
 } from '../../../../shared/signoff.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
+import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
 
 // 확인해주신 뒤에 뭐라고 답할 것인가.
 //
@@ -137,6 +138,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
       { dept: `${loaded.requiredDepts.join(', ')} 중에서 골라주세요.` },
       '어느 부서로 확인하시는지 알 수 없습니다.'
     )
+  }
+  const forbidden = departmentAuthority(env, dept)
+  if (forbidden) {
+    await releaseRateLimit(env, `signoff:${ip}`, ticket)
+    return forbidden
   }
   const objected = loaded.criteria.filter((c) => VERDICTS[body.verdicts[c.id]]?.needsReason)
 

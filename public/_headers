@@ -18,6 +18,9 @@
 /index.html
   Cache-Control: public, max-age=0, must-revalidate
 
+/bootstrap.js
+  Cache-Control: public, max-age=0, must-revalidate
+
 # 신청서·판정·성과는 사람마다 다른 값이고, 주소에 접수번호가 들어간다.
 # 중간에 있는 캐시가 그걸 들고 있으면 안 된다.
 /api/*
@@ -57,9 +60,6 @@
   # 화면 녹화(마이크로소프트), 그리고 우리 자신. 그 밖의 주소에서 온
   # 스크립트는 실행되지 않는다.
   #
-  # unsafe-inline 과 unsafe-eval 을 열어 둔 것은 통계와 녹화 도구가 그것을
-  # 요구하기 때문이다. 그만큼 약해지는 것은 사실이지만, 이 사이트는 사용자가
-  # 쓴 글을 원문 HTML 로 꽂는 자리가 한 군데도 없고(dangerouslySetInnerHTML 0건)
-  # 리액트가 기본으로 글자를 escape 한다. 그래서 남는 값은 "모르는 주소에서
-  # 온 스크립트를 막는 것"이고, 그건 그대로 얻는다.
-  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.clarity.ms; worker-src 'self' blob:
+  # 초기화 코드는 bootstrap.js로 분리한다. 인라인 이벤트와 eval은 허용하지 않는다.
+  # style-src의 인라인 스타일은 기존 React 동적 스타일에만 필요하다.
+  Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.googletagmanager.com https://www.clarity.ms https://*.clarity.ms; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com https://*.clarity.ms; worker-src 'self' blob:

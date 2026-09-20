@@ -51,7 +51,7 @@ describe('모르는 주소에서 온 스크립트를 막는가', () => {
   it('실제로 부르는 곳만 열려 있다', () => {
     // 화면이 부르는 바깥은 넷뿐이다. 여기 없는 주소를 코드가 부르기 시작하면
     // 조용히 막히므로, 두 목록이 어긋나지 않게 같이 본다.
-    const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+    const html = readFileSync(join(ROOT, 'public', 'bootstrap.js'), 'utf8')
     for (const host of ['googletagmanager.com', 'clarity.ms', 'cdn.jsdelivr.net']) {
       if (html.includes(host)) expect(csp, host).toContain(host)
     }
@@ -62,6 +62,18 @@ describe('모르는 주소에서 온 스크립트를 막는가', () => {
     const script = (csp.match(/script-src([^;]*)/) ?? [])[1] ?? ''
     expect(script).not.toContain(' *')
     expect(script).not.toContain('http:')
+    expect(script).not.toContain("'unsafe-inline'")
+    expect(script).not.toContain("'unsafe-eval'")
+    expect(csp).toContain("script-src-attr 'none'")
+  })
+
+  it('HTML에 인라인 스크립트나 이벤트 처리기가 남지 않는다', () => {
+    const html = readFileSync(join(ROOT, 'index.html'), 'utf8')
+    for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/g)) {
+      expect(match[1]).toMatch(/\bsrc=/)
+      expect(match[2].trim()).toBe('')
+    }
+    expect(html).not.toMatch(/\son\w+\s*=/i)
   })
 })
 

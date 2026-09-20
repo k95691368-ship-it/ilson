@@ -121,12 +121,12 @@ function Result({ id }) {
             {data.label.label}
           </span>
           <span className="badge badge-warning">기준선 표본 {o.baselineSampleN}회</span>
-          <span className="card-note">{o.runCount}번 돌린 결과</span>
+          <span className="card-note">총 {o.attemptCount ?? o.runCount}회 시도 · 성공 {o.successCount ?? 0}회 · 실패 {o.failedCount ?? 0}회{o.unknownCount > 0 ? ` · 미확인 ${o.unknownCount}회` : ''}</span>
         </div>
 
         <div className="outcome-number">{krw(o.netKrw)}</div>
         <div className="card-note">
-          아낀 시간 {duration(o.savedSeconds)} · 만든 공수와 운영비를 뺀 뒤의 금액입니다
+          {o.savedSeconds < 0 ? '추가로 든 시간' : '아낀 시간'} {duration(Math.abs(o.savedSeconds))} · 실패 비용·만든 공수·운영비를 포함한 순금액입니다
         </div>
         {data.label.note && <p className="outcome-warn">{data.label.note}</p>}
       </section>
@@ -170,7 +170,7 @@ function Result({ id }) {
           <div className="notice notice-info" style={{ marginTop: 14 }}>
             <div className="notice-title">
               연 단위로는 {num(data.annual.hours, 1)}시간 · {krw(data.annual.grossKrw)}
-              <span className="card-note"> (아무것도 빼기 전)</span>
+              <span className="card-note"> (실행·검토·재작업 반영, 제작 공수·운영비 차감 전)</span>
             </div>
             <div className="annual-split">
               <div>
@@ -191,7 +191,9 @@ function Result({ id }) {
             적어 두면 곧 넘어설 것인지 영영 아닌지를 알 수 없다. */}
         {o.breakEven && !o.breakEven.done && (
           <p className="outcome-warn" style={{ marginTop: 12 }}>
-            {o.breakEven.neverAtThisRate ? (
+            {o.successCount === 0 ? (
+              <>아직 성공이 확인된 업무가 없어 회당 절감과 손익분기 횟수를 전망하지 않습니다. 실패·미확인 시도에 든 비용은 위 계산에 포함했습니다.</>
+            ) : o.breakEven.neverAtThisRate ? (
               <>
                 지금은 <strong>돌릴수록 손해</strong>입니다. 사람이 하던 시간보다 자동 실행·검토·
                 재작업을 더한 시간이 더 깁니다. 몇 번 더 돌린다고 넘어서지 않습니다.
@@ -199,8 +201,8 @@ function Result({ id }) {
             ) : (
               <>
                 만든 공수를 뽑기까지 <strong>{krw(o.breakEven.shortfallKrw)}</strong> 남았습니다.
-                지금 속도(1회당 {krw(o.breakEven.perRunKrw)})로 <strong>{o.breakEven.runsNeeded}번</strong>{' '}
-                더 돌리면 넘어섭니다.
+                실패 비용을 포함한 성공 업무 1회당 {krw(o.breakEven.perRunKrw)}가 유지된다면 <strong>{o.breakEven.runsNeeded}회</strong>{' '}
+                추가 성공이 필요합니다.
               </>
             )}
           </p>
@@ -315,7 +317,6 @@ function ClaimedVsMeasured({ claimed, baseline }) {
       {gap != null && (
         <p className="card-note" style={{ marginTop: 10 }}>
           체감보다 실제가 <strong>{gap > 0 ? `${gap}% 더` : `${Math.abs(gap)}% 덜`}</strong> 걸렸습니다.
-          만들고 나서 기억으로 적었다면 이만큼 틀렸을 숫자입니다.
         </p>
       )}
     </section>
@@ -326,7 +327,7 @@ function Challenges({ data, send, toast }) {
   return (
     <section className="card">
       <div className="card-head">
-        <h2 className="card-title">이 숫자를 의심해보세요</h2>
+        <h2 className="card-title">성과 검증</h2>
         <span className="card-note">
           해소하지 못한 것 {data.unresolvedCount}개 / 전체 {data.challenges.length}개
         </span>
@@ -337,8 +338,7 @@ function Challenges({ data, send, toast }) {
             화면 위에는 '전체 9개'가 찍히는데 바로 아래에서 여덟이라고 하니,
             스스로의 정직함을 근거로 내세우는 화면에서 셀 수 있는 숫자가
             어긋났다. 세는 자리에서 받아 온다. */}
-        스스로 반박합니다. 반박은 <strong>정해진 {CHALLENGE_RULES.length}가지</strong>이고 해당되면
-        반드시 뜹니다. 매번 다르게 반박하면 그건 반박이 아니라 장식입니다.
+        {CHALLENGE_RULES.length}개 검증 규칙 중 해당 항목을 표시합니다.
       </p>
 
       {data.challenges.length === 0 ? (
@@ -351,7 +351,7 @@ function Challenges({ data, send, toast }) {
                 <span className={`badge ${c.resolved_at ? 'badge-success' : 'badge-warning'}`}>
                   {c.resolved_at ? '해소됨' : '아직'}
                 </span>
-                <strong style={{ color: 'var(--text-h)', fontSize: 14 }}>{c.title}</strong>
+                <strong style={{ color: 'var(--text-h)' }}>{c.title}</strong>
               </div>
               <div className="card-note">{c.body}</div>
               {c.resolution && (

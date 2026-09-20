@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 
 const ToastContext = createContext(null)
 
@@ -7,6 +7,16 @@ let counter = 0
 export function ToastProvider({ children }) {
   const [items, setItems] = useState([])
   const timers = useRef(new Map())
+  const alive = useRef(true)
+  useEffect(() => {
+    alive.current = true
+    const activeTimers = timers.current
+    return () => {
+      alive.current = false
+      for (const timer of activeTimers.values()) clearTimeout(timer)
+      activeTimers.clear()
+    }
+  }, [])
 
   const dismiss = useCallback((id) => {
     setItems((list) => list.filter((t) => t.id !== id))
@@ -19,7 +29,7 @@ export function ToastProvider({ children }) {
 
   const push = useCallback(
     (message, tone, ms) => {
-      if (!message) return null
+      if (!message || !alive.current) return null
       const id = ++counter
       setItems((list) => [...list, { id, tone, message: String(message) }])
       timers.current.set(id, setTimeout(() => dismiss(id), ms))

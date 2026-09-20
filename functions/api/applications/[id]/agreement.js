@@ -4,7 +4,8 @@
 // 화면 하나가 쓰는 것이라 한 곳에 모았다. 여러 라우트로 나누면 화면이 요청을
 // 예닐곱 번 보내야 하고, 그중 일부만 온 중간 상태가 화면에 남는다.
 
-import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
@@ -118,8 +119,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
       })),
       baseline: baseline ?? null,
     })
-  } catch {
-    return jsonError('협의안을 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '협의안을 불러오지 못했습니다.')
   }
 }
 
@@ -376,7 +377,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
             '지난 몇 주를 회상해 적게 하는 안. 회상 편향이 크고 바쁜 주가 과대 대표된다.',
           linkKind: 'baseline',
           linkId: app.id,
-        }).catch(() => {})
+        }).catch(rethrowDatabaseAccessFailure)
 
         return jsonResponse({ ok: true, median_seconds: median, sample_n: times.length })
       }
@@ -384,8 +385,8 @@ export async function onRequestPost({ env, data: requestData, params, request })
       default:
         return jsonError('무엇을 추가할지 알 수 없습니다.', 400)
     }
-  } catch {
-    return jsonError('저장하지 못했습니다.', 500)
+  } catch (error) {
+    return failUnexpected(error, '저장하지 못했습니다.', 500)
   }
 }
 
@@ -448,7 +449,7 @@ export async function onRequestPatch({ env, data: requestData, params, request }
           why: t(body.reject_reason),
           linkKind: 'requirement',
           linkId: t(body.id),
-        }).catch(() => {})
+        }).catch(rethrowDatabaseAccessFailure)
       }
       return jsonResponse({ ok: true })
     }
@@ -480,7 +481,7 @@ export async function onRequestPatch({ env, data: requestData, params, request }
         alternatives: t(body.tradeoff_note) || null,
         linkKind: 'conflict',
         linkId: t(body.id),
-      }).catch(() => {})
+      }).catch(rethrowDatabaseAccessFailure)
 
       return jsonResponse({ ok: true })
     }
@@ -520,8 +521,8 @@ export async function onRequestPatch({ env, data: requestData, params, request }
     }
 
     return jsonError('무엇을 고칠지 알 수 없습니다.', 400)
-  } catch {
-    return jsonError('고치지 못했습니다.', 500)
+  } catch (error) {
+    return failUnexpected(error, '고치지 못했습니다.', 500)
   }
 }
 
@@ -554,8 +555,8 @@ export async function onRequestDelete({ env, data: requestData, params, request 
       .bind(String(body.id ?? ''), app.id)
       .run()
     return jsonResponse({ ok: true })
-  } catch {
-    return jsonError('지우지 못했습니다.', 500)
+  } catch (error) {
+    return failUnexpected(error, '지우지 못했습니다.', 500)
   }
 }
 

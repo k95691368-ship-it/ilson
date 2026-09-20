@@ -9,10 +9,12 @@
 // 수령 확인·성과 확인과 같은 규칙이다.
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { validateBetaSay, betaSayState, BETA_SAY_KIND } from '../../../../shared/betasay.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
 
 async function load(env, ticket) {
   const app = await env.DB.prepare(
@@ -56,6 +58,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
   if (!loaded) {
     await releaseRateLimit(env, `betasay:${ip}`, ticket)
     return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+  }
+  const forbidden = departmentAuthority(env, loaded.app.dept)
+  if (forbidden) {
+    await releaseRateLimit(env, `betasay:${ip}`, ticket)
+    return forbidden
   }
 
   // 시험판을 아직 안 돌렸으면 써 볼 것이 없다. 없는 것에 대고 의견을
@@ -108,7 +115,7 @@ export async function onRequestPost({ env, data: requestData, request, params })
       why: `${loaded.app.dept}에서 시험판을 써 보고 적어 주셨습니다. 기계 채점은 "쓰기 불편하다"를 채점하지 못합니다.`,
       linkKind: BETA_SAY_KIND,
       linkId: loaded.round.id,
-    }).catch(() => {})
+    }).catch(rethrowDatabaseAccessFailure)
 
     const after = await load(env, loaded.app.ticket_no)
     return jsonResponse({

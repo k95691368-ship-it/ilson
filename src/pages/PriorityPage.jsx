@@ -31,8 +31,7 @@ export default function PriorityPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">무엇을 먼저 할까</span>
-        <h1>수용한 것 중에 무엇부터 하나</h1>
+        <h1>우선순위</h1>
       </header>
 
       {data.items.length === 0 ? (
@@ -281,7 +280,7 @@ function PickForm({ item, onClose, onDone, toast }) {
         label="먼저 할 이유"
         required
         error={errors.why}
-        hint="이 문장이 결정 기록에 남습니다. 뒤로 밀린 부서가 물어볼 때 답할 것이 됩니다."
+        hint="결정 기록에 저장됩니다"
       >
         <textarea
           rows={3}

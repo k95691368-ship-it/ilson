@@ -53,7 +53,7 @@ const KNOWN = [
 ]
 
 export function redactPath(pathname) {
-  const path = String(pathname || '/')
+  const path = String(pathname || '/').split(/[?#]/, 1)[0] || '/'
   for (const [pattern, label] of KNOWN) {
     if (pattern.test(path)) return label
   }
@@ -86,6 +86,7 @@ export function trackPageView(pathname) {
     // 주소창 그대로가 아니라 가린 주소로 보낸다. page_location 을 비워 두면
     // 태그가 현재 주소를 스스로 채워 넣어, 가린 의미가 없어진다.
     page_location: `${window.location.origin}${page_path}`,
+    page_referrer: '',
     page_title: document.title,
     send_to: MEASUREMENT_ID,
   })

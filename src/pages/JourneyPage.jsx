@@ -33,8 +33,8 @@ export default function JourneyPage() {
     } catch (error) { setMessage(error.message) } finally { setBusy(false) }
   }
   return <div className="journey-page">
-    <header><p className="eyebrow">일손 · 통합 이력</p><h1>{id ? '신청한 일이, 현장에 이르기까지.' : '한 건의 시작부터, 그다음까지.'}</h1>
-      <p>신청과 제작 기록에 운영 사건·개선 실험을 연결합니다. 기록이 없는 단계는 완료로 표시하지 않습니다.</p></header>
+    <header><h1>통합 이력</h1>
+      <p>기록이 없는 단계는 완료로 표시하지 않습니다.</p></header>
     {resource.loading && <p role="status">기록을 불러오는 중…</p>}
     {resource.error && <div role="alert"><p>{resource.error}</p><button className="btn-ghost" onClick={resource.reload}>다시 시도</button></div>}
     {!id && list.data && <ul className="journey-list">{list.data.items.map(app => <li key={app.id}>

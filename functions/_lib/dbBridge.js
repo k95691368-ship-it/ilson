@@ -1,5 +1,18 @@
 // Server-only Supabase bridge. Route handlers keep the D1 statement interface.
 const statementData = new WeakMap()
+const accessFailures = new WeakMap()
+
+// Only errors created at a verified scoped RPC boundary may change HTTP access
+// status. Never trust an upstream message or an arbitrary error.status property.
+export function databaseAccessFailure(error) {
+  return accessFailures.get(error) ?? null
+}
+
+// Optional logging/compatibility failures may be ignored, but a revoked scope
+// must still reach the HTTP boundary. This does not imply earlier writes failed.
+export function rethrowDatabaseAccessFailure(error) {
+  if (databaseAccessFailure(error)) throw error
+}
 
 function integerCasts(tokens) {
   // SQLite truncates integer casts; PostgreSQL rounds. Preserve elapsed-time values.
@@ -61,14 +74,19 @@ function resultOf(data) {
   }
 }
 
-export function createSupabaseDb(url, key, workspaceToken = null) {
+export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = null) {
+  if (actorEmail !== null && (workspaceToken || typeof actorEmail !== 'string' || !/^\S+@\S+\.\S+$/.test(actorEmail))) {
+    throw new Error('Invalid database actor scope')
+  }
   const endpoint = new URL(url.trim())
   if (endpoint.protocol !== 'https:' || !endpoint.hostname.endsWith('.supabase.co') || endpoint.username || endpoint.password) {
     throw new Error('Invalid Supabase URL')
   }
   const rpc = async (name, body) => {
     const response = await fetch(endpoint.origin + '/rest/v1/rpc/' + name, {
-      method: 'POST',
+      // Workers supports manual/follow, not error. Non-2xx below fails closed
+      // without forwarding service credentials to a redirect destination.
+      method: 'POST', redirect: 'manual',
       headers: { Authorization: 'Bearer ' + key.trim(), apikey: key.trim(), 'Content-Type': 'application/json' },
       body: JSON.stringify(body), signal: AbortSignal.timeout(25000),
     })
@@ -76,7 +94,18 @@ export function createSupabaseDb(url, key, workspaceToken = null) {
       // Never expose SQL, user data or service credentials through route errors.
       let code = ''
       try { code = (await response.json()).code || '' } catch { /* malformed upstream error */ }
-      throw new Error('Database request failed (' + response.status + (/^[A-Z0-9]+$/.test(code) ? '/' + code : '') + ')')
+      const error = new Error('Database request failed (' + response.status + (/^[A-Z0-9]+$/.test(code) ? '/' + code : '') + ')')
+      if ((actorEmail || workspaceToken) && (code === '28000' || code === '42501')) {
+        error.name = 'DatabaseAccessError'
+        accessFailures.set(error, Object.freeze({
+          status: code === '28000' ? 401 : 403,
+          code: code === '28000' ? 'ACCESS_REVOKED' : 'ACCESS_DENIED',
+          error: workspaceToken
+            ? code === '28000' ? '체험 공간이 만료되었습니다. 페이지를 새로 열어 주세요.' : '현재 체험 공간에서 이 자료에 접근할 수 없습니다.'
+            : code === '28000' ? '현재 계정으로 접근할 수 없습니다. 계정 권한을 확인해 주세요.' : '현재 계정에는 이 자료를 조회하거나 변경할 권한이 없습니다.',
+        }))
+      }
+      throw error
     }
     return response.json()
   }
@@ -84,7 +113,9 @@ export function createSupabaseDb(url, key, workspaceToken = null) {
     ? sql.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|E?'(?:''|\\.|[^'])*'|"(?:""|[^"])*"|\b(datetime|julianday|group_concat)\s*\(/gi,
       (match, name) => name ? `public.${name}(` : match)
     : sql
-  const queryRpc = (sql) => workspaceToken
+  const queryRpc = (sql) => actorEmail
+    ? rpc('ilson_actor_query', { p_actor: actorEmail, p_sql: sql })
+    : workspaceToken
     ? rpc('ilson_workspace_query', { p_token: workspaceToken, p_sql: scopedSql(sql) })
     : rpc('ilson_execute', { p_sql: sql })
   const owner = {}
@@ -103,18 +134,50 @@ export function createSupabaseDb(url, key, workspaceToken = null) {
   }
   return {
     provider: 'supabase', prepare,
+    actorEmail,
+    forActor: email => {
+      if (workspaceToken) throw new Error('A demonstration database cannot switch to production actor scope')
+      const normalized = String(email).trim().toLowerCase()
+      if (actorEmail && normalized !== actorEmail) throw new Error('Database actor scope cannot be switched')
+      return createSupabaseDb(url, key, null, normalized)
+    },
     workspace: Boolean(workspaceToken),
+    toolRunScope: async () => {
+      const identity = actorEmail ? `actor:${actorEmail}` : workspaceToken ? `workspace:${workspaceToken}` : 'legacy:public'
+      const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(identity))
+      return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+    },
+    recordToolRun: (slug, bucket, requestId, fingerprint, run) => rpc('ilson_record_tool_run', {
+      p_token: workspaceToken, p_actor: actorEmail, p_slug: slug, p_bucket: bucket,
+      p_request_id: requestId, p_fingerprint: fingerprint, p_run: run,
+    }),
+    recordBetaRound: (applicationId, requestId, fingerprint, round) => rpc('ilson_record_beta_round', {
+      p_token: workspaceToken, p_actor: actorEmail, p_application: applicationId,
+      p_request_id: requestId, p_fingerprint: fingerprint, p_round: round,
+    }),
     workspaceOpen: (token, applications) => rpc('ilson_workspace_open', { p_token: token, p_applications: applications }),
     workspaceReset: (token, applications, newToken) => rpc('ilson_workspace_reset', { p_token: token, p_applications: applications, p_new_token: newToken }),
-    claimRateLimit: (bucket, maxHits, windowSeconds) => rpc('ilson_claim_rate_limit', {
-      p_token: workspaceToken, p_bucket: bucket, p_max: maxHits, p_window: windowSeconds,
+    claimRateLimit: (bucket, maxHits, windowSeconds) => rpc(actorEmail ? 'ilson_actor_claim_rate_limit' : 'ilson_claim_rate_limit', {
+      ...(actorEmail ? { p_actor: actorEmail } : { p_token: workspaceToken }), p_bucket: bucket, p_max: maxHits, p_window: windowSeconds,
     }),
+    ...(actorEmail ? {
+      assignApplicationOwner: ({ applicationId, expectedOwnerEmail, newOwnerEmail, reason, requestId }) => rpc('ilson_assign_application_owner', {
+        p_actor: actorEmail, p_application: applicationId, p_expected_owner: expectedOwnerEmail,
+        p_new_owner: newOwnerEmail, p_reason: reason, p_request_id: requestId,
+      }),
+      rateLimitState: (bucket, maxHits, windowSeconds) => rpc('ilson_actor_rate_state', {
+        p_actor: actorEmail, p_bucket: bucket, p_max: maxHits, p_window: windowSeconds,
+      }),
+      releaseRateLimit: (bucket, ticket) => rpc('ilson_actor_release_rate_limit', {
+        p_actor: actorEmail, p_bucket: bucket, p_ticket: ticket,
+      }),
+    } : {}),
     readiness: () => rpc('ilson_readiness', { p_token: workspaceToken }),
-    mutationReceipt: (requestId, fingerprint) => rpc('ilson_mutation_receipt', {
-      p_token: workspaceToken, p_request_id: requestId, p_fingerprint: fingerprint,
+    mutationReceipt: (requestId, fingerprint) => rpc(actorEmail ? 'ilson_actor_receipt' : 'ilson_mutation_receipt', {
+      ...(actorEmail ? { p_actor: actorEmail } : { p_token: workspaceToken }), p_request_id: requestId, p_fingerprint: fingerprint,
     }),
-    commitMutation: (requestId, fingerprint, reads, writes, response) => rpc('ilson_commit_mutation', {
-      p_token: workspaceToken, p_request_id: requestId, p_fingerprint: fingerprint,
+    commitMutation: (requestId, fingerprint, reads, writes, response) => rpc(actorEmail ? 'ilson_actor_commit' : 'ilson_commit_mutation', {
+      ...(actorEmail ? { p_actor: actorEmail } : { p_token: workspaceToken }), p_request_id: requestId, p_fingerprint: fingerprint,
       p_reads: reads.map(row => ({ sql: scopedSql(compileSql(row.sql, row.binds)), rows: row.rows })),
       p_writes: writes.map(row => scopedSql(compileSql(row.sql, row.binds))), p_response: response,
     }),
@@ -126,7 +189,9 @@ export function createSupabaseDb(url, key, workspaceToken = null) {
       })
       if (!sql.length) return []
       // One RPC = one PostgreSQL transaction. Any failure rolls back the batch.
-      const data = workspaceToken
+      const data = actorEmail
+        ? await rpc('ilson_actor_batch', { p_actor: actorEmail, p_statements: sql })
+        : workspaceToken
         ? await rpc('ilson_workspace_batch', { p_token: workspaceToken, p_statements: sql.map(scopedSql) })
         : await rpc('ilson_batch', { p_statements: sql })
       if (!Array.isArray(data) || data.length !== sql.length) throw new Error('Invalid Supabase batch response')

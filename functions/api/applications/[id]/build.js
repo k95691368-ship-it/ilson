@@ -6,7 +6,8 @@
 // 파일이 서버로 올라오지 않는 이유가 둘이다. 정산 자료를 굳이 밖으로 내보낼
 // 이유가 없고, 올리고 기다리는 시간이 없어 결과가 즉시 나온다.
 
-import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { databaseAccessFailure, rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 
@@ -82,8 +83,8 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       quarantine,
       aliases,
     })
-  } catch {
-    return jsonError('제작 기록을 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '제작 기록을 불러오지 못했습니다.')
   }
 }
 
@@ -126,8 +127,8 @@ export async function onRequestPost({ env, data: requestData, params, request })
         )
         .run()
       return jsonResponse({ ok: true, external_code: external, canonical_code: canonical }, 201)
-    } catch {
-      return jsonError('저장하지 못했습니다.', 500)
+    } catch (error) {
+      return failUnexpected(error, '저장하지 못했습니다.', 500)
     }
   }
 
@@ -275,7 +276,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         why: '합계 줄과 모르는 상품코드를 조용히 버리면 합계가 조용히 틀린다. 버리지 않고 사람이 보게 한다.',
         linkKind: 'build_run',
         linkId: runId,
-      }).catch(() => {})
+      }).catch(rethrowDatabaseAccessFailure)
     }
 
     await env.DB.prepare(
@@ -283,10 +284,13 @@ export async function onRequestPost({ env, data: requestData, params, request })
     )
       .bind(app.id)
       .run()
-      .catch(() => {})
+      .catch(rethrowDatabaseAccessFailure)
 
     return jsonResponse({ ok: true, run_id: runId, seq }, 201)
-  } catch {
+  } catch (error) {
+    // A later permission failure does not prove the earlier records were absent.
+    // Preserve them, and do not turn an access error into destructive cleanup.
+    if (databaseAccessFailure(error)) return failUnexpected(error, '제작 기록의 저장 여부를 확인하지 못했습니다.')
     // 머리글은 들어갔는데 줄에서 엎어지면 "N줄 처리함"이라고 적힌 채 되짚을
     // 줄이 하나도 없는 실행이 남는다. 화면은 그 머리글을 읽으니 처리 건수는
     // 멀쩡해 보이고, 눌러 봐야 빈다 — 실제로 라이브에서 그런 실행이 하나
@@ -299,7 +303,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         .run()
         .catch(() => {})
     }
-    return jsonError('제작 기록을 저장하지 못했습니다.', 500)
+    return failUnexpected(error, '제작 기록을 저장하지 못했습니다.', 500)
   }
 }
 

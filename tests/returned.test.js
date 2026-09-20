@@ -16,6 +16,8 @@ const row = (over = {}) => ({
   median_seconds: 5400,
   people: 1,
   runs: 10,
+  success_count: 10,
+  failed_count: 0,
   duration_total_ms: 60000,
   review_seconds: 600,
   rework_seconds: 0,
@@ -46,8 +48,8 @@ describe('한 건이 돌려준 시간', () => {
     expect(returnedSecondsOf(row({ median_seconds: 0 }))).toBe(0)
   })
 
-  it('자동화가 더 오래 걸렸으면 음수로 안 간다', () => {
-    expect(returnedSecondsOf(row({ review_seconds: 999999 }))).toBe(0)
+  it('자동화가 더 오래 걸렸으면 추가 소요도 숨기지 않는다', () => {
+    expect(returnedSecondsOf(row({ review_seconds: 999999 }))).toBe(5400 * 10 - 60 - 999999)
   })
 
   it('빈 입력에도 터지지 않는다', () => {

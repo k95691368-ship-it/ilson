@@ -10,12 +10,12 @@ import { validDate, qualitySummary } from '../shared/fieldFeedback.js'
 vi.mock('../functions/_lib/access.js', () => ({ verifiedAccessEmail: async env => env.TEST_EMAIL || null }))
 const pg = new PGlite()
 const DB = createSupabaseDb('https://feedback-test.supabase.co', 'test-only')
-const root = { DB, OVERRIDE_DEMO_MODE: 'false' }
+const root = { DB, UNSCOPED_DB: DB, OVERRIDE_DEMO_MODE: 'false' }
 const env = email => ({ ...root, TEST_EMAIL: email })
 let queue = Promise.resolve()
 beforeAll(async () => {
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-  for (const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop.sql','0003_journey_workspaces.sql','0004_audit_hardening.sql','0005_field_feedback.sql'])
+  for (const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop.sql','0003_journey_workspaces.sql','0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql'])
     await pg.exec(readFileSync(new URL(`../supabase/migrations/${file}`, import.meta.url), 'utf8'))
   vi.stubGlobal('fetch', (url, options) => {
     if (!String(url).startsWith('https://feedback-test.supabase.co/rest/v1/rpc/')) throw Error('External call blocked')
@@ -131,4 +131,16 @@ describe.sequential('field feedback: real PostgreSQL and authenticated handlers'
     const access=(await pg.query("SELECT has_table_privilege('anon','public.field_feedback_case','SELECT') allowed, has_function_privilege('service_role','public.ilson_install_field_feedback(text)','EXECUTE') helper")).rows[0]
     expect(access).toEqual({allowed:false,helper:false})
   },60000)
+  it('loads manager feedback in two batched RPCs without dropping related records', async () => {
+    const batch = vi.spyOn(DB, 'batch')
+    try {
+      const snapshot = await ok(await get('manager@test.invalid'), 200)
+      expect(batch).toHaveBeenCalledTimes(2)
+      expect(batch.mock.calls.map(([statements]) => statements.length)).toEqual([6, 3])
+      expect(snapshot.cases.find(item => item.id === caseId).updates[0].id).toBe(updateId)
+      expect(snapshot.samples).toHaveLength(2)
+      expect(snapshot.nonuseSummary).toHaveLength(1)
+      expect(snapshot.nonuse).toHaveLength(0)
+    } finally { batch.mockRestore() }
+  })
 })

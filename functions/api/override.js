@@ -2,8 +2,12 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/htt
 import { newId } from '../_lib/ids.js'
 import { integrationConfig } from '../_lib/integrationConfig.js'
 import { createFeedbackCase } from '../_lib/fieldFeedback.js'
+import { hydrateEvent } from '../_lib/overrideEvents.js'
 import { overrideMetrics } from '../_lib/overrideMetrics.js'
 import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.js'
+import { isAccessAdmin, scopeEnvironment } from '../_lib/authorization.js'
+import { assertClusterClosable } from '../_lib/issueWorkflow.js'
+import { validDate } from '../../shared/fieldFeedback.js'
 import {
   ensureOverrideSchema,
   seedOverrideWorkspace,
@@ -23,12 +27,14 @@ import {
   causeByKey,
   compareDecision,
   evaluateExperimentRun,
+  experimentRunTimingError,
   validEvaluationPlan,
   priorityBand,
   priorityScore,
   recommendCluster,
   safeJson,
   suggestCauses,
+  roleCan,
 } from '../../shared/override.js'
 
 const ALLOWED_ACTIONS = new Set(DECISION_ACTIONS.map((item) => item.key))
@@ -46,22 +52,14 @@ function number(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
   return Math.min(max, Math.max(min, parsed))
 }
 
+const optionalNumber = (value, min = 0, max = Number.MAX_SAFE_INTEGER) => value == null || value === '' ? null : number(value,min,max)
+
 function list(value) {
   if (Array.isArray(value)) return value.map((item) => text(item, 500)).filter(Boolean)
   return text(value, 3000)
     .split(/[\n,]/)
     .map((item) => item.trim())
     .filter(Boolean)
-}
-
-function hydrateEvent(row) {
-  return {
-    ...row,
-    changed_fields: safeJson(row.changed_fields_json, []),
-    policy_refs: safeJson(row.policy_refs_json, []),
-    data_refs: safeJson(row.data_refs_json, []),
-    tools: safeJson(row.tools_json, []),
-  }
 }
 
 function hydrateCluster(row) {
@@ -161,6 +159,46 @@ function buildAlerts(clusters, experiments) {
   return alerts
 }
 
+function accountRow(row) {
+  return { email:row.email, display_name:row.display_name, role:row.role, active:Number(row.active) === 1,
+    departments:safeJson(row.departments_json,[]), product_ids:safeJson(row.product_ids_json,[]) }
+}
+
+function accountCanHandle(account, product) {
+  return account.active && roleCan(account.role,'update_cluster') && (isAccessAdmin(account)
+    || account.product_ids.includes(product.id) || account.departments.includes(product.owner_team))
+}
+
+async function assignmentDirectory(env, actor, products) {
+  if (actor.role === 'reviewer') return {candidates:[],actors:[]}
+  const rows = (await (env.UNSCOPED_DB ?? env.DB).prepare('SELECT email,display_name,role,active,departments_json,product_ids_json FROM override_actor ORDER BY display_name,email').all()).results
+  const accounts = rows.map(accountRow)
+  return {actors:isAccessAdmin(actor) ? accounts : [], candidates:accounts
+    .filter(account=>account.active && roleCan(account.role,'update_cluster') && (isAccessAdmin(actor) || products.some(product=>accountCanHandle(account,product))))
+    .map(account=>({email:account.email,label:account.display_name,departments:account.departments,product_ids:account.product_ids}))}
+}
+
+async function allowedAssignee(env, email, cluster) {
+  if (overrideDemoMode(env)) return null
+  const directory = env.UNSCOPED_DB ?? env.DB
+  const row = await directory.prepare('SELECT email,display_name,role,active,departments_json,product_ids_json FROM override_actor WHERE email=?').bind(email).first()
+  if (!row) return null
+  const products = (await env.DB.prepare('SELECT * FROM override_product WHERE id=?').bind(cluster.scope_product_id).all()).results
+  return products.some(product=>accountCanHandle(accountRow(row),product)) ? row : null
+}
+
+async function acknowledgeCluster(env, actor, body) {
+  const cluster = await env.DB.prepare('SELECT * FROM issue_cluster WHERE id=?').bind(text(body.clusterId,100)).first()
+  if (!cluster) return jsonError('그 문제를 찾지 못했습니다.',404)
+  const mine = overrideDemoMode(env) ? cluster.assignee_email === 'demo-owner@ilson.invalid' && roleCan(actor.role,'update_cluster') : cluster.assignee_email === actor.email
+  if (!mine) return jsonError('배정된 담당자만 접수를 확인할 수 있습니다.',403)
+  if (!cluster.acknowledged_at) {
+    await env.DB.prepare("UPDATE issue_cluster SET acknowledged_at=datetime('now'),updated_at=datetime('now') WHERE id=?").bind(cluster.id).run()
+    await auditOverride(env,actor,'acknowledge_cluster','issue_cluster',cluster.id,{})
+  }
+  return jsonResponse({ok:true})
+}
+
 async function loadWorkspace(env) {
   const [productRows, eventRows, clusterRows, experimentRows, runRows, decisionRows, volumeRows, integrationRows, auditRows, aiRows] =
     await Promise.all([
@@ -191,7 +229,10 @@ async function loadWorkspace(env) {
   const volumes = volumeRows.results ?? []
 
   const analytics = await overrideMetrics(env.DB, products)
-  const clusters = rawClusters.map(cluster => ({ ...cluster, recurrence_count:analytics.clusterCounts.get(cluster.id)||0, trend: analytics.trends.get(cluster.id) }))
+  const clusters = rawClusters.map(cluster => ({ ...cluster,
+    recurrence_count:analytics.clusterCounts.get(cluster.id)||0,
+    visible_event_count:analytics.clusterVisibility.get(cluster.id)?.total || 0,
+    trend: analytics.trends.get(cluster.id) }))
   const confirmedClusters = clusters.filter(cluster => cluster.cause_confirmed_at)
 
   const workspace = {
@@ -217,6 +258,7 @@ async function loadWorkspace(env) {
     execution: { mode: overrideDemoMode(env) ? 'simulation' : 'manual_evidence', external_rollout: false },
     metrics: {
       ...analytics.metrics,
+      totals_scope: overrideDemoMode(env) ? analytics.metrics.totals_scope : '계정에 열람이 허용된 전체 이력 · 유효 판정만 수정 사건에 포함',
       active_clusters: clusters.filter((cluster) => !['resolved', 'accepted_exception'].includes(cluster.status)).length,
       p0_clusters: clusters.filter(
         (cluster) => priorityBand(cluster.priority_score) === 'P0' && cluster.status !== 'resolved'
@@ -243,11 +285,20 @@ export async function onRequestGet({ env, data: requestData, request }) {
   try {
     await ensureOverrideSchema(env)
     await seedOverrideWorkspace(env)
+    const actor = await resolveOverrideActor(env, request)
+    if (!actor) return jsonError('인증된 사내 계정이 필요합니다.',401)
+    if (!overrideDemoMode(env)) env = scopeEnvironment(env, actor)
     const workspace = await loadWorkspace(env)
     if (!overrideDemoMode(env)) {
-      const actor = await resolveOverrideActor(env,request)
-      if (!actor) return jsonError('인증된 사내 계정이 필요합니다.',401)
-      workspace.current_actor = {role:actor.role,label:actor.label}
+      workspace.current_actor = {role:actor.role,label:actor.label,email:actor.email,is_admin:isAccessAdmin(actor)}
+      // A product name is enough for the first report; no other team's metadata is exposed.
+      workspace.capture_products = (await env.UNSCOPED_DB.prepare('SELECT id, name FROM override_product ORDER BY name').all()).results
+      const directory = await assignmentDirectory(env, actor, workspace.products)
+      workspace.assignment_candidates = directory.candidates
+      workspace.actors = directory.actors
+    } else {
+      workspace.assignment_candidates = [{email:'demo-owner@ilson.invalid',label:'시연 담당자',departments:[],product_ids:workspace.products.map(item=>item.id)}]
+      workspace.actors = []
     }
     return jsonResponse(workspace)
   } catch (error) {
@@ -258,6 +309,14 @@ export async function onRequestGet({ env, data: requestData, request }) {
 async function refreshCluster(env, clusterId) {
   if (!clusterId) return
   // Runs after the event write, in the same transaction; no read of staged data.
+  // Real users have row-limited event visibility. The protected database helper
+  // checks issue access and aggregates every valid event without revealing them.
+  const aggregate = env.DB.actorEmail
+    ? 'SELECT * FROM ilson_private.scope_cluster_totals(?)'
+    : `SELECT count(*) AS n, avg(customer_impact_score) AS customer,
+       sum(operations_cost_krw) AS cost, max(regulatory_risk_score) AS regulation,
+       min(occurred_at) AS first_seen,max(occurred_at) AS last_seen FROM override_event
+       WHERE cluster_id=? AND is_override=1 AND validity='valid'`
   await env.DB.prepare(
     `UPDATE issue_cluster
      SET recurrence_count = s.n, customer_impact_score = s.customer,
@@ -268,10 +327,7 @@ async function refreshCluster(env, clusterId) {
            + least(1,log((greatest(0,s.cost)+1)::numeric)/6)*20)::numeric,1),
          first_seen_at = coalesce(s.first_seen,first_seen_at),
          last_seen_at = coalesce(s.last_seen,last_seen_at), updated_at = datetime('now')
-     FROM (SELECT count(*) AS n, coalesce(avg(customer_impact_score),0) AS customer,
-       coalesce(sum(operations_cost_krw),0) AS cost, coalesce(max(regulatory_risk_score),0) AS regulation,
-       min(occurred_at) AS first_seen,max(occurred_at) AS last_seen FROM override_event
-       WHERE cluster_id=? AND is_override=1 AND validity='valid') s WHERE id=?`
+     FROM (${aggregate}) s WHERE id=?`
   )
     .bind(clusterId, clusterId)
     .run()
@@ -285,7 +341,7 @@ async function captureEvent(env, actor, body) {
   const aiDecision = text(body.aiDecision)
   const humanDecision = text(body.humanDecision)
   const reasonDetail = text(body.reasonDetail, 2000)
-  const reviewerLabel = text(body.reviewerLabel || actor.label, 60)
+  const reviewerLabel = text(actor.mode === 'access' ? actor.label : body.reviewerLabel || actor.label, 60)
   if (!productId) fields.productId = 'AI 제품을 선택해주세요.'
   if (!ALLOWED_ACTIONS.has(decisionAction)) fields.decisionAction = '최종 판단을 선택해주세요.'
   if (!aiDecision) fields.aiDecision = 'AI의 원래 판단을 적어주세요.'
@@ -294,7 +350,8 @@ async function captureEvent(env, actor, body) {
   if (!reviewerLabel) fields.reviewerLabel = '검토자를 적어주세요.'
   if (Object.keys(fields).length) return failFields(fields)
 
-  const product = await env.DB.prepare('SELECT * FROM override_product WHERE id = ?')
+  const productDb = actor.mode === 'access' && actor.role === 'reviewer' ? env.UNSCOPED_DB : env.DB
+  const product = await productDb.prepare('SELECT id, domain, model_version, prompt_version, agent_version, tool_version FROM override_product WHERE id = ?')
     .bind(productId)
     .first()
   if (!product) return jsonError('선택한 AI 제품을 찾지 못했습니다.', 404)
@@ -313,10 +370,10 @@ async function captureEvent(env, actor, body) {
   let clusterId = null
 
   if (action.isOverride) {
-    const { results: openClusters } = await env.DB.prepare(
+    const { results: openClusters } = actor.mode === 'access' && actor.role === 'reviewer' ? {results:[]} : await env.DB.prepare(
       `SELECT * FROM issue_cluster WHERE status NOT IN ('resolved', 'accepted_exception') ORDER BY id`
     ).all()
-    const hydrated = (openClusters ?? []).map(hydrateCluster)
+    const hydrated = (openClusters ?? []).filter(item => overrideDemoMode(env) || item.scope_product_id === productId).map(hydrateCluster)
     const recommendation = recommendCluster(
       { ...eventShape, causeKey: suggestedCause },
       hydrated
@@ -337,8 +394,8 @@ async function captureEvent(env, actor, body) {
          (id, title, summary, sample_text, cause_code, cause_status, cause_candidates_json,
           policy_refs_json, affected_workflow, affected_customer_count, customer_impact_score,
           operations_cost_krw, regulatory_risk_score, recurrence_count, owner_team,
-          priority_score, status)
-         VALUES (?, ?, ?, ?, ?, 'candidate', ?, ?, ?, 1, ?, ?, ?, 1, ?, ?, 'open')`
+          priority_score, status, scope_product_id, created_by_email)
+         VALUES (?, ?, ?, ?, ?, 'candidate', ?, ?, ?, 1, ?, ?, ?, 1, ?, ?, 'open', ?, ?)`
       )
         .bind(
           clusterId,
@@ -349,11 +406,13 @@ async function captureEvent(env, actor, body) {
           JSON.stringify(candidates),
           JSON.stringify(policyRefs),
           text(body.workflow || product.domain, 120),
-          number(body.customerImpact, 0, 5),
-          number(body.operationsCost, 0),
-          number(body.regulatoryRisk, 0, 5),
+          optionalNumber(body.customerImpact, 0, 5),
+          optionalNumber(body.operationsCost, 0),
+          optionalNumber(body.regulatoryRisk, 0, 5),
           owner,
-          initialPriority
+          initialPriority,
+          productId,
+          actor.email
         )
         .run()
     }
@@ -372,9 +431,9 @@ async function captureEvent(env, actor, body) {
         changed_fields_json, reason_code, reason_detail, policy_refs_json, model_version,
         prompt_version, agent_version, tool_version, data_refs_json, tools_json, segment,
         customer_impact_score, operations_cost_krw, regulatory_risk_score, customer_outcome,
-        business_outcome, recording_seconds, validity, validity_reason)
+        business_outcome, recording_seconds, validity, validity_reason, reporter_email)
        VALUES (?, ?, ?, ?, ?, datetime('now'), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
-               ?, ?, ?, ?, ?, ?, ?, ?)`
+               ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
       .bind(
         id,
@@ -401,14 +460,15 @@ async function captureEvent(env, actor, body) {
         JSON.stringify(list(body.dataRefs)),
         JSON.stringify(list(body.tools)),
         text(body.segment, 120) || '미분류',
-        number(body.customerImpact, 0, 5),
-        number(body.operationsCost, 0),
-        number(body.regulatoryRisk, 0, 5),
+        optionalNumber(body.customerImpact, 0, 5),
+        optionalNumber(body.operationsCost, 0),
+        optionalNumber(body.regulatoryRisk, 0, 5),
         text(body.customerOutcome, 1200) || null,
         text(body.businessOutcome, 1200) || null,
-        number(body.recordingSeconds, 0, 3600),
+        optionalNumber(body.recordingSeconds, 0, 3600),
         action.isOverride ? 'pending' : 'valid',
-        action.isOverride ? null : 'AI 판단 승인'
+        action.isOverride ? null : 'AI 판단 승인',
+        actor.email
       )
       .run()
   } catch (error) {
@@ -464,9 +524,9 @@ async function updateCluster(env, actor, body) {
   const ownerTeam = text(body.ownerTeam, 120) || causeByKey(causeCode).owner
   const reason = text(body.reason, 1600)
   if (!reason) return failFields({ reason: '원인 판정 또는 배정의 근거를 적어주세요.' })
-  const customer = number(body.customerImpact ?? cluster.customer_impact_score, 0, 5)
-  const cost = number(body.operationsCost ?? cluster.operations_cost_krw, 0)
-  const regulation = number(body.regulatoryRisk ?? cluster.regulatory_risk_score, 0, 5)
+  const customer = optionalNumber(Object.hasOwn(body,'customerImpact') ? body.customerImpact : cluster.customer_impact_score, 0, 5)
+  const cost = optionalNumber(Object.hasOwn(body,'operationsCost') ? body.operationsCost : cluster.operations_cost_krw, 0)
+  const regulation = optionalNumber(Object.hasOwn(body,'regulatoryRisk') ? body.regulatoryRisk : cluster.regulatory_risk_score, 0, 5)
   const score = priorityScore({
     customerImpact: customer,
     operationsCost: cost,
@@ -478,11 +538,26 @@ async function updateCluster(env, actor, body) {
   )
     ? body.status
     : cluster.status
+  await assertClusterClosable(env.DB, clusterId, status)
+  const assigneeEmail = Object.hasOwn(body, 'assigneeEmail') ? text(body.assigneeEmail,240).toLowerCase() || null : cluster.assignee_email
+  const nextResponseOn = Object.hasOwn(body, 'nextResponseOn') ? text(body.nextResponseOn,10) || null : cluster.next_response_on
+  if (nextResponseOn && !validDate(nextResponseOn)) return failFields({nextResponseOn:'올바른 회신 날짜를 선택해주세요.'})
+  if (assigneeEmail && !nextResponseOn) return failFields({nextResponseOn:'담당자를 배정할 때 다음 회신일을 지정해주세요.'})
+  if (!assigneeEmail && nextResponseOn) return failFields({assigneeEmail:'회신할 담당자를 먼저 선택해주세요.'})
+  let assigneeLabel = null
+  if (assigneeEmail) {
+    const candidate = overrideDemoMode(env) && assigneeEmail === 'demo-owner@ilson.invalid'
+      ? {display_name:'시연 담당자'} : await allowedAssignee(env, assigneeEmail, cluster)
+    if (!candidate) return failFields({assigneeEmail:'이 문제를 처리할 권한이 있는 활성 담당자를 선택해주세요.'})
+    assigneeLabel = candidate.display_name
+  }
+  const reassigned = assigneeEmail !== (cluster.assignee_email || null)
   await env.DB.prepare(
     `UPDATE issue_cluster
      SET title = ?, summary = ?, cause_code = ?, cause_status = ?, owner_team = ?,
          customer_impact_score = ?, operations_cost_krw = ?, regulatory_risk_score = ?,
-         priority_score = ?, status = ?, cause_confirmed_at = ?, updated_at = datetime('now')
+         priority_score = ?, status = ?, cause_confirmed_at = ?, assignee_email = ?, assignee_label = ?,
+         assigned_at = ?, acknowledged_at = ?, next_response_on = ?, updated_at = datetime('now')
      WHERE id = ?`
   )
     .bind(
@@ -497,6 +572,10 @@ async function updateCluster(env, actor, body) {
       score,
       status,
       causeStatus === 'confirmed' ? cluster.cause_confirmed_at || new Date().toISOString() : null,
+      assigneeEmail, assigneeLabel,
+      assigneeEmail ? (reassigned ? new Date().toISOString() : cluster.assigned_at) : null,
+      reassigned || !assigneeEmail ? null : cluster.acknowledged_at,
+      nextResponseOn,
       clusterId
     )
     .run()
@@ -505,6 +584,7 @@ async function updateCluster(env, actor, body) {
     owner_team: ownerTeam,
     priority_score: score,
     reason,
+    assignee_email: assigneeEmail, next_response_on: nextResponseOn,
   })
   return jsonResponse({ ok: true, priority_score: score, priority_band: priorityBand(score) })
 }
@@ -654,17 +734,21 @@ async function recordRun(env, actor, body) {
       plan.metricType === 'rate' ? Number(value)>100 : !Number.isSafeInteger(Number(value)))) return failFields({ controlValue: '비율은 0~100, 건수는 0 이상의 정수로 입력해주세요.' })
 
   const phaseIndex = EXPERIMENT_PHASES.findIndex((item) => item.key === phase)
+  let previousRun = null
   if (phaseIndex > 0) {
     const prior = EXPERIMENT_PHASES[phaseIndex - 1].key
     const passed = await env.DB.prepare(
-      `SELECT id,status FROM experiment_run
+      `SELECT id,status,measurement_end FROM experiment_run
        WHERE experiment_id = ? AND phase = ? AND approval_id = ? AND change_version = ?
        ORDER BY run_sequence DESC LIMIT 1`
     )
       .bind(experimentId, prior, experiment.approval_id, experiment.change_version)
       .first()
     if (passed?.status !== 'passed') return jsonError(`현재 승인 주기의 최신 ${EXPERIMENT_PHASES[phaseIndex - 1].label}를 먼저 통과해야 합니다.`, 409)
+    previousRun = passed
   }
+  const timingError = experimentRunTimingError(experiment, {phase,measurement_start:new Date(start).toISOString(),measurement_end:new Date(end).toISOString()}, previousRun)
+  if (timingError) return failFields({measurementStart:timingError})
   const laterPhases = EXPERIMENT_PHASES.slice(phaseIndex+1).map(item=>item.key)
   const later = laterPhases.length ? await env.DB.prepare('SELECT id FROM experiment_run WHERE experiment_id=? AND approval_id=? AND phase IN (' + laterPhases.map(()=>'?').join(',') + ') LIMIT 1')
     .bind(experimentId, experiment.approval_id, ...laterPhases).first() : null
@@ -758,12 +842,13 @@ async function decideExperiment(env, actor, body) {
           ? '고위험 변경 승인이 없습니다.'
           : gate.missing.length
             ? `${gate.missing.join(' · ')} 결과가 필요합니다.`
-            : `통과하지 못한 단계가 있습니다: ${gate.blocked.join(' · ')}`,
+            : gate.timingIssues.length ? `측정 시간 근거를 다시 확인해주세요: ${gate.timingIssues.map(issue=>`${issue.phase} · ${issue.reason}`).join(' / ')}`
+              : `통과하지 못한 단계가 있습니다: ${gate.blocked.join(' · ')}`,
         409
       )
     }
   }
-  if (['expanded','rolled_back'].includes(experiment.status)) return jsonError('이미 종료된 실험입니다. 기존 결정을 바꾸지 말고 후속 실험을 작성해주세요.', 409)
+  if (experiment.status === 'rolled_back' || (experiment.status === 'expanded' && decision !== 'rollback')) return jsonError('이미 종료된 실험입니다. 확대 후에는 기존 근거를 보존하는 새 롤백 결정만 기록할 수 있습니다.', 409)
   if (experiment.risk_level === 'high' && !['policy', 'audit', 'executive'].includes(actor.role)) {
     return jsonError('고위험 변경의 최종 결정은 정책·감사·사업 책임자만 할 수 있습니다.', 403)
   }
@@ -808,8 +893,9 @@ async function decideExperiment(env, actor, body) {
        SET status = ?, current_phase = 'decided', updated_at = datetime('now'), mutation_version = mutation_version + 1 WHERE id = ?`
     ).bind(statusMap[decision], experimentId),
     env.DB.prepare(
-      `UPDATE issue_cluster SET status = ?, updated_at = datetime('now') WHERE id = ?`
-    ).bind(clusterStatus, experiment.cluster_id),
+      `UPDATE issue_cluster SET acknowledged_at=CASE WHEN status IN ('resolved','accepted_exception') AND ?='open' THEN NULL ELSE acknowledged_at END,
+       status = ?, updated_at = datetime('now') WHERE id = ?`
+    ).bind(clusterStatus, clusterStatus, experiment.cluster_id),
   ])
   await auditOverride(env, actor, 'decide_experiment', 'override_decision_record', id, {
     experiment_id: experimentId,
@@ -941,12 +1027,17 @@ async function syncIntegration(env, actor, body, requestId, fingerprint) {
   if (!config) return jsonError('연동 설정이 변경되었습니다. 관리자 확인이 필요합니다.',409)
   let status = 0, ok = false
   try {
-    const response = await fetch(config.endpointUrl, { method:'POST', redirect:'error', signal:AbortSignal.timeout(12000),
+    const response = await fetch(config.endpointUrl, { method:'POST', redirect:'manual', signal:AbortSignal.timeout(12000),
       headers: { 'Content-Type':'application/json', Authorization: `Bearer ${env[config.secretBinding]}`, 'Idempotency-Key':requestId },
       body:JSON.stringify(payload) })
     status = response.status; ok = response.ok
   } catch { /* The durable intent remains. Retrying uses the identical remote idempotency key. */ }
   if (!status) return jsonError('외부 전송 결과를 확인하지 못했습니다. 같은 요청으로 다시 시도해주세요.',502)
+  // A temporary rejection is not a completed operation. Keep the durable intent
+  // and its original payload/key, but allow the next user retry to reach the provider.
+  if ([408, 425, 429].includes(status) || status >= 500) {
+    return jsonError(`연동 대상의 일시 오류(${status})입니다. 잠시 후 같은 요청으로 다시 시도해주세요.`, 503)
+  }
   return atomicMutation(env.DB,requestId,fingerprint,async DB => {
     await DB.prepare(`UPDATE override_integration SET status=?,last_sync_at=datetime('now'),last_result=?,updated_at=datetime('now') WHERE id=?`)
       .bind(ok?'healthy':'error',String(status),integration.id).run()
@@ -964,15 +1055,34 @@ async function saveActor(env, actor, body) {
   if (!/^\S+@\S+\.\S+$/.test(email) || !displayName || !ALLOWED_ROLES.has(role)) {
     return failFields({ email: '메일·이름·역할을 확인해주세요.' })
   }
+  const previous = await env.DB.prepare('SELECT * FROM override_actor WHERE email=?').bind(email).first()
+  const active = Object.hasOwn(body,'active') ? body.active : previous ? Number(previous.active) === 1 : true
+  if (typeof active !== 'boolean') return failFields({active:'계정 활성 여부를 확인해주세요.'})
+  const departments = body.departments ?? safeJson(previous?.departments_json,[])
+  const productIds = body.productIds ?? safeJson(previous?.product_ids_json,[])
+  const validScope = (values,max) => Array.isArray(values) && values.length<=50 && values.every(value=>typeof value==='string' && value.trim().length>0 && value.trim().length<=max)
+  if (!validScope(departments,120) || !validScope(productIds,100)) return failFields({departments:'담당 부서와 제품을 올바르게 선택해주세요.'})
+  const uniqueDepts = [...new Set(departments.map(value=>value.trim()))]
+  const uniqueProducts = [...new Set(productIds.map(value=>value.trim()))]
+  if (uniqueProducts.length) {
+    const actual = await env.DB.prepare(`SELECT id FROM override_product WHERE id IN (${uniqueProducts.map(()=>'?').join(',')})`).bind(...uniqueProducts).all()
+    if (actual.results.length !== uniqueProducts.length) return failFields({productIds:'존재하는 제품을 선택해주세요.'})
+  }
+  if (actor.email === email && (!active || !['audit','executive'].includes(role))) return jsonError('자신의 관리자 권한을 제거할 수 없습니다. 다른 관리자가 처리해야 합니다.',409)
+  if (previous && Number(previous.active) === 1 && isAccessAdmin(previous) && (!active || !['audit','executive'].includes(role))) {
+    const admins = await env.DB.prepare("SELECT email FROM override_actor WHERE active=1 AND role IN ('audit','executive') ORDER BY email").all()
+    if (admins.results.length <= 1) return jsonError('마지막 활성 관리자 계정은 비활성화할 수 없습니다.',409)
+  }
   await env.DB.prepare(
-    `INSERT INTO override_actor (email, display_name, role, active)
-     VALUES (?, ?, ?, 1)
+    `INSERT INTO override_actor (email, display_name, role, active, departments_json, product_ids_json)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(email) DO UPDATE SET display_name = excluded.display_name,
-       role = excluded.role, active = 1, updated_at = datetime('now')`
+       role = excluded.role, active = excluded.active, departments_json=excluded.departments_json,
+       product_ids_json=excluded.product_ids_json, updated_at = datetime('now')`
   )
-    .bind(email, displayName, role)
+    .bind(email, displayName, role, active?1:0, JSON.stringify(uniqueDepts),JSON.stringify(uniqueProducts))
     .run()
-  await auditOverride(env, actor, 'save_actor', 'override_actor', email, { role, display_name: displayName })
+  await auditOverride(env, actor, 'save_actor', 'override_actor', email, { role, active, display_name: displayName, departments:uniqueDepts, product_ids:uniqueProducts })
   return jsonResponse({ ok: true })
 }
 
@@ -988,6 +1098,8 @@ export async function onRequestPost({ env, data: requestData, request }) {
     await ensureOverrideSchema(env)
     await seedOverrideWorkspace(env)
     const actor = await resolveOverrideActor(env, request, body)
+    if (!actor) return jsonError('인증된 사내 계정이 필요합니다.',401)
+    if (!overrideDemoMode(env)) env = scopeEnvironment(env, actor)
     const action = text(body.action, 80)
     if (overrideDemoMode(env) && ['sync_integration', 'save_actor'].includes(action)) {
       return jsonError('개인 체험에서는 외부 전송과 실제 계정 설정을 실행하지 않습니다.', 403)
@@ -1006,6 +1118,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
     if (action === 'capture_event') return await captureEvent(env, actor, body)
     if (action === 'validate_event') return await validateEvent(env, actor, body)
     if (action === 'update_cluster') return await updateCluster(env, actor, body)
+    if (action === 'acknowledge_cluster') return await acknowledgeCluster(env, actor, body)
     if (action === 'create_product') return await createProduct(env, actor, body)
     if (action === 'create_experiment') return await createExperiment(env, actor, body)
     if (action === 'approve_experiment') return await approveExperiment(env, actor, body)

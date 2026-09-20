@@ -51,18 +51,15 @@ export async function checkRateLimit(env, bucket, maxHits, windowSeconds) {
 // 번호로 지운다. "가장 최근 것"을 지우면, 같은 종류의 요청이 동시에 둘 들어와
 // 하나만 실패했을 때 성공한 쪽의 기록을 지울 수 있다.
 export async function releaseRateLimit(env, bucket, ticket) {
-  const stmt = ticket
-    ? env.DB.prepare('DELETE FROM rate_limit_hits WHERE id = ?').bind(ticket)
-    : env.DB.prepare(
-        `DELETE FROM rate_limit_hits WHERE id = (
-           SELECT id FROM rate_limit_hits WHERE bucket = ? ORDER BY id DESC LIMIT 1
-         )`
-      ).bind(bucket)
-  await stmt.run().catch(() => {})
+  if (!Number.isSafeInteger(ticket) || ticket <= 0) return false
+  if (env.DB.releaseRateLimit) return env.DB.releaseRateLimit(bucket, ticket).catch(() => false)
+  return env.DB.prepare('DELETE FROM rate_limit_hits WHERE id = ? AND bucket = ?').bind(ticket, bucket)
+    .run().then(result => Boolean(result.meta?.changes)).catch(() => false)
 }
 
 // 남은 횟수. 화면에 "오늘 남은 실행 12회"처럼 보여 줄 때 쓴다.
 export async function remainingQuota(env, bucket, maxHits, windowSeconds) {
+  if (env.DB.rateLimitState) return (await env.DB.rateLimitState(bucket, maxHits, windowSeconds)).remaining
   const row = await env.DB.prepare(
     `SELECT COUNT(*) AS n FROM rate_limit_hits
      WHERE bucket = ? AND created_at >= datetime('now', '-' || ? || ' seconds')`
@@ -70,4 +67,17 @@ export async function remainingQuota(env, bucket, maxHits, windowSeconds) {
     .bind(bucket, windowSeconds)
     .first()
   return Math.max(0, maxHits - (row?.n ?? 0))
+}
+
+// Keep the displayed remaining count and next opening in the same DB snapshot.
+// In real mode only a service-only RPC can inspect the actor's exact quota bucket.
+export async function quotaState(env, bucket, maxHits, windowSeconds) {
+  if (env.DB.rateLimitState) return env.DB.rateLimitState(bucket, maxHits, windowSeconds)
+  const [remaining, next] = await Promise.all([
+    remainingQuota(env, bucket, maxHits, windowSeconds),
+    env.DB.prepare(`SELECT datetime(MIN(created_at), '+' || ? || ' seconds') AS next_free
+      FROM rate_limit_hits WHERE bucket = ? AND created_at >= datetime('now', '-' || ? || ' seconds')`)
+      .bind(windowSeconds, bucket, windowSeconds).first(),
+  ])
+  return { remaining, nextFreeAt: remaining > 0 ? null : next?.next_free ?? null }
 }

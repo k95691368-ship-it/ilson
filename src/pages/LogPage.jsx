@@ -50,8 +50,7 @@ export default function LogPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">기록</span>
-        <h1>내린 결정 전부</h1>
+        <h1>결정 기록</h1>
       </header>
 
       {t && (
@@ -106,7 +105,7 @@ export default function LogPage() {
           <input
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="말로 찾기 — 제목·내용·근거·대안 어디에 있든 찾습니다"
+            placeholder="제목·내용·근거·대안 검색"
             style={{ flex: 1, minWidth: 220 }}
           />
           <button type="submit" className="btn-ghost">

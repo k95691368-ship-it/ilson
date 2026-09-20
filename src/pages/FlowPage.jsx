@@ -50,39 +50,10 @@ export default function FlowPage() {
 
   return (
     <div className="stack flow-home">
-      <header className="page-head home-hero ms-hero">
-        <span className="ms-eyebrow">일손</span>
-        <h1>반복 업무를<br />실제 도구로.</h1>
-        <p className="page-lede ms-lead">
-          함께 정의하고, 만들어 보고, 달라진 일을 확인합니다.
-        </p>
-        <div className="page-head-actions ms-actions">
-          <Link to="/apply" className="btn-primary">반복 업무 신청하기</Link>
-          <a href="#process" className="btn-ghost">과정 보기</a>
-        </div>
-        <div className="settlement-preview" aria-label="다섯 채널의 정산 파일을 표준화된 결과로 합치는 흐름">
-          <div className="settlement-sources">
-            {[
-              ['CSV', '자사몰', 'UTF-8'], ['XLSX', '오프라인', '병합 셀'],
-              ['CSV', '오픈마켓', 'CP949'], ['CSV', '해외 A', 'USD'], ['XLSX', '해외 B', 'JPY'],
-            ].map(([type, name, detail]) => <div className="source-document" key={name}><span className="source-file-type">{type}</span><strong>{name}</strong><small>{detail}</small><span className="source-file-lines" aria-hidden="true" /></div>)}
-          </div>
-          <div className="settlement-join" aria-hidden="true"><span /><span>↓</span><span /></div>
-          <div className="settlement-output">
-            <div className="settlement-output-title"><span className="output-mark" aria-hidden="true">↳</span><strong>하나로 정리된 정산</strong><span>원본까지 연결</span></div>
-            <div className="settlement-columns"><span>날짜</span><span>채널</span><span>상품</span><span>순매출</span><span>원본</span></div>
-            <div className="settlement-output-note">통화와 상품코드는 맞추고, 확인이 필요한 행은 따로 모읍니다.</div>
-          </div>
-        </div>
+      <header className="page-head flow-heading">
+        <h1>업무 현황</h1>
+        <Link to="/apply" className="btn-primary">업무 신청</Link>
       </header>
-
-      <section className="ms-feature flow-feature">
-        <span className="ms-eyebrow">원본 근거</span>
-        <h2>합쳐진 숫자에도,<br />돌아갈 곳이 있도록.</h2>
-        <p>파일에서 시트, 행까지.<br />결과를 누르면 그 숫자가 만들어진 과정을 확인합니다.</p>
-        <Link to="/build" className="ms-feature-link">정산 도구 살펴보기 ›</Link>
-        <div className="provenance-path" aria-label="원본 추적 단계"><span>원본 파일</span><b aria-hidden="true">›</b><span>시트와 행</span><b aria-hidden="true">›</b><span>변환 규칙</span><b aria-hidden="true">›</b><span>정산 결과</span></div>
-      </section>
 
       {/* 예시를 넣은 다음 무엇을 눌러야 하는가.
           "예시 세 건 넣기"를 놨더니, 눌러 보면 접수함에 세
@@ -121,10 +92,10 @@ export default function FlowPage() {
               그 칸은 넘긴 것이 있어야 뜬다. 넘긴 것이 없을 때 "넘기면 어떻게
               되는지"를 보러 갈 길이 없었다. */}
           <Link to="/tools" className="btn-ghost btn-sm">
-            넘긴 도구는 지금 어떻게 됐나
+            운영 도구
           </Link>
           <Link to="/track" className="btn-ghost btn-sm">
-            접수번호로 내 신청서 찾기
+            접수번호 조회
           </Link>
         </div>
       </div>
@@ -139,11 +110,9 @@ export default function FlowPage() {
                 <span className="flow-no">{s.no}</span>
                 <span className="flow-body">
                   <span className="flow-title">
-                    {s.title}
-                    {here > 0 && <span className="flow-count">{here}건 머물러 있음</span>}
+                    {s.label}
+                    {here > 0 && <span className="flow-count">{here}건</span>}
                   </span>
-                  <span className="flow-owner">{s.owner}</span>
-                  <span className="flow-summary">{s.summary}</span>
                 </span>
                 <span className="flow-go" aria-hidden="true">
                   →
@@ -220,12 +189,11 @@ function NextStep({ overview }) {
   return (
     <section className="nextstep">
       <div className="nextstep-head">
-        <span className="badge badge-neutral">다음은 이것</span>
         <strong className="nextstep-title">{step.label}</strong>
         <span className="spacer" />
         {/* 몇 칸 남았는지 안 보이면 끝이 없는 일처럼 느껴진다. */}
         <span className="card-note">
-          여섯 단계 중 {p.done}칸까지 왔습니다
+          {p.done} / 6단계
         </span>
       </div>
 
@@ -544,7 +512,7 @@ function Overview({ data }) {
                   ◆ {d.stage} · {ago(d.created_at)}
                   {d.unrequested === 1 && ' · 먼저 제안'}
                 </span>
-                <div className="item-body" style={{ fontSize: 14, fontWeight: 700 }}>
+                <div className="item-body" style={{ fontWeight: 600 }}>
                   {d.title}
                 </div>
                 {readableWhy(d.why) && (

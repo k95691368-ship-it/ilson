@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { ago, duration, num } from '../lib/format.js'
@@ -16,6 +18,7 @@ import {
   clearDraft,
   draftAge,
   describeDraft,
+  draftKey,
   DRAFT_MAX_DAYS,
 } from '../lib/draft.js'
 
@@ -44,8 +47,20 @@ function browserStore() {
 }
 
 export default function ApplyPage() {
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  const scope = session.status === 'active' && draftKey(session.scope) ? session.scope : null
+  return <ApplySession key={`${session.generation}:${session.status}:${session.mode ?? ''}:${scope ?? ''}`} scope={scope} generation={session.generation} status={session.status} mode={session.mode} />
+}
+
+function ApplySession({ scope, generation, status, mode }) {
   const { data, error, reload } = useApi('/applications')
   const toast = useToast()
+  const captureView = useActionLifetime(`${generation}:${status}:${scope ?? ''}`)
+  const currentSession = useCallback(() => {
+    const latest = getAccessSession()
+    const latestScope = latest.status === 'active' && draftKey(latest.scope) ? latest.scope : null
+    return latest.generation === generation && latest.status === status && latest.mode === mode && latestScope === scope
+  }, [generation, status, mode, scope])
 
   const [form, setForm] = useState(EMPTY)
   // 적다 만 것을 잃지 않는다.
@@ -68,28 +83,33 @@ export default function ApplyPage() {
   const [receipt, setReceipt] = useState(null)
 
   useEffect(() => {
-    const found = loadDraft(browserStore())
+    if (!scope || !currentSession()) return
+    const found = loadDraft(browserStore(), scope)
     if (found) setRestorable(found)
-  }, [])
+  }, [scope, currentSession])
 
   // 손을 멈추면 그때 저장한다. 한 글자마다 저장하면 쓸데없이 시끄럽다.
   //
   // 되살릴지 물어보는 중에는 저장하지 않는다. 그 사이에 저장해 버리면
   // 사람이 "이어서 쓰기"를 누르기도 전에 옛 초안이 지워진다.
   useEffect(() => {
-    if (restorable) return
-    const timer = setTimeout(() => saveDraft(browserStore(), form), 800)
+    if (!scope || restorable || !currentSession()) return
+    const current = captureView()
+    const timer = setTimeout(() => {
+      if (current() && currentSession()) saveDraft(browserStore(), scope, form)
+    }, 800)
     return () => clearTimeout(timer)
-  }, [form, restorable])
+  }, [form, restorable, scope, captureView, currentSession])
 
   // 타이핑이 멈추면 그때 묻는다. 한 글자마다 물으면 서버도 사람도 시끄럽다.
   useEffect(() => {
     const written = `${form.title}${form.bottleneck}${form.problem}`.trim()
-    if (written.length < 8) {
-      setSimilar([])
-      return
-    }
+    setSimilar([])
+    if (!scope || !currentSession() || written.length < 8) return
+    const current = captureView()
+    let active = true
     const timer = setTimeout(() => {
+      if (!current() || !currentSession()) return
       api
         .post('/applications/similar', {
           dept: form.dept,
@@ -97,13 +117,13 @@ export default function ApplyPage() {
           bottleneck: form.bottleneck,
           problem: form.problem,
         })
-        .then((r) => setSimilar(r.hits ?? []))
+        .then((r) => { if (active && current() && currentSession()) setSimilar(r.hits ?? []) })
         // 못 찾아도 신청은 계속돼야 한다. 이건 거들어 주는 기능이지
         // 신청을 막는 기능이 아니다.
-        .catch(() => setSimilar([]))
+        .catch(() => { if (active && current() && currentSession()) setSimilar([]) })
     }, 700)
-    return () => clearTimeout(timer)
-  }, [form.dept, form.title, form.bottleneck, form.problem])
+    return () => { active = false; clearTimeout(timer) }
+  }, [form.dept, form.title, form.bottleneck, form.problem, scope, captureView, currentSession])
 
   function set(key, value) {
     setForm((f) => ({ ...f, [key]: value }))
@@ -112,27 +132,31 @@ export default function ApplyPage() {
 
   async function submit(e) {
     e.preventDefault()
+    if (submitting || !currentSession()) return
     setSubmitting(true)
     setFieldErrors({})
+    const current = captureView()
 
     const body = new FormData()
     Object.entries(form).forEach(([k, v]) => body.append(k, v))
 
     try {
       const json = await api.form('/applications', body)
+      if (!current() || !currentSession()) return
       // 냈으면 초안은 쓸모가 없다. 남겨 두면 다음에 열었을 때 이미 낸 것을
       // 또 내라고 권하게 된다.
-      clearDraft(browserStore())
+      clearDraft(browserStore(), scope)
       setReceipt(json)
       setForm(EMPTY)
       toast.success(`접수됐습니다. 접수번호 ${json.ticket_no}`)
       await reload()
     } catch (err) {
+      if (!current() || !currentSession()) return
       // 칸별 오류가 있으면 그 칸 아래에 붙이고, 아니면 알림으로 알린다.
       if (err.fields) setFieldErrors(err.fields)
       toast.error(err.message)
     } finally {
-      setSubmitting(false)
+      if (current() && currentSession()) setSubmitting(false)
     }
   }
 
@@ -150,9 +174,7 @@ export default function ApplyPage() {
           <div>
             <div className="receipt-title">접수됐습니다</div>
             <p className="receipt-body">
-              접수번호 <strong className="mono">{receipt.ticket_no}</strong> — 이 번호로 진행 상황을
-              확인하실 수 있습니다. 담당자가 <strong>영업일 1일 안에</strong> 열람하고, 만들 수 있는
-              일인지부터 알려드립니다. 만들 수 없는 경우에도 이유와 대안을 함께 보내드립니다.
+              접수번호 <strong className="mono">{receipt.ticket_no}</strong>로 진행 상황을 확인하실 수 있습니다.
             </p>
             <a className="btn-ghost btn-sm" href={`/track?no=${receipt.ticket_no}`}>
               지금 진행 상황 보기
@@ -166,7 +188,8 @@ export default function ApplyPage() {
 
       <div className="grid-side">
         <form className="stack" onSubmit={submit} noValidate>
-          {restorable && (
+          {!scope && <p className="card-note" role="status">현재 계정·체험 공간 확인 전에는 초안을 자동 저장하거나 불러오지 않습니다.</p>}
+          {scope && restorable && (
             <section className="draft-restore">
               <div className="draft-restore-head">
                 <span className="draft-restore-title">적으시던 것이 있습니다</span>
@@ -181,6 +204,7 @@ export default function ApplyPage() {
                   type="button"
                   className="btn-primary btn-sm"
                   onClick={() => {
+                    if (!currentSession()) return
                     setForm({ ...EMPTY, ...restorable.form })
                     setRestorable(null)
                   }}
@@ -191,7 +215,8 @@ export default function ApplyPage() {
                   type="button"
                   className="btn-ghost btn-sm"
                   onClick={() => {
-                    clearDraft(browserStore())
+                    if (!currentSession()) return
+                    clearDraft(browserStore(), scope)
                     setRestorable(null)
                   }}
                 >
@@ -205,7 +230,7 @@ export default function ApplyPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <h2 className="card-title">누가 신청하나요</h2>
+              <h2 className="card-title">신청자 정보</h2>
             </div>
             <div className="field-row">
               <Field label="신청 부서" required error={fieldErrors.dept}>
@@ -242,10 +267,10 @@ export default function ApplyPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <h2 className="card-title">무엇이 막혀 있나요</h2>
+              <h2 className="card-title">업무 내용</h2>
             </div>
 
-            <Field label="한 줄로" required hint="이것만 있으면 낼 수 있습니다" error={fieldErrors.title}>
+            <Field label="한 줄로" required error={fieldErrors.title}>
               <input
                 value={form.title}
                 onChange={(e) => set('title', e.target.value)}
@@ -267,7 +292,7 @@ export default function ApplyPage() {
 
             <Field
               label="무엇이 병목인가요"
-              hint="어느 대목에서 시간이 가장 많이 드는지 · 빈칸이어도 냅니다"
+              hint="선택 · 시간이 많이 드는 작업"
               error={fieldErrors.bottleneck}
               count={[form.bottleneck.length, 1000]}
             >
@@ -281,7 +306,7 @@ export default function ApplyPage() {
 
             <Field
               label="그래서 지금 무슨 일이 생기나요"
-              hint="실제로 있었던 일이 있으면 가장 좋습니다 · 빈칸이어도 냅니다"
+              hint="선택 · 실제 발생한 사례"
               error={fieldErrors.problem}
               count={[form.problem.length, 1500]}
             >
@@ -295,7 +320,7 @@ export default function ApplyPage() {
 
             <Field
               label="이렇게 되면 좋겠다"
-              hint="선택. 바라는 모습이 있으면 적어 주세요"
+              hint="선택"
               error={fieldErrors.wish}
               count={[form.wish.length, 1000]}
             >
@@ -309,7 +334,7 @@ export default function ApplyPage() {
 
             <Field
               label="틀리면 무슨 일이 생기나요"
-              hint="선택. 무엇을 먼저 할지 정할 때 이 답이 가장 큽니다"
+              hint="선택 · 오류 발생 시 영향"
               error={fieldErrors.impact_if_wrong}
             >
               <textarea
@@ -323,7 +348,7 @@ export default function ApplyPage() {
 
           <section className="card card-boxed">
             <div className="card-head">
-              <h2 className="card-title">지금 얼마나 드나요</h2>
+              <h2 className="card-title">현재 소요 시간</h2>
             </div>
             <div className="field-row">
               <Field label="한 번에 몇 분" hint="분 단위" error={fieldErrors.current_minutes}>

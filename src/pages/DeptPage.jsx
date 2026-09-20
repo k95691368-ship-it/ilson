@@ -26,15 +26,14 @@ export default function DeptPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">부서</span>
-        <h1>{data.dept}와 나 사이에 있었던 일</h1>
+        <h1>{data.dept} 업무 현황</h1>
       </header>
 
       {/* 내가 빚진 것. 맨 위다. */}
       {data.owed.length > 0 ? (
         <section className="owed">
           <div className="owed-head">
-            <span className="owed-title">내가 {data.dept}에 못 준 것 {data.owed.length}가지</span>
+            <span className="owed-title">처리 대기 {data.owed.length}건</span>
           </div>
           <ol>
             {data.owed.map((o, i) => (
@@ -55,7 +54,7 @@ export default function DeptPage() {
         </section>
       ) : (
         <section className="card decided">
-          <h2 className="card-title">{data.dept}에 밀린 것은 없습니다</h2>
+          <h2 className="card-title">처리 대기 0건</h2>
         </section>
       )}
 
@@ -66,7 +65,7 @@ export default function DeptPage() {
       {data.returned?.show && (
         <section className="returned">
           <div className="returned-head">
-            <span className="badge badge-success">돌려드린 것</span>
+            <span className="badge badge-neutral">업무 시간 변화</span>
             <strong className="returned-line">{returnedLine(data.dept, data.returned)}</strong>
           </div>
           <p className="card-note returned-note">{returnedNote(data.returned)}</p>
@@ -80,8 +79,8 @@ export default function DeptPage() {
                   </Link>
                   <span className="returned-title">{x.title}</span>
                   <span className="returned-hours">
-                    {num(x.hours, 1)}시간
-                    <span className="card-note"> · {num(x.runs, 0)}번 돌림</span>
+                    {x.seconds < 0 ? '추가 소요' : '절감'} {num(Math.abs(x.seconds) / 60, 1)}분
+                    <span className="card-note"> · 총 {num(x.runs, 0)}회 시도 / 성공 {num(x.successCount, 0)}회 / 실패 {num(x.failedCount, 0)}회{x.unknownCount > 0 ? ` / 미확인 ${x.unknownCount}회` : ''}</span>
                   </span>
                   {/* 반박이 남아 있으면 성과 화면이 '보수적 추정'으로
                       내린다. 여기서만 당당하면 두 화면이 다른 말을 한다. */}
@@ -101,8 +100,8 @@ export default function DeptPage() {
                   </Link>
                   <span className="returned-title">{x.title}</span>
                   <span className="returned-hours">
-                    {num(x.hours, 1)}시간분
-                    <span className="card-note"> · 확인 전</span>
+                    {x.seconds < 0 ? '추가 소요' : '절감'} {num(Math.abs(x.seconds) / 60, 1)}분
+                    <span className="card-note"> · 총 {num(x.runs, 0)}회 시도 / 성공 {num(x.successCount, 0)}회 · 확인 전</span>
                   </span>
                 </li>
               ))}
@@ -164,8 +163,8 @@ export default function DeptPage() {
           value={`연 ${num(s.claimedAnnualHours, 0)}시간`}
           note={
             s.claimedMissing > 0
-              ? `${s.claimedMissing}건은 안 적었습니다 · 실측이 아닌 체감치입니다`
-              : '실측이 아닌 체감치입니다'
+              ? `미입력 ${s.claimedMissing}건 제외 · 체감치, 실측 아님`
+              : '체감치, 실측 아님'
           }
         />
         <Tile

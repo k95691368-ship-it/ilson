@@ -24,7 +24,7 @@ const baseline = {
 }
 
 // 한 번 돌 때 자동 60초 + 검토 300초 + 재작업 0
-const run = (o = {}) => ({ duration_ms: 60000, human_review_seconds: 300, rework_seconds: 0, ...o })
+const run = (o = {}) => ({ ok: 1, duration_ms: 60000, human_review_seconds: 300, rework_seconds: 0, ...o })
 
 describe('아낀 시간', () => {
   it('사람이 하던 시간은 중앙값 × 사람 수 × 횟수다', () => {
@@ -210,13 +210,13 @@ describe('스스로 반박하기', () => {
 
   it('반박이 남아 있으면 보수적 추정으로 낮춰 부른다', () => {
     // 숫자는 안 바꾼다. 부르는 이름만 바꾼다 — 몰래 깎는 것도 정직하지 않다.
-    const l = labelForOutcome({ status: '인정' }, 3)
+    const l = labelForOutcome({ status: '인정', successCount: 1 }, 3)
     expect(l.label).toBe('보수적 추정')
     expect(l.note).toContain('3개')
   })
 
   it('반박이 없으면 확인됨이다', () => {
-    expect(labelForOutcome({ status: '인정' }, 0).label).toBe('확인됨')
+    expect(labelForOutcome({ status: '인정', successCount: 1 }, 0).label).toBe('확인됨')
   })
 })
 
@@ -248,7 +248,7 @@ describe('두 곳에 있는 같은 표', () => {
 describe('인원수가 절감액에 그대로 곱해진다', () => {
   const one = { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 }
   const three = { ...one, people: 3 }
-  const runs = [{ duration_ms: 60000, human_review_seconds: 300 }]
+  const runs = [{ ok: 1, duration_ms: 60000, human_review_seconds: 300 }]
 
   it('세 명이면 아낀 시간이 세 배다', () => {
     const a = computeOutcome({ baseline: one, runs })
@@ -272,7 +272,7 @@ describe('인원수가 절감액에 그대로 곱해진다', () => {
 // 묻는 것 자체가 연기다.
 describe('부서가 다르다고 하면', () => {
   const baseline5 = { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 }
-  const runs = [{ duration_ms: 60000, human_review_seconds: 300 }]
+  const runs = [{ ok: 1, duration_ms: 60000, human_review_seconds: 300 }]
   const ctx = (deptFelt) => ({
     outcome: computeOutcome({ baseline: baseline5, runs, devHours: 20 }),
     quarantineLeft: 0,
@@ -311,7 +311,7 @@ describe('부서가 다르다고 하면', () => {
 
   it('그 반박이 남아 있으면 금액이 보수적 추정으로 내려간다', () => {
     const c = buildChallenges(ctx(40))
-    expect(labelForOutcome({ status: '인정' }, c.length).label).toBe('보수적 추정')
+    expect(labelForOutcome({ status: '인정', successCount: 1 }, c.length).label).toBe('보수적 추정')
   })
 })
 
@@ -322,7 +322,7 @@ describe('안 물어본 것을 0이라고 읽지 않는다', () => {
   const ctx = (deptFelt) => ({
     outcome: computeOutcome({
       baseline: { median_seconds: 5400, sample_n: 6, people: 1, hourly_wage_krw: 20000 },
-      runs: [{ duration_ms: 60000, human_review_seconds: 300 }],
+      runs: [{ ok: 1, duration_ms: 60000, human_review_seconds: 300 }],
       devHours: 20,
     }),
     quarantineLeft: 0,
@@ -350,7 +350,7 @@ describe('안 물어본 것을 0이라고 읽지 않는다', () => {
 // "사람이 검토한 시간을 0으로 뒀습니다"라는 반박이 실제로는 쟀는데도
 // 붙었다. 성과 화면은 다섯 건인데 정직 화면은 여섯 건이 되었다.
 describe('합계에서 실행 기록을 되돌릴 때', () => {
-  const totals = { count: 3, durationMs: 90000, reviewSeconds: 600, reworkSeconds: 120 }
+  const totals = { count: 3, successCount: 3, failedCount: 0, durationMs: 90000, reviewSeconds: 600, reworkSeconds: 120 }
 
   it('실행 수만큼 만든다', () => {
     expect(runsFromTotals(totals)).toHaveLength(3)

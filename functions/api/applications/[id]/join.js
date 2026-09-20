@@ -19,6 +19,7 @@ import {
   UNJOIN_KIND,
 } from '../../../../shared/join.js'
 import { withJosa } from '../../../../shared/korean.js'
+import { DEPTS } from '../../../../shared/depts.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -43,6 +44,10 @@ export async function loadJoins(env, applicationId) {
   const released = new Set(
     results.filter((r) => r.link_kind === UNJOIN_KIND).map((r) => r.link_id)
   )
+  const grants = env.DB.actorEmail
+    ? (await env.DB.prepare('SELECT id FROM application_participation WHERE application_id = ? AND revoked_at IS NULL').bind(applicationId).all()).results
+    : null
+  const verified = grants && new Set(grants.map(row => row.id))
 
   return results
     .filter((r) => r.link_kind === JOIN_KIND)
@@ -71,6 +76,7 @@ export async function loadJoins(env, applicationId) {
         story: r.what,
         at: r.created_at,
         released: released.has(r.id),
+        ...(verified ? { accessVerified: verified.has(r.id) } : {}),
       }
     })
 }
@@ -88,9 +94,10 @@ export async function onRequestGet({ env, data: requestData, params }) {
       joins,
       summary,
       line: joinLine(summary),
+      capabilities: { canAuthorizeParticipation: Boolean(env.DB.actorEmail && ['audit', 'executive'].includes(env.AUTH_ACTOR?.role)) },
     })
-  } catch {
-    return jsonError('손든 부서를 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '손든 부서를 불러오지 못했습니다.')
   }
 }
 
@@ -99,6 +106,10 @@ export async function onRequestPost({ env, data: requestData, request, params })
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `join:${ip}`, 10, 3600)
   if (!ticket) return jsonError('손들기는 시간당 10회까지 가능합니다.', 429)
+  const refund = async response => {
+    await releaseRateLimit(env, `join:${ip}`, ticket)
+    return response
+  }
 
   const app = await findApplication(env, params.id)
   if (!app) {
@@ -120,16 +131,18 @@ export async function onRequestPost({ env, data: requestData, request, params })
   // 신청서에 계속 세어지고, 정작 그 부서는 자기 신청서를 안 냈다.
   if (body.kind === 'release') {
     const joinId = String(body.join_id ?? '').trim()
-    if (!joinId) return jsonError('어느 것을 푸실지 알 수 없습니다.', 400)
+    if (!joinId) return refund(jsonError('어느 것을 푸실지 알 수 없습니다.', 400))
     const reason = String(body.reason ?? '').trim()
     if (reason.length < 5) {
-      return failFields(
+      return refund(failFields(
         { reason: '왜 다른 건인지 적어주세요. 이 문장이 그 부서에 갑니다.' },
         '적어 주신 내용을 확인해주세요.'
-      )
+      ))
     }
     try {
-      await env.DB.prepare(
+      const current = (await loadJoins(env, app.id)).find(join => join.id === joinId && !join.released)
+      if (!current) return refund(jsonError('이 신청서에 연결된 참여 기록을 찾지 못했습니다.', 404))
+      const statements = [env.DB.prepare(
         `INSERT INTO decision_log
            (id, application_id, stage, actor, title, what, why, link_kind, link_id)
          VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?)`
@@ -143,7 +156,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
           UNJOIN_KIND,
           joinId
         )
-        .run()
+        ]
+      if (env.DB.actorEmail) statements.push(env.DB.prepare(
+        "UPDATE application_participation SET revoked_at = datetime('now'), revoked_by_email = ? WHERE id = ? AND application_id = ? AND revoked_at IS NULL"
+      ).bind(env.AUTH_ACTOR.email, joinId, app.id))
+      await env.DB.batch(statements)
 
       const joins = await loadJoins(env, app.id)
       const summary = joinSummary({ application: app, joins })
@@ -155,7 +172,25 @@ export async function onRequestPost({ env, data: requestData, request, params })
         message: '풀었습니다. 그 부서에는 따로 내 주시라고 알려야 합니다.',
       })
     } catch (err) {
-      return failUnexpected(err, '풀지 못했습니다.')
+      return refund(failUnexpected(err, '풀지 못했습니다.'))
+    }
+  }
+
+  // Old free-form join logs remain evidence, not access grants. An administrator
+  // must explicitly confirm their department before enabling collaboration.
+  if (body.kind === 'authorize') {
+    if (!env.DB.actorEmail || !['audit', 'executive'].includes(env.AUTH_ACTOR?.role)) return refund(jsonError('기존 참여 기록의 권한 확인은 관리자만 할 수 있습니다.', 403))
+    try {
+      const existing = (await loadJoins(env, app.id)).find(join => join.id === body.join_id && !join.released)
+      const department = String(body.dept ?? '').trim()
+      if (!existing || !DEPTS.includes(department) || normDept(existing.dept) !== normDept(department)) return refund(jsonError('참여 기록과 확인할 부서를 다시 선택해주세요.', 400))
+      if (existing.accessVerified) return refund(jsonResponse({ ok: true, already: true }))
+      await env.DB.prepare('INSERT INTO application_participation(id,application_id,department_id,granted_by_email) VALUES(?,?,?,?)')
+        .bind(existing.id, app.id, department, env.AUTH_ACTOR.email).run()
+      return jsonResponse({ ok: true, message: '확인한 부서에 이 신청서의 기준 조회·서명 권한을 부여했습니다.' }, 201)
+    } catch (error) {
+      if (error.message.includes('/22023')) return refund(jsonError('관리자가 먼저 이 신청서의 소유 계정을 확인해야 합니다.', 409))
+      return refund(failUnexpected(error, '참여 권한을 확인하지 못했습니다.'))
     }
   }
 
@@ -172,6 +207,10 @@ export async function onRequestPost({ env, data: requestData, request, params })
     minutes: Number(body.minutes),
     people: Number(body.people) > 0 ? Number(body.people) : 1,
     frequency: t(body.frequency) || null,
+  }
+  if (env.DB.actorEmail && !DEPTS.includes(detail.dept)) {
+    await releaseRateLimit(env, `join:${ip}`, ticket)
+    return failFields({ dept: '등록된 부서 목록에서 정확한 부서명을 선택해주세요.' })
   }
 
   try {
@@ -192,18 +231,21 @@ export async function onRequestPost({ env, data: requestData, request, params })
         409
       )
     }
-    if (joins.some((j) => !j.released && normDept(j.dept) === key)) {
+    const previous = joins.find((j) => !j.released && normDept(j.dept) === key)
+    if (previous) {
       await releaseRateLimit(env, `join:${ip}`, ticket)
+      if (env.DB.actorEmail && !previous.accessVerified) return jsonError('기존 참여 기록은 접근 권한이 확인되지 않았습니다. 관리자에게 해당 부서의 참여 권한 확인을 요청해주세요.', 409)
       return jsonError(`${withJosa(detail.dept, '는')} 이미 손드셨습니다. 두 번 세지 않습니다.`, 409)
     }
 
-    await env.DB.prepare(
+    const joinId = newId('dec')
+    const statements = [env.DB.prepare(
       `INSERT INTO decision_log
          (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
        VALUES (?, ?, '신청서', 'human', ?, ?, ?, ?, ?, ?)`
     )
       .bind(
-        newId('dec'),
+        joinId,
         app.id,
         `${detail.dept} — 우리도 같은 일을 겪는다`,
         t(body.story).slice(0, 1000),
@@ -218,7 +260,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
         JOIN_KIND,
         app.id
       )
-      .run()
+      ]
+    if (env.DB.actorEmail) statements.push(env.DB.prepare(
+      'INSERT INTO application_participation(id,application_id,department_id,granted_by_email) VALUES(?,?,?,?)'
+    ).bind(joinId, app.id, detail.dept, env.AUTH_ACTOR.email))
+    await env.DB.batch(statements)
 
     const after = await loadJoins(env, app.id)
     const summary = joinSummary({ application: app, joins: after })
@@ -237,6 +283,7 @@ export async function onRequestPost({ env, data: requestData, request, params })
     )
   } catch (err) {
     await releaseRateLimit(env, `join:${ip}`, ticket)
+    if (err.message.includes('/22023')) return jsonError('관리자가 먼저 이 신청서의 소유 계정을 확인해야 합니다.', 409)
     return failUnexpected(err, '손드신 것을 남기지 못했습니다.')
   }
 }

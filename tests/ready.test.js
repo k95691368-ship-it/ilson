@@ -51,10 +51,10 @@ describe('준비됐다는 말이 무엇을 보고 하는 말인가', () => {
 
   it('세는 표가 실제로 만들어지는 표다', () => {
     // 이름을 잘못 적으면 영영 "덜 준비됐습니다"가 뜬다.
-    const sql = readdirSync(join(ROOT, 'migrations'))
+    const sql = ['migrations','supabase/migrations'].flatMap(dir => readdirSync(join(ROOT,dir))
       .filter((f) => f.endsWith('.sql'))
-      .map((f) => readFileSync(join(ROOT, 'migrations', f), 'utf8'))
-      .join('\n')
+      .map((f) => readFileSync(join(ROOT, dir, f), 'utf8')))
+      .join('\n').replaceAll('CREATE TABLE public.','CREATE TABLE ')
     const listed = [...health.matchAll(/^ {2}'(\w+)',$/gm)].map((m) => m[1])
     expect(listed.length).toBeGreaterThan(8)
     for (const t of listed) {

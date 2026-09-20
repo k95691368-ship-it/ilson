@@ -21,7 +21,8 @@
 //
 // 시연 시드(AX-DEM-*)는 어느 쪽에서도 안 건드린다. 그건 옆의 되돌리기 몫이다.
 
-import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { databaseAccessFailure } from '../../_lib/dbBridge.js'
 import { DEMO_PREFIX } from '../../../shared/provenance.js'
 
 // 지울 것을 고르는 단 하나의 규칙. 세는 쪽과 지우는 쪽이 같은 문장을 쓴다 —
@@ -87,6 +88,7 @@ async function pick(env, sql = PICK) {
 
 export async function onRequestGet({ env, data: requestData }) {
   env = requestData?.requestEnv ?? env
+  if (!env.DEMO_WORKSPACE) return jsonError('개인 체험 공간에서만 사용할 수 있습니다.', 403)
   try {
     const rows = await pick(env)
     const all = await pick(env, PICK_ALL)
@@ -103,13 +105,14 @@ export async function onRequestGet({ env, data: requestData }) {
       // 문장을 안 읽는다 — shared/tryit.js 에 적힌 것을 쓴다. 같은 말을 두
       // 군데 두면 한쪽만 고치는 날 서로 다른 말을 하게 된다.
     })
-  } catch {
-    return jsonError('세지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '세지 못했습니다.')
   }
 }
 
 export async function onRequestDelete({ env, data: requestData, request }) {
   env = requestData?.requestEnv ?? env
+  if (!env.DEMO_WORKSPACE) return jsonError('개인 체험 공간에서만 사용할 수 있습니다.', 403)
   // 몸이 없으면 ①이다. 여태 그렇게 불러 왔으므로 그 동작을 안 바꾼다.
   let body = {}
   try {
@@ -158,7 +161,8 @@ export async function onRequestDelete({ env, data: requestData, request }) {
     for (const g of GRANDCHILD) {
       try {
         await env.DB.prepare(`SELECT 1 FROM ${g.table} LIMIT 1`).first()
-      } catch {
+      } catch (error) {
+        if (databaseAccessFailure(error)) throw error
         continue
       }
       statements.push(
@@ -173,7 +177,8 @@ export async function onRequestDelete({ env, data: requestData, request }) {
       try {
         // 없는 표가 있을 수 있다. 미리 한 번 두드려 본다.
         await env.DB.prepare(`SELECT 1 FROM ${t} LIMIT 1`).first()
-      } catch {
+      } catch (error) {
+        if (databaseAccessFailure(error)) throw error
         continue
       }
       statements.push(
@@ -195,7 +200,7 @@ export async function onRequestDelete({ env, data: requestData, request }) {
           ? `만져 보신 것까지 ${ids.length}건을 지웠습니다. 처음 화면으로 돌아갔습니다.`
           : `${ids.length}건을 지웠지만 ${left.length}건이 남았습니다.`,
     })
-  } catch {
-    return jsonError('지우지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '지우지 못했습니다.')
   }
 }

@@ -86,6 +86,8 @@ function fakeDBWithRows() {
   }
   return {
     prepare: () => stmt,
+    // ANY_ROW.rolled_back_at is set: the new atomic RPC owns this guard.
+    recordToolRun: async () => ({ response: { status:409,body:{error:'이 도구는 잠시 내려가 있습니다.'} }, replayed:false }),
     batch: async (list) => (list ?? []).map(() => ({ meta: {} })),
     exec: async () => ({}),
   }

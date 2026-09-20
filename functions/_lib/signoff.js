@@ -115,6 +115,11 @@ export async function loadSignoff(env, applicationId, ownDept = null) {
 // 걸린 일인데 재무 한 사람이 확인했다고 "확인됨"이 되고, 나머지 두 부서는
 // 다 만들어진 뒤에 처음 기준을 본다. 그때는 늦다.
 export async function requiredDeptsOf(env, applicationId, ownDept) {
+  if (env.DB.actorEmail) {
+    const { results } = await env.DB.prepare('SELECT department_id FROM application_participation WHERE application_id = ? AND revoked_at IS NULL')
+      .bind(applicationId).all()
+    return [...new Set([ownDept, ...results.map(row => row.department_id)].filter(Boolean))]
+  }
   const { results } = await env.DB.prepare(
     `SELECT id, title, why, link_kind, link_id FROM decision_log
      WHERE application_id = ? AND link_kind IN (?, ?)`
@@ -194,7 +199,16 @@ export async function fullySignedIds(env, apps) {
     joins.results.filter((r) => r.link_kind === UNJOIN_KIND).map((r) => r.link_id)
   )
   const joinedBy = new Map()
+  if (env.DB.actorEmail) {
+    const { results } = await env.DB.prepare(`SELECT application_id, department_id FROM application_participation
+      WHERE application_id IN (${holes}) AND revoked_at IS NULL`).bind(...ids).all()
+    for (const row of results) {
+      if (!joinedBy.has(row.application_id)) joinedBy.set(row.application_id, new Set())
+      joinedBy.get(row.application_id).add(row.department_id)
+    }
+  }
   for (const r of joins.results) {
+    if (env.DB.actorEmail) continue // Unverified historical text never defines required approvers.
     if (r.link_kind !== JOIN_KIND || released.has(r.id)) continue
     let dept = null
     try {

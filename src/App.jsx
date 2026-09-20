@@ -3,7 +3,6 @@ import { Routes, Route, Link, useLocation } from 'react-router-dom'
 import PageViewTracker from './components/PageViewTracker.jsx'
 import SiteNav from './components/SiteNav.jsx'
 import DemoWorkspaceBar from './components/DemoWorkspaceBar.jsx'
-import { STAGES } from './lib/stages.js'
 
 const FlowPage = lazy(() => import('./pages/FlowPage.jsx'))
 const JourneyPage = lazy(() => import('./pages/JourneyPage.jsx'))
@@ -103,26 +102,22 @@ export default function App() {
       {/* 주소가 바뀌어도 새 문서를 안 받아오므로, 화면 이동을 여기서 듣고
           직접 보낸다. 열쇠(접수번호·도구 주소·신청서 id)는 가려서 보낸다. */}
       <PageViewTracker />
-      <a className="skip-link" href="#main">
+      <a className="skip-link" href="#main" onClick={event => {
+        // Keep a real anchor for modified clicks and non-JavaScript fallback.
+        // Ordinary activation moves focus without replacing a workspace's
+        // menu fragment or adding a second history entry for the same screen.
+        if (event.defaultPrevented || event.button > 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+        const main = document.getElementById('main')
+        if (!main) return
+        event.preventDefault()
+        main.focus({ preventScroll: true })
+        main.scrollIntoView({ block: 'start', behavior: 'instant' })
+      }}>
         본문으로 건너뛰기
       </a>
 
       {!bare && <SiteNav />}
       <DemoWorkspaceBar />
-      {!bare && !workspace && (
-        <header className="product-subnav">
-          <div className="product-subnav-inner">
-            <Link to="/portfolio" className="product-subnav-title">일손</Link>
-            <nav aria-label="일손 메뉴">
-              <Link to="/portfolio" className="product-subnav-link">전체 과정</Link>
-              <Link to="/tools" className="product-subnav-link">넘긴 도구</Link>
-              <Link to="/log" className="product-subnav-link">결정 기록</Link>
-              <Link to="/journey" className="product-subnav-link">통합 이력</Link>
-              <Link to="/apply" className="btn-primary btn-sm">업무 신청</Link>
-            </nav>
-          </div>
-        </header>
-      )}
 
       {bare && !workspace && (
         <header className="barebar">
@@ -130,7 +125,6 @@ export default function App() {
             <span aria-hidden="true">IL</span>
             <strong>일손</strong>
           </Link>
-          <span className="barebar-context">부서 전용 화면</span>
           <span className="spacer" />
           <Link to="/portfolio" className="barebar-back">전체 과정 보기 →</Link>
         </header>
@@ -181,27 +175,9 @@ export default function App() {
 
       {!bare && !workspace && (
         <footer className="app-footer">
-          <div className="footer-grid">
-            <div className="footer-col">
-              <h2 className="footer-title">일손 (ILSON)</h2>
-              <p className="footer-text">
-                현업의 반복 업무를 신청받아 검토하고 합의한 뒤, 실제 도구로 만들어
-                효과까지 확인합니다.
-              </p>
-            </div>
-            <nav className="footer-col" aria-labelledby="footer-stages-title">
-              <h2 className="footer-title" id="footer-stages-title">여섯 단계</h2>
-              <div className="footer-links">
-                {STAGES.map((s, i) => (
-                  <span key={s.key}>
-                    {i > 0 && ' · '}
-                    <Link to={s.path}>{s.no} {s.label}</Link>
-                  </span>
-                ))}
-              </div>
-            </nav>
-            <nav className="footer-col" aria-labelledby="footer-crosscut-title">
-              <h2 className="footer-title" id="footer-crosscut-title">운영 메뉴</h2>
+          <details className="footer-menu">
+            <summary>운영 메뉴</summary>
+            <nav aria-label="운영 메뉴">
               <div className="footer-links">
                 {CROSSCUT.filter((c) => c.to !== '/bug').map((c, i) => (
                   <span key={c.to}>
@@ -212,13 +188,7 @@ export default function App() {
                 <span> · <Link to="/bug">버그 신고</Link></span>
               </div>
             </nav>
-          </div>
-          <div className="footer-bottom">
-            <span>
-              Cloudflare Pages Functions · Supabase
-            </span>
-            <span>가상의 회사·부서·데이터입니다. 실존하지 않습니다.</span>
-          </div>
+          </details>
         </footer>
       )}
     </div>

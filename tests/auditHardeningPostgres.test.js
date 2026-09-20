@@ -16,10 +16,12 @@ const pg = new PGlite()
 const DB = createSupabaseDb('https://audit-test.supabase.co','local-only')
 const env = { DB, SUPABASE_URL:'https://audit-test.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'local-only',OVERRIDE_DEMO_MODE:'true' }
 let queue = Promise.resolve()
+let testNow
+const approvalTimes = new Map()
 let external = ()=>{throw Error('Unexpected external call')}
 beforeAll(async()=>{
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop.sql','0003_journey_workspaces.sql','0004_audit_hardening.sql','0005_field_feedback.sql'])
+for (const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop.sql','0003_journey_workspaces.sql','0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql'])
     await pg.exec(readFileSync(new URL(`../supabase/migrations/${file}`,import.meta.url),'utf8'))
   vi.stubGlobal('fetch',(url,options)=>{
     if (!String(url).startsWith(env.SUPABASE_URL+'/rest/v1/rpc/')) return external(url,options)
@@ -36,10 +38,21 @@ for (const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop
     return result
   })
   await seedOverrideWorkspace(env)
+  testNow=Date.now()
+  vi.spyOn(Date,'now').mockImplementation(()=>testNow)
 },60000)
-afterAll(async()=>{ vi.unstubAllGlobals(); await pg.close() })
-const post = (body,key=crypto.randomUUID())=>mutate({env,request:new Request('https://ilson.test/api/override',{
-  method:'POST',headers:{'X-Idempotency-Key':key},body:JSON.stringify({role:'product',...body}) })})
+afterAll(async()=>{ vi.restoreAllMocks(); vi.unstubAllGlobals(); await pg.close() })
+const post = async(body,key=crypto.randomUUID())=>{
+  // Model elapsed live measurement time after approval, not pre-approval data.
+  if(body.action==='record_run' && Number.isFinite(Date.parse(body.measurementEnd))) testNow=Math.max(testNow,Date.parse(body.measurementEnd)+1)
+  const response=await mutate({env,request:new Request('https://ilson.test/api/override',{
+    method:'POST',headers:{'X-Idempotency-Key':key},body:JSON.stringify({role:'product',...body}) })})
+  if(body.action==='approve_experiment' && response.status===200) {
+    const row=await DB.prepare('SELECT approved_at FROM change_experiment WHERE id=?').bind(body.experimentId).first()
+    approvalTimes.set(body.experimentId,Date.parse(row.approved_at.replace(' ','T')+'Z'))
+  }
+  return response
+}
 const plan = {metricType:'rate',minimumWindowSeconds:60,minimumSamples:{historical:10,shadow:10,limited:10},
   rationale:'관측 변동성과 주간 업무량에 맞춘 사전 계획',datasetVersion:'data-v1',modelVersion:'model-v1',policyVersion:'policy-v1'}
 async function experiment() {
@@ -51,9 +64,12 @@ async function experiment() {
   expect((await post({action:'approve_experiment',experimentId:id,basis:'측정 계획 검토'})).status).toBe(200)
   return id
 }
-const run = (id,phase='historical',overrides={})=>({action:'record_run',experimentId:id,phase,controlValue:10,variantValue:7,
-  sampleSize:20,guardrailBreaches:0,evidenceRefs:['local-test-run/001'],measurementStart:new Date(Date.now()-3600000).toISOString(),
-  measurementEnd:new Date(Date.now()-1800000).toISOString(),...overrides})
+const run = (id,phase='historical',overrides={})=>{
+  const start=phase==='historical'?Date.now()-3600000:approvalTimes.get(id)+(phase==='limited'?1800000:0)
+  return {action:'record_run',experimentId:id,phase,controlValue:10,variantValue:7,
+    sampleSize:20,guardrailBreaches:0,evidenceRefs:['local-test-run/001'],measurementStart:new Date(start).toISOString(),
+    measurementEnd:new Date(start+1800000).toISOString(),...overrides}
+}
 
 describe.sequential('audit regressions against actual PostgreSQL handlers',()=>{
   it('checks the migration RPC and scoped readiness, not just old tables',async()=>{
@@ -193,7 +209,7 @@ describe.sequential('audit regressions against actual PostgreSQL handlers',()=>{
     const body={kind:'event',context:{summary:'가상 오류 검증'}}
     const ai=(key)=>assist({env:realEnv,request:new Request('https://ilson.test/api/override/assist',{method:'POST',headers:{'X-Idempotency-Key':key},body:JSON.stringify(body)})})
     let calls=0
-    external=async(url)=>{expect(url).toBe('https://api.anthropic.com/v1/messages');calls++;return Response.json({content:[{type:'text',text:'{"summary":"가상 초안"}'}],usage:{input_tokens:10,output_tokens:5}})}
+    external=async(url,options)=>{expect(url).toBe('https://api.anthropic.com/v1/messages');expect(options.redirect).toBe('manual');calls++;return Response.json({content:[{type:'text',text:'{"summary":"가상 초안"}'}],usage:{input_tokens:10,output_tokens:5}})}
     const first=crypto.randomUUID()
     expect((await ai(first)).status).toBe(200);expect((await ai(first)).status).toBe(200);expect(calls).toBe(1)
     await pg.exec(`CREATE FUNCTION public.fail_ai_test() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN

@@ -8,8 +8,8 @@
       name="description"
       content="AI 판단의 수정·거절·이관을 수집하고, 원인 판정부터 안전한 개선 실험과 재발 측정까지 연결하는 운영 시스템."
     />
-    <meta name="theme-color" content="#0d1b35" />
-    <meta name="ilson-design" content="agent-resources-2026" />
+    <meta name="theme-color" content="#ffffff" />
+    <meta name="ilson-design" content="microsoft-fluent-public-2026" />
     <meta property="og:type" content="website" />
     <meta property="og:locale" content="ko_KR" />
     <meta property="og:site_name" content="일손 · OverrideLoop" />
@@ -30,41 +30,7 @@
       content="현장의 수정·거절·이관을 증거로 남기고, 반복 문제를 안전한 개선 실험으로 바꿉니다."
     />
     <meta name="twitter:image" content="https://ilson.pages.dev/og.png" />
-    <!--
-      글꼴은 다른 도메인에서 받아 온다. 그 도메인에 처음 닿는 데만 DNS 조회와
-      TLS 악수가 붙는데, 이 파일은 **첫 그림을 막는 파일**이라 그 시간이
-      그대로 흰 화면이 된다. 미리 연결해 두면 그만큼 앞당겨진다.
-
-      as="style" 은 rel="preload" 일 때만 뜻이 있는 값이라 뺐다. crossorigin
-      도 뺐다 — 스타일시트에 붙이면 CORS 로 받아 오게 되는데 그럴 이유가 없다.
-    -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-    <!--
-      글꼴 파일은 받되 **첫 그림을 막지 않는다.**
-
-      스타일시트로 그냥 걸어 두면 브라우저는 그 파일이 남의 도메인에서 올
-      때까지 아무것도 안 그린다. 흰 화면이 그만큼 길어진다.
-
-      preload 로 받아 두었다가 다 받은 뒤에 스타일시트로 바꿔 단다. 그러면
-      글자가 먼저 뜨고 글꼴이 나중에 갈아 끼워진다. 그렇게 해도 되는 이유가
-      둘 있다 — 이 글꼴 파일 자체가 font-display:swap 이라 어차피 대체 글꼴로
-      먼저 그리게 돼 있고, 우리 쪽 글꼴 목록도 system-ui 로 받아 두어서
-      한글이 깨지지 않는다.
-
-      자바스크립트를 끈 브라우저를 위해 noscript 로 원래 방식도 남긴다.
-    -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link
-        rel="stylesheet"
-        href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500&amp;family=Plus+Jakarta+Sans:wght@400;500;600;700&amp;display=swap"
-      />
-    </noscript>
+    <!-- Segoe UI and local Korean fallbacks: no external font request. -->
     <title>OverrideLoop — AI가 틀린 순간을, 조직의 다음 결정으로.</title>
 
     <!-- Google tag (gtag.js) -->
@@ -80,15 +46,7 @@
       그래서 화면 이동은 React 쪽(src/lib/analytics.js)에서 열쇠를 가린
       주소로 직접 보낸다. 첫 화면도 거기서 보낸다.
     -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-VLP0X6V7TM"></script>
-    <script>
-      window.dataLayer = window.dataLayer || []
-      function gtag() {
-        dataLayer.push(arguments)
-      }
-      gtag('js', new Date())
-      gtag('config', 'G-VLP0X6V7TM', { send_page_view: false })
-    </script>
+    <script defer src="/bootstrap.js"></script>
 
     <!-- Microsoft Clarity -->
     <!--
@@ -103,20 +61,6 @@
 
       입력칸에 친 값은 클레어티가 기본으로 가린다.
     -->
-    <script type="text/javascript">
-      ;(function (c, l, a, r, i, t, y) {
-        c[a] =
-          c[a] ||
-          function () {
-            ;(c[a].q = c[a].q || []).push(arguments)
-          }
-        t = l.createElement(r)
-        t.async = 1
-        t.src = 'https://www.clarity.ms/tag/' + i
-        y = l.getElementsByTagName(r)[0]
-        y.parentNode.insertBefore(t, y)
-      })(window, document, 'clarity', 'script', 'y28b6n8ub2')
-    </script>
   </head>
   <body>
     <div id="root"></div>
@@ -134,17 +78,6 @@
       다시 부르는 것은 값이 바뀌었을까 봐 부르는 것이라, 미리 받아 둔 옛 답을
       주면 새로고침이 안 되는 화면이 된다.
     -->
-    <script>
-      if (location.pathname === '/' && document.documentElement.dataset.sharedDemoPrefetch === 'true') {
-        window.__boot = {}
-        for (const p of ['/override']) {
-          // 실패하면 null 이 된다. 여기서 거절을 남기면 아무도 안 받는
-          // 거절이 되어 브라우저 콘솔에 오류로 찍힌다. 화면은 null 을 보고
-          // 그냥 제 손으로 다시 부른다.
-          window.__boot[p] = fetch('/api' + p).catch(() => null)
-        }
-      }
-    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -259,8 +259,8 @@ export function dossierText(record) {
           money
             ? [
                 line(
-                  '지금까지 줄인 시간',
-                  `${money.runCount}번 돌려서 ${Math.round(money.savedSeconds / 60)}분 (검수·재작업 뺀 값)`
+                  money.savedSeconds < 0 ? '지금까지 추가로 든 시간' : '지금까지 줄인 시간',
+                  `총 ${money.attemptCount ?? money.runCount}회 시도 · 성공 ${money.successCount ?? '미확인'}회 · ${money.savedSeconds < 0 ? '추가 소요' : '절감'} ${Math.round(Math.abs(money.savedSeconds) / 60)}분 (실패를 포함한 전체 실행·검수·재작업 비용 반영)`
                 ),
                 line('순절감', `${krw(money.netKrw)} — 만든 공수와 운영비를 뺀 값`),
                 money.annual

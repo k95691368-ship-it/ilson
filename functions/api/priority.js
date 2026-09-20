@@ -111,8 +111,8 @@ export async function onRequestGet({ env, data: requestData }) {
         picked: state.picked.length,
       },
     })
-  } catch {
-    return jsonError('우선순위 판을 만들지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '우선순위 판을 만들지 못했습니다.')
   }
 }
 

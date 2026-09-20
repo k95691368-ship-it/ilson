@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { api } from '../api/client.js'
+import { accessBlocked, getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
 
 // GET 한 번을 상태로 감싼다.
 //
 // 세 가지를 신경 썼다.
 // 1) 화면을 떠난 뒤 도착한 응답으로 상태를 바꾸지 않는다. 이미 사라진 화면의
 //    데이터가 다음 화면에 잠깐 그려지는 일이 실제로 생긴다.
-// 2) 다시 불러올 때 기존 데이터를 지우지 않는다. 지우면 새로고침할 때마다
-//    화면이 빈 상태로 깜빡이고, 그게 느린 것보다 나쁘게 느껴진다.
+// 2) 일시적인 재조회 실패에는 현재 데이터를 유지하되, 접근이 거절되거나
+//    리소스가 사라진 응답이면 원문과 그 원문에 대한 작업 화면을 숨긴다.
 // 3) **늦게 온 응답이 최신 응답을 덮어쓰지 않는다.**
 //
 // 3번이 빠져 있었다. alive 는 화면을 떠났는지만 본다. 같은 화면에 머문 채
@@ -21,7 +22,10 @@ import { api } from '../api/client.js'
 //
 // 요청마다 번호를 매기고 **마지막에 보낸 것만** 받는다.
 export function useApi(path, { skip = false } = {}) {
-  const resourceKey = skip || !path ? null : path
+  const access = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  const blocked = accessBlocked(access)
+  const resourcePath = skip || !path ? null : path
+  const resourceKey = resourcePath ? `${access.generation}:${resourcePath}` : null
   const [snapshot, setSnapshot] = useState(() => ({
     key: resourceKey,
     data: null,
@@ -30,38 +34,47 @@ export function useApi(path, { skip = false } = {}) {
   }))
   const alive = useRef(true)
   const seq = useRef(0)
+  const controller = useRef(null)
 
   useEffect(() => {
     alive.current = true
     return () => {
       alive.current = false
+      controller.current?.abort()
     }
   }, [])
 
   const load = useCallback(async () => {
+    if (!alive.current) return
     const mine = ++seq.current
-    if (!resourceKey) {
+    controller.current?.abort()
+    controller.current = null
+    if (!resourceKey || blocked) {
       setSnapshot({ key: null, data: null, error: null, loading: false })
       return
     }
 
     // 내가 보낸 것이 아직 최신인가. 응답을 쓰기 직전마다 다시 본다.
-    const latest = () => alive.current && seq.current === mine
+    const pending = new AbortController()
+    controller.current = pending
+    const latest = () => alive.current && seq.current === mine && !pending.signal.aborted
+      && getAccessSession().generation === access.generation && !accessBlocked(getAccessSession())
     setSnapshot((previous) =>
       previous.key === resourceKey
         ? { ...previous, loading: true }
         : { key: resourceKey, data: null, error: null, loading: true }
     )
     try {
-      const result = await api.get(resourceKey)
+      const result = await api.get(resourcePath, { signal: pending.signal })
       if (latest()) {
         setSnapshot({ key: resourceKey, data: result, error: null, loading: true })
       }
     } catch (err) {
       if (latest()) {
+        const unavailable = [401, 403, 404, 410].includes(err.status)
         setSnapshot((previous) => ({
           key: resourceKey,
-          data: previous.key === resourceKey ? previous.data : null,
+          data: !unavailable && previous.key === resourceKey ? previous.data : null,
           error: err.message || '불러오지 못했습니다.',
           loading: true,
         }))
@@ -75,14 +88,16 @@ export function useApi(path, { skip = false } = {}) {
         )
       }
     }
-  }, [resourceKey])
+  }, [resourceKey, resourcePath, blocked, access.generation])
 
   useEffect(() => {
     load()
+    return () => { controller.current?.abort() }
   }, [load])
 
   const setData = useCallback(
     (next) => {
+      if (getAccessSession().generation !== access.generation || accessBlocked(getAccessSession())) return
       setSnapshot((previous) => {
         const previousData = previous.key === resourceKey ? previous.data : null
         return {
@@ -93,14 +108,16 @@ export function useApi(path, { skip = false } = {}) {
         }
       })
     },
-    [resourceKey]
+    [resourceKey, access.generation]
   )
 
   // effect가 새 요청을 시작하기 전 렌더에서도 다른 URL의 상태는 숨긴다.
   const isCurrentResource = snapshot.key === resourceKey
-  const data = isCurrentResource ? snapshot.data : null
-  const error = isCurrentResource ? snapshot.error : null
-  const loading = resourceKey ? (isCurrentResource ? snapshot.loading : true) : false
+  const data = !blocked && isCurrentResource ? snapshot.data : null
+  const error = resourcePath && access.status === 'blocked'
+    ? access.error || '접근 권한을 다시 확인해 주세요.'
+    : isCurrentResource ? snapshot.error : null
+  const loading = resourcePath ? (blocked ? access.status === 'checking' : isCurrentResource ? snapshot.loading : true) : false
 
   return { data, error, loading, reload: load, setData }
 }

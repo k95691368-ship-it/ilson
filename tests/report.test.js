@@ -434,7 +434,8 @@ describe('신고한 부서가 그 뒤를 보는가', () => {
 
   it('아직 안 고친 것은 그렇다고 말한다', () => {
     // 조용히 비워 두면 신고가 사라진 것으로 읽힌다.
-    expect(page).toContain('담당자 할 일 목록에 올라가 있습니다')
+    expect(page).toContain('myreports-open card-note')
+    expect(page).toContain('처리 대기 · 수정 내용은 여기에 표시됩니다.')
   })
 
   it('신고가 없으면 빈 칸을 안 만든다', () => {

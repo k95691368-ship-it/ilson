@@ -11,6 +11,7 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
+import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
 import { validateOutcomeConfirm, OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../../../shared/accept.js'
 
 async function load(env, ticket) {
@@ -125,6 +126,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
   if (!loaded) {
     await releaseRateLimit(env, `outconf:${ip}`, ticket)
     return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+  }
+  const forbidden = departmentAuthority(env, loaded.app.dept)
+  if (forbidden) {
+    await releaseRateLimit(env, `outconf:${ip}`, ticket)
+    return forbidden
   }
 
   let body

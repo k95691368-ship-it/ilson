@@ -13,11 +13,9 @@ import WorkspaceGate from './components/WorkspaceGate.jsx'
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <ErrorBoundary>
-      <ToastProvider>
-        <BrowserRouter>
-          <WorkspaceGate><App /></WorkspaceGate>
-        </BrowserRouter>
-      </ToastProvider>
+      <BrowserRouter>
+        <WorkspaceGate><ToastProvider><App /></ToastProvider></WorkspaceGate>
+      </BrowserRouter>
     </ErrorBoundary>
   </StrictMode>
 )

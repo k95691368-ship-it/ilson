@@ -26,16 +26,9 @@ export default function CodesPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">제작</span>
-        <h1>알려 준 상품코드</h1>
+        <h1>상품코드 관리</h1>
         <p className="page-sub">
-          채널마다 상품코드를 제멋대로 붙입니다. 그걸 우리 표준코드에 이어 두면 다음부터 저절로
-          처리됩니다. <strong>코드 하나를 잘못 이으면 그 코드로 팔린 것이 전부 엉뚱한 상품 매출로
-          잡힙니다</strong> — 밀려난 줄은 눈에 띄지만 잘못 이어진 줄은 조용히 섞입니다.
-        </p>
-        <p className="page-sub">
-          그래서 부서가 알려준 것은 <strong>바로 쓰되</strong>, 여기 쌓아 두고 담당자가 나중에
-          훑어봅니다. 승인을 기다리게 하면 부서가 아예 안 알려줍니다.
+          등록 즉시 계산에 적용됩니다. 잘못 연결하면 매출이 다른 상품에 합산되므로 원본과 확인해 주세요.
         </p>
       </header>
 

@@ -70,12 +70,10 @@ export default function StallPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">막힌 곳</span>
-        <h1>지금 어디서 멈춰 있나</h1>
+        <h1>지연 현황</h1>
       </header>
 
       <section className="stall-line">
-        <span className="stall-line-label">한 줄로 말하면</span>
         <p>{data.line}</p>
       </section>
 

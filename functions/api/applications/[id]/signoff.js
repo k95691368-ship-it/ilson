@@ -50,8 +50,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
       // 빼도 화면에는 그대로 남는다.
       ways: RESOLUTIONS,
     })
-  } catch {
-    return jsonError('이의를 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '이의를 불러오지 못했습니다.')
   }
 }
 

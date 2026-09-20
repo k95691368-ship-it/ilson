@@ -22,6 +22,11 @@ const CORE_TABLES = [
   'outcome',
   'rate_limit_hits',
 ]
+const FEEDBACK_TABLES = [
+  'field_feedback_case', 'field_feedback_update', 'field_feedback_receipt',
+  'quality_sample_batch', 'quality_sample_item', 'tool_nonuse_report',
+  'issue_followup', 'quality_sample_review_history', 'application_participation',
+]
 
 export async function onRequestGet({ env, data: requestData }) {
   env = requestData?.requestEnv ?? env
@@ -56,7 +61,9 @@ export async function onRequestGet({ env, data: requestData }) {
       tables = rows.results.map((r) => r.name)
     }
 
-    const missing = CORE_TABLES.filter((t) => !tables.includes(t))
+    // A healthy legacy schema alone cannot serve the deployed feedback feature.
+    const required = isSupabase ? [...CORE_TABLES, ...FEEDBACK_TABLES] : CORE_TABLES
+    const missing = required.filter((t) => !tables.includes(t))
     checks.schema = missing.length === 0
     if (missing.length > 0) {
       notes.push(`스키마가 덜 적용됐습니다. 없는 표: ${missing.join(', ')}`)
@@ -67,7 +74,7 @@ export async function onRequestGet({ env, data: requestData }) {
       const readiness = await env.DB.readiness()
       checks.runtime = readiness.schemaReady === true
       checks.capacity = env.DEMO_WORKSPACES !== 'true' || readiness.capacityAvailable === true
-      if (!checks.runtime) notes.push('운영 RPC 또는 0004 마이그레이션이 준비되지 않았습니다.')
+      if (!checks.runtime) notes.push('운영 RPC 또는 0006~0013 접근 권한·후속 처리·재검토·참여 부서·소유계정·실행·베타·검토 버전 마이그레이션이 준비되지 않았습니다.')
       if (!checks.capacity) notes.push('새 체험 공간 정원이 찼습니다. 소개 화면과 기존 체험 공간은 계속 사용할 수 있습니다.')
     }
   } catch {

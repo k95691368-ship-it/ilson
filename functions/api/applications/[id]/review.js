@@ -4,10 +4,11 @@
 // 의사결정 로그에 근거를 적는다. 셋이 함께 일어나야 한다 — 판정만 저장되고
 // 근거가 없으면 나중에 "왜 반려했나"에 답할 수 없다.
 //
-// D1은 여러 문장을 한 번에 보내는 batch를 지원한다. 세 쓰기를 batch로 묶어
-// 중간에 끊긴 상태(판정은 있는데 로그가 없는 상태)가 남지 않게 한다.
+// 화면의 revision과 현재 값을 부모행 잠금 안에서 비교한 뒤 세 쓰기를 묶는다.
+// 오래된 화면은 최신 판정을 덮어쓰지 않고, 중간 실패도 근거를 분리하지 않는다.
 
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.js'
 import { validateReview, statusFromVerdict, REFUSE_LABELS } from '../../../../shared/review.js'
 import { newId } from '../../../_lib/ids.js'
 
@@ -27,27 +28,34 @@ export async function onRequestPost({ env, data: requestData, params, request })
     return jsonResponse({ error: '적어 주신 내용을 확인해주세요.', fields: check.errors }, 400)
   }
   const v = check.value
+  if (!validReviewRevision(body.expectedRevision)) return reviewConflict()
 
-  const application = await env.DB.prepare(
-    `SELECT id, ticket_no, dept, title, status FROM application WHERE id = ? OR ticket_no = ?`
+  return reviewMutation(env.DB, request, `review:${id}`, body, async DB => {
+
+  const application = await DB.prepare(
+    `SELECT id, ticket_no, dept, title, status, review_revision FROM application WHERE id = ? OR ticket_no = ?`
   )
     .bind(id, id)
     .first()
 
   if (!application) return jsonError('그런 신청서가 없습니다.', 404)
+  if (Number(application.review_revision) !== body.expectedRevision) return reviewConflict()
 
-  const nextStatus = statusFromVerdict(v.verdict)
+  const advanced = ['진행중', '완료'].includes(application.status)
+  if (advanced && v.verdict !== '수용') return jsonError('이미 제작하거나 인수한 신청서를 검토 판정으로 이전 단계로 되돌릴 수 없습니다.', 409)
+  const nextStatus = advanced ? application.status : statusFromVerdict(v.verdict)
 
   // 판정을 바꾸는 것 자체는 막지 않는다. 검토는 다시 할 수 있는 일이고,
   // 무엇이 어떻게 바뀌었는지는 decision_log에 두 줄로 남는다.
   const isUpdate = Boolean(
-    await env.DB.prepare('SELECT 1 FROM review WHERE application_id = ?')
+    await DB.prepare('SELECT 1 FROM review WHERE application_id = ?')
       .bind(application.id)
       .first()
   )
 
+  await lockReviewRevision(DB, application)
   const statements = [
-    env.DB.prepare(
+    DB.prepare(
       `INSERT INTO review
          (application_id, impact_score, impact_reason, difficulty_score, difficulty_reason,
           verdict, verdict_reason, alternatives_considered,
@@ -94,11 +102,11 @@ export async function onRequestPost({ env, data: requestData, params, request })
       v.reviewer_label
     ),
 
-    env.DB.prepare(
+    DB.prepare(
       `UPDATE application SET status = ?, updated_at = datetime('now') WHERE id = ?`
     ).bind(nextStatus, application.id),
 
-    env.DB.prepare(
+    DB.prepare(
       `INSERT INTO decision_log
          (id, application_id, stage, actor, title, what, why, alternatives, unrequested, link_kind, link_id)
        VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?, 'review', ?)`
@@ -123,11 +131,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
     ),
   ]
 
-  try {
-    await env.DB.batch(statements)
-  } catch {
-    return jsonError('판정을 저장하지 못했습니다.', 500)
-  }
+  await DB.batch(statements)
 
   return jsonResponse({
     ok: true,
@@ -136,6 +140,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
     status: nextStatus,
     verdict: v.verdict,
   })
+  }, '판정을 저장하지 못했습니다.')
 }
 
 function buildWhat(application, v) {

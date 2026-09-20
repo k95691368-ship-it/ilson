@@ -2,6 +2,7 @@ import { newId } from './ids.js'
 import { verifiedAccessEmail } from './access.js'
 import { atomicMutation, mutationFingerprint } from './atomicMutation.js'
 import { OVERRIDE_ROLES, roleCan } from '../../shared/override.js'
+import { actorAssignments } from './dataScope.js'
 
 // Pages Functions는 새 격리 프로세스가 뜰 때마다 파일을 다시 읽는다. 같은
 // 프로세스 안에서는 한 번만 확인하고, 새 배포나 새 Supabase 프로젝트에서도
@@ -335,14 +336,19 @@ export async function seedOverrideWorkspace(env) {
 }
 
 export async function resolveOverrideActor(env, request, body = {}) {
+  if (env.AUTH_ACTOR) return env.AUTH_ACTOR
   const email = overrideDemoMode(env) ? null : await verifiedAccessEmail(env, request)
   if (email) {
     const actor = await env.DB.prepare(
-      'SELECT email, display_name, role FROM override_actor WHERE email = ? AND active = 1'
+      'SELECT * FROM override_actor WHERE email = ? AND active = 1'
     )
       .bind(email)
       .first()
-    if (actor) return { label: actor.display_name, role: actor.role, email, mode: 'access' }
+    if (actor) {
+      const assignments = actorAssignments(actor)
+      return { label: actor.display_name, role: actor.role, email, mode: 'access',
+        departments: assignments.departments, product_ids: assignments.productIds }
+    }
   }
 
   // 공개 포트폴리오에서는 역할별 화면과 권한 거절까지 직접 시험할 수 있게 한다.

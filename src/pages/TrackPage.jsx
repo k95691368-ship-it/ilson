@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.js'
+import { useApi } from '../hooks/useApi.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import Thread from '../components/Thread.jsx'
 import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
@@ -24,49 +26,21 @@ import { RESUBMIT_BACK_KIND } from '../../shared/resubmit.js'
 export default function TrackPage() {
   const [params, setParams] = useSearchParams()
   const [ticket, setTicket] = useState(params.get('no') ?? '')
-  const [data, setData] = useState(null)
-  const [error, setError] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const askedNo = String(params.get('no') ?? '').trim().toUpperCase()
+  const { data, error, loading, reload } = useApi(askedNo ? `/track/${encodeURIComponent(askedNo)}` : null)
 
-  async function look(no) {
+  function look(no) {
     const clean = String(no ?? '').trim().toUpperCase()
     if (!clean) return
-    setLoading(true)
-    setError(null)
-    try {
-      const r = await api.get(`/track/${encodeURIComponent(clean)}`)
-      setData(r)
-      // 손든 부서가 자기 시점으로 여는 주소(?as=부서)를 지우지 않는다.
-      // 지우면 새로고침 한 번에 낸 부서 시점으로 돌아가고, 그 부서는
-      // 자기가 적어 낸 한 줄을 다시 못 찾는다.
-      const as = params.get('as')
-      setParams(as ? { no: clean, as } : { no: clean }, { replace: true })
-    } catch (err) {
-      setError(err.message)
-      setData(null)
-    } finally {
-      setLoading(false)
-    }
+    if (clean === askedNo) return reload()
+    // 조회를 시작할 때 주소를 정합니다. 이전 응답은 주소를 바꾸지 않습니다.
+    const as = params.get('as')
+    setParams(as ? { no: clean, as } : { no: clean }, { replace: true })
   }
 
-  // 주소에 번호가 붙어 있으면 바로 찾아 준다.
-  // 담당자가 "여기 눌러 보세요" 하고 링크를 보낼 수 있다.
-  //
-  // 의존성이 [] 였다. 그래서 **처음 열 때 한 번만** 찾았다. 그런데 이 화면
-  // 안에는 다른 접수번호로 가는 링크가 여럿 있다 — 같은 건으로 묶였을 때
-  // "그 신청서가 어디까지 왔는지 보기", 재신청했을 때 새 번호. 그걸 누르면
-  // 주소만 바뀌고 화면은 앞 신청서 그대로였다.
-  //
-  // 부서 쪽에서 보면 눌렀는데 아무 일도 안 일어난 것이다. 실제로는 더
-  // 나쁜데, 주소창에는 새 번호가 떠 있으니 **지금 보고 있는 것이 그 번호인
-  // 줄 안다.** 남의 신청서를 자기 것으로 읽고, 그 화면에서 서명이나 확인을
-  // 누른다.
-  const askedNo = params.get('no')
+  // 본문, 검색 입력, 하위 폼이 같은 접수번호를 가리키게 합니다.
   useEffect(() => {
-    if (askedNo) look(askedNo)
-    // look 은 렌더마다 새로 만들어지므로 의존성에 넣으면 끝없이 돈다.
-    // 번호가 바뀔 때만 다시 찾는 것이 맞다.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setTicket(askedNo)
   }, [askedNo])
 
   // 사람이 대시를 빼고 적거나 소문자로 적는 일이 흔하다. 알아서 맞춰 준다.
@@ -80,8 +54,7 @@ export default function TrackPage() {
   return (
     <div className="stack track-page">
       <header className="page-head">
-        <span className="page-eyebrow">부서 담당자용</span>
-        <h1>내가 낸 신청서, 어떻게 됐나요</h1>
+        <h1>신청 현황</h1>
       </header>
 
       <form
@@ -119,7 +92,7 @@ export default function TrackPage() {
         </div>
       )}
 
-      {data && <Result data={data} as={params.get('as')} onChanged={() => look(data.ticket)} />}
+      {data && !error && <Result key={`${askedNo}:${params.get('as') ?? ''}`} data={data} as={params.get('as')} onChanged={reload} />}
 
       {!data && !error && (
         <div className="card">
@@ -467,7 +440,7 @@ function Result({ data, as, onChanged }) {
                   <span className="origin-label origin-human">
                     ◆ {d.stage} · {ago(d.created_at)}
                   </span>
-                  <div className="item-body" style={{ fontSize: 14, fontWeight: 700 }}>
+                  <div className="item-body" style={{ fontWeight: 600 }}>
                     {d.title}
                   </div>
                   <div className="card-note" style={{ marginTop: 3 }}>
@@ -500,29 +473,23 @@ function Result({ data, as, onChanged }) {
 //
 // 그래서 되는 것만 열어 둔다. 안 되는 사유는 안 된다고 먼저 말한다.
 // 헛수고를 시키지 않는 것이 이 자리의 핵심이다.
-function Retry({ ticket, onDone }) {
-  const [info, setInfo] = useState(null)
+export function Retry({ ticket, onDone }) {
+  const { data: info, setData } = useApi(`/track/${encodeURIComponent(ticket)}/resubmit`)
+  const captureView = useActionLifetime(ticket)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState(null)
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState(null)
+  const [expectedRevision, setExpectedRevision] = useState(null)
+  const [conflict, setConflict] = useState(false)
+  const [latestReview, setLatestReview] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-  useEffect(() => {
-    let alive = true
-    api
-      .get(`/track/${encodeURIComponent(ticket)}/resubmit`)
-      .then((r) => {
-        if (alive) setInfo(r)
-      })
-      .catch(() => {})
-    return () => {
-      alive = false
-    }
-  }, [ticket])
-
-  if (!info?.eligible) return null
-  const plan = info.plan
+  if (!info?.eligible && !open && !done) return null
+  const plan = info?.plan ?? { canRetry: false, headline: '현재 신청서는 다시 낼 수 없습니다.', change: info?.why }
+  const revisionReady = Number.isSafeInteger(expectedRevision) && expectedRevision >= 0
+  const needsRefresh = conflict || (open && revisionReady && info?.previous?.review_revision !== expectedRevision)
 
   if (done) {
     return (
@@ -544,28 +511,64 @@ function Retry({ ticket, onDone }) {
 
   function start() {
     setForm({ ...info.draft, changed: '' })
+    setExpectedRevision(info.previous?.review_revision)
+    setConflict(false)
+    setLatestReview(null)
+    setErrors({})
     setOpen(true)
   }
 
   async function submit(e) {
     e.preventDefault()
+    if (busy || refreshing || needsRefresh || !revisionReady || !info?.eligible || !plan.canRetry) return
     const bad = validateResubmit(form)
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
     setBusy(true)
+    const current = captureView()
     try {
-      const r = await api.post(`/track/${encodeURIComponent(ticket)}/resubmit`, form)
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/resubmit`, { ...form, expectedRevision })
+      if (!current()) return
       setDone(r)
       setOpen(false)
       onChangedSafely(onDone)
     } catch (err) {
-      setErrors({ changed: err.message })
+      if (current()) {
+        setErrors(err.fields ?? { changed: err.message })
+        if (err.status === 409) { setConflict(true); setLatestReview(null) }
+      }
     } finally {
-      setBusy(false)
+      if (current()) setBusy(false)
     }
   }
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
+  async function readLatest() {
+    if (busy || refreshing) return
+    setRefreshing(true)
+    const current = captureView()
+    try {
+      const latest = await api.get(`/track/${encodeURIComponent(ticket)}/resubmit`)
+      if (current()) setLatestReview(latest)
+    } catch (err) {
+      if (current()) setErrors({ changed: err.message })
+    } finally {
+      if (current()) setRefreshing(false)
+    }
+  }
+
+  function acknowledgeLatest() {
+    if (busy || refreshing || !latestReview?.eligible || !latestReview.plan?.canRetry
+      || !Number.isSafeInteger(latestReview.previous?.review_revision)) return
+    setExpectedRevision(latestReview.previous.review_revision)
+    setData(latestReview)
+    setConflict(false)
+    setLatestReview(null)
+    setErrors({})
+  }
+
+  const set = (k) => (e) => {
+    if (!busy && !refreshing) setForm((f) => ({ ...f, [k]: e.target.value }))
+  }
 
   return (
     <section className={`retry${plan.canRetry ? '' : ' retry-no'}`}>
@@ -592,6 +595,28 @@ function Retry({ ticket, onDone }) {
 
       <p className="retry-change">{plan.change}</p>
 
+      {needsRefresh && (
+        <section className="notice notice-warn" aria-label="재신청 최신 판정 확인">
+          <p role="alert">앞 신청서의 판정이 바뀌었습니다. 작성한 내용은 유지했습니다. 최신 판정을 먼저 확인해주세요.</p>
+          <button type="button" className="btn-ghost btn-sm" disabled={busy || refreshing} onClick={readLatest}>
+            {refreshing ? '불러오는 중…' : '최신 판정 불러오기'}
+          </button>
+          {latestReview && (
+            <>
+              <p>최신 상태: {latestReview.previous?.status ?? (latestReview.eligible ? '반려' : '재신청 불가')} · 최신 판정: {latestReview.previous?.verdict ?? '아직 없음'}</p>
+              <p>{latestReview.plan?.headline ?? latestReview.why}</p>
+              {latestReview.plan?.change && <p>{latestReview.plan.change}</p>}
+              {latestReview.plan?.fromReviewer && <p>담당자가 적어 둔 대안: {latestReview.plan.fromReviewer}</p>}
+              {latestReview.eligible && latestReview.plan?.canRetry && (
+                <button type="button" className="btn-ghost btn-sm" disabled={busy || refreshing} onClick={acknowledgeLatest}>
+                  최신 판정을 확인하고 작성 내용 유지
+                </button>
+              )}
+            </>
+          )}
+        </section>
+      )}
+
       {plan.canRetry && !open && (
         <button type="button" className="btn-primary btn-sm" onClick={start}>
           {plan.cta}
@@ -600,6 +625,7 @@ function Retry({ ticket, onDone }) {
 
       {open && (
         <form className="retry-form" onSubmit={submit}>
+          <fieldset disabled={busy || refreshing} style={{ border: 0, margin: 0, padding: 0, minWidth: 0, display: 'grid', gap: 'inherit' }}>
           {/* 바꾼 것을 맨 위에 둔다. 담당자가 열자마자 보는 것도 이것이고,
               부서가 적으면서 스스로 확인하게 되는 것도 이것이다. */}
           <label>
@@ -681,7 +707,7 @@ function Retry({ ticket, onDone }) {
 
 
           <div className="row">
-            <button type="submit" className="btn-primary" disabled={busy}>
+            <button type="submit" className="btn-primary" disabled={busy || refreshing || needsRefresh || !revisionReady || !info?.eligible || !plan.canRetry}>
               {busy ? '내는 중…' : '다시 내기'}
             </button>
             <button
@@ -693,6 +719,7 @@ function Retry({ ticket, onDone }) {
               그만두기
             </button>
           </div>
+          </fieldset>
         </form>
       )}
     </section>
@@ -711,7 +738,8 @@ function onChangedSafely(fn) {
 // 아닌지를 받는다. 한 항목이라도 안 고르면 못 넘어간다 — 안 고른 것을
 // 동의로 세면, 안 읽은 것을 읽었다고 기록하는 셈이 된다.
 function Signoff({ ticket, as, onDone }) {
-  const [data, setData] = useState(null)
+  const { data, reload } = useApi(`/track/${encodeURIComponent(ticket)}/signoff`)
+  const captureView = useActionLifetime(`${ticket}:${as ?? ''}`)
   const [by, setBy] = useState('')
   // 손든 부서가 ?as=부서로 들어왔으면 그 부서를 골라 둔다. 안 그러면
   // 자기 부서를 다시 고르게 되고, 안 고르고 넘기면 남의 부서 서명이 된다.
@@ -721,17 +749,6 @@ function Signoff({ ticket, as, onDone }) {
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
-
-  const reload = useCallback(() => {
-    api
-      .get(`/track/${encodeURIComponent(ticket)}/signoff`)
-      .then(setData)
-      .catch(() => {})
-  }, [ticket])
-
-  useEffect(() => {
-    reload()
-  }, [reload])
 
   if (!data) return null
   const { criteria, state } = data
@@ -752,6 +769,7 @@ function Signoff({ ticket, as, onDone }) {
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
     setBusy(true)
+    const current = captureView()
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/signoff`, {
         by,
@@ -761,13 +779,14 @@ function Signoff({ ticket, as, onDone }) {
         verdicts,
         reasons,
       })
+      if (!current()) return
       setMsg(r.message)
       reload()
       onChangedSafely(onDone)
     } catch (err) {
-      setErrors({ by: err.message })
+      if (current()) setErrors({ by: err.message })
     } finally {
-      setBusy(false)
+      if (current()) setBusy(false)
     }
   }
 
@@ -992,19 +1011,10 @@ function ToolDown({ data }) {
 // 있어야 합니다." 그래 놓고 그 답을 부서가 볼 자리에 안 뒀다. 답을 적어
 // 서랍에 넣어 둔 셈이다.
 function WaitLine({ ticket }) {
-  const [state, setState] = useState(null)
+  const { data } = useApi(`/track/${encodeURIComponent(ticket)}/waitline`)
+  const state = data?.state
   // 서버가 같이 보내 주는 "언제쯤". 안 받아 두면 화면에 그릴 것이 없다.
-  const [lead, setLead] = useState(null)
-
-  useEffect(() => {
-    api
-      .get(`/track/${encodeURIComponent(ticket)}/waitline`)
-      .then((r) => {
-        setState(r.state)
-        setLead(r.lead ?? null)
-      })
-      .catch(() => {})
-  }, [ticket])
+  const lead = data?.lead ?? null
 
   if (!state?.show) return null
 
@@ -1094,7 +1104,9 @@ function WaitLine({ ticket }) {
 // 안다**는 것이다. 담당자가 한 달에 한 번 전화를 돌리지 않는 한 보류함은
 // 조용히 무덤이 된다.
 function HoldLift({ ticket, onDone }) {
-  const [state, setState] = useState(null)
+  const { data, setData } = useApi(`/track/${encodeURIComponent(ticket)}/hold`)
+  const state = data?.state
+  const captureView = useActionLifetime(ticket)
   const [open, setOpen] = useState(false)
   const [by, setBy] = useState('')
   const [kind, setKind] = useState('met')
@@ -1103,32 +1115,23 @@ function HoldLift({ ticket, onDone }) {
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
 
-  const reload = useCallback(() => {
-    api
-      .get(`/track/${encodeURIComponent(ticket)}/hold`)
-      .then((r) => setState(r.state))
-      .catch(() => {})
-  }, [ticket])
-
-  useEffect(() => {
-    reload()
-  }, [reload])
-
   // 보류가 아니면 이 자리는 아무 말도 하지 않는다.
   if (!state?.canTell) return null
 
   async function send(payload, done) {
     setBusy(true)
+    const current = captureView()
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/hold`, payload)
+      if (!current()) return
       setMsg(r.message)
-      setState(r.state)
+      setData(r)
       done?.()
       onChangedSafely(onDone)
     } catch (err) {
-      setErrors({ body: err.message })
+      if (current()) setErrors({ body: err.message })
     } finally {
-      setBusy(false)
+      if (current()) setBusy(false)
     }
   }
 
@@ -1285,7 +1288,9 @@ function HoldLift({ ticket, onDone }) {
 // 그 말을 적을 칸을 아무 데도 안 뒀다. 시키기만 하고 갈 곳이 없는 문장은
 // 한 번 겪으면 그다음부터 그 목록을 통째로 안 읽게 만든다.
 function BetaSay({ ticket, onDone }) {
-  const [state, setState] = useState(null)
+  const { data, setData } = useApi(`/track/${encodeURIComponent(ticket)}/beta`)
+  const state = data?.state
+  const captureView = useActionLifetime(ticket)
   const [open, setOpen] = useState(false)
   const [by, setBy] = useState('')
   const [kind, setKind] = useState('막힌곳')
@@ -1293,17 +1298,6 @@ function BetaSay({ ticket, onDone }) {
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
-
-  const reload = useCallback(() => {
-    api
-      .get(`/track/${encodeURIComponent(ticket)}/beta`)
-      .then((r) => setState(r.state))
-      .catch(() => {})
-  }, [ticket])
-
-  useEffect(() => {
-    reload()
-  }, [reload])
 
   // 시험판을 아직 안 돌렸으면 물어볼 것이 없다.
   if (!state?.canSay) return null
@@ -1314,17 +1308,19 @@ function BetaSay({ ticket, onDone }) {
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
     setBusy(true)
+    const current = captureView()
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/beta`, { by, kind, body })
+      if (!current()) return
       setMsg(r.message)
-      setState(r.state)
+      setData(r)
       setBody('')
       setOpen(false)
       onChangedSafely(onDone)
     } catch (err) {
-      setErrors({ body: err.message })
+      if (current()) setErrors({ body: err.message })
     } finally {
-      setBusy(false)
+      if (current()) setBusy(false)
     }
   }
 
@@ -1461,7 +1457,9 @@ function BetaSay({ ticket, onDone }) {
 // 실제로 한 번에 몇 분쯤 걸린다고 느끼는지를 숫자로 받고, 우리가 잰 값과
 // 20% 넘게 다르면 성과 화면의 금액이 '보수적 추정'으로 내려간다.
 function OutcomeCheck({ ticket, onDone }) {
-  const [state, setState] = useState(null)
+  const { data, setData } = useApi(`/track/${encodeURIComponent(ticket)}/outcome`)
+  const state = data?.state
+  const captureView = useActionLifetime(ticket)
   const [by, setBy] = useState('')
   const [agree, setAgree] = useState(null)
   const [felt, setFelt] = useState('')
@@ -1469,17 +1467,6 @@ function OutcomeCheck({ ticket, onDone }) {
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
-
-  const reload = useCallback(() => {
-    api
-      .get(`/track/${encodeURIComponent(ticket)}/outcome`)
-      .then((r) => setState(r.state))
-      .catch(() => {})
-  }, [ticket])
-
-  useEffect(() => {
-    reload()
-  }, [reload])
 
   // 아직 한 번도 안 돌았거나 기준선이 없으면 물어볼 것이 없다. 쓰지도 않은
   // 것에 "얼마나 줄었습니까"를 물으면 그 화면은 그때부터 안 읽힌다.
@@ -1493,6 +1480,7 @@ function OutcomeCheck({ ticket, onDone }) {
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
     setBusy(true)
+    const current = captureView()
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/outcome`, {
         by,
@@ -1500,13 +1488,14 @@ function OutcomeCheck({ ticket, onDone }) {
         felt: agree === false ? Number(felt) : null,
         comment,
       })
+      if (!current()) return
       setMsg(r.message)
-      setState(r.state)
+      setData(r)
       onChangedSafely(onDone)
     } catch (err) {
-      setErrors({ by: err.message })
+      if (current()) setErrors({ by: err.message })
     } finally {
-      setBusy(false)
+      if (current()) setBusy(false)
     }
   }
 
@@ -1520,12 +1509,10 @@ function OutcomeCheck({ ticket, onDone }) {
       </div>
 
       <h3>
-        저희는 이 일이 한 번에 <strong>{num(state.measuredMinutes, 0)}분</strong> 걸리는 것으로
-        재 두었습니다
+        자동화 전 소요 시간 <strong>{num(state.measuredMinutes, 0)}분</strong>
       </h3>
       <p className="dconf-why">
-        이 숫자 위에서 절감액이 계산됩니다. 만든 사람만 아는 성과는 성과가 아닙니다.{' '}
-        <strong>부서가 아니라고 하면 아닌 것입니다.</strong>
+        절감액 계산에 쓰이는 기준선입니다. 실제 소요 시간과 맞는지 확인해 주세요.
       </p>
       <p className="card-note">
         {state.sampleN > 0

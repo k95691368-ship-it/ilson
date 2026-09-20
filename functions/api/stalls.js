@@ -6,7 +6,7 @@
 //
 // 계산은 shared/stall.js가 한다. 여기서는 기록을 모아 넘긴다.
 
-import { jsonResponse, jsonError } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { stallBoard, boardLine } from '../../shared/stall.js'
 
 export async function onRequestGet({ env, data: requestData }) {
@@ -40,7 +40,7 @@ export async function onRequestGet({ env, data: requestData }) {
       ...board,
       line: boardLine(board.summary),
     })
-  } catch {
-    return jsonError('막힌 곳을 세지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '막힌 곳을 세지 못했습니다.')
   }
 }

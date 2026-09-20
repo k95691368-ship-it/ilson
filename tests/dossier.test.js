@@ -231,6 +231,7 @@ describe('성과 문서에 금액이 있는가', () => {
   const money = {
     status: '인정',
     runCount: 3,
+    successCount: 3,
     savedSeconds: 12600,
     netKrw: 37500,
     annual: {

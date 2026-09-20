@@ -1,6 +1,7 @@
 import { useId, useState } from 'react'
 import { api } from '../api/client.js'
 import { useToast } from '../context/ToastContext.jsx'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { toThread, openQuestions, waitingOnDept, waitingOnStaff } from '../../shared/thread.js'
 import { ago, dateTimeLabel } from '../lib/format.js'
 import Field from './Field.jsx'
@@ -9,7 +10,11 @@ import Field from './Field.jsx'
 //
 // 두 자리에서 같은 것을 보여 준다. 담당자는 검토 화면에서 묻고, 부서는
 // 접수번호 조회 화면에서 답한다. 같은 것을 보되 할 수 있는 일이 다르다.
-export default function Thread({ decisions, applicationId, ticket, mode, onChanged }) {
+export default function Thread(props) {
+  return <ThreadSession key={JSON.stringify([props.mode, props.applicationId, props.ticket])} {...props} />
+}
+
+function ThreadSession({ decisions, applicationId, ticket, mode, onChanged }) {
   const thread = toThread(decisions)
   const open = openQuestions(thread)
   // 누구를 기다리는 것인지 갈라야 배지가 반대로 안 뜬다.
@@ -94,6 +99,7 @@ export default function Thread({ decisions, applicationId, ticket, mode, onChang
 // 담당자가 묻는다.
 function AskForm({ applicationId, onSaved }) {
   const toast = useToast()
+  const captureView = useActionLifetime(applicationId)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ question: '', why: '', author: 'AX 담당자' })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -101,25 +107,29 @@ function AskForm({ applicationId, onSaved }) {
 
   async function send(e) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
     setFieldErrors({})
+    const current = captureView()
     try {
       const r = await api.post(`/applications/${applicationId}/ask`, form)
+      if (!current()) return
       toast.success(r.tellThem)
       setForm({ question: '', why: '', author: form.author })
       setOpen(false)
       await onSaved?.()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
       toast.error(err.message)
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 
   if (!open) {
     return (
-      <button type="button" className="btn-ghost btn-sm thread-ask-open" onClick={() => setOpen(true)}>
+      <button type="button" className="btn-ghost btn-sm thread-ask-open" disabled={saving} onClick={() => setOpen(true)}>
         되물어보기
       </button>
     )
@@ -130,6 +140,7 @@ function AskForm({ applicationId, onSaved }) {
       <Field label="무엇이 궁금하십니까" required error={fieldErrors.question}>
         <textarea
           rows={2}
+          disabled={saving}
           value={form.question}
           onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
           placeholder="정산서를 받는 채널이 몇 개인지, 그리고 양식이 매달 바뀌는지 알려주실 수 있을까요?"
@@ -143,6 +154,7 @@ function AskForm({ applicationId, onSaved }) {
       >
         <textarea
           rows={2}
+          disabled={saving}
           value={form.why}
           onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
           placeholder="채널이 셋 이하면 규칙으로 풀리고, 그보다 많으면 양식이 바뀔 때마다 손이 갑니다. 만들지 말지가 여기서 갈립니다."
@@ -155,7 +167,7 @@ function AskForm({ applicationId, onSaved }) {
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
           {saving ? '남기는 중…' : '질문 남기기'}
         </button>
-        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+        <button type="button" className="btn-ghost btn-sm" disabled={saving} onClick={() => setOpen(false)}>
           그만두기
         </button>
         <span className="spacer" />
@@ -163,6 +175,7 @@ function AskForm({ applicationId, onSaved }) {
           부서는 접수번호로 조회하면 이 질문을 봅니다. 알려주는 것은 아직 사람이 해야 합니다.
         </span>
       </div>
+      {saving && <p className="card-note" role="status">전송 중입니다. 화면을 이동해도 전송 요청은 취소되지 않습니다.</p>}
     </form>
   )
 }
@@ -170,24 +183,29 @@ function AskForm({ applicationId, onSaved }) {
 // 부서가 답한다.
 function AnswerForm({ ticket, questionId, onSaved }) {
   const toast = useToast()
+  const captureView = useActionLifetime(`${ticket}:${questionId}`)
   const [form, setForm] = useState({ answer: '', author: '' })
   const [fieldErrors, setFieldErrors] = useState({})
   const [saving, setSaving] = useState(false)
 
   async function send(e) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
     setFieldErrors({})
+    const current = captureView()
     try {
       await api.post(`/track/${ticket}/answer`, { ...form, questionId })
+      if (!current()) return
       toast.success('답을 남겼습니다. 담당자가 확인하면 다음 단계로 넘어갑니다.')
       setForm({ answer: '', author: form.author })
       await onSaved?.()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
       toast.error(err.message)
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 
@@ -196,6 +214,7 @@ function AnswerForm({ ticket, questionId, onSaved }) {
       <Field label="답" required error={fieldErrors.answer}>
         <textarea
           rows={2}
+          disabled={saving}
           value={form.answer}
           onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
           placeholder="다섯 개입니다. 양식은 자사몰만 가끔 바뀌고 나머지는 그대로입니다."
@@ -204,6 +223,7 @@ function AnswerForm({ ticket, questionId, onSaved }) {
 
       <Field label="누가 답하십니까" required error={fieldErrors.author}>
         <input
+          disabled={saving}
           value={form.author}
           onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
           placeholder="정산 담당자"
@@ -223,6 +243,7 @@ function AnswerForm({ ticket, questionId, onSaved }) {
           않습니다.
         </span>
       </div>
+      {saving && <p className="card-note" role="status">전송 중입니다. 화면을 이동해도 전송 요청은 취소되지 않습니다.</p>}
     </form>
   )
 }
@@ -234,6 +255,7 @@ function AnswerForm({ ticket, questionId, onSaved }) {
 // 물어보려다 만다.
 function DeptAskForm({ ticket, onSaved }) {
   const toast = useToast()
+  const captureView = useActionLifetime(ticket)
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ question: '', author: '' })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -241,19 +263,23 @@ function DeptAskForm({ ticket, onSaved }) {
 
   async function send(e) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
     setFieldErrors({})
+    const current = captureView()
     try {
       const r = await api.post(`/track/${encodeURIComponent(ticket)}/ask`, form)
+      if (!current()) return
       toast.success(r.message)
       setForm({ question: '', author: form.author })
       setOpen(false)
       await onSaved?.()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
       toast.error(err.message)
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 
@@ -262,6 +288,7 @@ function DeptAskForm({ ticket, onSaved }) {
       <button
         type="button"
         className="btn-ghost btn-sm thread-ask-open"
+        disabled={saving}
         onClick={() => setOpen(true)}
       >
         담당자에게 물어보기
@@ -274,6 +301,7 @@ function DeptAskForm({ ticket, onSaved }) {
       <Field label="무엇이 궁금하십니까" required error={fieldErrors.question}>
         <textarea
           rows={2}
+          disabled={saving}
           value={form.question}
           onChange={(e) => setForm((f) => ({ ...f, question: e.target.value }))}
           placeholder="언제쯤 시작될지 알 수 있을까요? 이번 달 마감 전에 필요해서 그렇습니다."
@@ -287,6 +315,7 @@ function DeptAskForm({ ticket, onSaved }) {
         error={fieldErrors.author}
       >
         <input
+          disabled={saving}
           value={form.author}
           onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
           placeholder="정산 담당자"
@@ -299,12 +328,13 @@ function DeptAskForm({ ticket, onSaved }) {
         <button type="submit" className="btn-primary btn-sm" disabled={saving}>
           {saving ? '보내는 중…' : '보내기'}
         </button>
-        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+        <button type="button" className="btn-ghost btn-sm" disabled={saving} onClick={() => setOpen(false)}>
           그만두기
         </button>
         <span className="spacer" />
         <span className="card-note">물어보신 것도 결정 기록에 그대로 남습니다.</span>
       </div>
+      {saving && <p className="card-note" role="status">전송 중입니다. 화면을 이동해도 전송 요청은 취소되지 않습니다.</p>}
     </form>
   )
 }
@@ -315,6 +345,7 @@ function DeptAskForm({ ticket, onSaved }) {
 // 못 받는다. 그건 물을 데가 없는 것보다 나쁘다 — 물어본 사람은 기다린다.
 function ReplyForm({ applicationId, questionId, onSaved }) {
   const toast = useToast()
+  const captureView = useActionLifetime(`${applicationId}:${questionId}`)
   const uid = useId().replaceAll(':', '')
   const [form, setForm] = useState({ answer: '', author: 'AX 담당자' })
   const [fieldErrors, setFieldErrors] = useState({})
@@ -322,18 +353,22 @@ function ReplyForm({ applicationId, questionId, onSaved }) {
 
   async function send(e) {
     e.preventDefault()
+    if (saving) return
     setSaving(true)
     setFieldErrors({})
+    const current = captureView()
     try {
       const r = await api.post(`/applications/${applicationId}/reply`, { ...form, questionId })
+      if (!current()) return
       toast.success(r.message)
       setForm({ answer: '', author: form.author })
       await onSaved?.()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
       toast.error(err.message)
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
   }
 
@@ -343,6 +378,7 @@ function ReplyForm({ applicationId, questionId, onSaved }) {
         <textarea
           id={`reply-answer-${uid}`}
           rows={2}
+          disabled={saving}
           value={form.answer}
           onChange={(e) => setForm((f) => ({ ...f, answer: e.target.value }))}
           placeholder="이번 주 안에 착수합니다. 마감 전에 쓰실 수 있게 하겠습니다."
@@ -353,6 +389,7 @@ function ReplyForm({ applicationId, questionId, onSaved }) {
           <input
             id={`reply-author-${uid}`}
             className="thread-author"
+            disabled={saving}
             value={form.author}
             onChange={(e) => setForm((f) => ({ ...f, author: e.target.value }))}
             placeholder="예: AX 담당자"
@@ -362,6 +399,7 @@ function ReplyForm({ applicationId, questionId, onSaved }) {
           {saving ? '보내는 중…' : '답하기'}
         </button>
       </div>
+      {saving && <p className="card-note" role="status">전송 중입니다. 화면을 이동해도 전송 요청은 취소되지 않습니다.</p>}
     </form>
   )
 }

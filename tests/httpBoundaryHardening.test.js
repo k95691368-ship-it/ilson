@@ -8,12 +8,32 @@ import { onRequestGet as health } from '../functions/api/health.js'
 import { requestBodyLimit } from '../functions/_lib/requestBody.js'
 
 vi.mock('../functions/_lib/rateLimit.js', () => ({ checkRateLimit: vi.fn(async () => true) }))
-const env = { DBBridgeApplied: true, OVERRIDE_DEMO_MODE: 'true' }
+const scope = 'a'.repeat(64)
+const env = { DBBridgeApplied: true, DB: { forActor: () => ({ toolRunScope: async () => scope }) }, AUTH_ACTOR: { email: 'test@local.invalid', role: 'audit', label: 'verified', mode: 'access' } }
 const sentry = 'private-sql-and-credential-sentinel'
-const run = (request, next, options = env) => onRequest({ request, next: bounded => next(bounded ?? request), env: options })
+const run = (request, next, options = env) => {
+  request.headers.set('Origin', 'https://ilson.test')
+  request.headers.set('X-Ilson-Request', '1')
+  request.headers.set('X-Ilson-Scope', scope)
+  return onRequest({ request, next: bounded => next(bounded ?? request), env: options })
+}
 const post = body => new Request('https://ilson.test/api/override', { method: 'POST', body })
 
 describe('API resource and information boundary', () => {
+  it('does not report a Supabase release healthy when feedback tables are missing', async () => {
+    const names = ['application','review','decision_log','acceptance_criterion','baseline','build_run','beta_round','manual','handover','tool_use','outcome','rate_limit_hits']
+    const configured = { SUPABASE_URL: 'https://test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'test-only', DB: {
+      prepare: () => ({ all: async () => ({ results: names.map(name => ({ name })) }) }),
+      readiness: async () => ({ schemaReady: true, capacityAvailable: true }),
+    } }
+    const incomplete = await health({ env: configured })
+    expect(incomplete.status).toBe(503)
+    expect(await incomplete.json()).toMatchObject({ ready: false, checks: { schema: false } })
+    names.push('field_feedback_case','field_feedback_update','field_feedback_receipt','quality_sample_batch','quality_sample_item','tool_nonuse_report','issue_followup','quality_sample_review_history','application_participation')
+    const ready = await health({ env: configured })
+    expect(ready.status).toBe(200)
+    expect(await ready.json()).toMatchObject({ ready: true, checks: { schema: true } })
+  })
   it('never reflects an unexpected exception into the response', async () => {
     expect(await failUnexpected(new Error(sentry), '저장하지 못했습니다.').json()).toEqual({ error: '저장하지 못했습니다.' })
     const response = await health({ env: { DB: { prepare() { throw Error(sentry) } } } })
@@ -65,7 +85,7 @@ describe('API resource and information boundary', () => {
   })
   it('preserves valid JSON and multipart file requests', async () => {
     const response = await run(post(JSON.stringify({ note: '정상 입력' })), async bounded => ok(await bounded.json()))
-    expect(await response.json()).toEqual({ note: '정상 입력' })
+    expect(await response.json()).toMatchObject({ note: '정상 입력', by: 'verified' })
     const form = new FormData()
     form.set('title', '신청서')
     form.set('files', new File(['col\nvalue'], 'sample.csv', { type: 'text/csv' }))
@@ -90,7 +110,7 @@ describe('API resource and information boundary', () => {
     body.set(bytes)
     const response = await run(post(body), async bounded => ok(await bounded.json()))
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({ value: '한글' })
+    expect(await response.json()).toMatchObject({ value: '한글', by: 'verified' })
     const excessive = new Uint8Array(body.length + 1).fill(32)
     excessive.set(bytes)
     const rejected = await run(post(excessive), async bounded => ok(await bounded.json()))

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
+import { useOverrideEvents } from '../hooks/useOverrideEvents.js'
 import { useToast } from '../context/ToastContext.jsx'
 import FieldFeedbackView from '../components/FieldFeedbackView.jsx'
+import OverrideEventPager from '../components/OverrideEventPager.jsx'
 import {
   CAUSES,
   DECISION_ACTIONS,
@@ -30,6 +32,7 @@ const NAV = [
 
 const MODAL_TITLES = {
   event: '새 판단 기록',
+  eventDetail: '판단 사건 원문',
   validate: '사람의 수정 검토',
   cluster: '원인과 책임 조직 확정',
   experiment: '개선 실험 만들기',
@@ -56,6 +59,7 @@ function fmtDate(value, withTime = false) {
 }
 
 function won(value) {
+  if (value == null || value === '') return '—'
   const number = Number(value) || 0
   if (number >= 100000000) return `${Math.round(number / 10000000) / 10}억원`
   if (number >= 10000) return `${Math.round(number / 1000) / 10}만원`
@@ -119,13 +123,18 @@ function formObject(form) {
 export default function OverridePage() {
   const { data, error, loading, reload } = useApi('/override')
   const toast = useToast()
-  const [view, setView] = useState(() => window.location.hash.replace('#', '') || 'overview')
+  const location = useLocation()
+  const navigate = useNavigate()
+  const hashView = location.hash.slice(1)
+  const view = NAV.some(item => item.key === hashView) ? hashView : 'overview'
   const [demoRole, setRole] = useState(() => localStorage.getItem('override-role') || 'product')
   const role = data?.demo_mode === false ? data.current_actor?.role || 'reviewer' : demoRole
   const [modal, setModal] = useState(null)
+  const [mutationProblem, setMutationProblem] = useState(null)
   const [busy, setBusy] = useState(false)
   const [aiDraft, setAiDraft] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [focusedClusterId, setFocusedClusterId] = useState(null)
   const menuToggleRef = useRef(null)
 
   function closeMenu() {
@@ -135,14 +144,9 @@ export default function OverridePage() {
 
   function navigateView(next) {
     if (menuOpen) closeMenu()
-    setView(next)
+    if (location.hash !== `#${next}`) navigate({ pathname: location.pathname, search: location.search, hash: `#${next}` }, { state: location.state })
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
-
-  useEffect(() => {
-    if (!NAV.some((item) => item.key === view)) setView('overview')
-    window.location.hash = view
-  }, [view])
 
   useEffect(() => {
     localStorage.setItem('override-role', demoRole)
@@ -150,6 +154,7 @@ export default function OverridePage() {
 
   async function mutate(action, payload = {}, success = '저장했습니다.') {
     setBusy(true)
+    setMutationProblem(null)
     try {
       const result = await api.post('/override', {
         ...payload,
@@ -162,7 +167,9 @@ export default function OverridePage() {
       await reload()
       return result
     } catch (mutationError) {
-      toast.error(mutationError.message)
+      const fields = [...new Set(Object.values(mutationError.fields ?? {}).filter(value => typeof value === 'string' && value.trim()))]
+      setMutationProblem({ message: mutationError.message, fields })
+      toast.error(fields.length ? fields.join(' ') : mutationError.message)
       return null
     } finally {
       setBusy(false)
@@ -171,6 +178,7 @@ export default function OverridePage() {
 
   async function askAi(kind, context, entityKind, entityId) {
     setBusy(true)
+    setMutationProblem(null)
     setAiDraft(null)
     setModal({ type: 'ai' })
     try {
@@ -193,6 +201,7 @@ export default function OverridePage() {
 
   function open(type, entity = null) {
     setMenuOpen(false)
+    setMutationProblem(null)
     setModal({ type, entity })
   }
 
@@ -229,7 +238,7 @@ export default function OverridePage() {
       )}
 
       <div className="ol-context-bar">
-        <span>{data?.demo_mode ? '시연 데이터로 살펴보는 AI 운영' : 'AI 운영 워크스페이스'}</span>
+        <span>{data?.demo_mode ? '시연 데이터' : '운영 데이터'}</span>
         {data?.execution && <span>{data.execution.mode === 'simulation' ? '가상 자료' : '수동 근거 기록'} · {data.execution.external_rollout ? '외부 실행 연결' : '외부 배포 제어 미연결'}</span>}
         {data?.current_actor && <span>{data.current_actor.label} · {roleLabel(data.current_actor.role)}</span>}
         {data?.demo_mode && <label className="ol-role-select">
@@ -250,10 +259,10 @@ export default function OverridePage() {
             <>
               {view === 'overview' && <OverviewView data={data} open={open} go={navigateView} />}
               {view === 'events' && <EventsView data={data} open={open} askAi={askAi} />}
-              {view === 'clusters' && <ClustersView data={data} open={open} askAi={askAi} />}
+              {view === 'clusters' && <ClustersView data={data} open={open} askAi={askAi} mutate={mutate} busy={busy} role={role} initialSelectedId={focusedClusterId} />}
               {view === 'experiments' && <ExperimentsView data={data} open={open} />}
               {view === 'intelligence' && <IntelligenceView data={data} />}
-              {['feedback','quality'].includes(view) && <FieldFeedbackView key={`${role}:${view}`} mode={view} role={role} products={data.products ?? []} onCapture={() => open('event')} />}
+              {['feedback','quality'].includes(view) && <FieldFeedbackView key={`${role}:${view}`} mode={view} role={role} products={data.capture_products ?? data.products ?? []} onCapture={() => open('event')} onOpenEvent={eventId => open('eventDetail', eventId)} onOpenCluster={async clusterId => { await reload(); setFocusedClusterId(clusterId); navigateView('clusters') }} />}
               {view === 'integrations' && (
                 <IntegrationsView data={data} open={open} mutate={mutate} role={role} busy={busy} />
               )}
@@ -264,21 +273,26 @@ export default function OverridePage() {
       </div>
 
       <footer className="ol-footer">
-        <div><strong>일손 · OverrideLoop</strong><p>업무를 바꾸는 과정과 그 이후의 기록.</p></div>
+        <div><strong>일손 · OverrideLoop</strong></div>
         <nav aria-label="함께 살펴보기"><Link to="/portfolio">일손 전체 과정</Link><Link to="/tools">부서에 넘긴 도구</Link><button type="button" onClick={() => navigateView('audit')}>감사 기록</button><Link to="/built">기술 구현</Link></nav>
-        <small>{data?.demo_mode ? '가상의 회사·부서·데이터로 구성된 포트폴리오입니다.' : '판단의 근거와 변경 이력을 함께 기록합니다.'}</small>
+        {data?.demo_mode && <small>가상의 회사·부서·데이터로 구성된 포트폴리오입니다.</small>}
       </footer>
 
       {modal && (
         <Modal title={MODAL_TITLES[modal.type]} onClose={() => !busy && setModal(null)}>
+          {mutationProblem && <div className="notice notice-danger" role="alert">
+            <p>{mutationProblem.message}</p>
+            {mutationProblem.fields.length > 0 && <ul>{mutationProblem.fields.map(message => <li key={message}>{message}</li>)}</ul>}
+          </div>}
           {modal.type === 'event' && (
             <EventForm data={data} busy={busy} onSubmit={(payload) => mutate('capture_event', payload, '판단과 근거를 저장했습니다.')} />
           )}
+          {modal.type === 'eventDetail' && <EventDetail eventId={modal.entity} open={open} askAi={askAi} refresh={data?.generated_at} />}
           {modal.type === 'validate' && (
             <ValidateForm event={modal.entity} busy={busy} onSubmit={(payload) => mutate('validate_event', payload, '사람의 수정 타당성을 기록했습니다.')} />
           )}
           {modal.type === 'cluster' && (
-            <ClusterForm cluster={modal.entity} busy={busy} onSubmit={(payload) => mutate('update_cluster', payload, '원인과 책임 조직을 확정했습니다.')} />
+            <ClusterForm cluster={modal.entity} candidates={data.assignment_candidates ?? []} busy={busy} onSubmit={(payload) => mutate('update_cluster', payload, '원인과 담당을 확정했습니다.')} />
           )}
           {modal.type === 'experiment' && (
             <ExperimentForm cluster={modal.entity} busy={busy} onSubmit={(payload) => mutate('create_experiment', payload, '개선 실험 카드를 만들었습니다.')} onAssist={() => askAi('experiment', modal.entity, 'issue_cluster', modal.entity?.id)} />
@@ -302,7 +316,7 @@ export default function OverridePage() {
             <ProductForm busy={busy} onSubmit={(payload) => mutate('create_product', payload, 'AI 제품을 등록했습니다.')} />
           )}
           {modal.type === 'actor' && (
-            <ActorForm busy={busy} onSubmit={(payload) => mutate('save_actor', payload, '접근 역할을 등록했습니다.')} />
+            <ActorForm actor={modal.entity} products={data.products ?? []} busy={busy} onSubmit={(payload) => mutate('save_actor', payload, '접근 권한을 저장했습니다.')} />
           )}
           {modal.type === 'ai' && <AiDraft result={aiDraft} busy={busy} />}
         </Modal>
@@ -332,11 +346,10 @@ function ErrorState({ message, onRetry }) {
   )
 }
 
-function PageIntro({ eyebrow, title, copy, actions }) {
+function PageIntro({ title, copy, actions }) {
   return (
     <header className="ol-page-intro">
       <div>
-        <span className="ol-eyebrow">{eyebrow}</span>
         <h1>{title}</h1>
         {copy && <p>{copy}</p>}
       </div>
@@ -349,16 +362,13 @@ function OverviewView({ data, open, go }) {
   const featured = data.events.find((event) => Number(event.is_override)) ?? data.events[0]
   return (
     <div className="ol-page ol-overview">
-      <section className="ms-hero ol-hero">
-        <span className="ms-eyebrow">OverrideLoop</span>
-        <h1>AI의 답에,<br />사람의 판단을.</h1>
-        <p className="ms-lead">현장의 수정 기록을 모아, 다음 개선을 준비합니다.</p>
-        <div className="ms-actions">
+      <PageIntro title="운영판" actions={<>
           <button className="ol-primary" type="button" onClick={() => go('events')}>판단 사건 살펴보기</button>
           <button className="ol-secondary" type="button" onClick={() => open('event')}>새 판단 기록</button>
-        </div>
-        {featured && <div className="decision-preview" aria-label="최근 판단 사건 미리보기">
-          <div className="decision-preview-bar"><span>OverrideLoop · 판단 기록</span><span>{data.demo_mode ? '시연 사건' : '최근 사건'}</span></div>
+          <button className="ol-text-button" type="button" onClick={() => go('experiments')}>개선 실험 보기</button>
+        </>} />
+        {featured && <section className="decision-preview" aria-label="최근 판단 사건 미리보기">
+          <div className="decision-preview-bar"><span>{data.demo_mode ? '최근 판단 · 시연 사건' : '최근 판단'}</span></div>
           <div className="decision-preview-heading"><span>{featured.product_name}</span><span>{featured.external_ref || featured.id}</span></div>
           <div className="decision-preview-grid">
             <div><span className="decision-preview-label">AI의 원안</span><p>{featured.ai_decision}</p></div>
@@ -366,28 +376,7 @@ function OverviewView({ data, open, go }) {
             <div className="decision-preview-human"><span className="decision-preview-label">사람의 최종 판단</span><p>{featured.human_decision}</p></div>
           </div>
           <div className="decision-preview-evidence"><span>판단의 근거</span><p>{featured.reason_detail}</p><Validity value={featured.validity} /></div>
-        </div>}
-      </section>
-
-
-      <section className="ol-loop-card">
-        <div className="ol-section-head">
-          <div>
-            <span className="ol-kicker">개선 과정</span>
-            <h2>바꾸기 전에 시험하고.<br />바꾼 뒤에도 확인하고.</h2>
-          </div>
-          <button className="ol-text-button" type="button" onClick={() => go('experiments')}>개선 실험 보기 ›</button>
-        </div>
-        <div className="ol-loop" role="list" aria-label="OverrideLoop 전체 흐름">
-          <LoopStep no="01" label="판단" text="승인 · 수정 · 거절 · 이관" active />
-          <LoopStep no="02" label="증거" text="정책 · 모델 · 근거 · 결과" />
-          <LoopStep no="03" label="원인" text="군집 · 타당성 · 책임 조직" />
-          <LoopStep no="04" label="실험" text="Replay · Shadow · 제한 배포" />
-          <LoopStep no="05" label="결정" text="확대 · 보류 · 중단 · 롤백" />
-          <LoopStep no="06" label="재측정" text="예외 · 고객 · 비용 · 안전" />
-        </div>
-      </section>
-
+        </section>}
     </div>
   )
 }
@@ -402,16 +391,6 @@ function Metric({ label, value, note, tone }) {
   )
 }
 
-function LoopStep({ no, label, text, active }) {
-  return (
-    <div className={`ol-loop-step${active ? ' active' : ''}`} role="listitem">
-      <span>{no}</span>
-      <strong>{label}</strong>
-      <small>{text}</small>
-    </div>
-  )
-}
-
 function PriorityPill({ score, band }) {
   return <span className={`ol-priority-pill ${toneForPriority(score)}`}>{band ?? priorityBand(score)}</span>
 }
@@ -421,33 +400,20 @@ function EventsView({ data, open, askAi }) {
   const [product, setProduct] = useState('all')
   const [validity, setValidity] = useState('all')
   const [action, setAction] = useState('all')
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase()
-    return data.events.filter((event) => {
-      if (product !== 'all' && event.product_id !== product) return false
-      if (validity !== 'all' && event.validity !== validity) return false
-      if (action !== 'all' && event.decision_action !== action) return false
-      if (!needle) return true
-      return [event.ai_decision, event.human_decision, event.reason_detail, event.external_ref, event.product_name]
-        .join(' ')
-        .toLowerCase()
-        .includes(needle)
-    })
-  }, [action, data.events, product, query, validity])
+  const listing = useOverrideEvents({ q: query.trim(), productId: product, validity, action }, { refresh: data.generated_at })
 
   return (
     <div className="ol-page">
       <PageIntro
-        eyebrow="Decision evidence"
-        title="판단이 바뀐 순간"
-        copy="AI의 원안과 사람의 최종 판단을 버전·정책·업무 결과와 함께 보존합니다. 사람의 수정은 검토 전까지 정답으로 쓰지 않습니다."
+        title="판단 사건"
+        copy="사람의 수정은 검토 전까지 정답으로 쓰지 않습니다."
         actions={<button className="ol-primary" type="button" onClick={() => open('event')}>판단 기록</button>}
       />
 
-      {data.event_list?.truncated && <p className="ol-gate-copy">전체 {data.event_list.total.toLocaleString('ko-KR')}건 중 최근 {data.event_list.limit}건을 표시합니다. 검색·내보내기는 이 목록 범위이며, 조직 집계는 전체 기록을 사용합니다.</p>}
+      <p className="field-muted">검색과 필터는 열람 권한이 있는 전체 이력에 적용합니다. 최신 사건부터 페이지별로 표시하며, 조직 집계는 페이지 이동과 관계없이 전체 기록을 사용합니다.</p>
 
       <div className="ol-toolbar">
-        <label className="ol-search"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="사건·근거·제품 검색" /></label>
+        <label className="ol-search"><span aria-hidden="true">⌕</span><input value={query} maxLength={200} onChange={(event) => setQuery(event.target.value)} placeholder="사건·근거·제품 검색" /></label>
         <select value={product} onChange={(event) => setProduct(event.target.value)} aria-label="AI 제품 필터">
           <option value="all">모든 AI 제품</option>
           {data.products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
@@ -462,9 +428,28 @@ function EventsView({ data, open, askAi }) {
         </select>
       </div>
 
+      {listing.error && <ErrorState message={listing.error} onRetry={listing.reload} />}
+      {listing.loading && !listing.data && <p role="status">판단 사건을 불러오는 중입니다.</p>}
+      {listing.page && <p className="field-muted">검색 결과 {listing.page.total.toLocaleString('ko-KR')}건 · 현재 {listing.events.length}건 표시</p>}
       <div className="ol-event-list">
-        {filtered.map((event) => (
-          <article key={event.id} className="ol-event-card">
+        {listing.events.map(event => <EventCard key={event.id} event={event} open={open} askAi={askAi} />)}
+        {!listing.loading && !listing.error && listing.events.length === 0 && <Empty title="조건에 맞는 판단 사건이 없습니다." />}
+      </div>
+      <OverrideEventPager listing={listing} />
+    </div>
+  )
+}
+
+function EventDetail({ eventId, open, askAi, refresh }) {
+  const listing = useOverrideEvents({ eventId }, { refresh })
+  if (listing.error) return <ErrorState message={listing.error} onRetry={listing.reload} />
+  if (!listing.data) return <p role="status">판단 사건 원문을 불러오는 중입니다.</p>
+  const event = listing.events.find(item => item.id === eventId)
+  return event ? <EventCard event={event} open={open} askAi={askAi} /> : <Empty title="이 판단 사건을 찾을 수 없습니다." />
+}
+
+function EventCard({ event, open, askAi }) {
+  return <article className="ol-event-card">
             <div className="ol-event-meta">
               <span className={`ol-action action-${event.decision_action}`}>{actionLabel(event.decision_action)}</span>
               <strong>{event.product_name}</strong>
@@ -494,11 +479,6 @@ function EventsView({ data, open, askAi }) {
               <button className="ol-text-button" type="button" onClick={() => askAi('event', event, 'override_event', event.id)}>Claude 원인 초안</button>
             </div>
           </article>
-        ))}
-        {filtered.length === 0 && <Empty title="조건에 맞는 판단 사건이 없습니다." />}
-      </div>
-    </div>
-  )
 }
 
 function Validity({ value }) {
@@ -512,26 +492,32 @@ function Validity({ value }) {
   return <span className={`ol-validity ${tone}`}>{label}</span>
 }
 
-function ClustersView({ data, open, askAi }) {
+function ClustersView({ data, open, askAi, mutate, busy, role, initialSelectedId }) {
   const fromHash = window.location.hash.startsWith('#clusters:') ? window.location.hash.split(':')[1] : null
-  const [selectedId, setSelectedId] = useState(fromHash || data.clusters[0]?.id)
+  const [selectedId, setSelectedId] = useState(initialSelectedId || fromHash || data.clusters[0]?.id)
   const [query, setQuery] = useState('')
-  const selected = data.clusters.find((cluster) => cluster.id === selectedId) ?? data.clusters[0]
+  const [onlyMine, setOnlyMine] = useState(false)
+  const isMine = cluster => Boolean(cluster.assignee_email && cluster.assignee_email === (data.demo_mode ? 'demo-owner@ilson.invalid' : data.current_actor?.email))
   const clusters = data.clusters.filter((cluster) =>
-    `${cluster.title} ${cluster.summary} ${cluster.owner_team}`.toLowerCase().includes(query.toLowerCase())
+    (!onlyMine || (isMine(cluster) && !['resolved', 'accepted_exception'].includes(cluster.status))) &&
+    `${cluster.title} ${cluster.summary} ${cluster.owner_team} ${cluster.assignee_label || cluster.assignee_email || ''}`.toLowerCase().includes(query.toLowerCase())
   )
-  const related = data.events.filter((event) => event.cluster_id === selected?.id)
+  const linkedMissing = initialSelectedId === selectedId && initialSelectedId && !data.clusters.some(cluster => cluster.id === initialSelectedId)
+  const selected = clusters.find((cluster) => cluster.id === selectedId) ?? (linkedMissing ? null : clusters[0])
+  const assigneeLabel = cluster => cluster.assignee_label || data.assignment_candidates?.find(person => person.email === cluster.assignee_email)?.label || cluster.assignee_email || '미배정'
+  const overdue = cluster => cluster.next_response_on && cluster.next_response_on < new Date().toISOString().slice(0, 10) && !['resolved', 'accepted_exception'].includes(cluster.status)
+  const listing = useOverrideEvents({ clusterId: selected?.id }, { refresh: data.generated_at, skip: !selected })
+  const related = listing.events.filter(event => event.cluster_id === selected?.id)
 
   return (
     <div className="ol-page">
       <PageIntro
-        eyebrow="Issue clusters"
-        title="같은 문제가 반복되는 곳"
-        copy="유사한 사건을 묶고 모델 탓인지, 정책·데이터·업무·시스템 문제인지 사람이 최종 판정합니다."
+        title="반복 문제"
       />
       <div className="ol-split-workspace">
         <section className="ol-master-list">
           <label className="ol-search"><span aria-hidden="true">⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="반복 문제 검색" /></label>
+          <label className="ol-assignment-filter"><input type="checkbox" checked={onlyMine} onChange={event => setOnlyMine(event.target.checked)} />{data.demo_mode ? '시연 담당자의 할 일만' : '내가 맡은 할 일만'}</label>
           <div className="ol-cluster-list">
             {clusters.map((cluster) => (
               <button key={cluster.id} type="button" className={selected?.id === cluster.id ? 'active' : ''} onClick={() => setSelectedId(cluster.id)}>
@@ -539,6 +525,7 @@ function ClustersView({ data, open, askAi }) {
                 <strong>{cluster.title}</strong>
                 <p>{causeByKey(cluster.cause_code).label}</p>
                 <small>{cluster.recurrence_count}건 · {cluster.owner_team}</small>
+                <small>{assigneeLabel(cluster)}{cluster.assignee_email && !cluster.acknowledged_at ? ' · 접수 확인 대기' : ''}{overdue(cluster) ? ' · 회신 기한 지남' : ''}</small>
               </button>
             ))}
           </div>
@@ -553,15 +540,24 @@ function ClustersView({ data, open, askAi }) {
               <div className="ol-card-actions">
                 <button className="ol-secondary ol-compact" type="button" onClick={() => open('cluster', selected)}>원인·담당 확정</button>
                 <button className="ol-primary ol-compact" type="button" onClick={() => open('experiment', selected)}>실험 만들기</button>
-                <button className="ol-text-button" type="button" onClick={() => askAi('cluster', { cluster: selected, events: related }, 'issue_cluster', selected.id)}>Claude 가설</button>
+                <button className="ol-text-button" type="button" disabled={listing.loading || Boolean(listing.error)} onClick={() => askAi('cluster', { cluster: selected, events: related }, 'issue_cluster', selected.id)}>현재 원문으로 Claude 가설</button>
               </div>
             </div>
+
+            <section className="ol-detail-section ol-assignment-summary" aria-label="문제 담당과 회신 일정">
+              <div><span>개인 담당자</span><strong>{assigneeLabel(selected)}</strong></div>
+              <div><span>접수 확인</span><strong>{selected.acknowledged_at ? fmtDate(selected.acknowledged_at, true) : selected.assignee_email ? '담당자 확인 대기' : '담당자 배정 후 확인'}</strong></div>
+              <div><span>다음 회신 기한</span><strong className={overdue(selected) ? 'field-error' : undefined}>{selected.next_response_on || '미지정'}{overdue(selected) ? ' · 기한 지남' : ''}</strong></div>
+              {isMine(selected) && !selected.acknowledged_at && (!data.demo_mode || roleCan(role, 'update_cluster')) && <button className="ol-secondary ol-compact" type="button" disabled={busy} onClick={() => mutate('acknowledge_cluster', { clusterId: selected.id }, '담당 접수를 확인했습니다.')}>담당 접수 확인</button>}
+            </section>
 
             <div className="ol-detail-metrics">
               <Metric label="반복" value={`${selected.recurrence_count}건`} note={`${fmtDate(selected.first_seen_at)} — ${fmtDate(selected.last_seen_at)}`} />
               <Metric label="운영 비용" value={won(selected.operations_cost_krw)} note="연결 사건의 재작업" />
-              <Metric label="규제 위험" value={`${selected.regulatory_risk_score}/5`} note="가장 높은 사건 기준" tone={Number(selected.regulatory_risk_score) >= 4 ? 'danger' : undefined} />
+              <Metric label="규제 위험" value={valueOrDash(selected.regulatory_risk_score, '/5')} note="가장 높은 사건 기준" tone={Number(selected.regulatory_risk_score) >= 4 ? 'danger' : undefined} />
             </div>
+
+            <p className="field-muted">문제 수치는 전체 연결 사건 기준입니다. 원문은 계정에 열람이 허용된 사건만 표시합니다.</p>
 
             <section className="ol-detail-section">
               <div className="ol-section-head"><h3>원인 판정</h3><span>{selected.cause_status === 'confirmed' ? '사람이 확정' : '후보'}</span></div>
@@ -579,7 +575,9 @@ function ClustersView({ data, open, askAi }) {
             </section>
 
             <section className="ol-detail-section">
-              <div className="ol-section-head"><h3>연결된 판단 사건</h3><span>{related.length}건</span></div>
+              <div className="ol-section-head"><h3>연결된 판단 사건</h3><span>현재 {related.length}건 표시 · 열람 가능 전체 {listing.page?.total ?? selected.visible_event_count ?? related.length}건</span></div>
+              {listing.error && <ErrorState message={listing.error} onRetry={listing.reload} />}
+              {listing.loading && !listing.data && <p role="status">연결된 원문을 불러오는 중입니다.</p>}
               <div className="ol-mini-events">
                 {related.map((event) => (
                   <div key={event.id}>
@@ -587,12 +585,14 @@ function ClustersView({ data, open, askAi }) {
                     <strong>{event.product_name}</strong>
                     <p>{event.reason_detail}</p>
                     <small>{fmtDate(event.occurred_at)} · {event.segment}</small>
+                    <button className="ol-text-button" type="button" onClick={() => open('eventDetail', event.id)}>원문 보기</button>
                   </div>
                 ))}
               </div>
+              <OverrideEventPager listing={listing} label="연결된 판단 사건 페이지" />
             </section>
           </article>
-        ) : <Empty title="아직 반복 문제 군집이 없습니다." />}
+        ) : <Empty title={linkedMissing ? '연결된 문제를 현재 조회 범위에서 찾지 못했습니다.' : onlyMine ? '현재 맡은 미해결 문제가 없습니다.' : '조건에 맞는 반복 문제가 없습니다.'} />}
       </div>
     </div>
   )
@@ -608,9 +608,8 @@ function ExperimentsView({ data, open }) {
   return (
     <div className="ol-page">
       <PageIntro
-        eyebrow="Safe change experiments"
-        title="배포 전에 틀릴 기회"
-        copy="과거 사건 재생, Shadow Test, 제한 배포의 측정 근거를 순서대로 기록합니다. 위반 입력 시 중단으로 판정하지만 외부 시스템을 직접 중단하거나 롤백하지는 않습니다."
+        title="개선 실험"
+        copy="측정 근거를 기록하고 기준 위반을 판정합니다. 외부 시스템의 배포·중단·롤백은 실행하지 않습니다."
       />
       <div className="ol-experiment-board">
         <aside className="ol-experiment-list">
@@ -691,12 +690,12 @@ function ExperimentsView({ data, open }) {
             <div className="ol-card-actions ol-experiment-actions">
               {['draft','held','stopped'].includes(selected.status) && selected.evaluation_plan_json && <button className="ol-secondary" type="button" onClick={() => open('approve', selected)}>사람 승인</button>}
               <button className="ol-primary" type="button" disabled={!selected.evaluation_plan_json || !selected.approval_id || !['approved','running'].includes(selected.status)} onClick={() => open('run', selected)}>실험 결과 입력</button>
-              <button className="ol-secondary" type="button" disabled={['expanded','rolled_back'].includes(selected.status)} onClick={() => open('decision', selected)}>최종 결정</button>
+              <button className="ol-secondary" type="button" disabled={selected.status === 'rolled_back'} onClick={() => open('decision', selected)}>{selected.status === 'expanded' ? '롤백 결정 기록' : '최종 결정'}</button>
             </div>
             <p className="ol-gate-copy">수동 입력 근거의 기준 충족 여부를 기록합니다. 실제 AI 배포·중단·롤백은 실행하지 않습니다.</p>
             {!selected.evaluation_plan_json && <p className="ol-gate-copy">이전 참고 기록입니다. 사전 측정 계획이 없어 추가 시험·확대 승인을 할 수 없습니다. 반복 문제에서 새 개선 실험을 만들어 주세요.</p>}
             {gate && !gate.ok && (
-              <p className="ol-gate-copy">확대 전 확인 · {gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 필요' : gate.missing.length ? `${gate.missing.join(' → ')} 필요` : `${gate.blocked.join(' · ')} 재검토 필요`}</p>
+              <p className="ol-gate-copy">확대 전 확인 · {gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 필요' : gate.missing.length ? `${gate.missing.join(' → ')} 필요` : gate.timingIssues.length ? gate.timingIssues.map(issue=>`${issue.phase} · ${issue.reason}`).join(' / ') : `${gate.blocked.join(' · ')} 재검토 필요`}</p>
             )}
           </article>
         ) : <Empty title="아직 만든 개선 실험이 없습니다." />}
@@ -733,15 +732,16 @@ function IntelligenceView({ data }) {
   return (
     <div className="ol-page">
       <PageIntro
-        eyebrow="Organization intelligence"
-        title="한 제품 밖에서 보이는 것"
-        copy="정책 영향, 고객군 격차, 제품 간 공통 원인과 투자 우선순위를 같은 증거 위에서 봅니다."
+        title="조직 인사이트"
         actions={<button className="ol-secondary" type="button" onClick={downloadDataset}>현재 목록의 모델 오류 내보내기</button>}
       />
+      {data.metrics?.totals_scope && <p className="field-muted">원본 자료 집계 범위: {data.metrics.totals_scope}</p>}
+      <p className="field-muted">내보내기는 운영 자료에 불러온 최근 {data.events.length}건 중 타당성이 확인된 모델 오류만 포함합니다. 전체 이력이나 다른 사건 페이지를 합친 자료는 아닙니다.</p>
+      {data.event_list?.truncated && <p className="field-muted">열람 가능한 전체 {data.event_list.total.toLocaleString('ko-KR')}건 중 최근 최대 {data.event_list.limit}건의 미리보기입니다. 이전 원문은 판단 사건에서 검색할 수 있습니다.</p>}
 
       <div className="ol-insight-grid">
         <section className="ol-panel ol-span-2">
-          <div className="ol-section-head"><div><span className="ol-kicker">Fairness</span><h2>고객군별 수정률</h2></div><span>최근 30일 · 같은 날짜·고객군의 분모 필요</span></div>
+          <div className="ol-section-head"><h2>고객군별 수정률</h2><span>최근 30일 · 같은 날짜·고객군의 분모 필요</span></div>
           <div className="ol-fairness-table">
             <div className="head"><span>AI 제품</span><span>고객군</span><span>수정 / 적용 가능</span><span>수정률</span></div>
             {data.fairness.map((row) => (
@@ -753,7 +753,7 @@ function IntelligenceView({ data }) {
         </section>
 
         <section className="ol-panel">
-          <div className="ol-section-head"><div><span className="ol-kicker">Policy scenario</span><h2>정책 변경 영향</h2></div></div>
+          <div className="ol-section-head"><h2>정책 변경 영향</h2></div>
           <select className="ol-wide-select" value={policy} onChange={(event) => setPolicy(event.target.value)}>
             {data.policy_impact.map((item) => <option key={item.policy} value={item.policy}>{item.policy}</option>)}
           </select>
@@ -763,7 +763,7 @@ function IntelligenceView({ data }) {
         </section>
 
         <section className="ol-panel">
-          <div className="ol-section-head"><div><span className="ol-kicker">Shared failures</span><h2>제품을 가로지른 원인</h2></div></div>
+          <div className="ol-section-head"><h2>제품을 가로지른 원인</h2></div>
           <div className="ol-common-list">
             {data.common_issues.map((issue) => (
               <div key={issue.cause_code}><strong>{issue.cause_label}</strong><span>{issue.events}건</span><p>{issue.products.join(' · ')}</p></div>
@@ -773,12 +773,12 @@ function IntelligenceView({ data }) {
         </section>
 
         <section className="ol-panel ol-span-2">
-          <div className="ol-section-head"><div><span className="ol-kicker">Decision graph</span><h2>판단 그래프</h2></div><span>{data.graph.nodes.length}개 노드 · {data.graph.edges.length}개 연결</span></div>
+          <div className="ol-section-head"><h2>판단 그래프</h2><span>{data.graph.nodes.length}개 노드 · {data.graph.edges.length}개 연결</span></div>
           <DecisionGraph data={data} />
         </section>
 
         <section className="ol-panel">
-          <div className="ol-section-head"><div><span className="ol-kicker">Investment</span><h2>개선 투자 순서</h2></div></div>
+          <div className="ol-section-head"><h2>개선 투자 순서</h2></div>
           <ol className="ol-invest-list">
             {data.clusters.slice(0, 5).map((cluster, index) => (
               <li key={cluster.id}><span>{index + 1}</span><div><strong>{cluster.title}</strong><small>{cluster.owner_team}</small></div><b>{Math.round(cluster.priority_score)}</b></li>
@@ -787,11 +787,16 @@ function IntelligenceView({ data }) {
         </section>
 
         <section className="ol-panel">
-          <div className="ol-section-head"><div><span className="ol-kicker">Leading signals</span><h2>새 예외·증가 신호</h2></div></div>
+          <div className="ol-section-head"><h2>새 예외·증가 신호</h2></div>
           <div className="ol-signal-list">
-            {data.clusters.map((cluster) => (
-              <div key={cluster.id}><span className={`ol-trend ${cluster.trend.direction}`}>{cluster.trend.direction === 'surge' ? '↑' : cluster.trend.direction === 'down' ? '↓' : cluster.trend.direction === 'new' ? 'NEW' : '–'}</span><p>{cluster.title}</p><strong>{cluster.trend.change > 0 ? '+' : ''}{cluster.trend.change}%</strong></div>
-            ))}
+            {data.clusters.map((cluster) => {
+              const trend = cluster.trend
+              const hasTrend = Number.isFinite(trend?.change) && ['surge', 'down', 'new', 'flat'].includes(trend?.direction)
+              const direction = hasTrend ? trend.direction : 'unavailable'
+              return (
+                <div key={cluster.id}><span className={`ol-trend ${direction}`}>{direction === 'surge' ? '↑' : direction === 'down' ? '↓' : direction === 'new' ? 'NEW' : '–'}</span><p>{cluster.title}</p><strong>{hasTrend ? `${trend.change > 0 ? '+' : ''}${trend.change}%` : '자료 없음'}</strong></div>
+              )
+            })}
           </div>
         </section>
       </div>
@@ -837,19 +842,18 @@ function IntegrationsView({ data, open, mutate, role, busy }) {
   return (
     <div className="ol-page">
       <PageIntro
-        eyebrow="Connected operations"
-        title="기존 업무 안에서 연결"
-        copy="새 화면으로 복사하지 않고 판단 사건을 API로 받고, 검증된 개선 과제만 기존 시스템으로 돌려보냅니다. 시크릿 값은 저장하지 않고 Cloudflare 바인딩 이름만 보관합니다."
+        title="연동"
+        copy="시크릿 값은 저장하지 않고 Cloudflare 바인딩 이름만 보관합니다."
         actions={<button className="ol-primary" type="button" onClick={() => open('integration')}>연동 추가</button>}
       />
       <div className="ol-integration-catalog">
         {catalog.map((item) => (
-          <article key={item.kind}><span className={`ol-integration-icon ${item.kind}`}>{item.title.slice(0, 1)}</span><h2>{item.title}</h2><p>{item.copy}</p><button className="ol-text-button" type="button" onClick={() => open('integration', item)}>연결 설정 →</button></article>
+          <article key={item.kind}><h2>{item.title}</h2><p>{item.copy}</p><button className="ol-text-button" type="button" onClick={() => open('integration', item)}>연결 설정</button></article>
         ))}
       </div>
 
       <section className="ol-panel">
-        <div className="ol-section-head"><div><span className="ol-kicker">Configured</span><h2>연결된 시스템</h2></div><span>{data.integrations.length}개</span></div>
+        <div className="ol-section-head"><h2>연결된 시스템</h2><span>{data.integrations.length}개</span></div>
         <div className="ol-connected-list">
           {data.integrations.map((integration) => (
             <div key={integration.id}><span className={`ol-connection-state ${integration.status}`}><i />{integration.status}</span><div><strong>{integration.name}</strong><p>{integration.kind} · {integration.endpoint_url}</p><small>{integration.last_sync_at ? `${fmtDate(integration.last_sync_at, true)} · ${integration.last_result}` : '아직 동기화하지 않음'}</small></div><button className="ol-secondary ol-compact" type="button" disabled={busy || !roleCan(role, 'sync_integration')} onClick={() => mutate('sync_integration', { integrationId: integration.id }, '연동 자료를 전송했습니다.')}>지금 동기화</button></div>
@@ -859,8 +863,12 @@ function IntegrationsView({ data, open, mutate, role, busy }) {
       </section>
 
       <section className="ol-api-card">
-        <div><span className="ol-kicker">Inbound API</span><h2>업무 화면에서 자동 수집</h2><p>직원이 기존 도구에서 수정·거절·이관하는 순간 같은 스키마로 전송합니다. 외부 사건 번호는 중복 저장을 막습니다.</p></div>
+        <div><h2>판단 수집 API</h2><p>외부 사건 번호는 중복 저장을 막습니다.</p><p>인증된 연결에서 먼저 GET /api/session으로 접근 범위를 확인합니다. 반환된 scope를 이후 조회·저장의 X-Ilson-Scope 헤더에 넣습니다. 계정이 바뀌면 저장은 거절되며 새 계정에서 내용을 다시 확인해야 합니다. 이 값은 인증 토큰을 대신하지 않습니다.</p></div>
         <pre>{`POST /api/override
+Content-Type: application/json
+X-Ilson-Request: 1
+X-Ilson-Scope: <GET /api/session에서 확인한 scope>
+
 {
   "action": "capture_event",
   "productId": "olp_...",
@@ -877,18 +885,26 @@ function IntegrationsView({ data, open, mutate, role, busy }) {
 }
 
 function AuditView({ data, open, role }) {
+  const canManage = data.demo_mode === false && (data.current_actor?.is_admin || roleCan(role, 'save_actor'))
   return (
     <div className="ol-page">
       <PageIntro
-        eyebrow="Immutable evidence trail"
-        title="누가, 무엇을, 왜"
-        copy="사건 검토, 원인 확정, 실험 승인, 배포 결정과 외부 전송을 하나의 감사 흐름으로 남깁니다."
-        actions={roleCan(role, 'save_actor') ? <button className="ol-secondary" type="button" onClick={() => open('actor')}>접근 역할 등록</button> : null}
+        title="감사 기록"
+        actions={canManage ? <button className="ol-secondary" type="button" onClick={() => open('actor')}>접근 역할 등록</button> : null}
       />
+      {data.demo_mode && <p className="ol-gate-copy">체험 모드에서는 실제 계정의 접근 권한을 변경하지 않습니다.</p>}
+      {canManage && <section className="ol-panel ol-account-panel" aria-label="계정 접근 관리">
+        <div className="ol-section-head"><h2>계정 접근 관리</h2><span>{data.actors?.length ?? 0}명</span></div>
+        <p className="ol-gate-copy">부서 또는 제품 범위 안에서만 기록을 조회합니다. 계정을 비활성화하면 새 요청부터 접근을 차단하며 기존 작성 기록은 유지합니다.</p>
+        <div className="ol-account-list">{(data.actors ?? []).map(actor => <article key={actor.email}>
+          <div><strong>{actor.display_name || actor.email}</strong><p>{actor.email} · {roleLabel(actor.role)} · {actor.active ? '활성' : '비활성'}</p><small>부서: {actor.departments?.join(' · ') || '미지정'} / 제품: {actor.product_ids?.map(id => data.products?.find(product => product.id === id)?.name || id).join(' · ') || '미지정'}</small></div>
+          <button className="ol-secondary ol-compact" type="button" onClick={() => open('actor', actor)} aria-label={`${actor.display_name || actor.email} 접근 권한 변경`}>권한 변경</button>
+        </article>)}</div>
+        {!data.actors?.length && <p className="field-muted">등록된 계정이 없습니다.</p>}
+      </section>}
       <div className="ol-audit-summary">
         <Metric label="감사 사건" value={`${data.audit.length}건`} note="최근 160건 표시" />
         <Metric label="Claude 호출" value={`${data.ai_calls.length}건`} note="모델·프롬프트·토큰 기록" />
-        <Metric label="고위험 무승인 확대" value="0건" note="서버 게이트가 차단" tone="success" />
       </div>
       <div className="ol-audit-layout">
         <section className="ol-panel">
@@ -914,25 +930,68 @@ function AuditView({ data, open, role }) {
 }
 
 function Empty({ title }) {
-  return <div className="ol-empty"><span aria-hidden="true">○</span><p>{title}</p></div>
+  return <div className="ol-empty"><p>{title}</p></div>
 }
 
 function Modal({ title, onClose, children }) {
+  const dialogRef = useRef(null)
+  const closeRef = useRef(onClose)
+  useEffect(() => { closeRef.current = onClose }, [onClose])
   useEffect(() => {
+    const dialog = dialogRef.current
+    const returnTarget = document.activeElement
+    function focusableElements() {
+      return [...dialog.querySelectorAll('a[href], button, input, select, textarea, summary, [tabindex], [contenteditable="true"]')].filter((element) => {
+        if (element.tabIndex < 0 || element.matches(':disabled, input[type="hidden"]')) return false
+        for (let current = element; current && current !== dialog.parentElement; current = current.parentElement) {
+          if (current.hidden || current.hasAttribute('inert') || current.getAttribute('aria-hidden') === 'true') return false
+          if (current.tagName === 'DETAILS' && !current.open && !current.querySelector(':scope > summary')?.contains(element)) return false
+          const style = window.getComputedStyle(current)
+          if (style.display === 'none' || style.visibility === 'hidden') return false
+        }
+        return true
+      })
+    }
+    function focusFirst() {
+      ;(focusableElements()[0] || dialog).focus({ preventScroll: true })
+    }
     function keydown(event) {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        closeRef.current()
+      }
+      if (event.key !== 'Tab') return
+      const elements = focusableElements()
+      const first = elements[0]
+      const last = elements.at(-1)
+      const active = document.activeElement
+      if (!first) {
+        event.preventDefault()
+        dialog.focus({ preventScroll: true })
+      } else if (!elements.includes(active) || (event.shiftKey ? active === first : active === last)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus({ preventScroll: true })
+      }
+    }
+    function focusin(event) {
+      if (!dialog.contains(event.target)) focusFirst()
     }
     document.addEventListener('keydown', keydown)
+    document.addEventListener('focusin', focusin)
     document.body.classList.add('ol-modal-open')
+    focusFirst()
     return () => {
       document.removeEventListener('keydown', keydown)
+      document.removeEventListener('focusin', focusin)
       document.body.classList.remove('ol-modal-open')
+      if (returnTarget instanceof HTMLElement && returnTarget.isConnected) returnTarget.focus({ preventScroll: true })
     }
-  }, [onClose])
+  }, [])
   return (
     <div className="ol-modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section className="ol-modal" role="dialog" aria-modal="true" aria-labelledby="ol-modal-title">
-        <header><div><span>OverrideLoop</span><h2 id="ol-modal-title">{title}</h2></div><button type="button" onClick={onClose} aria-label="닫기">×</button></header>
+      <section ref={dialogRef} tabIndex={-1} className="ol-modal" role="dialog" aria-modal="true" aria-labelledby="ol-modal-title">
+        <header><h2 id="ol-modal-title">{title}</h2><button type="button" onClick={onClose} aria-label="닫기">×</button></header>
         <div className="ol-modal-body">{children}</div>
       </section>
     </div>
@@ -949,26 +1008,31 @@ function Field({ label, hint, required, children, wide = false }) {
   )
 }
 
-function SubmitBar({ busy, label, note }) {
+function SubmitBar({ busy, disabled = false, label, note }) {
   return (
     <div className="ol-submit-bar">
       {note && <p>{note}</p>}
-      <button className="ol-primary" type="submit" disabled={busy}>{busy ? '저장 중…' : label}</button>
+      <button className="ol-primary" type="submit" disabled={busy || disabled}>{busy ? '저장 중…' : label}</button>
     </div>
   )
 }
 
 function EventForm({ data, busy, onSubmit }) {
+  const products = data.capture_products ?? data.products ?? []
   return (
-    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit(formObject(event.currentTarget)) }}>
+    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit(Object.fromEntries(Object.entries(formObject(event.currentTarget)).filter(([, value]) => value !== ''))) }}>
+      <p className="ol-gate-copy">문제가 된 답변과 원하셨던 결과를 남겨주세요. 기술 정보는 아는 경우에만 추가하시면 됩니다.</p>
       <div className="ol-form-grid">
-        <Field label="AI 제품" name="productId" required><select name="productId" required defaultValue={data.products[0]?.id}>{data.products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
+        <Field label="AI 제품" name="productId" required><select name="productId" required defaultValue={products[0]?.id || ''}>{!products.length && <option value="">등록된 제품이 없습니다</option>}{products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
         <Field label="직원의 최종 판단" name="decisionAction" required><select name="decisionAction" required defaultValue="modify">{DECISION_ACTIONS.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></Field>
-        <Field label="외부 사건 번호" name="externalRef" hint="같은 번호의 중복 수집을 막습니다."><input name="externalRef" placeholder="예: CRM-20491" /></Field>
-        <Field label="고객·업무군" name="segment"><input name="segment" placeholder="예: 신혼특례" /></Field>
         <Field label="AI의 원래 판단" name="aiDecision" wide required><textarea name="aiDecision" rows="3" required placeholder="AI가 답변·추천·실행하려던 내용을 원문 그대로" /></Field>
         <Field label="사람의 최종 판단" name="humanDecision" wide required><textarea name="humanDecision" rows="3" required placeholder="수정·거절·이관 후 실제로 확정한 내용" /></Field>
         <Field label="수정 이유" name="reasonDetail" wide required><textarea name="reasonDetail" rows="3" required placeholder="당시 확인한 근거와 달랐던 점" /></Field>
+      </div>
+      <details className="ol-optional-details"><summary>추가 정보 · 선택</summary>
+      <div className="ol-form-grid">
+        <Field label="외부 사건 번호" name="externalRef" hint="같은 번호의 중복 수집을 막습니다."><input name="externalRef" placeholder="예: CRM-20491" /></Field>
+        <Field label="고객·업무군" name="segment"><input name="segment" placeholder="예: 신혼특례" /></Field>
         <Field label="바뀐 항목" name="changedFields" hint="쉼표로 구분"><input name="changedFields" placeholder="요구 서류, 답변 표현" /></Field>
         <Field label="정책·내규 원문" name="policyRefs" hint="쉼표로 구분"><input name="policyRefs" placeholder="대출내규-2026.08-14" /></Field>
         <Field label="모델 버전" name="modelVersion"><input name="modelVersion" placeholder="비우면 제품 기본 버전" /></Field>
@@ -977,14 +1041,15 @@ function EventForm({ data, busy, onSubmit }) {
         <Field label="업무 도구 버전" name="toolVersion"><input name="toolVersion" /></Field>
         <Field label="참고 데이터·문서" name="dataRefs"><input name="dataRefs" placeholder="CRM 상태, 검색 문서" /></Field>
         <Field label="실행 도구" name="tools"><input name="tools" placeholder="CRM, 정책 검색" /></Field>
-        <Field label="고객 영향" name="customerImpact"><select name="customerImpact" defaultValue="3">{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
-        <Field label="규제 위험" name="regulatoryRisk"><select name="regulatoryRisk" defaultValue="3">{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
-        <Field label="재작업 비용(원)" name="operationsCost"><input name="operationsCost" type="number" min="0" defaultValue="0" /></Field>
-        <Field label="기록 시간(초)" name="recordingSeconds"><input name="recordingSeconds" type="number" min="0" max="3600" defaultValue="20" /></Field>
+        <Field label="고객 영향" name="customerImpact"><select name="customerImpact" defaultValue=""><option value="">아직 확인하지 않음</option>{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
+        <Field label="규제 위험" name="regulatoryRisk"><select name="regulatoryRisk" defaultValue=""><option value="">아직 확인하지 않음</option>{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
+        <Field label="재작업 비용(원)" name="operationsCost"><input name="operationsCost" type="number" min="0" /></Field>
+        <Field label="기록 시간(초)" name="recordingSeconds"><input name="recordingSeconds" type="number" min="0" max="3600" /></Field>
         <Field label="실제 고객 결과" name="customerOutcome" wide><textarea name="customerOutcome" rows="2" placeholder="재문의, 사후 정정, 민원 또는 해결 결과" /></Field>
         <Field label="실제 업무 결과" name="businessOutcome" wide><textarea name="businessOutcome" rows="2" placeholder="재작업 시간, 비용, 처리 결과" /></Field>
       </div>
-      <SubmitBar busy={busy} label="판단 증거 저장" note="저장 직후 유사 사건을 검색해 군집 후보와 원인 후보를 만듭니다." />
+      </details>
+      <SubmitBar busy={busy} label="판단 증거 저장" note="원본과 수정 이유를 보존하고 담당자가 원인과 후속 처리를 확인합니다." />
     </form>
   )
 }
@@ -1000,18 +1065,31 @@ function ValidateForm({ event, busy, onSubmit }) {
   )
 }
 
-function ClusterForm({ cluster, busy, onSubmit }) {
+function ClusterForm({ cluster, candidates, busy, onSubmit }) {
+  const [assigned, setAssigned] = useState(cluster.assignee_email || '')
+  function submit(event) {
+    event.preventDefault()
+    const values = formObject(event.currentTarget)
+    for (const [field, original] of [['customerImpact', cluster.customer_impact_score], ['regulatoryRisk', cluster.regulatory_risk_score], ['operationsCost', cluster.operations_cost_krw]]) {
+      if (values[field] !== '') continue
+      if (original == null) delete values[field]
+      else values[field] = null
+    }
+    onSubmit({ ...values, nextResponseOn: assigned ? values.nextResponseOn : '', clusterId: cluster.id })
+  }
   return (
-    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), clusterId: cluster.id }) }}>
+    <form className="ol-form" onSubmit={submit}>
       <div className="ol-form-grid">
         <Field label="문제 이름" wide><input name="title" defaultValue={cluster.title} /></Field>
         <Field label="최종 원인" required><select name="causeCode" defaultValue={cluster.cause_code}>{CAUSES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></Field>
         <Field label="판정 상태"><select name="causeStatus" defaultValue={cluster.cause_status}><option value="candidate">후보</option><option value="confirmed">사람이 확정</option><option value="disputed">이견 있음</option></select></Field>
         <Field label="책임 조직" required><input name="ownerTeam" defaultValue={cluster.owner_team} required /></Field>
+        <Field label="개인 담당자"><select name="assigneeEmail" value={assigned} onChange={event => setAssigned(event.target.value)}><option value="">미배정</option>{cluster.assignee_email && !candidates.some(person => person.email === cluster.assignee_email) && <option value={cluster.assignee_email}>{cluster.assignee_label || cluster.assignee_email} · 기존 배정</option>}{candidates.map(person => <option key={person.email} value={person.email}>{person.label || person.email} · {person.email}</option>)}</select></Field>
+        <Field label="다음 회신 기한" required={Boolean(assigned)} hint="담당자를 지정하면 회신 기한도 함께 정합니다."><input name="nextResponseOn" type="date" disabled={!assigned} required={Boolean(assigned)} defaultValue={cluster.next_response_on || ''} /></Field>
         <Field label="처리 상태"><select name="status" defaultValue={cluster.status}><option value="open">원인 검토</option><option value="experiment">실험 설계</option><option value="monitoring">재발 측정</option><option value="resolved">해결</option><option value="accepted_exception">정당한 예외</option></select></Field>
-        <Field label="고객 영향"><select name="customerImpact" defaultValue={cluster.customer_impact_score}>{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
-        <Field label="규제 위험"><select name="regulatoryRisk" defaultValue={cluster.regulatory_risk_score}>{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
-        <Field label="운영 비용(원)"><input type="number" name="operationsCost" min="0" defaultValue={cluster.operations_cost_krw} /></Field>
+        <Field label="고객 영향"><select name="customerImpact" defaultValue={cluster.customer_impact_score ?? ''}><option value="">미기록</option>{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
+        <Field label="규제 위험"><select name="regulatoryRisk" defaultValue={cluster.regulatory_risk_score ?? ''}><option value="">미기록</option>{[0,1,2,3,4,5].map((n) => <option key={n} value={n}>{n} / 5</option>)}</select></Field>
+        <Field label="운영 비용(원)"><input type="number" name="operationsCost" min="0" defaultValue={cluster.operations_cost_krw ?? ''} /></Field>
         <Field label="문제 설명" wide><textarea name="summary" rows="4" defaultValue={cluster.summary} /></Field>
         <Field label="판정·배정 근거" wide required><textarea name="reason" rows="4" required placeholder="왜 이 원인이고 왜 이 조직이 책임져야 하는지" /></Field>
       </div>
@@ -1068,22 +1146,24 @@ function ApproveForm({ experiment, busy, onSubmit }) {
 function RunForm({ experiment, busy, onSubmit }) {
   const completed = new Set(experiment.runs.filter((run) => run.status === 'passed' && run.approval_id === experiment.approval_id && run.change_version === experiment.change_version).map((run) => run.phase))
   const suggested = EXPERIMENT_PHASES.find((phase, index) => index === 0 ? !completed.has(phase.key) : completed.has(EXPERIMENT_PHASES[index - 1].key) && !completed.has(phase.key))?.key ?? 'limited'
+  const [phase, setPhase] = useState(suggested)
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); const values = formObject(event.currentTarget); onSubmit({ ...values, measurementStart:new Date(values.measurementStart).toISOString(), measurementEnd:new Date(values.measurementEnd).toISOString(), experimentId: experiment.id }) }}>
       <div className="ol-form-context"><span>실험</span><strong>{experiment.title}</strong></div>
       <div className="ol-form-grid">
-        <Field label="실행 단계" required><select name="phase" defaultValue={suggested}>{EXPERIMENT_PHASES.map((phase) => <option key={phase.key} value={phase.key}>{phase.label}</option>)}</select></Field>
+        <Field label="실행 단계" required><select name="phase" value={phase} onChange={event=>setPhase(event.target.value)}>{EXPERIMENT_PHASES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></Field>
         <Field label="표본 수" required><input name="sampleSize" type="number" min="0" required /></Field>
         <Field label="대조군 값" required><input name="controlValue" type="number" min="0" step="0.01" required /></Field>
         <Field label="변경군 값" required><input name="variantValue" type="number" min="0" step="0.01" required /></Field>
         <Field label="가드레일 위반 건수" required><input name="guardrailBreaches" type="number" min="0" required /></Field>
         <Field label="기존 업무 비용(원)"><input name="costBefore" type="number" min="0" defaultValue="0" /></Field>
         <Field label="변경 후 비용(원)"><input name="costAfter" type="number" min="0" defaultValue="0" /></Field>
-        <Field label="측정 시작 시각" required><input name="measurementStart" type="datetime-local" required /></Field>
-        <Field label="측정 종료 시각" required><input name="measurementEnd" type="datetime-local" required /></Field>
+        <Field label={phase === 'historical' ? '재생 대상 데이터 시작 시각' : '측정 시작 시각'} required><input name="measurementStart" type="datetime-local" required /></Field>
+        <Field label={phase === 'historical' ? '재생 대상 데이터 종료 시각' : '측정 종료 시각'} required><input name="measurementEnd" type="datetime-local" required /></Field>
         <Field label="원본 실행·데이터 근거" wide required><textarea name="evidenceRefs" required placeholder="원본 실행 ID 또는 검토 가능한 자료 주소 (줄바꿈 구분)" /></Field>
         <Field label="실행 근거·관찰" wide><textarea name="notes" rows="4" placeholder="데이터셋 버전, 트래픽 범위, 예상 밖의 변화" /></Field>
       </div>
+      <p className="ol-gate-copy">{phase === 'historical' ? '과거 사건 재생은 대상 데이터의 기간을 기록합니다. 승인 전 데이터도 사용할 수 있습니다.' : 'Shadow·제한 배포는 현재 승인 이후의 실제 측정 기간을 기록합니다. 앞 단계 종료와 다음 단계 시작이 같은 시각인 경우는 허용합니다.'} 입력 시각은 현재 기기 시간대에서 UTC로 변환해 비교합니다.</p>
       <SubmitBar busy={busy} label="결과 판정" note={`목표는 ${experiment.success_metric} ${experiment.target_improvement}% 개선입니다. 위반 1건이면 성과와 관계없이 차단합니다.`} />
     </form>
   )
@@ -1091,10 +1171,11 @@ function RunForm({ experiment, busy, onSubmit }) {
 
 function DecisionForm({ experiment, busy, onSubmit }) {
   const gate = canExpandExperiment(experiment, experiment.runs)
+  const rollbackOnly = experiment.status === 'expanded'
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), experimentId: experiment.id }) }}>
-      <div className={`ol-gate ${gate.ok ? 'ok' : 'blocked'}`}><strong>{gate.ok ? '확대 조건 충족' : '확대 조건 미충족'}</strong><p>{gate.ok ? '현재 승인 주기의 수동 입력값이 세 단계의 사전 기준을 충족했습니다. 통계적 유의성이나 실제 배포 완료를 뜻하지 않습니다.' : gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 기록이 없습니다.' : gate.missing.length ? `${gate.missing.join(' → ')} 결과가 없습니다.` : `${gate.blocked.join(' · ')} 단계가 통과하지 못했습니다.`}</p></div>
-      <Field label="결정" required><select name="decision" defaultValue={gate.ok ? 'expand' : 'hold'}><option value="expand" disabled={!gate.ok}>적용 범위 확대</option><option value="hold">보류 및 추가 실험</option><option value="stop">중단</option><option value="rollback">롤백 결정 기록</option></select></Field>
+      <div className={`ol-gate ${gate.ok ? 'ok' : 'blocked'}`}><strong>{rollbackOnly ? '확대 이후 롤백 결정' : gate.ok ? '확대 조건 충족' : '확대 조건 미충족'}</strong><p>{rollbackOnly ? '최초 확대 결정과 근거는 그대로 보존하고, 새 롤백 결정을 추가합니다. 외부 시스템의 배포나 복귀를 실행하지 않습니다.' : gate.ok ? '현재 승인 주기의 수동 입력값이 세 단계의 사전 기준을 충족했습니다. 통계적 유의성이나 실제 배포 완료를 뜻하지 않습니다.' : gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 기록이 없습니다.' : gate.missing.length ? `${gate.missing.join(' → ')} 결과가 없습니다.` : gate.timingIssues.length ? gate.timingIssues.map(issue=>`${issue.phase} · ${issue.reason}`).join(' / ') : `${gate.blocked.join(' · ')} 단계가 통과하지 못했습니다.`}</p></div>
+      <Field label="결정" required><select name="decision" defaultValue={rollbackOnly ? 'rollback' : gate.ok ? 'expand' : 'hold'}>{!rollbackOnly && <><option value="expand" disabled={!gate.ok}>적용 범위 확대</option><option value="hold">보류 및 추가 실험</option><option value="stop">중단</option></>}<option value="rollback">롤백 결정 기록</option></select></Field>
       <Field label="결정 근거" required><textarea name="basis" rows="6" required placeholder="어떤 지표와 안전 근거로 이 결정을 내렸는지" /></Field>
       <SubmitBar busy={busy} label="결정 기록" note="결정 당시의 모든 실험 결과가 스냅샷으로 함께 보존됩니다." />
     </form>
@@ -1129,17 +1210,26 @@ function ProductForm({ busy, onSubmit }) {
   )
 }
 
-function ActorForm({ busy, onSubmit }) {
+function ActorForm({ actor, products, busy, onSubmit }) {
+  const [active, setActive] = useState(actor ? Boolean(actor.active) : true)
+  const [confirmed, setConfirmed] = useState(false)
+  const disabling = Boolean(actor?.active && !active)
   return (
-    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit(formObject(event.currentTarget)) }}>
-      <Field label="Cloudflare Access 메일" required><input name="email" type="email" required /></Field><Field label="표시 이름" required><input name="displayName" required /></Field><Field label="역할" required><select name="actorRole">{OVERRIDE_ROLES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></Field>
-      <SubmitBar busy={busy} label="접근 역할 저장" note="실서비스에서 OVERRIDE_DEMO_MODE=false로 두면 Access 인증 메일과 이 역할이 일치해야만 쓸 수 있습니다." />
+    <form className="ol-form" onSubmit={(event) => { event.preventDefault(); if (disabling && !confirmed) return; const form = new FormData(event.currentTarget); const values = Object.fromEntries(form.entries()); onSubmit({ email: values.email, displayName: values.displayName, actorRole: values.actorRole, active, departments: values.departments.split(/[\n,]/).map(value => value.trim()).filter(Boolean), productIds: form.getAll('productIds') }) }}>
+      <Field label="Cloudflare Access 메일" required><input name="email" type="email" required defaultValue={actor?.email || ''} readOnly={Boolean(actor)} /></Field>
+      <Field label="표시 이름" required><input name="displayName" required defaultValue={actor?.display_name || ''} /></Field>
+      <Field label="역할" required><select name="actorRole" defaultValue={actor?.role || 'reviewer'}>{OVERRIDE_ROLES.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></Field>
+      <Field label="접근 가능한 부서" hint="등록된 부서명을 쉼표 또는 줄바꿈으로 구분합니다."><textarea name="departments" rows="2" defaultValue={(actor?.departments ?? []).join(', ')} /></Field>
+      <fieldset className="ol-scope-products"><legend>접근 가능한 AI 제품</legend>{products.map(product => <label key={product.id}><input type="checkbox" name="productIds" value={product.id} defaultChecked={actor?.product_ids?.includes(product.id)} />{product.name}</label>)}{(actor?.product_ids ?? []).filter(id => !products.some(product => product.id === id)).map(id => <label key={id}><input type="checkbox" name="productIds" value={id} defaultChecked />{id} · 기존 범위</label>)}</fieldset>
+      <label className="ol-assignment-filter"><input type="checkbox" checked={active} onChange={event => { setActive(event.target.checked); setConfirmed(false) }} />계정 활성</label>
+      {disabling && <label className="ol-disable-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required />이 계정의 접근을 차단합니다. 기존 업무 기록은 삭제하지 않습니다.</label>}
+      <SubmitBar busy={busy} disabled={disabling && !confirmed} label="접근 역할 저장" note="범위가 없는 일반 계정에는 제품·부서 전체 접근을 허용하지 않습니다. 보안·감사 및 사업 책임자 역할은 관리자 권한입니다." />
     </form>
   )
 }
 
 function AiDraft({ result, busy }) {
-  if (busy) return <div className="ol-ai-wait"><span className="ol-ai-pulse" /><h3>근거를 나누어 보고 있습니다.</h3><p>사람의 수정도 틀릴 수 있다는 전제로 반증 근거까지 찾습니다.</p></div>
+  if (busy) return <div className="ol-ai-wait" role="status"><h3>분석 초안 생성 중…</h3></div>
   if (result?.error) return <div className="ol-ai-error"><strong>초안을 만들지 못했습니다.</strong><p>{result.error}</p></div>
   if (!result) return null
   return (

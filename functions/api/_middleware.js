@@ -8,6 +8,8 @@ import { checkRateLimit } from '../_lib/rateLimit.js'
 import { withDbBinding } from '../_lib/dbBridge.js'
 import { workspaceEnabled, workspaceToken, workspaceDb, sameOrigin } from '../_lib/workspace.js'
 import { resolveOverrideActor } from '../_lib/override.js'
+import { canUseBusinessRoute, scopeEnvironment, verifiedAttribution } from '../_lib/authorization.js'
+import { requireSessionScope } from '../_lib/sessionScope.js'
 
 // 한 사람이 십 분에 몇 번까지 쓸 수 있는가.
 //
@@ -27,7 +29,7 @@ export async function onRequest(context) {
       context.request = body.request
       // Pages must pass the bounded stream to the downstream handler, not the
       // original request captured when the middleware chain was constructed.
-      context.next = () => next(body.request)
+      context.next = (forwarded = context.request) => next(forwarded)
       response = await handleRequest(context)
     }
   } catch (error) {
@@ -59,41 +61,71 @@ async function handleRequest(context) {
   }
 
   const path = new URL(request.url).pathname.replace(/\/$/, '')
+  // Demo maintenance must never target the public business schema, even for admins.
+  if (path.startsWith('/api/demo/') && !workspaceEnabled(context.env)) {
+    // The UI gate must be able to discover that demos are disabled. This one
+    // read returns only { enabled: false }; it neither authenticates a business
+    // request nor opens a workspace. All other demo operations stay forbidden.
+    if (path === '/api/demo/workspace' && request.method === 'GET') return next()
+    return jsonError('개인 체험 공간에서만 사용할 수 있습니다.', 403)
+  }
   if (workspaceEnabled(context.env)) {
+    const rateLimitEnv = { ...context.env }
     const control = path === '/api/demo/workspace'
     const health = path === '/api/health'
+    const sessionProbe = path === '/api/session' && request.method === 'GET'
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !sameOrigin(request)) {
       return jsonError('이 사이트에서 직접 요청해 주세요.', 403)
     }
-    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
-      const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
-      if (!await checkRateLimit(context.env, 'write:' + ip, WRITES_PER_WINDOW, WINDOW_SECONDS)) {
-        return jsonError('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
-      }
-    }
-    if (!control && !health) {
+    if ((!control && !health) || (control && request.method === 'DELETE')) {
       const token = workspaceToken(request)
       if (!token) return jsonError('개인 체험 공간을 먼저 열어 주세요.', 428)
-      context.env.DB = workspaceDb(context.env, token)
-      try { await context.env.DB.prepare('SELECT 1').first() } catch (error) {
-        return jsonError(error.message.includes('/28000') ? '체험 공간이 만료되었습니다. 페이지를 새로 열어 주세요.' : '체험 공간에 연결하지 못했습니다.', error.message.includes('/28000') ? 428 : 503)
+      const scopedDB = workspaceDb(context.env, token)
+      try { await scopedDB.prepare('SELECT 1').first() } catch (error) {
+        return failUnexpected(error, '체험 공간에 연결하지 못했습니다.')
       }
-      context.env.DEMO_WORKSPACE = true
-      context.env.OVERRIDE_DEMO_MODE = 'true'
-      // A demonstration must not use real integration or model credentials.
-      if (path === '/api/override/assist') return jsonError('개인 체험에서는 외부 AI 호출을 실행하지 않습니다.', 403)
+      if (!sessionProbe) {
+        const mismatch = await requireSessionScope(request, scopedDB)
+        if (mismatch) return mismatch
+      }
+      if (!control) {
+        context.env.DB = scopedDB
+        context.env.DEMO_WORKSPACE = true
+        context.env.OVERRIDE_DEMO_MODE = 'true'
+        // A demonstration must not use real integration or model credentials.
+        if (path === '/api/override/assist') return jsonError('개인 체험에서는 외부 AI 호출을 실행하지 않습니다.', 403)
+      }
+    }
+    // A stale tab must not consume a quota ticket or reset the current space.
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method)) {
+      const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
+      if (!await checkRateLimit(rateLimitEnv, 'write:' + ip, WRITES_PER_WINDOW, WINDOW_SECONDS)) {
+        return jsonError('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
+      }
     }
     return next()
   }
 
+  // A demo role is only safe after selecting an isolated visitor workspace.
+  if (path !== '/api/health' && context.env.OVERRIDE_DEMO_MODE === 'true') return jsonError('개인 체험 공간 설정이 필요합니다.', 503)
   // Real deployments protect reads as well as writes. An email header is not authentication.
-  if (path !== '/api/health' && context.env.OVERRIDE_DEMO_MODE !== 'true') {
+  if (path !== '/api/health') {
     const actor = await resolveOverrideActor(context.env, request)
     if (!actor) return jsonError('인증된 사내 계정이 필요합니다.', 401)
     if (!['GET', 'HEAD', 'OPTIONS'].includes(request.method) && !sameOrigin(request)) return jsonError('이 사이트에서 직접 요청해 주세요.', 403)
+    if (!canUseBusinessRoute(actor, path, request.method)) return jsonError('현재 계정에는 이 작업 권한이 없습니다.', 403)
+    context.env = scopeEnvironment(context.env, actor)
+    context.data.requestEnv = context.env
+    if (!(path === '/api/session' && request.method === 'GET')) {
+      const mismatch = await requireSessionScope(request, context.env.DB)
+      if (mismatch) return mismatch
+    }
+    const attributed = await verifiedAttribution(request, actor)
+    if (attributed instanceof Response) return attributed
+    context.request = attributed
   }
   if (request.method === 'GET' || request.method === 'HEAD' || request.method === 'OPTIONS') {
-    return next()
+    return next(context.request)
   }
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
@@ -102,5 +134,5 @@ async function handleRequest(context) {
     return jsonError('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.', 429)
   }
 
-  return next()
+  return next(context.request)
 }

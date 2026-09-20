@@ -27,6 +27,9 @@ const outcome = (over = {}) => ({
   savedSeconds: 36000,
   savedKrw: 250000,
   runCount: 57,
+  successCount: 57,
+  failedCount: 0,
+  unknownCount: 0,
   reviewSeconds: 600,
   reworkSeconds: 0,
   ...over,
@@ -91,6 +94,8 @@ describe('전수로 세는가', () => {
     // 통째로 빠진다.
     const runs = runsFromTotals({
       count: 57,
+      successCount: 57,
+      failedCount: 0,
       durationMs: 57000,
       reviewSeconds: 600,
       reworkSeconds: 60,

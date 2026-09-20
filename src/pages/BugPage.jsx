@@ -58,12 +58,7 @@ export default function BugPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">기타</span>
         <h1>버그 신고</h1>
-        <p className="page-sub">
-          만들어 드린 기능이 이상하게 굴면 여기 적어 주세요. 로그인은 없습니다.{' '}
-          <strong>적어 주신 것은 고쳤든 못 고쳤든 그대로 남습니다.</strong>
-        </p>
       </header>
 
       {targets.length === 0 ? (
@@ -121,7 +116,7 @@ export default function BugPage() {
           <Field
             label="누구신지"
             required
-            hint="되물을 데가 있어야 고칠 수 있습니다"
+            hint="추가 확인을 받을 연락처"
             error={fieldErrors.reporter}
           >
             <input

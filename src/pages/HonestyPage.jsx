@@ -29,8 +29,7 @@ export default function HonestyPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">정직</span>
-        <h1>못 한 것과 증명하지 못한 것</h1>
+        <h1>미처리·미검증 항목</h1>
       </header>
 
       <section className="stat-row">
@@ -163,7 +162,7 @@ export default function HonestyPage() {
                   </div>
                 ) : (
                   <div className="honest-alt honest-alt-missing">
-                    대안을 적지 않고 반려했습니다. 이건 제 잘못입니다.
+                    대안이 기록되지 않은 반려입니다.
                   </div>
                 )}
               </li>

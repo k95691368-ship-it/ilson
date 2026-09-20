@@ -15,6 +15,7 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
+import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
 import {
   validateAccept,
   validateReject,
@@ -80,6 +81,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
   if (!loaded) {
     await releaseRateLimit(env, `accept:${ip}`, ticket)
     return jsonError('그런 도구가 없습니다.', 404)
+  }
+  const forbidden = departmentAuthority(env, loaded.handover.handed_to_dept)
+  if (forbidden) {
+    await releaseRateLimit(env, `accept:${ip}`, ticket)
+    return forbidden
   }
 
   let body

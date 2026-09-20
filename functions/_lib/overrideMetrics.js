@@ -43,7 +43,16 @@ export async function overrideMetrics(db, products) {
       GROUP BY cluster_id`).bind(from, from, previous.toISOString().slice(0,10), until).all(),
     db.prepare(`SELECT DISTINCT product_id,cluster_id FROM override_event
       WHERE cluster_id IS NOT NULL ORDER BY product_id,cluster_id`).all(),
-    db.prepare(`SELECT cluster_id,count(*) AS n FROM override_event WHERE is_override=1 AND validity='valid' GROUP BY cluster_id`).all(),
+    // Shared issue summaries are visible to an authorized issue reader, while
+    // other employees' source events are not. Keep those two scopes explicit.
+    db.prepare(db.actorEmail ? `SELECT c.id AS cluster_id,s.n,
+        coalesce(v.visible_total,0) AS visible_total
+      FROM issue_cluster c CROSS JOIN LATERAL ilson_private.scope_cluster_totals(c.id) s
+      LEFT JOIN (SELECT cluster_id,count(*) AS visible_total
+        FROM override_event GROUP BY cluster_id) v ON v.cluster_id=c.id`
+      : `SELECT cluster_id,count(*) FILTER(WHERE is_override=1 AND validity='valid') AS n,
+        count(*) AS visible_total
+        FROM override_event WHERE cluster_id IS NOT NULL GROUP BY cluster_id`).all(),
   ])
   const names = new Map(products.map(row => [row.id,row.name]))
   const fairness = bins.results.map(row => ({ ...row, product_name: names.get(row.product_id),
@@ -61,5 +70,6 @@ export async function overrideMetrics(db, products) {
     trends: new Map(trends.results.map(row=>[row.cluster_id,trendSignal(Number(row.recent),Number(row.previous))])),
     edges: edges.results,
     clusterCounts: new Map(clusterCounts.results.map(row=>[row.cluster_id,Number(row.n)])),
+    clusterVisibility: new Map(clusterCounts.results.map(row=>[row.cluster_id,{total:Number(row.visible_total)}])),
   }
 }

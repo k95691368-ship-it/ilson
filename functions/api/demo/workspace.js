@@ -1,4 +1,4 @@
-import { jsonError } from '../../_lib/http.js'
+import { jsonError, failUnexpected } from '../../_lib/http.js'
 import { DEMO_APPLICATIONS } from '../../_lib/demoApplications.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { workspaceEnabled, workspaceToken, workspaceDb, workspaceCookie, sameOrigin } from '../../_lib/workspace.js'
@@ -17,7 +17,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
     return reply({ enabled: true, active: true })
   } catch (error) {
     if (error.message.includes('/28000')) return reply({ enabled: true, active: false, expired: true })
-    return reply({ error: '체험 공간을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.' }, 503)
+    return failUnexpected(error, '체험 공간을 확인하지 못했습니다. 잠시 후 다시 시도해 주세요.')
   }
 }
 
@@ -38,8 +38,8 @@ export async function onRequestPost({ env, data: requestData, request }) {
     const token = newToken()
     const result = await env.DB.workspaceOpen(token, seeds())
     return reply({ enabled: true, active: true, expiresAt: result.expiresAt }, 201, { 'Set-Cookie': workspaceCookie(request, token) })
-  } catch {
-    return reply({ error: '체험 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.' }, 503)
+  } catch (error) {
+    return failUnexpected(error, '체험 공간을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.')
   }
 }
 
@@ -56,5 +56,5 @@ export async function onRequestDelete({ env, data: requestData, request }) {
     const replacement = newToken()
     const result = await env.DB.workspaceReset(token, seeds(), replacement)
     return reply({ enabled: true, active: true, reset: true, expiresAt: result.expiresAt }, 200, { 'Set-Cookie': workspaceCookie(request, replacement) })
-  } catch { return reply({ error: '초기화하지 못했습니다. 기존 체험 공간을 다시 확인해 주세요.' }, 503) }
+  } catch (error) { return failUnexpected(error, '초기화하지 못했습니다. 기존 체험 공간을 다시 확인해 주세요.') }
 }

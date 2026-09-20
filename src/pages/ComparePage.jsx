@@ -39,13 +39,10 @@ export default function ComparePage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">검토</span>
-        <h1>같은 건인가, 말만 비슷한가</h1>
+        <h1>신청서 비교</h1>
         <p className="page-sub">
-          겹치는 말은 <span className="tok tok-both">이렇게</span>, 왼쪽에만 있는 말은{' '}
-          <span className="tok tok-a">이렇게</span>, 오른쪽에만 있는 말은{' '}
-          <span className="tok tok-b">이렇게</span> 갈라 뒀습니다. <strong>다른 대목만</strong>{' '}
-          읽으시면 됩니다.
+          <span className="tok tok-both">공통</span> · <span className="tok tok-a">왼쪽만</span> ·{' '}
+          <span className="tok tok-b">오른쪽만</span>
         </p>
       </header>
 
@@ -141,11 +138,12 @@ export default function ComparePage() {
             </div>
 
             {(f.both.length > 0 || f.onlyA.length > 0 || f.onlyB.length > 0) && (
-              <div className="cmp-tokens">
+              <details className="cmp-tokens">
+                <summary>낱말 비교</summary>
                 <TokenRow label="양쪽 다" tokens={f.both} kind="both" />
                 <TokenRow label="왼쪽에만" tokens={f.onlyA} kind="a" />
                 <TokenRow label="오른쪽에만" tokens={f.onlyB} kind="b" />
-              </div>
+              </details>
             )}
           </section>
         ))}

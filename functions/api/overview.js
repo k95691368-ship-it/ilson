@@ -8,7 +8,7 @@
 //   어느 단계에 몇 건이 머물러 있는가 — 병목은 신청서에만 있는 게 아니다.
 //   접수부터 인수인계까지 실제로 며칠 걸렸는가 — 이 조직의 처리 속도.
 
-import { jsonResponse, jsonError } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { REFUSE_LABELS } from '../../shared/review.js'
 import { OUTCOME_KIND } from '../../shared/accept.js'
 import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
@@ -385,7 +385,7 @@ export async function onRequestGet({ env, data: requestData }) {
       unrequestedCount: unrequestedAll?.n ?? 0,
       recent: items.slice(0, 6).map((a) => ({ ...a, stage: stageOf(a) })),
     })
-  } catch {
-    return jsonError('현황을 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '현황을 불러오지 못했습니다.')
   }
 }

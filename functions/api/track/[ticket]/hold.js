@@ -13,6 +13,7 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
+import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
 import {
   validateHoldLift,
   holdState,
@@ -92,6 +93,11 @@ export async function onRequestPost({ env, data: requestData, request, params })
   if (!loaded) {
     await releaseRateLimit(env, `holdlift:${ip}`, ticket)
     return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+  }
+  const forbidden = departmentAuthority(env, loaded.app.dept)
+  if (forbidden) {
+    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
+    return forbidden
   }
 
   // 보류가 아닌 것에 "조건이 풀렸다"는 말이 오면 담당자는 무엇을 두고 하신

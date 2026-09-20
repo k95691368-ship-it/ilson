@@ -6,7 +6,8 @@
 // 계산을 서버에서 하는 이유: 이 숫자는 사람이 고칠 수 있으면 안 된다. 화면에서
 // 계산하면 브라우저를 열어 값을 바꿀 수 있고, 그러면 근거가 아니라 주장이 된다.
 
-import { jsonResponse, jsonError } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
+import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import {
@@ -130,8 +131,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
       label: labelForOutcome(outcome, unresolved),
       saved: saved ?? null,
     })
-  } catch {
-    return jsonError('성과를 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '성과를 불러오지 못했습니다.')
   }
 }
 
@@ -226,7 +227,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
         why: '만든 사람만 아는 성과는 성과가 아니다. 실제로 쓰는 사람이 확인해야 근거가 된다.',
         linkKind: OUTCOME_PROXY_KIND,
         linkId: app.id,
-      }).catch(() => {})
+      }).catch(rethrowDatabaseAccessFailure)
 
       return jsonResponse({ ok: true })
     }
@@ -261,7 +262,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
     }
 
     return jsonError('무엇을 저장할지 알 수 없습니다.', 400)
-  } catch {
-    return jsonError('저장하지 못했습니다.', 500)
+  } catch (error) {
+    return failUnexpected(error, '저장하지 못했습니다.', 500)
   }
 }

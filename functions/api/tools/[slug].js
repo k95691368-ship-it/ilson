@@ -1,14 +1,15 @@
 // 부서에 넘긴 도구가 열리는 자리.
 //
-// 이 화면은 현업 담당자가 연다. 로그인이 없다 — 계정을 만들게 하면 안 쓴다.
-// 대신 하루 실행 횟수를 제한하고, 남은 횟수를 화면에 항상 보여 준다.
+// 실제 업무는 인증된 계정 범위, 체험은 개인 워크스페이스 범위로 연다.
+// 최근 24시간의 성공 실행 횟수를 제한하고 남은 횟수를 보여 준다.
 //
 // 계산 자체는 브라우저에서 돈다. 여기는 "누가 언제 돌렸고 무엇이 나왔는지"를
 // 기록으로 남기는 자리다. 그 기록이 8단계 성과의 재료가 된다.
 
-import { jsonResponse, jsonError } from '../../_lib/http.js'
-import { checkRateLimit, remainingQuota } from '../../_lib/rateLimit.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { quotaState } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
+import { mutationFingerprint } from '../../_lib/atomicMutation.js'
 import {
   computeOutcome,
   labelForOutcome,
@@ -38,11 +39,13 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
   env = requestData?.requestEnv ?? env
   const h = await findHandover(env, params.slug)
   if (!h) return jsonError('그런 도구가 없습니다. 주소를 확인해주세요.', 404)
+  const runScope = await env.DB.toolRunScope?.() ?? null
 
   if (h.rolled_back_at) {
     return jsonResponse(
       {
         rolledBack: true,
+        runScope,
         title: h.title,
         reason: h.rollback_reason,
         message: '이 도구는 잠시 내려가 있습니다. 담당자에게 문의해주세요.',
@@ -56,11 +59,10 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
 
   try {
     const [
-      remaining,
+      quota,
       manual,
       recent,
       aliases,
-      nextFree,
       baseline,
       totals,
       resolved,
@@ -68,7 +70,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       saved,
       reportRows,
     ] = await Promise.all([
-      remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS),
+      quotaState(env, bucket, h.daily_limit, DAY_SECONDS),
       env.DB.prepare(
         'SELECT title, intro, when_to_run, what_to_do_after, contact FROM manual WHERE application_id = ?'
       )
@@ -85,19 +87,6 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       // 반영되지 않는다. 알려주고 나서 그대로 또 밀려나면, 부서는 그
       // 뒤로 아무것도 안 알려준다.
       env.DB.prepare('SELECT external_code, canonical_code, product_name, taught_by FROM sku_alias').all(),
-      // 언제 한 칸이 풀리는가.
-      //
-      // 한도는 자정에 초기화되는 것이 아니라 최근 24시간 안에 몇 번 썼는지로
-      // 센다. 가장 오래된 실행이 24시간을 넘기는 그때 한 칸이 풀린다.
-      // "기다리세요"만 하면 얼마나 기다릴지 몰라 결국 담당자에게 전화한다.
-      env.DB.prepare(
-        `SELECT datetime(MIN(created_at), '+' || ? || ' seconds') AS next_free
-         FROM rate_limit_hits
-         WHERE bucket = ? AND created_at >= datetime('now', '-' || ? || ' seconds')`
-      )
-        .bind(DAY_SECONDS, bucket, DAY_SECONDS)
-        .first(),
-
       // 이 도구를 쓰기 전에 사람이 하면 얼마나 걸렸나.
       //
       // 부서는 매주 이 도구를 돌리면서도 그게 얼마나 줄여 줬는지를 못 봤다.
@@ -115,6 +104,8 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       // 계산에 쓰면 41번째부터 통째로 빠진다.
       env.DB.prepare(
         `SELECT COUNT(*) AS n,
+                SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS success_count,
+                SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS failed_count,
                 SUM(duration_ms) AS duration_ms,
                 SUM(human_review_seconds) AS review_seconds,
                 SUM(rework_seconds) AS rework_seconds
@@ -198,6 +189,8 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
         // 본전'에 갇혔다. 숫자만 작아지는 것이 아니라 판정 문구까지 갈렸다.
         runs: runsFromTotals({
           count: totals.n,
+          successCount: totals.success_count,
+          failedCount: totals.failed_count,
           durationMs: totals.duration_ms,
           reviewSeconds: totals.review_seconds,
           reworkSeconds: totals.rework_seconds,
@@ -224,11 +217,15 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       if (computed.status !== '산정불가') {
         payoff = {
           runs: computed.runCount,
+          attemptCount: computed.attemptCount,
+          successCount: computed.successCount,
+          failedCount: computed.failedCount,
+          unknownCount: computed.unknownCount,
           // 부서에게는 시간이 먼저다. 금액은 그다음이다 — 부서가 아낀 것은
           // 자기 시간이고, 원 단위는 위에 보고할 때 쓰는 말이다.
           savedMinutes: Math.round(computed.savedSeconds / 60),
           savedKrw: computed.savedKrw,
-          perRunMinutes: Math.round(computed.savedSeconds / 60 / Math.max(1, computed.runCount)),
+          perRunMinutes: computed.successCount > 0 ? Math.round(computed.savedSeconds / 60 / computed.successCount) : null,
           // 검수·재작업에 든 시간을 빼고 낸 값이라는 것을 밝힌다. 안 밝히면
           // 부서는 "그만큼 안 줄었는데"라고 느끼고 이 숫자를 안 믿는다.
           reviewMinutes: Math.round(computed.reviewSeconds / 60),
@@ -241,6 +238,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
 
     return jsonResponse({
       slug: h.slug,
+      runScope,
       // 이 도구가 어느 신청서에서 나왔는지.
       //
       // 부서는 이 화면 주소 하나만 받는다. 여기서 나가는 길이 하나도
@@ -253,11 +251,11 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       handedAt: h.handed_at,
       limits: {
         dailyLimit: h.daily_limit,
-        remainingToday: remaining,
+        remainingToday: quota.remaining,
         maxFileMb: h.max_file_mb,
         // 하루 단위가 아니라 최근 24시간 기준이라는 것을 이름에도 남긴다.
         windowHours: DAY_SECONDS / 3600,
-        nextFreeAt: remaining > 0 ? null : (nextFree?.next_free ?? null),
+        nextFreeAt: quota.nextFreeAt,
       },
       payoff,
       // 부서가 낸 신고와 그 처리. 담당자 화면과 **같은 함수**로 만든다.
@@ -286,8 +284,8 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       aliases: Object.fromEntries(aliases.results.map((a) => [a.external_code, a.canonical_code])),
       taught: aliases.results,
     })
-  } catch {
-    return jsonError('도구를 불러오지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '도구를 불러오지 못했습니다.')
   }
 }
 
@@ -296,20 +294,9 @@ export async function onRequestPost({ env, data: requestData, params, request })
   env = requestData?.requestEnv ?? env
   const h = await findHandover(env, params.slug)
   if (!h) return jsonError('그런 도구가 없습니다.', 404)
-  if (h.rolled_back_at) return jsonError('이 도구는 잠시 내려가 있습니다.', 409)
 
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const bucket = `tool:${h.slug}:${ip}`
-
-  const ticket = await checkRateLimit(env, bucket, h.daily_limit, DAY_SECONDS)
-  if (!ticket) {
-    return jsonError(
-      // '오늘·내일'이라고 하지 않는다. 자정에 초기화되는 것이 아니라 최근
-      // 24시간 기준이라, 내일 아침에 오면 여전히 막혀 있을 수 있다.
-      `지금은 더 돌리실 수 없습니다(24시간에 ${h.daily_limit}회). 가장 오래된 실행이 24시간을 넘기면 한 번씩 풀립니다. 급하시면 담당자에게 말씀해주세요.`,
-      429
-    )
-  }
 
   let body
   try {
@@ -317,31 +304,35 @@ export async function onRequestPost({ env, data: requestData, params, request })
   } catch {
     return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
-
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonError('요청 형식이 올바르지 않습니다.', 400)
+  }
+  const requestId = body.run_id ?? request.headers.get('X-Idempotency-Key') ?? crypto.randomUUID()
+  const counts = [body.rows_out ?? 0, body.quarantined ?? 0, body.duration_ms ?? 0].map(Number)
+  if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{16,100}$/.test(requestId)
+    || counts.some(value => !Number.isFinite(value) || value < 0 || value > 2147483647)
+    || (body.ok !== undefined && typeof body.ok !== 'boolean')
+    || !Array.isArray(body.files ?? []) || (body.files?.length ?? 0) > 200
+    || (body.files ?? []).some(file => !file || typeof file !== 'object' || typeof file.name !== 'string')) {
+    return jsonError('실행 기록의 형식과 숫자를 확인해 주십시오.', 400)
+  }
+  const run = {
+    actor_label: String(env.AUTH_ACTOR?.label ?? body.actor_label ?? h.handed_to_person).slice(0, 40),
+    files: (body.files ?? []).map(file => ({ name: file.name.slice(0, 255), channel: String(file.channel ?? '').slice(0, 80), rowsOut: Math.max(0, Math.trunc(Number(file.rowsOut) || 0)) })),
+    rows_out: Math.round(counts[0]), quarantined: Math.round(counts[1]), duration_ms: Math.round(counts[2]),
+    ok: body.ok !== false,
+    fail_reason: body.ok === false ? String(body.fail_reason ?? '').slice(0, 200) : '',
+  }
+  if (!env.DB.recordToolRun) return jsonError('실행 기록 저장 기능이 아직 준비되지 않았습니다.', 503)
+  if (!body.run_scope || body.run_scope !== await env.DB.toolRunScope?.()) {
+    return jsonError('실행을 시작한 계정 또는 체험 공간과 현재 연결이 다릅니다. 원래 연결로 돌아온 뒤 같은 기록을 다시 확인해 주십시오.', 409)
+  }
   try {
-    const id = newId('use')
-    await env.DB.prepare(
-      `INSERT INTO tool_use
-         (id, application_id, actor_label, files_json, rows_out, quarantined,
-          duration_ms, ok, fail_reason)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        id,
-        h.application_id,
-        String(body.actor_label ?? h.handed_to_person).slice(0, 40),
-        JSON.stringify(body.files ?? []),
-        Number(body.rows_out) || 0,
-        Number(body.quarantined) || 0,
-        Number(body.duration_ms) || null,
-        body.ok === false ? 0 : 1,
-        String(body.fail_reason ?? '').slice(0, 200) || null
-      )
-      .run()
-
-    const remaining = await remainingQuota(env, bucket, h.daily_limit, DAY_SECONDS)
-    return jsonResponse({ ok: true, id, remainingToday: remaining }, 201)
-  } catch {
-    return jsonError('기록하지 못했습니다.', 500)
+    const fingerprint = await mutationFingerprint({ kind: 'tool-run', slug: h.slug, run })
+    const saved = await env.DB.recordToolRun(h.slug, bucket, requestId, fingerprint, { ...run, id: newId('use') })
+    return jsonResponse(saved.response.body, saved.response.status, { 'X-Idempotency-Replayed': saved.replayed ? '1' : '0' })
+  } catch (error) {
+    if (String(error.message).includes('/40001')) return jsonError('같은 실행 번호의 내용이나 권한이 변경되었습니다. 원래 실행 기록을 확인해 주십시오.', 409)
+    return failUnexpected(error, '실행 기록의 저장 여부를 확인하지 못했습니다. 같은 기록으로 다시 시도해 주십시오.')
   }
 }

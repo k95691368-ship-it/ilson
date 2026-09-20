@@ -9,12 +9,12 @@
 }
 
 .app-shell-workspace {
-  background: var(--apple-parchment);
+  background: var(--ms-parchment);
 }
 
 .ol-shell {
-  --ol-bg: var(--apple-parchment);
-  --ol-paper: var(--apple-paper);
+  --ol-bg: var(--ms-parchment);
+  --ol-paper: var(--ms-paper);
   --ol-paper-strong: #ffffff;
   --ol-ink: #1d1d1f;
   --ol-copy: #4d4c49;
@@ -34,7 +34,7 @@
   min-height: 100svh;
   color: var(--ol-copy);
   background: var(--ol-bg);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Pretendard Variable', Pretendard, 'Segoe UI', sans-serif;
+  font-family: var(--ms-body);
 }
 
 .ol-shell *,
@@ -93,7 +93,7 @@
   border-radius: 9px;
   background: var(--ol-ink);
   color: white;
-  font-size: 0.63rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: -0.08em;
   overflow: hidden;
@@ -144,7 +144,7 @@
   align-items: center;
   gap: 6px;
   color: var(--ol-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -257,7 +257,7 @@
 .ol-side-kicker {
   padding: 0 12px 16px;
   color: var(--ol-muted);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -296,7 +296,7 @@
 
 .ol-side-index {
   color: #aaa49b;
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-variant-numeric: tabular-nums;
   letter-spacing: 0.04em;
 }
@@ -312,12 +312,12 @@
   padding: 16px 12px 0;
   border-top: 1px solid var(--ol-line);
   color: var(--ol-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-side-foot a {
   color: var(--ol-ink);
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -347,7 +347,7 @@
 .ol-kicker {
   display: block;
   color: var(--ol-accent);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -357,7 +357,7 @@
   max-width: 820px;
   margin-top: 9px;
   color: var(--ol-ink);
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Pretendard Variable', Pretendard, sans-serif;
+  font-family: var(--ms-display);
   font-size: clamp(2.65rem, 5vw, 5.7rem);
   font-weight: 600;
   line-height: 0.98;
@@ -401,7 +401,7 @@
 
 .ol-metric > span {
   color: var(--ol-muted);
-  font-size: 0.73rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -419,7 +419,7 @@
   margin-top: auto;
   padding-top: 12px;
   color: var(--ol-faint);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 .ol-metric.danger {
@@ -469,7 +469,7 @@
 
 .ol-section-head > span {
   color: var(--ol-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-live {
@@ -497,7 +497,7 @@
   overflow: hidden;
   border: 1px solid var(--ol-line);
   border-radius: 20px;
-  background: var(--apple-parchment);
+  background: var(--ms-parchment);
 }
 
 .ol-loop-step {
@@ -522,7 +522,7 @@
   width: 14px;
   height: 24px;
   margin-top: -12px;
-  background: var(--apple-parchment);
+  background: var(--ms-parchment);
   color: #aaa49b;
   text-align: center;
 }
@@ -537,7 +537,7 @@
 
 .ol-loop-step > span {
   color: var(--ol-accent);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -550,7 +550,7 @@
 .ol-loop-step > small {
   margin-top: 6px;
   color: var(--ol-muted);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   line-height: 1.48;
 }
 
@@ -576,7 +576,7 @@
   border-radius: 999px;
   background: var(--ol-wash);
   color: var(--ol-copy);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -592,7 +592,7 @@
 
 .ol-priority-pill.accent {
   background: var(--ol-accent-soft);
-  color: var(--apple-blue);
+  color: var(--ms-blue);
 }
 
 .ol-toolbar {
@@ -653,7 +653,7 @@
   align-items: center;
   gap: 9px;
   color: var(--ol-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 .ol-event-meta > strong {
@@ -674,7 +674,7 @@
   border-radius: 999px;
   background: var(--ol-wash);
   color: var(--ol-copy);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -682,7 +682,7 @@
 .ol-action.action-modify,
 .ol-action.action-correct_after {
   background: var(--ol-accent-soft);
-  color: var(--apple-blue);
+  color: var(--ms-blue);
 }
 
 .ol-action.action-reject,
@@ -719,11 +719,11 @@
   padding: 16px;
   border: 1px solid var(--ol-line);
   border-radius: 16px;
-  background: var(--apple-parchment);
+  background: var(--ms-parchment);
 }
 
 .ol-decision-compare > div.human {
-  border-color: var(--apple-focus);
+  border-color: var(--ms-focus);
   background: var(--accent-bg);
 }
 
@@ -735,7 +735,7 @@
 .ol-form-context > span,
 .ol-scenario-result > span {
   color: var(--ol-muted);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -770,7 +770,7 @@
   display: block;
   margin-top: 7px;
   color: var(--ol-muted);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
 }
 
 .ol-card-actions {
@@ -831,7 +831,7 @@
 
 .ol-cluster-list > button > div > span:last-child {
   color: var(--ol-muted);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
 }
 
 .ol-cluster-list > button > strong {
@@ -843,7 +843,7 @@
 .ol-cluster-list > button > p,
 .ol-cluster-list > button > small {
   color: var(--ol-muted);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
 }
 
 .ol-detail-panel,
@@ -854,7 +854,7 @@
 .ol-detail-head {
   padding: 29px;
   border-bottom: 1px solid var(--ol-line);
-  background: var(--apple-paper);
+  background: var(--ms-paper);
 }
 
 .ol-detail-head > div:first-child {
@@ -885,7 +885,7 @@
   display: block;
   margin-top: 8px;
   color: var(--ol-muted);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
 }
 
 .ol-detail-metrics {
@@ -937,7 +937,7 @@
 
 .ol-cause-block span {
   color: var(--ol-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-candidate-row {
@@ -954,7 +954,7 @@
   border: 1px solid var(--ol-line);
   border-radius: 999px;
   color: var(--ol-muted);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
 }
 
 .ol-candidate-row strong {
@@ -982,20 +982,20 @@
 
 .ol-mini-events strong {
   color: var(--ol-ink);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
 }
 
 .ol-mini-events p {
   overflow: hidden;
   color: var(--ol-copy);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .ol-mini-events small {
   color: var(--ol-muted);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
 }
 
 .ol-experiment-board {
@@ -1044,7 +1044,7 @@
 
 .ol-experiment-list small {
   color: var(--ol-muted);
-  font-size: 0.63rem;
+  font-size: 0.75rem;
 }
 
 .ol-status-dot {
@@ -1122,7 +1122,7 @@
   border-radius: 50%;
   background: var(--ol-paper);
   color: var(--ol-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1146,7 +1146,7 @@
 
 .ol-phase small {
   color: var(--ol-muted);
-  font-size: 0.63rem;
+  font-size: 0.75rem;
 }
 
 .ol-experiment-grid {
@@ -1193,14 +1193,14 @@
   margin: 7px 0 0;
   padding-left: 17px;
   color: var(--ol-ink);
-  font-size: 0.69rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
 .ol-safety-box p {
   margin-top: 7px;
   color: var(--ol-ink);
-  font-size: 0.69rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
@@ -1214,7 +1214,7 @@
   border-radius: 12px;
   background: var(--ol-amber-soft);
   color: var(--warning-text);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 .ol-decision-records {
@@ -1245,13 +1245,13 @@
 .ol-decision-records article span,
 .ol-decision-records article small {
   color: var(--ol-faint);
-  font-size: 0.65rem;
+  font-size: 0.75rem;
 }
 
 .ol-decision-records article p {
   margin: 7px 0 5px;
   color: var(--ol-copy);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 
@@ -1279,13 +1279,13 @@
   padding: 11px 4px;
   border-top: 1px solid var(--ol-line);
   color: var(--ol-copy);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-fairness-table > div.head {
   border-top: 0;
   color: var(--ol-muted);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1319,7 +1319,7 @@
 .ol-scenario-result p {
   margin: 6px 0 13px;
   color: var(--ol-copy);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
 }
 
 .ol-common-list,
@@ -1344,14 +1344,14 @@
 .ol-common-list span {
   float: right;
   color: var(--ol-accent);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
 .ol-common-list p {
   margin-top: 5px;
   color: var(--ol-muted);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
 }
 
 .ol-decision-graph {
@@ -1370,7 +1370,7 @@
 .ol-graph-label {
   margin-bottom: 3px;
   color: var(--ol-muted);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1384,9 +1384,9 @@
   padding: 9px 11px;
   border: 1px solid var(--ol-line);
   border-radius: 13px;
-  background: var(--apple-parchment);
+  background: var(--ms-parchment);
   color: var(--ol-ink);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   line-height: 1.35;
 }
 
@@ -1441,7 +1441,7 @@
 
 .ol-invest-list li > span {
   color: var(--ol-faint);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
 }
 
 .ol-invest-list li > div {
@@ -1451,12 +1451,12 @@
 
 .ol-invest-list strong {
   color: var(--ol-ink);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-invest-list small {
   color: var(--ol-muted);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
 }
 
 .ol-invest-list b {
@@ -1485,7 +1485,7 @@
   border-radius: 8px;
   background: var(--ol-wash);
   color: var(--ol-muted);
-  font-size: 0.58rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1502,13 +1502,13 @@
 
 .ol-signal-list p {
   color: var(--ol-ink);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   line-height: 1.35;
 }
 
 .ol-signal-list strong {
   color: var(--ol-copy);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-integration-catalog {
@@ -1561,7 +1561,7 @@
 .ol-integration-catalog p {
   margin-top: 7px;
   color: var(--ol-muted);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 
@@ -1606,7 +1606,7 @@
 .ol-connected-list small {
   margin-top: 3px;
   color: var(--ol-muted);
-  font-size: 0.64rem;
+  font-size: 0.75rem;
 }
 
 .ol-api-card {
@@ -1638,7 +1638,7 @@
   border-radius: 15px;
   background: #1c1b1a;
   color: #f1eee8;
-  font-size: 0.67rem;
+  font-size: 0.75rem;
   line-height: 1.5;
 }
 
@@ -1693,14 +1693,14 @@
 .ol-audit-list strong,
 .ol-ai-log strong {
   color: var(--ol-ink);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
 }
 
 .ol-audit-list p,
 .ol-ai-log p {
   margin-top: 3px;
   color: var(--ol-copy);
-  font-size: 0.67rem;
+  font-size: 0.75rem;
 }
 
 .ol-audit-list small,
@@ -1708,7 +1708,7 @@
   display: block;
   margin-top: 3px;
   color: var(--ol-muted);
-  font-size: 0.61rem;
+  font-size: 0.75rem;
 }
 
 .ol-ai-log > div:not(.ol-empty) {
@@ -1721,7 +1721,7 @@
 .ol-ai-log > div > span {
   float: right;
   color: var(--ol-green);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -1747,7 +1747,7 @@
 .ol-empty p,
 .ol-empty-copy {
   color: var(--ol-muted);
-  font-size: 0.73rem;
+  font-size: 0.75rem;
 }
 
 .ol-modal-open {
@@ -1792,7 +1792,7 @@
 
 .ol-modal > header span {
   color: var(--ol-accent);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1848,7 +1848,7 @@
 
 .ol-field > span {
   color: var(--ol-ink);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
 }
 
@@ -1859,7 +1859,7 @@
 
 .ol-field > small {
   color: var(--ol-muted);
-  font-size: 0.62rem;
+  font-size: 0.75rem;
 }
 
 .ol-field input,
@@ -1907,7 +1907,7 @@
 .ol-submit-bar p {
   max-width: 540px;
   color: var(--ol-muted);
-  font-size: 0.66rem;
+  font-size: 0.75rem;
   line-height: 1.45;
 }
 
@@ -1953,7 +1953,7 @@
 .ol-gate p {
   margin-top: 5px;
   color: var(--ol-copy);
-  font-size: 0.7rem;
+  font-size: 0.75rem;
 }
 
 .ol-ai-wait,
@@ -1984,7 +1984,7 @@
 .ol-ai-wait p,
 .ol-ai-error p {
   color: var(--ol-muted);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
 }
 
 .ol-ai-result {
@@ -2005,13 +2005,13 @@
   border-radius: 16px;
   background: #282624;
   color: #f4f0e8;
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   line-height: 1.55;
 }
 
 .ol-ai-result > p {
   color: var(--ol-muted);
-  font-size: 0.68rem;
+  font-size: 0.75rem;
 }
 
 .ol-skeleton {
@@ -2222,7 +2222,7 @@
     border-radius: 14px;
     background: transparent;
     color: #b9b5ad;
-    font-size: 0.58rem;
+    font-size: 0.75rem;
   }
 
   .ol-mobile-nav button span {
@@ -2233,7 +2233,7 @@
     border-radius: 7px;
     background: #45423e;
     color: #eeeae2;
-    font-size: 0.61rem;
+    font-size: 0.75rem;
     font-weight: 700;
   }
 
@@ -2478,3 +2478,26 @@
   }
 }
 .ol-evidence-json { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12px; line-height: 1.6; max-width: 100%; }
+
+.ol-optional-details { border: 1px solid #dedede; border-radius: 12px; padding: 16px; }
+.ol-optional-details > summary { cursor: pointer; padding: 8px 0; font-weight: 600; }
+.ol-optional-details[open] > summary { margin-bottom: 16px; }
+.ol-assignment-filter, .ol-disable-confirm { display: flex; align-items: flex-start; gap: 10px; padding: 12px 0; font-size: 14px; line-height: 1.6; }
+.ol-assignment-filter input, .ol-disable-confirm input, .ol-scope-products input { width: 18px; height: 18px; flex: 0 0 18px; margin-top: 3px; }
+.ol-assignment-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.ol-assignment-summary > div { display: flex; flex-direction: column; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.ol-assignment-summary > div > span { color: #616161; font-size: 13px; }
+.ol-assignment-summary > button { grid-column: 1 / -1; justify-self: start; }
+.ol-account-panel { margin-bottom: 28px; }
+.ol-account-list > article { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 18px 0; border-top: 1px solid #e5e5e5; }
+.ol-account-list > article > div { min-width: 0; overflow-wrap: anywhere; }
+.ol-account-list p, .ol-account-list small { color: #616161; line-height: 1.6; }
+.ol-scope-products { border: 1px solid #dedede; border-radius: 12px; padding: 16px; display: grid; gap: 10px; }
+.ol-scope-products label { display: flex; align-items: flex-start; gap: 10px; line-height: 1.6; }
+.ol-disable-confirm { padding: 16px; background: #fff4ce; border-radius: 12px; }
+.field-followup { border-left: 3px solid #0067b8; padding: 16px; margin-top: 20px; background: #f7f7f7; overflow-wrap: anywhere; }
+@media (max-width: 640px) {
+  .ol-assignment-summary { grid-template-columns: 1fr; }
+  .ol-account-list > article { align-items: stretch; flex-direction: column; }
+  .ol-account-list > article > button { align-self: flex-start; }
+}

@@ -4,7 +4,8 @@
 // 해야 한다 — 한 번에 판정하게 하면 사람은 안 읽고 누르고, 읽지도 않고
 // 반려된 신청서가 생기면 부서는 그걸 알아챈다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failFields } from '../../_lib/http.js'
+import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../_lib/reviewMutation.js'
 import { validateBulk, partition, resultText, BULK_BY_CODE } from '../../../shared/bulk.js'
 
 export async function onRequestPost({ env, data: requestData, request }) {
@@ -27,16 +28,19 @@ export async function onRequestPost({ env, data: requestData, request }) {
   }
 
   const spec = BULK_BY_CODE[action]
+  const expected = body.expectedRevisions
+  if (!expected || typeof expected !== 'object' || Array.isArray(expected) || ids.some(id => !validReviewRevision(expected[id]))) return reviewConflict()
 
-  try {
+  return reviewMutation(env.DB, request, 'bulk-review', body, async DB => {
     const placeholders = ids.map(() => '?').join(',')
-    const { results } = await env.DB.prepare(
-      `SELECT id, ticket_no, dept, title, status FROM application WHERE id IN (${placeholders})`
+    const { results } = await DB.prepare(
+      `SELECT id, ticket_no, dept, title, status, review_revision FROM application WHERE id IN (${placeholders}) ORDER BY id`
     )
       .bind(...ids)
       .all()
 
     const { ok, skipped, missing } = partition(results, ids, action)
+    if (results.some(app => Number(app.review_revision) !== expected[app.id])) return reviewConflict()
     if (ok.length === 0) {
       return jsonError(
         skipped.length > 0
@@ -49,6 +53,8 @@ export async function onRequestPost({ env, data: requestData, request }) {
     // 한 묶음으로 돌린다. 따로 돌리다 중간에 끊기면 어떤 건 바뀌고 어떤
     // 건 안 바뀐 상태가 남는데, 무엇이 됐는지 아무도 모른다.
     const stmts = []
+    // Lock all eligible parents in a stable order before touching any review.
+    for (const app of [...ok].sort((a, b) => a.id.localeCompare(b.id))) await lockReviewRevision(DB, app)
     for (const app of ok) {
       // 한 번에 미루는 것도 판정이다. 조건을 review 표에 적는다.
       //
@@ -62,7 +68,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
       // bulk 칸으로 "한 번에 미루면서 남긴 것"임을 밝힌다.
       if (spec.code === 'hold') {
         stmts.push(
-          env.DB.prepare(
+          DB.prepare(
             `INSERT INTO review
                (application_id, verdict, verdict_reason, hold_until_condition,
                 bulk, reviewer_label, decided_at, updated_at)
@@ -78,13 +84,13 @@ export async function onRequestPost({ env, data: requestData, request }) {
       }
       if (spec.changesStatus) {
         stmts.push(
-          env.DB.prepare(
+          DB.prepare(
             `UPDATE application SET status = ?, updated_at = datetime('now') WHERE id = ?`
           ).bind(spec.changesStatus, app.id)
         )
       }
       stmts.push(
-        env.DB.prepare(
+        DB.prepare(
           `INSERT INTO decision_log
              (id, application_id, stage, actor, title, what, why, link_kind, link_id)
            VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?)`
@@ -103,7 +109,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
         )
       )
     }
-    await env.DB.batch(stmts)
+    await DB.batch(stmts)
 
     return jsonResponse({
       ok: true,
@@ -112,9 +118,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
       missing,
       message: resultText({ action, ok: ok.length, skipped: skipped.length }),
     })
-  } catch (err) {
-    return failUnexpected(err, '한 번에 처리하지 못했습니다.')
-  }
+  }, '한 번에 처리하지 못했습니다.')
 }
 
 // 무엇을 한 번에 할 수 있는지는 화면이 서버에 묻지 않는다.

@@ -6,13 +6,14 @@
 // 심는 것은 신청서까지다. 검토·판정은 심지 않는다 — 그 화면에서 실제로
 // 판정해 보이는 것이 이 포트폴리오가 보여주려는 것이기 때문이다.
 
-import { jsonResponse, jsonError } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { DEMO_APPLICATIONS } from '../../_lib/demoApplications.js'
 
 export async function onRequestPost({ env, data: requestData, request }) {
   env = requestData?.requestEnv ?? env
+  if (!env.DEMO_WORKSPACE) return jsonError('개인 체험 공간에서만 사용할 수 있습니다.', 403)
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `demo-seed:${ip}`, 8, 3600)
   if (!ticket) {
@@ -73,8 +74,8 @@ export async function onRequestPost({ env, data: requestData, request }) {
       skipped: DEMO_APPLICATIONS.length - added,
       total: all[0]?.n ?? 0,
     })
-  } catch {
-    return jsonError('시연 데이터를 심지 못했습니다.', 500)
+  } catch (error) {
+    return failUnexpected(error, '시연 데이터를 심지 못했습니다.', 500)
   }
 }
 
@@ -89,6 +90,7 @@ export async function onRequestPost({ env, data: requestData, request }) {
 // 없는 신청서를 가리키는 줄이 남는다. 손으로 같이 지운다.
 export async function onRequestDelete({ env, data: requestData, request }) {
   env = requestData?.requestEnv ?? env
+  if (!env.DEMO_WORKSPACE) return jsonError('개인 체험 공간에서만 사용할 수 있습니다.', 403)
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
   const ticket = await checkRateLimit(env, `demo-seed:${ip}`, 8, 3600)
   if (!ticket) return jsonError('시간당 8회까지 가능합니다.', 429)
@@ -119,7 +121,7 @@ export async function onRequestDelete({ env, data: requestData, request }) {
       removed: targets.length,
       message: `시연 신청서 ${targets.length}건과 거기 딸린 결정 기록을 지웠습니다.`,
     })
-  } catch {
-    return jsonError('지우지 못했습니다.', 500)
+  } catch (error) {
+    return failUnexpected(error, '지우지 못했습니다.', 500)
   }
 }

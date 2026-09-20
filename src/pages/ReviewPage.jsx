@@ -5,9 +5,11 @@ import HotkeyHelp from '../components/HotkeyHelp.jsx'
 import SimilarNotice from '../components/SimilarNotice.jsx'
 import Thread from '../components/Thread.jsx'
 import Field from '../components/Field.jsx'
+import ApplicationOwnership from '../components/ApplicationOwnership.jsx'
 import { handleRadioGroupKeyDown } from '../lib/radioGroup.js'
 import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useApi } from '../hooks/useApi.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { ago, duration, num, krw } from '../lib/format.js'
@@ -24,6 +26,7 @@ import {
 } from '../lib/inbox.js'
 import { findSimilar } from '../../shared/similar.js'
 import { refuseHelp } from '../../shared/resubmit.js'
+import { DEPTS } from '../../shared/depts.js'
 import { BULK_ACTIONS, MAX_AT_ONCE, validateBulk } from '../../shared/bulk.js'
 import {
   VERDICTS,
@@ -56,7 +59,7 @@ const EMPTY_FORM = {
 }
 
 export default function ReviewPage() {
-  const { data, error, reload } = useApi('/applications')
+  const { data, error, reload, setData } = useApi('/applications')
   const toast = useToast()
   const [params] = useSearchParams()
   const wanted = params.get('id')
@@ -70,7 +73,9 @@ export default function ReviewPage() {
   // 신청서가 밀리는 이유는 판정이 어려워서가 아니라, 한 건 열고 읽고 닫고를
   // 반복하는 것이 지겨워서다. 다만 판정은 여기서 안 한다 — 한 번에
   // 판정하게 하면 사람은 안 읽고 누른다.
-  const [picked, setPicked] = useState(() => new Set())
+  const [picked, setPicked] = useState(() => new Map())
+  const [bulkBusy, setBulkBusy] = useState(false)
+  const captureList = useActionLifetime('review-list')
 
   // 무엇을 어떤 순서로 볼 것인가.
   //
@@ -279,9 +284,7 @@ export default function ReviewPage() {
           <div className="demo-wipe-text">
             <strong>지금 접수함에 시연용 신청서 {demoCount}건이 섞여 있습니다.</strong>
             <p className="card-note">
-              접수번호가 AX-DEM- 으로 시작하는 것만 지웁니다. 실제로 들어온 신청서는 건드리지
-              않습니다. 딸린 결정 기록도 같이 지웁니다 — 신청서만 지우면 없는 신청서를 가리키는
-              기록이 남습니다.
+              AX-DEM- 신청서와 연결된 결정 기록만 삭제합니다. 실제 접수된 신청서는 유지됩니다.
             </p>
           </div>
           {confirmWipe ? (
@@ -348,7 +351,7 @@ export default function ReviewPage() {
                   // 찾고 있는지 확인할 수 없다.
                   setQ({ q: e.target.value.trim() })
                 }}
-                placeholder="말로 찾기 — 제목·병목·문제·접수번호 어디에 있든 찾습니다"
+                placeholder="제목·병목·문제·접수번호 검색"
                 aria-label="신청서 검색"
                 style={{ flex: 1, minWidth: 220 }}
               />
@@ -366,6 +369,8 @@ export default function ReviewPage() {
               )}
             </form>
 
+            <details className="review-filters">
+              <summary>상세 필터</summary>
             {/* 상태 칩. 네 개만 박아 두면 '진행중'인 신청서가 있어도 그것만
                 골라 볼 방법이 없다 — 화면에 보이는데 좁힐 수가 없는 상태가
                 생긴다. 실제로 그 상태인 것이 있는 것만 낸다. */}
@@ -461,6 +466,7 @@ export default function ReviewPage() {
               </div>
             </div>
 
+            </details>
             {/* 조건을 걸면 이 합계도 따라 움직인다. 전체 합계를 그대로 두면
                 "재무 것만 봤는데 왜 합계가 그대로지"가 된다. */}
             {visible.length > 0 && (
@@ -536,17 +542,24 @@ export default function ReviewPage() {
                 </div>
               )}
 
-              {picked.size > 0 && (
-                <BulkBar
-                  count={picked.size}
-                  onClear={() => setPicked(new Set())}
-                  onDone={async () => {
-                    setPicked(new Set())
-                    await reload()
-                  }}
-                  ids={[...picked]}
-                />
-              )}
+              <BulkBar
+                count={picked.size}
+                onClear={() => setPicked(new Map())}
+                onDone={async () => {
+                  setPicked(new Map())
+                  await reload()
+                }}
+                onRefresh={async () => {
+                  const current = captureList()
+                  const latest = await api.get('/applications')
+                  if (!current()) return
+                  setData(latest)
+                  setPicked(new Map())
+                }}
+                onBusy={setBulkBusy}
+                ids={[...picked.keys()]}
+                expectedRevisions={Object.fromEntries(picked)}
+              />
 
               <ul>
                 {visible.map((a) => (
@@ -559,10 +572,12 @@ export default function ReviewPage() {
                       <input
                         type="checkbox"
                         checked={picked.has(a.id)}
+                        disabled={bulkBusy}
                         onChange={(e) => {
+                          if (bulkBusy) return
                           setPicked((p) => {
-                            const n = new Set(p)
-                            if (e.target.checked) n.add(a.id)
+                            const n = new Map(p)
+                            if (e.target.checked) n.set(a.id, a.review_revision)
                             else n.delete(a.id)
                             return n
                           })
@@ -652,49 +667,83 @@ export default function ReviewPage() {
 //
 // 무엇을 할 수 있는지는 shared/bulk.js가 정한다. 화면에 박아 두면 거기서
 // 하나 빼도 화면에는 남아, 누르면 400이 나는 버튼이 생긴다.
-function BulkBar({ count, ids, onClear, onDone }) {
+function BulkBar({ count, ids, expectedRevisions, onClear, onDone, onRefresh, onBusy }) {
   const toast = useToast()
+  const captureView = useActionLifetime('review-bulk')
   const [action, setAction] = useState('')
   const [reason, setReason] = useState('')
   const [saving, setSaving] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
+  const [conflict, setConflict] = useState(false)
 
   const spec = BULK_ACTIONS.find((a) => a.code === action)
   const tooMany = count > MAX_AT_ONCE
 
   async function send() {
+    if (saving || conflict) return
     const errs = validateBulk({ action, ids, reason })
     setFieldErrors(errs)
     if (Object.keys(errs).length > 0) return
 
     setSaving(true)
+    onBusy?.(true)
+    const current = captureView()
     try {
-      const r = await api.post('/applications/bulk', { action, ids, reason })
+      const r = await api.post('/applications/bulk', { action, ids, reason, expectedRevisions })
+      if (!current()) return
       toast.success(r.message)
       setAction('')
       setReason('')
       await onDone()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
+      if (err.status === 409) setConflict(true)
       toast.error(err.message)
     } finally {
-      setSaving(false)
+      if (current()) { setSaving(false); onBusy?.(false) }
     }
   }
+
+  async function refreshSelection() {
+    if (saving) return
+    setSaving(true)
+    onBusy?.(true)
+    const current = captureView()
+    try {
+      await onRefresh()
+      if (current()) setConflict(false)
+    } catch (err) {
+      if (current()) toast.error(err.message)
+    } finally {
+      if (current()) { setSaving(false); onBusy?.(false) }
+    }
+  }
+
+  if (count === 0) return null
 
   return (
     <div className="bulk-bar">
       <div className="row" style={{ marginBottom: 8 }}>
         <strong>{count}건 고르셨습니다</strong>
         <span className="spacer" />
-        <button type="button" className="btn-ghost btn-sm" onClick={onClear}>
+        <button type="button" className="btn-ghost btn-sm" disabled={saving} onClick={() => { setConflict(false); onClear() }}>
           고른 것 지우기
         </button>
       </div>
 
+      {conflict && (
+        <div className="notice notice-warn" role="alert">
+          <p>선택한 뒤 판정이 바뀌었습니다. 작성한 사유는 유지됩니다. 최신 목록을 읽고 처리할 신청서를 다시 골라주세요.</p>
+          <button type="button" className="btn-ghost btn-sm" disabled={saving} onClick={refreshSelection}>
+            최신 목록을 읽고 선택 해제
+          </button>
+        </div>
+      )}
+
       {tooMany ? (
         <p className="card-note">
-          한 번에 {MAX_AT_ONCE}건까지입니다. 그보다 많으면 안 읽고 누르게 됩니다.
+          한 번에 {MAX_AT_ONCE}건까지 처리할 수 있습니다.
         </p>
       ) : (
         <>
@@ -706,6 +755,7 @@ function BulkBar({ count, ids, onClear, onDone }) {
                 className={`chip${action === a.code ? ' on' : ''}`}
                 onClick={() => setAction(action === a.code ? '' : a.code)}
                 aria-pressed={action === a.code}
+                disabled={saving}
               >
                 {a.label}
               </button>
@@ -722,6 +772,7 @@ function BulkBar({ count, ids, onClear, onDone }) {
                   <textarea
                     rows={2}
                     value={reason}
+                    disabled={saving}
                     onChange={(e) => setReason(e.target.value)}
                     placeholder={spec.reasonPlaceholder}
                   />
@@ -731,7 +782,7 @@ function BulkBar({ count, ids, onClear, onDone }) {
                 type="button"
                 className="btn-primary btn-sm"
                 onClick={send}
-                disabled={saving}
+                disabled={saving || conflict}
               >
                 {saving ? '처리 중…' : `${count}건 ${spec.label}`}
               </button>
@@ -746,17 +797,23 @@ function BulkBar({ count, ids, onClear, onDone }) {
   )
 }
 
-function Detail({ id, onSaved, pool }) {
-  const { data, error, loading, reload } = useApi(`/applications/${id}`)
+export function Detail({ id, onSaved, pool }) {
+  const { data, error, loading, reload, setData } = useApi(`/applications/${id}`)
   const toast = useToast()
+  const captureView = useActionLifetime(id)
+  const initialized = useRef(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [fieldErrors, setFieldErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [expectedRevision, setExpectedRevision] = useState(null)
+  const [conflict, setConflict] = useState(false)
+  const [latestReview, setLatestReview] = useState(null)
+  const [refreshing, setRefreshing] = useState(false)
 
-  // 신청서를 바꾸면 폼을 그 신청서의 상태로 되돌린다. 이전 신청서에 적던
-  // 내용이 다음 신청서 폼에 남아 있으면, 그대로 저장해 버리는 사고가 난다.
+  // 대화나 담당자 변경의 배경 재조회는 작성 중인 판정과 그 기준 버전을 바꾸지 않는다.
   useEffect(() => {
-    if (!data) return
+    if (!data || data.application.id !== id || initialized.current === id) return
+    initialized.current = id
     if (data.review) {
       setForm({
         // 한 번에 미룬 건은 점수가 비어 있다. String(null) 은 "null" 이라
@@ -777,28 +834,70 @@ function Detail({ id, onSaved, pool }) {
     } else {
       setForm(EMPTY_FORM)
     }
+    setExpectedRevision(data.application.review_revision)
+    setConflict(false)
+    setLatestReview(null)
     setFieldErrors({})
-  }, [data])
+  }, [data, id])
+
+  const revisionReady = Number.isSafeInteger(expectedRevision) && expectedRevision >= 0
+  const needsRefresh = conflict || (revisionReady && data?.application.review_revision !== expectedRevision)
 
   function set(key, value) {
+    if (saving || refreshing) return
     setForm((f) => ({ ...f, [key]: value }))
     if (fieldErrors[key]) setFieldErrors((e) => ({ ...e, [key]: undefined }))
   }
 
   async function save(e) {
     e.preventDefault()
+    if (saving || refreshing || needsRefresh || !revisionReady) return
     setSaving(true)
     setFieldErrors({})
+    const current = captureView()
+    let committed = false
     try {
-      const json = await api.post(`/applications/${id}/review`, form)
+      const json = await api.post(`/applications/${id}/review`, { ...form, expectedRevision })
+      if (!current()) return
+      committed = true
       toast.success(`${json.verdict} 판정을 저장했습니다.`)
-      await Promise.all([reload(), onSaved()])
+      const [fresh] = await Promise.all([api.get(`/applications/${id}`), onSaved()])
+      if (!current()) return
+      initialized.current = null
+      setData(fresh)
+      setExpectedRevision(fresh.application.review_revision)
+      setConflict(false)
+      setLatestReview(null)
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
-      toast.error(err.message)
+      if (err.status === 409 || committed) { setConflict(true); setLatestReview(null) }
+      toast.error(committed ? `판정은 저장됐지만 최신 내용을 읽지 못했습니다. ${err.message}` : err.message)
     } finally {
-      setSaving(false)
+      if (current()) setSaving(false)
     }
+  }
+
+  async function readLatest() {
+    if (saving || refreshing) return
+    setRefreshing(true)
+    const current = captureView()
+    try {
+      const latest = await api.get(`/applications/${id}`)
+      if (current()) setLatestReview(latest)
+    } catch (err) {
+      if (current()) toast.error(err.message)
+    } finally {
+      if (current()) setRefreshing(false)
+    }
+  }
+
+  function acknowledgeLatest() {
+    if (saving || refreshing || !Number.isSafeInteger(latestReview?.application.review_revision)) return
+    setExpectedRevision(latestReview.application.review_revision)
+    setData(latestReview)
+    setConflict(false)
+    setLatestReview(null)
   }
 
   // 비슷한 신청서 찾기를 렌더 안에서 그냥 부르고 있었다.
@@ -890,6 +989,7 @@ function Detail({ id, onSaved, pool }) {
           목록이 이미 브라우저에 다 있어서 서버를 다시 부르지 않는다. */}
       {/* 다른 부서가 손든 것. 판정 화면 위쪽에 둔다 — 우선순위를 매기기
           전에 이 병목이 몇 부서 것인지 알아야 한다. */}
+      <ApplicationOwnership key={a.id} applicationId={a.id} onChanged={() => Promise.all([reload(), onSaved()])} />
       <Joined id={a.id} />
 
       <SimilarNotice hits={similarHits} tone="review" selfId={a.id} />
@@ -903,7 +1003,28 @@ function Detail({ id, onSaved, pool }) {
         onChanged={() => Promise.all([reload(), onSaved()])}
       />
 
+      {needsRefresh && (
+        <section className="notice notice-warn" aria-label="최신 판정 확인">
+          <p role="alert">판정이 바뀌었습니다. 작성 중인 내용은 유지했습니다. 최신 판정과 근거를 확인한 뒤 다시 저장해주세요.</p>
+          <button type="button" className="btn-ghost btn-sm" disabled={saving || refreshing} onClick={readLatest}>
+            {refreshing ? '불러오는 중…' : '최신 판정 불러오기'}
+          </button>
+          {latestReview && (
+            <>
+              <p>최신 상태: {latestReview.application.status} · 최신 판정: {latestReview.review?.verdict ?? '아직 없음'}</p>
+              <p>최신 판정 근거: {latestReview.review?.verdict_reason || '아직 없음'}</p>
+              {latestReview.review?.hold_until_condition && <p>보류 조건: {latestReview.review.hold_until_condition}</p>}
+              {latestReview.review?.refuse_alternative && <p>반려 대안: {latestReview.review.refuse_alternative}</p>}
+              <button type="button" className="btn-ghost btn-sm" disabled={saving || refreshing} onClick={acknowledgeLatest}>
+                최신 판정을 확인하고 작성 내용 유지
+              </button>
+            </>
+          )}
+        </section>
+      )}
+
       <form className="card decided" onSubmit={save}>
+        <fieldset disabled={saving || refreshing} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
         <div className="card-head">
           <span className="origin-label origin-human">◆ 내 판정</span>
           {/* 점수가 없는 판정이 있다. 접수함에서 여러 건을 한 번에 '보류로
@@ -992,7 +1113,7 @@ function Detail({ id, onSaved, pool }) {
           )}
         </div>
 
-        <Field label="판정 근거" hint="근거 없이 누른 것은 결정이 아니라 클릭입니다" error={fieldErrors.verdict_reason}>
+        <Field label="판정 근거" error={fieldErrors.verdict_reason}>
           <textarea
             rows={3}
             value={form.verdict_reason}
@@ -1003,7 +1124,6 @@ function Detail({ id, onSaved, pool }) {
 
         <Field
           label="고려했다 뺀 것"
-          hint="무엇을 고르지 않았는지를 적어야 판단이 판단이 됩니다"
           error={fieldErrors.alternatives_considered}
         >
           <textarea
@@ -1044,10 +1164,6 @@ function Detail({ id, onSaved, pool }) {
                 placeholder="업로드 양식에 맞춘 파일까지는 만들어 드립니다. 등록 버튼은 사람이 누릅니다."
               />
             </Field>
-            <p className="card-note">
-              &quot;안 됩니다&quot;만 돌려보내면 그 부서는 다시 신청하지 않습니다. 병목은 그대로
-              남습니다.
-            </p>
           </div>
         )}
 
@@ -1067,9 +1183,10 @@ function Detail({ id, onSaved, pool }) {
           </div>
         )}
 
-        <button type="submit" className="btn-primary btn-block" disabled={saving}>
+        <button type="submit" className="btn-primary btn-block" disabled={saving || refreshing || needsRefresh || !revisionReady}>
           {saving ? '저장하는 중…' : data.review ? '판정 다시 저장' : '판정 저장'}
         </button>
+        </fieldset>
       </form>
 
       {data.decisions.length > 0 && (
@@ -1083,7 +1200,7 @@ function Detail({ id, onSaved, pool }) {
                 >
                   {dec.actor === 'ai' ? '◇ AI' : '◆ 사람'} · {dec.stage} · {ago(dec.created_at)}
                 </span>
-                <div className="item-body" style={{ fontSize: 14.5, fontWeight: 700 }}>
+                <div className="item-body" style={{ fontWeight: 600 }}>
                   {dec.title}
                 </div>
                 <div className="card-note" style={{ marginTop: 4 }}>
@@ -1162,7 +1279,7 @@ function statusTone(status) {
 // 처음 판정할 때는 한 부서 일인 줄 알고 점수를 매긴다. 그 뒤에 두 부서가
 // 손들면 같은 신청서인데 크기가 세 배가 된다. 그러면 우선순위를 다시
 // 매겨야 하는데, 손든 사실이 어디에도 안 뜨면 그럴 일이 없다.
-function Joined({ id }) {
+export function Joined({ id }) {
   const { data, reload } = useApi(`/applications/${id}/join`)
   const toast = useToast()
   const [open, setOpen] = useState(null)
@@ -1196,6 +1313,28 @@ function Joined({ id }) {
     }
   }
 
+  async function authorize(event, joinId) {
+    event.preventDefault()
+    const values = new FormData(event.currentTarget)
+    if (values.get('confirmed') !== 'yes' || !DEPTS.includes(values.get('department'))) {
+      toast.error('참여 부서와 공유할 범위를 확인해주세요.')
+      return
+    }
+    setBusy(true)
+    try {
+      const result = await api.post(`/applications/${id}/join`, {
+        kind: 'authorize', join_id: joinId, dept: values.get('department'),
+      })
+      toast.success(result.message || '참여 권한을 확인했습니다.')
+      setOpen(null)
+      await reload()
+    } catch (error) {
+      toast.error(error.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <section className="joined">
       <div className="joined-head">
@@ -1223,9 +1362,22 @@ function Joined({ id }) {
             </div>
             <p className="joined-story">{j.story}</p>
 
+            {j.accessVerified === false && <div className="joined-warn">
+              <p>참여 권한 확인 대기. 과거 참여 기록만으로는 추가 부서에 조회·서명 권한을 부여하지 않습니다.</p>
+              {data.capabilities?.canAuthorizeParticipation ? open === `authorize:${j.id}` ? <form className="stack" onSubmit={event => authorize(event, j.id)}>
+                <label>확인한 참여 부서<select name="department" required defaultValue=""><option value="">선택해주세요</option>{DEPTS.map(dept => <option key={dept} value={dept}>{dept}</option>)}</select></label>
+                <p className="card-note">선택한 부서에 이 신청서·합격 기준·결정 기록을 보여주고, 해당 부서의 기준 서명·이의 제기를 허용합니다. 다른 업무의 수정 권한은 추가하지 않습니다.</p>
+                <label><input name="confirmed" type="checkbox" value="yes" required /> 실제 참여 부서와 위 공유 범위를 확인했습니다.</label>
+                <div className="row"><button className="btn-primary btn-sm" type="submit" disabled={busy}>{busy ? '확인 중…' : '확인한 범위로 참여 허용'}</button><button className="btn-ghost btn-sm" type="button" disabled={busy} onClick={() => setOpen(null)}>취소</button></div>
+              </form> : <button className="btn-ghost btn-sm" type="button" disabled={busy} onClick={() => setOpen(`authorize:${j.id}`)}>참여 부서 권한 확인</button>
+                : <p className="card-note">관리자의 참여 부서 확인이 필요합니다.</p>}
+            </div>}
+            {j.accessVerified === true && <p className="card-note">참여 부서 조회·서명 권한 확인됨</p>}
+
             {open === j.id ? (
               <div className="joined-release">
                 <input
+                  aria-label="다른 건으로 분리하는 이유"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   placeholder="왜 다른 건입니까 — 이 문장이 그 부서에 갑니다"

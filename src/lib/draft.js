@@ -7,11 +7,16 @@
 // 한 번 날려 본 사람은 다시 안 적는다. 그러면 그 병목은 영영 접수되지
 // 않고, 이 사이트는 "귀찮은 데"가 된다.
 //
-// 서버에 보내지 않는다. 이 사이트는 로그인이 없어서, 초안을 서버에 두면
-// 그것을 누구 것이라고 할 수가 없다. 남이 적던 것을 다른 사람이 이어
-// 쓰게 되는 쪽이 잃는 것보다 나쁘다. 브라우저 안에만 둔다.
+// 초안은 브라우저에만 두되, 서버가 확인한 계정·체험 공간별로 분리한다.
+// 소유 범위가 없는 이전 공용 초안은 새 계정에 이관하거나 읽거나 지우지 않는다.
 
 export const DRAFT_KEY = 'ilson.apply.draft.v1'
+
+export function draftKey(scope) {
+  return typeof scope === 'string' && /^[0-9a-f]{64}$/.test(scope)
+    ? `ilson.apply.draft.v2:${scope}`
+    : null
+}
 
 // 이 날짜가 지나면 되살리지 않는다.
 //
@@ -43,16 +48,17 @@ export function isExpired(savedAt, now = Date.now(), days = DRAFT_MAX_DAYS) {
 
 // 저장한다. 저장할 값이 없으면 전에 저장해 둔 것을 지운다 —
 // 사람이 다 지웠는데 옛것이 남아 있으면 다음에 그게 되살아난다.
-export function saveDraft(storage, form, now = Date.now()) {
-  if (!storage) return false
+export function saveDraft(storage, scope, form, now = Date.now()) {
+  const key = draftKey(scope)
+  if (!storage || !key) return false
   if (!isWorthSaving(form)) {
-    clearDraft(storage)
+    clearDraft(storage, scope)
     return false
   }
   try {
     storage.setItem(
-      DRAFT_KEY,
-      JSON.stringify({ savedAt: new Date(now).toISOString(), form })
+      key,
+      JSON.stringify({ scope, savedAt: new Date(now).toISOString(), form })
     )
     return true
   } catch {
@@ -62,11 +68,12 @@ export function saveDraft(storage, form, now = Date.now()) {
   }
 }
 
-export function loadDraft(storage, now = Date.now()) {
-  if (!storage) return null
+export function loadDraft(storage, scope, now = Date.now()) {
+  const key = draftKey(scope)
+  if (!storage || !key) return null
   let raw
   try {
-    raw = storage.getItem(DRAFT_KEY)
+    raw = storage.getItem(key)
   } catch {
     return null
   }
@@ -77,25 +84,26 @@ export function loadDraft(storage, now = Date.now()) {
     parsed = JSON.parse(raw)
   } catch {
     // 깨진 값이 남아 있으면 치운다. 그대로 두면 열 때마다 실패한다.
-    clearDraft(storage)
+    clearDraft(storage, scope)
     return null
   }
 
-  if (!parsed?.form || !isWorthSaving(parsed.form)) {
-    clearDraft(storage)
+  if (parsed?.scope !== scope || !parsed?.form || !isWorthSaving(parsed.form)) {
+    clearDraft(storage, scope)
     return null
   }
   if (isExpired(parsed.savedAt, now)) {
-    clearDraft(storage)
+    clearDraft(storage, scope)
     return null
   }
   return { form: parsed.form, savedAt: parsed.savedAt }
 }
 
-export function clearDraft(storage) {
-  if (!storage) return
+export function clearDraft(storage, scope) {
+  const key = draftKey(scope)
+  if (!storage || !key) return
   try {
-    storage.removeItem(DRAFT_KEY)
+    storage.removeItem(key)
   } catch {
     // 지우지 못해도 할 수 있는 것이 없다.
   }

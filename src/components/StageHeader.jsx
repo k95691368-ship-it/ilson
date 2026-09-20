@@ -1,5 +1,4 @@
-import { Link } from 'react-router-dom'
-import { STAGES, STAGE_BY_KEY, nextStage, prevStage } from '../lib/stages.js'
+import { STAGES, STAGE_BY_KEY } from '../lib/stages.js'
 
 // 단계 화면의 머리. 여덟 화면이 같은 모양으로 시작하게 한다.
 //
@@ -9,54 +8,14 @@ import { STAGES, STAGE_BY_KEY, nextStage, prevStage } from '../lib/stages.js'
 export default function StageHeader({ stageKey, children }) {
   const stage = STAGE_BY_KEY[stageKey]
   if (!stage) return null
-  const prev = prevStage(stageKey)
-  const next = nextStage(stageKey)
 
   return (
     <header className="stage-head">
-      <div className="stage-kicker">
-        <span>실행 흐름</span>
-        <span>{stage.no} / {STAGES.length}</span>
-      </div>
       <div className="stage-head-top">
-        <span className="stage-no" aria-hidden="true">{String(stage.no).padStart(2, '0')}</span>
         <div className="stage-head-text">
           <h1>{stage.title}</h1>
-          <p className="page-sub">{stage.summary}</p>
         </div>
-      </div>
-
-      <nav className="stage-progress" aria-label="여섯 단계 진행 위치">
-        {STAGES.map((item) => (
-          <Link
-            key={item.key}
-            to={item.path}
-            className={`${item.no < stage.no ? 'done' : ''}${item.no === stage.no ? ' current' : ''}`}
-            aria-current={item.no === stage.no ? 'step' : undefined}
-            title={`${item.no}단계 ${item.label}`}
-          >
-            <span aria-hidden="true" />
-            <small>{item.label}</small>
-          </Link>
-        ))}
-      </nav>
-
-      <div className="stage-head-meta">
-        <span className="stage-owner">
-          <span className="stage-owner-label">이 단계의 주인</span>
-          {stage.owner}
-        </span>
-        <span className="spacer" />
-        {prev && (
-          <Link to={prev.path} className="stage-nav-link">
-            ← {prev.no} {prev.label}
-          </Link>
-        )}
-        {next && (
-          <Link to={next.path} className="stage-nav-link">
-            {next.no} {next.label} →
-          </Link>
-        )}
+        <span className="stage-context">{stage.no} / {STAGES.length} · {stage.owner}</span>
       </div>
 
       {children}

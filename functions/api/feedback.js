@@ -2,6 +2,7 @@ import { jsonResponse, jsonError, failUnexpected } from '../_lib/http.js'
 import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.js'
 import { resolveOverrideActor, auditOverride } from '../_lib/override.js'
 import { feedbackActorKey } from '../_lib/fieldFeedback.js'
+import { createIssueFollowup } from '../_lib/issueWorkflow.js'
 import { newId } from '../_lib/ids.js'
 import { canManageFeedback, canReviewQuality, validDate, FEEDBACK_KINDS, FEEDBACK_VERDICTS, QUALITY_VERDICTS, NONUSE_STATES, NONUSE_REASONS } from '../../shared/fieldFeedback.js'
 
@@ -13,6 +14,19 @@ function text(value,max=2000,required=true) {
   return value.trim()
 }
 const has = (object,key) => typeof key==='string' && Object.hasOwn(object,key)
+const CASE_PAGE_SIZE = 100
+const BATCH_PAGE_SIZE = 50
+const FOLLOWUP_OVERVIEW_SIZE = 200
+function readCursor(value) {
+  if (!value) return null
+  try {
+    demand(value.length <= 1000 && /^[A-Za-z0-9+/]+={0,2}$/.test(value),'페이지 주소를 확인해주세요.')
+    const cursor=JSON.parse(new TextDecoder('utf-8',{fatal:true}).decode(Uint8Array.from(atob(value),c=>c.charCodeAt(0))))
+    demand(Array.isArray(cursor) && cursor.length===2 && typeof cursor[0]==='string' && cursor[0].length<=40 && Number.isFinite(Date.parse(cursor[0])) && typeof cursor[1]==='string' && cursor[1].length>0 && cursor[1].length<=100,'페이지 주소를 확인해주세요.')
+    return cursor
+  } catch { demand(false,'페이지 주소를 확인해주세요.') }
+}
+const encodeCursor = item => btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify([item.created_at,item.id]))))
 async function actorFor(env,request,body) {
   const role=new URL(request.url).searchParams.get('role')
   const actor=await resolveOverrideActor(env,request,body ?? {role:role || 'reviewer'})
@@ -25,28 +39,86 @@ async function visibleCase(DB,id,key,manager) {
   return row
 }
 
+async function readRows(DB, queries) {
+  const entries = Object.entries(queries)
+  if (!entries.length) return {}
+  const results = await DB.batch(entries.map(([, statement]) => statement))
+  return Object.fromEntries(entries.map(([name], index) => [name, results[index].results]))
+}
+
 export async function onRequestGet({env,data:requestData,request}) {
   env=requestData?.requestEnv ?? env
   try {
     const actor=await actorFor(env,request), key=await feedbackActorKey(actor)
     const manager=canManageFeedback(actor.role), reviewer=canReviewQuality(actor.role)
-    const cases=(await env.DB.prepare(`SELECT c.*,e.reason_detail,e.product_id,p.name AS product_name
+    const params=new URL(request.url).searchParams
+    const cursor=readCursor(params.get('caseCursor')), batchCursor=readCursor(params.get('batchCursor'))
+    const caseConditions=[...(manager?[]:['c.reporter_key=?']),...(cursor?['(c.created_at<? OR (c.created_at=? AND c.id<?))']:[])]
+    const caseBinds=[...(manager?[]:[key]),...(cursor?[cursor[0],cursor[0],cursor[1]]:[])]
+    const followupConditions=manager ? [] : [`(${reviewer ? "f.source_kind='quality_sample' OR " : ''}EXISTS(SELECT 1 FROM field_feedback_case own WHERE own.event_id=f.event_id AND own.reporter_key=?))`]
+    const followupQuery=(conditions=[],binds=[],limit='')=>env.DB.prepare(`SELECT f.*,c.title AS cluster_title,c.assignee_email,c.assignee_label,c.acknowledged_at,c.next_response_on,p.name AS product_name
+      FROM issue_followup f JOIN issue_cluster c ON c.id=f.cluster_id JOIN override_product p ON p.id=f.product_id
+      ${followupConditions.length || conditions.length ? 'WHERE '+[...followupConditions,...conditions].join(' AND ') : ''}
+      ORDER BY CASE WHEN f.status='open' THEN 0 ELSE 1 END,f.created_at DESC,f.id ${limit}`).bind(...(manager ? [] : [key]),...binds)
+    // Independent reads share one RPC. Related rows need just one more RPC,
+    // instead of seven serial network round trips to Supabase.
+    const { cases: caseRows, batches: batchRows = [], nonuse, nonuseSummary = [], unread: unreadRows, followups } = await readRows(env.DB, {
+      cases: env.DB.prepare(`SELECT c.*,e.reason_detail,e.product_id,p.name AS product_name
       FROM field_feedback_case c JOIN override_event e ON e.id=c.event_id JOIN override_product p ON p.id=e.product_id
-      ${manager?'':'WHERE c.reporter_key=?'} ORDER BY c.created_at DESC,c.id DESC LIMIT 100`).bind(...(manager?[]:[key])).all()).results
-    const updates=cases.length ? (await env.DB.prepare(`SELECT u.*,r.seen_at,r.verdict,r.note,r.responded_at
+      ${caseConditions.length?'WHERE '+caseConditions.join(' AND '):''} ORDER BY c.created_at DESC,c.id DESC LIMIT ${CASE_PAGE_SIZE+1}`).bind(...caseBinds),
+      ...(reviewer ? { batches: env.DB.prepare(`SELECT b.*,p.name AS product_name FROM quality_sample_batch b JOIN override_product p ON p.id=b.product_id
+      ${batchCursor?'WHERE b.created_at<? OR (b.created_at=? AND b.id<?)':''} ORDER BY b.created_at DESC,b.id DESC LIMIT ${BATCH_PAGE_SIZE+1}`).bind(...(batchCursor?[batchCursor[0],batchCursor[0],batchCursor[1]]:[])) } : {}),
+      nonuse: env.DB.prepare(`SELECT r.id,r.product_id,p.name AS product_name,r.usage_state,r.reason,r.note,r.occurred_on
+      FROM tool_nonuse_report r JOIN override_product p ON p.id=r.product_id WHERE r.reporter_key=? ORDER BY r.created_at DESC,r.id LIMIT 50`).bind(key),
+      ...((manager || reviewer) ? { nonuseSummary: env.DB.prepare(`SELECT p.id AS product_id,p.name AS product_name,r.usage_state,r.reason,count(*) AS reports
+      FROM tool_nonuse_report r JOIN override_product p ON p.id=r.product_id GROUP BY p.id,p.name,r.usage_state,r.reason ORDER BY reports DESC,p.id,r.usage_state,r.reason`) } : {}),
+      unread: env.DB.prepare(`SELECT count(*) AS n FROM field_feedback_update u JOIN field_feedback_case c ON c.id=u.case_id
+      LEFT JOIN field_feedback_receipt r ON r.update_id=u.id WHERE c.reporter_key=? AND r.update_id IS NULL`).bind(key),
+      followups: followupQuery([],[],`LIMIT ${FOLLOWUP_OVERVIEW_SIZE}`),
+    })
+    const cases=caseRows.slice(0,CASE_PAGE_SIZE), hasMore=caseRows.length>CASE_PAGE_SIZE
+    const batches=batchRows.slice(0,BATCH_PAGE_SIZE), moreBatches=batchRows.length>BATCH_PAGE_SIZE
+    // The capped overview is not the source of truth for a page's linked work.
+    // Fetch only missing links for these cases/batches, in the same scoped RPC.
+    const pageFollowupConditions=[
+      ...(cases.length ? [`(f.source_kind='feedback' AND f.event_id IN (${cases.map(()=>'?').join(',')}))`] : []),
+      ...(batches.length ? [`(f.source_kind='quality_sample' AND EXISTS(SELECT 1 FROM quality_sample_item page_item WHERE page_item.id=f.source_id AND page_item.batch_id IN (${batches.map(()=>'?').join(',')})))`] : []),
+    ]
+    const { updates = [], samples = [], reviews = [], pageFollowups = [] } = await readRows(env.DB, {
+      ...(cases.length ? { updates: env.DB.prepare(`SELECT u.*,r.seen_at,r.verdict,r.note,r.responded_at
       FROM field_feedback_update u LEFT JOIN field_feedback_receipt r ON r.update_id=u.id
-      WHERE u.case_id IN (${cases.map(()=>'?').join(',')}) ORDER BY u.created_at,u.id`).bind(...cases.map(c=>c.id)).all()).results : []
-    const batches=reviewer ? (await env.DB.prepare(`SELECT b.*,p.name AS product_name FROM quality_sample_batch b JOIN override_product p ON p.id=b.product_id ORDER BY b.created_at DESC,b.id DESC LIMIT 50`).all()).results : []
-    const samples=batches.length ? (await env.DB.prepare(`SELECT * FROM quality_sample_item WHERE batch_id IN (${batches.map(()=>'?').join(',')}) ORDER BY id`).bind(...batches.map(b=>b.id)).all()).results : []
-    const nonuse=(await env.DB.prepare(`SELECT r.id,r.product_id,p.name AS product_name,r.usage_state,r.reason,r.note,r.occurred_on
-      FROM tool_nonuse_report r JOIN override_product p ON p.id=r.product_id WHERE r.reporter_key=? ORDER BY r.created_at DESC,r.id LIMIT 50`).bind(key).all()).results
-    const nonuseSummary=(manager || reviewer) ? (await env.DB.prepare(`SELECT p.id AS product_id,p.name AS product_name,r.usage_state,r.reason,count(*) AS reports
-      FROM tool_nonuse_report r JOIN override_product p ON p.id=r.product_id GROUP BY p.id,p.name,r.usage_state,r.reason ORDER BY reports DESC,p.id,r.usage_state,r.reason`).all()).results : []
-    const items=cases.map(({reporter_key,...c})=>({...c,is_mine:reporter_key===key,updates:updates.filter(u=>u.case_id===c.id)}))
-    const unread=(await env.DB.prepare(`SELECT count(*) AS n FROM field_feedback_update u JOIN field_feedback_case c ON c.id=u.case_id
-      LEFT JOIN field_feedback_receipt r ON r.update_id=u.id WHERE c.reporter_key=? AND r.update_id IS NULL`).bind(key).first())?.n ?? 0
-    return jsonResponse({cases:items,unread:Number(unread),manager,reviewer,batches,
-      samples:samples.map(({snapshot_json,...item})=>({...item,snapshot:JSON.parse(snapshot_json)})),nonuse,nonuseSummary})
+      WHERE u.case_id IN (${cases.map(()=>'?').join(',')}) ORDER BY u.created_at,u.id`).bind(...cases.map(c=>c.id)) } : {}),
+      ...(batches.length ? { samples: env.DB.prepare(`SELECT * FROM quality_sample_item WHERE batch_id IN (${batches.map(()=>'?').join(',')}) ORDER BY id`).bind(...batches.map(b=>b.id)) } : {}),
+      ...(batches.length ? { reviews: env.DB.prepare(`SELECT h.* FROM quality_sample_review_history h JOIN quality_sample_item i ON i.id=h.item_id
+      WHERE i.batch_id IN (${batches.map(()=>'?').join(',')}) ORDER BY h.item_id,h.revision`).bind(...batches.map(b=>b.id)) } : {}),
+      ...(followups.length===FOLLOWUP_OVERVIEW_SIZE && pageFollowupConditions.length ? { pageFollowups: followupQuery([
+        '('+pageFollowupConditions.join(' OR ')+')',
+        ...(followups.length ? [`f.id NOT IN (${followups.map(()=>'?').join(',')})`] : []),
+      ],[...cases.map(c=>c.event_id),...batches.map(b=>b.id),...followups.map(f=>f.id)]) } : {}),
+    })
+    const updatesByCase = new Map()
+    for (const update of updates) {
+      if (!updatesByCase.has(update.case_id)) updatesByCase.set(update.case_id, [])
+      updatesByCase.get(update.case_id).push(update)
+    }
+    const reviewsBySample=new Map()
+    for(const review of reviews) {
+      if(!reviewsBySample.has(review.item_id)) reviewsBySample.set(review.item_id,[])
+      reviewsBySample.get(review.item_id).push(review)
+    }
+    const followupsByEvent=new Map(), followupsBySample=new Map()
+    for(const followup of [...followups,...pageFollowups]) {
+      if(followup.source_kind==='quality_sample') followupsBySample.set(followup.source_id,followup)
+      else {
+        if(!followupsByEvent.has(followup.event_id)) followupsByEvent.set(followup.event_id,[])
+        followupsByEvent.get(followup.event_id).push(followup)
+      }
+    }
+    const items=cases.map(({reporter_key,...c})=>({...c,is_mine:reporter_key===key,updates:updatesByCase.get(c.id) ?? [],followups:followupsByEvent.get(c.event_id) ?? []}))
+    const unread=unreadRows[0]?.n ?? 0
+    return jsonResponse({cases:items,casePage:{hasMore,nextCursor:hasMore?encodeCursor(cases.at(-1)):null},unread:Number(unread),manager,reviewer,batches,
+      batchPage:{hasMore:moreBatches,nextCursor:moreBatches?encodeCursor(batches.at(-1)):null},followups,
+      samples:samples.map(({snapshot_json,...item})=>({...item,snapshot:JSON.parse(snapshot_json),review_history:reviewsBySample.get(item.id) ?? [],followup:followupsBySample.get(item.id) ?? null})),nonuse,nonuseSummary})
   } catch(error) {
     if(error.publicStatus)return jsonError(error.message,error.publicStatus)
     return failUnexpected(error,'현장 피드백을 불러오지 못했습니다. 새 기능의 DB 마이그레이션 적용 여부를 확인해주세요.')
@@ -68,7 +140,7 @@ async function act(env,actor,key,body) {
   } else if(action==='read_update' || action==='confirm_update') {
     const update=await DB.prepare('SELECT * FROM field_feedback_update WHERE id=?').bind(text(body.updateId,100)).first()
     demand(update,'안내를 찾을 수 없습니다.',404)
-    await visibleCase(DB,update.case_id,key,false)
+    const feedbackCase=await visibleCase(DB,update.case_id,key,false)
     const receipt=await DB.prepare('SELECT * FROM field_feedback_receipt WHERE update_id=?').bind(update.id).first()
     if(action==='read_update') {
       if(!receipt) await DB.prepare('INSERT INTO field_feedback_receipt(update_id) VALUES(?)').bind(update.id).run()
@@ -80,6 +152,11 @@ async function act(env,actor,key,body) {
       await DB.prepare(`INSERT INTO field_feedback_receipt(update_id,verdict,note,responded_at) VALUES(?,?,?,datetime('now'))
         ON CONFLICT(update_id) DO UPDATE SET verdict=excluded.verdict,note=excluded.note,responded_at=excluded.responded_at`)
         .bind(update.id,body.verdict,note).run()
+      if(body.verdict==='not_resolved') {
+        const event=await DB.prepare('SELECT * FROM override_event WHERE id=?').bind(feedbackCase.event_id).first()
+        demand(event,'원본 사건을 찾을 수 없습니다.',404)
+        await createIssueFollowup(DB,actor,{sourceKind:'feedback',sourceId:update.id,event,reason:note,evidenceRefs:`개선 안내 ${update.id}; 원본 사건 ${event.id}`})
+      }
     }
     entityId=update.id
   } else if(action==='create_sample') {
@@ -108,11 +185,27 @@ async function act(env,actor,key,body) {
     demand(canReviewQuality(actor.role),'현재 역할에는 표본 점검 권한이 없습니다.',403)
     const item=await DB.prepare('SELECT * FROM quality_sample_item WHERE id=?').bind(text(body.itemId,100)).first()
     demand(item,'표본을 찾을 수 없습니다.',404)
-    demand(!item.reviewed_at,'이미 점검한 표본입니다.',409)
+    demand((!item.reviewed_at && !item.verdict) || item.verdict==='insufficient','이미 최종 판정한 표본입니다.',409)
     demand(has(QUALITY_VERDICTS,body.verdict),'점검 결과를 선택해주세요.')
+    const reason=text(body.reason),evidenceRefs=text(body.evidenceRefs,1000,body.verdict!=='insufficient')
     await DB.prepare(`UPDATE quality_sample_item SET verdict=?,reason=?,evidence_refs=?,reviewed_by=?,reviewed_at=datetime('now') WHERE id=?`)
-      .bind(body.verdict,text(body.reason),text(body.evidenceRefs,1000,body.verdict!=='insufficient'),actor.label,item.id).run()
+      .bind(body.verdict,reason,evidenceRefs,actor.label,item.id).run()
+    if(body.verdict==='issue') {
+      const event=await DB.prepare('SELECT * FROM override_event WHERE id=?').bind(item.event_id).first()
+      demand(event,'원본 사건을 찾을 수 없습니다.',404)
+      const snapshot=JSON.parse(item.snapshot_json)
+      await createIssueFollowup(DB,actor,{sourceKind:'quality_sample',sourceId:item.id,
+        event:{...event,ai_decision:snapshot.ai_decision,human_decision:snapshot.human_decision,policy_refs_json:snapshot.policy_refs_json},reason,evidenceRefs})
+    }
     entityId=item.id
+  } else if(action==='resolve_followup') {
+    demand(canManageFeedback(actor.role),'현재 역할에는 후속 과제 처리 권한이 없습니다.',403)
+    const followup=await DB.prepare('SELECT * FROM issue_followup WHERE id=?').bind(text(body.followupId,100)).first()
+    demand(followup,'후속 과제를 찾을 수 없습니다.',404)
+    demand(followup.status==='open','이미 처리한 후속 과제입니다.',409)
+    await DB.prepare("UPDATE issue_followup SET status='resolved',resolution=?,resolved_by=?,resolved_at=datetime('now') WHERE id=?")
+      .bind(text(body.resolution),actor.label,followup.id).run()
+    entityId=followup.id
   } else if(action==='record_nonuse') {
     demand(has(NONUSE_STATES,body.usageState)&&has(NONUSE_REASONS,body.reason),'사용 상태와 이유를 선택해주세요.')
     demand(validDate(body.occurredOn)&&body.occurredOn<=new Date().toISOString().slice(0,10),'사용 중단일을 확인해주세요.')

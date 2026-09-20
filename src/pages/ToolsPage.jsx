@@ -41,8 +41,7 @@ export default function ToolsPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">넘긴 뒤</span>
-        <h1>넘긴 도구는 지금 어떻게 됐나</h1>
+        <h1>운영 도구</h1>
       </header>
 
       {data.items.length === 0 ? (

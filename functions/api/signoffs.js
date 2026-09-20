@@ -7,7 +7,7 @@
 //
 // 첫 화면 할 일 목록에 올리려고 여기서 센다.
 
-import { jsonResponse, jsonError } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
 
 export async function onRequestGet({ env, data: requestData }) {
@@ -39,7 +39,7 @@ export async function onRequestGet({ env, data: requestData }) {
       },
       applicationIds: [...apps],
     })
-  } catch {
-    return jsonError('부서 이의를 세지 못했습니다.', 503)
+  } catch (error) {
+    return failUnexpected(error, '부서 이의를 세지 못했습니다.')
   }
 }

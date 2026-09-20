@@ -422,7 +422,7 @@ textarea:focus {
   border-radius: 11px;
   border: 1px solid var(--text-h);
   color: var(--text-h);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 600;
   letter-spacing: -0.04em;
   flex: 0 0 auto;
@@ -496,7 +496,7 @@ textarea:focus {
 }
 
 .topbar-link-no {
-  font: 0.61rem/1 var(--mono);
+  font: 0.75rem/1 var(--mono);
   color: var(--text-dim);
 }
 
@@ -572,7 +572,7 @@ textarea:focus {
   color: var(--text-muted);
   font-weight: 600;
   line-height: 1.02;
-  font-size: 0.68rem;
+  font-size: 0.75rem;
   white-space: nowrap;
 }
 
@@ -942,7 +942,7 @@ details.disclose > summary {
   padding: 4px 10px;
   border-radius: var(--radius-pill);
   border: 1px solid transparent;
-  font-size: 0.74rem;
+  font-size: 0.75rem;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
@@ -1503,7 +1503,7 @@ details.disclose[open] > summary::after {
   justify-content: center;
   gap: 5px;
   color: var(--text-muted);
-  font-size: 0.74rem;
+  font-size: 0.75rem;
 }
 
 .stage-progress > a:first-child,
@@ -1732,7 +1732,7 @@ details.disclose[open] > summary::after {
   border-radius: 999px;
   background: var(--accent-bg);
   color: var(--accent-hover);
-  font-size: 0.72rem;
+  font-size: 0.75rem;
   font-weight: 700;
 }
 
@@ -1878,7 +1878,7 @@ kbd {
   border-radius: 8px;
   background: var(--surface-subtle);
   border: 1px solid var(--line);
-  font: 0.74rem/1 var(--mono);
+  font: 0.75rem/1 var(--mono);
 }
 
 .hotkey-foot,
@@ -1937,7 +1937,6 @@ a.btn-danger:hover {
 .track-timeline,
 .todo-list,
 .field-row,
-.track-actions,
 .grid-side {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
@@ -2343,11 +2342,11 @@ a.btn-danger:hover {
 
 @media (max-width: 540px) {
   .app-tab-link {
-    font-size: 0.62rem;
+    font-size: 0.75rem;
   }
 
   .app-tab-icon {
-    font-size: 0.72rem;
+    font-size: 0.75rem;
   }
 
   .app-tabbar {

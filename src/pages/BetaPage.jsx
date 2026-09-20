@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { readLocalFiles } from '../lib/readFiles.js'
 import { useSearchParams } from 'react-router-dom'
 import { DEPTS } from '../../shared/depts.js'
@@ -10,6 +10,7 @@ import { num, ms, ago } from '../lib/format.js'
 import { gradeAll } from '../../shared/grade.js'
 import { passCaveat } from '../../shared/signoff.js'
 import { PERIOD } from '../../shared/master.js'
+import { pendingBetaRound, keepBetaRound, forgetBetaRound, subscribeBetaRounds } from '../lib/pendingBetaRounds.js'
 
 // 시연 파일 다섯 장을 사이트에서 걷어냈다. 그래서 이 화면도 넣은 파일로
 // 채점한다. 정답표가 함께 없어졌으므로 정답 대조 기준 셋은 「판정불가」로
@@ -71,23 +72,111 @@ export default function BetaPage() {
 }
 
 function Beta({ id }) {
-  const { data, error, loading, reload } = useApi(`/applications/${id}/beta`)
+  const query = useApi(`/applications/${id}/beta`)
+  // A -> B -> A is three component lifetimes. A late operation from the first
+  // account must not become current merely because its scope string returns.
+  return <BetaSession key={`${id}:${query.data?.runScope ?? ''}`} id={id} {...query} />
+}
+
+function BetaSession({ id, data, error, loading, reload }) {
   const toast = useToast()
   const [testing, setTesting] = useState(false)
   const [progress, setProgress] = useState('')
   const fileInput = useRef(null)
   const [fixedWhat, setFixedWhat] = useState('')
+  const [saving, setSaving] = useState(false)
+  const busy = useRef(false)
+  const saveBusy = useRef(false)
+  const runScope = data?.runScope
+  const currentScope = useRef(runScope)
+  const mounted = useRef(true)
+  currentScope.current = runScope
+  const pendingRound = useSyncExternalStore(subscribeBetaRounds,
+    () => pendingBetaRound(runScope, id), () => null)
+  const previousPending = useRef(pendingRound)
+  const ownedClear = useRef(null)
+  const refreshedRun = useRef(null)
+  const refreshRecordedRound = useCallback(async runId => {
+    if (!mounted.current || refreshedRun.current === runId) return
+    refreshedRun.current = runId
+    try { await reload() } catch { if (mounted.current) toast.error('채점 기록은 저장했지만 최신 회차를 불러오지 못했습니다.') }
+  }, [reload, toast])
+
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+
+  useEffect(() => {
+    const previous = previousPending.current
+    previousPending.current = pendingRound
+    if (!previous || pendingRound) return
+    if (ownedClear.current === previous.payload.run_id) { ownedClear.current = null; return }
+    // The original request can finish after this screen was remounted. Reflect
+    // both its queue acknowledgement and the newly stored round on this screen.
+    if (!saveBusy.current) void refreshRecordedRound(previous.payload.run_id)
+  }, [pendingRound, refreshRecordedRound])
+
+  async function saveRound(payload) {
+    if (saveBusy.current || !mounted.current || payload.run_scope !== currentScope.current) return
+    const existing = pendingBetaRound(payload.run_scope, id)
+    if (existing && existing.payload.run_id !== payload.run_id) return
+    saveBusy.current = true
+    setSaving(true)
+    const scope = payload.run_scope
+    const record = { payload, error: null, criteriaChanged: false }
+    keepBetaRound(scope, id, record)
+    const current = () => mounted.current && currentScope.current === scope
+    let saved = null
+    try {
+      saved = await api.post(`/applications/${id}/beta`, payload)
+      if (current() && pendingBetaRound(scope, id)?.payload.run_id === payload.run_id) ownedClear.current = payload.run_id
+      forgetBetaRound(scope, id, payload.run_id)
+      if (current()) {
+        setFixedWhat('')
+        if (saved.overall === '통과') toast.success('전부 통과했습니다.')
+        else if (saved.overall === '차단') toast.error('필수 안전 기준이 깨져 배포가 막혔습니다.')
+        else toast.info('일부 기준이 통과하지 못했습니다.')
+      }
+    } catch (err) {
+      const failed = {
+        payload, error: err.message,
+        criteriaChanged: err.code === 'BETA_CRITERIA_CHANGED' && err.notSaved === true,
+      }
+      if (pendingBetaRound(scope, id)?.payload.run_id === payload.run_id) {
+        keepBetaRound(scope, id, failed)
+        if (current()) toast.error(`채점 기록 저장을 확인하지 못했습니다. ${err.message}`)
+      }
+    } finally {
+      if (current()) setSaving(false)
+      saveBusy.current = false
+    }
+    if (current() && (saved || !pendingBetaRound(scope, id))) await refreshRecordedRound(payload.run_id)
+  }
+
+  async function prepareCurrentCriteria() {
+    if (!mounted.current || !pendingRound?.criteriaChanged || saveBusy.current) return
+    // The server explicitly confirmed this attempt was not saved. Other
+    // conflicts or transport errors may have committed and must keep their ID.
+    ownedClear.current = pendingRound.payload.run_id
+    forgetBetaRound(pendingRound.payload.run_scope, id, pendingRound.payload.run_id)
+    try { await reload() } catch { if (mounted.current) toast.error('현재 합격 기준을 불러오지 못했습니다. 다시 확인해 주세요.') }
+  }
 
   async function runTest(fileList) {
+    if (busy.current || saveBusy.current || pendingBetaRound(runScope, id) || error || !data?.canTest || !runScope) return
     const picked = [...(fileList ?? [])]
     if (picked.length === 0) return
+    busy.current = true
     setTesting(true)
+    const current = () => mounted.current && currentScope.current === runScope
     try {
       setProgress('파일을 읽는 중…')
       const [files, aliasData] = await Promise.all([
         readLocalFiles(picked),
         api.get(`/applications/${id}/build`),
       ])
+      if (!current()) return
       // 정답표는 없다. 없으면 없는 대로 넘긴다 — 대조할 정답이 없는 기준은
       // 실패가 아니라 판정불가로 적힌다.
       const truth = undefined
@@ -103,44 +192,53 @@ function Beta({ id }) {
         truth,
         period: PERIOD,
       })
+      if (!current()) return
 
       setProgress('결과를 기록하는 중…')
-      const saved = await api.post(`/applications/${id}/beta`, {
+      await saveRound({
         kind: 'round',
+        run_id: crypto.randomUUID(),
+        run_scope: runScope,
+        criteria_revision: data.criteriaRevision,
         build_run_id: data.latestBuild?.id ?? null,
         graded: graded.graded,
         summary: graded.summary,
         fixed_what: fixedWhat.trim() || null,
       })
 
-      if (saved.overall === '통과') toast.success('전부 통과했습니다.')
-      else if (saved.overall === '차단') toast.error('필수 안전 기준이 깨져 배포가 막혔습니다.')
-      else toast.info('일부 기준이 통과하지 못했습니다.')
-
-      setFixedWhat('')
-      await reload()
     } catch (err) {
-      toast.error(err.message)
+      if (current()) toast.error(err.message)
     } finally {
-      setTesting(false)
-      setProgress('')
+      if (current()) { setTesting(false); setProgress('') }
+      busy.current = false
     }
   }
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
-  if (error) return <div className="notice notice-danger">{error}</div>
+  if (error && !data) return <div className="notice notice-danger" role="alert"><p>{error}</p><button type="button" className="btn-ghost" onClick={reload}>다시 불러오기</button></div>
   if (!data) return null
 
   const latest = data.rounds[0] ?? null
 
   return (
     <div className="stack">
+      {error && <div className="notice notice-warn" role="alert"><p>최신 기준과 회차를 확인하지 못했습니다. 아래 기록은 마지막 조회 상태입니다. {error}</p><button type="button" className="btn-ghost" onClick={reload}>상태 다시 확인</button></div>}
+      {pendingRound && <section className="notice notice-warn" aria-label="채점 기록 저장 상태">
+        <div className="notice-title">{pendingRound.criteriaChanged ? '합격 기준이 바뀌어 저장하지 않았습니다' : '채점 기록의 저장 여부를 확인해 주세요'}</div>
+        <p>{pendingRound.error || '같은 채점 결과를 기록하는 중입니다.'}</p>
+        <p>저장이 확인되기 전에는 새 시험을 시작하지 않습니다. 원본 파일은 보관하지 않으며, 같은 탭 안에서 이동해도 채점 기록은 유지됩니다. 새로고침하거나 탭을 닫으면 미확인 기록은 사라집니다.</p>
+        <div className="row">
+          {pendingRound.criteriaChanged
+            ? <button type="button" className="btn-primary" disabled={saving} onClick={prepareCurrentCriteria}>현재 기준으로 다시 준비</button>
+            : <button type="button" className="btn-primary" disabled={saving} onClick={() => saveRound(pendingRound.payload)}>{saving ? '저장 확인 중…' : '같은 채점 기록 다시 저장'}</button>}
+          <button type="button" className="btn-ghost" disabled={saving} onClick={reload}>현재 상태 다시 확인</button>
+        </div>
+      </section>}
       {!data.canTest && (
         <div className="notice notice-warn">
           <div className="notice-title">아직 시험할 수 없습니다</div>
           <p>
-            3단계에서 <strong>합격 기준을 확정</strong>해야 채점할 것이 생깁니다. 무엇을 통과로 볼지
-            정하지 않고 시험하면, 결과에 맞춰 기준이 움직입니다.
+            3단계 협의안에서 <strong>합격 기준을 확정</strong>해 주세요.
           </p>
         </div>
       )}
@@ -183,7 +281,7 @@ function Beta({ id }) {
             type="button"
             className="btn-primary btn-block"
             onClick={() => fileInput.current?.click()}
-            disabled={testing}
+            disabled={testing || saving || !!pendingRound || !!error || !runScope}
           >
             {testing ? progress || '채점하는 중…' : latest ? '파일 넣고 다시 시험하기' : '파일 넣고 시험 시작'}
           </button>
@@ -241,8 +339,7 @@ function VerdictBanner({ round, signoff }) {
         <div className="verdict-head">{round.seq}차 — 배포 차단</div>
         <p className="verdict-body">
           <strong>필수 안전 기준 {round.safety_failed}개가 깨졌습니다.</strong> 다른 기준을{' '}
-          {round.passed}개 통과했더라도 넘기지 않습니다. 금액이 틀린 표는 없느니만 못합니다.
-          4단계로 돌아가 고친 뒤 다시 시험하세요.
+          {round.passed}개를 통과했어도 배포할 수 없습니다. 제작 단계에서 수정 후 다시 시험해 주세요.
         </p>
       </div>
     )

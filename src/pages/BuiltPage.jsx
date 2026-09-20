@@ -42,8 +42,7 @@ export default function BuiltPage() {
   return (
     <div className="stack">
       <header className="page-head">
-        <span className="page-eyebrow">기술 구현 보러가기</span>
-        <h1>무엇을 만들었고, 어떻게 만들었나</h1>
+        <h1>기능·구현 정보</h1>
       </header>
 
       <div className="built-tabs" role="tablist">
@@ -76,11 +75,6 @@ export default function BuiltPage() {
 function Plain() {
   return (
     <>
-      <section className="card built-lead">
-        <h2>{PLAIN.headline}</h2>
-        <p>{PLAIN.intro}</p>
-      </section>
-
       <section className="card">
         <div className="card-head">
           <h2 className="card-title">여섯 단계</h2>
@@ -102,7 +96,6 @@ function Plain() {
         <div className="card-head">
           <h2 className="card-title">AI 판단 적용 후 운영 루프</h2>
         </div>
-        <p>{OVERRIDE_LOOP.intro}</p>
         <ol className="built-stages">
           {OVERRIDE_LOOP.flow.map((s) => (
             <li key={s.n}>
@@ -152,7 +145,7 @@ function Plain() {
 
       <section className="card">
         <div className="card-head">
-          <h2 className="card-title">다른 관리 도구와 다른 점</h2>
+          <h2 className="card-title">설계 원칙</h2>
         </div>
         <div className="built-points">
           {PLAIN.points.map((p) => (
@@ -165,10 +158,6 @@ function Plain() {
       </section>
 
       <section className="card built-cta">
-        <p>
-          읽기만 하지 마시고 직접 눌러 보셔도 됩니다. 로그인이 없습니다 —
-          판정도, 반려도, 도구 실행도 지금 그대로 하실 수 있습니다.
-        </p>
         <div className="row">
           <Link to="/review" className="btn-primary btn-sm">
             신청서 판정해 보기
@@ -187,7 +176,7 @@ function Tech({ facts }) {
   return (
     <>
       <section className="card built-lead">
-        <h2>{TECH.headline}</h2>
+        <h2>구현 현황</h2>
         {/* 숫자는 서버에서 실제로 센 값만 쓴다. 화면에서 지어내면 이
             문서 자체가 이 사이트가 하지 말라는 것을 한다. */}
         {facts.length > 0 && (
@@ -252,10 +241,6 @@ function Tech({ facts }) {
       </section>
 
       <section className="card built-cta">
-        <p>
-          코드는 전부 공개되어 있습니다. 이 화면에 적은 것이 실제로 그렇게
-          되어 있는지 직접 확인하실 수 있습니다.
-        </p>
         <div className="row">
           <a
             href="https://github.com/k95691368-ship-it/ilson"

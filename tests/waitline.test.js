@@ -231,7 +231,8 @@ describe('언제쯤 되는지 답하는가', () => {
     expect(page).toContain('lead?.show')
     expect(page).toContain('언제쯤 되나')
     // 서버가 보내 주는 것을 실제로 받아 둬야 한다.
-    expect(page).toContain('setLead(r.lead')
+    expect(page).toContain('const lead = data?.lead ?? null')
+    expect(page).toContain('useApi(`/track/${encodeURIComponent(ticket)}/waitline`)')
   })
 
   it('첫 화면과 같은 방식으로 센다', () => {

@@ -178,6 +178,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
                   b.median_seconds, b.people,
                   o.dept_confirmed_at,
                   (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) AS runs,
+                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id AND u.ok = 1) AS success_count,
+                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id AND u.ok = 0) AS failed_count,
                   (SELECT COALESCE(SUM(u.duration_ms), 0) FROM tool_use u
                     WHERE u.application_id = a.id) AS duration_total_ms,
                   (SELECT COALESCE(SUM(u.human_review_seconds), 0) FROM tool_use u
@@ -394,6 +396,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
             // 한쪽만 고쳐지고 두 화면이 다른 말을 한다.
             runs: runsFromTotals({
               count: r.runs,
+              successCount: r.success_count,
+              failedCount: r.failed_count,
               durationMs: r.duration_total_ms,
               reviewSeconds: r.review_seconds,
               reworkSeconds: r.rework_seconds,

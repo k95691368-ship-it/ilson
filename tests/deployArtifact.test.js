@@ -31,10 +31,11 @@ describe('deployable Pages Worker', () => {
   })
 
   it('protects early responses and enforces streamed body limits in the actual compiled Worker', async () => {
-    const DB = { claimRateLimit: async () => 1, prepare: vi.fn() }
-    const env = { ASSETS: assets, DB, DBBridgeApplied: true, OVERRIDE_DEMO_MODE: 'true' }
+    const DB = { claimRateLimit: async () => 1, prepare: vi.fn(), forActor: () => DB, toolRunScope: async () => 'a'.repeat(64) }
+    const env = { ASSETS: assets, DB, DBBridgeApplied: true,
+      AUTH_ACTOR: { email: 'test@local.invalid', role: 'audit', label: 'verified', mode: 'access' } }
     const request = new Request('https://ilson.test/api/override', {
-      method: 'POST', body: ' '.repeat(1024 * 1024) + '{}', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', body: ' '.repeat(1024 * 1024) + '{}', headers: { 'Content-Type': 'application/json', Origin: 'https://ilson.test', 'X-Ilson-Request': '1', 'X-Ilson-Scope': 'a'.repeat(64) },
     })
     const response = await worker.fetch(request, env, context)
     expect(response.status).toBe(413)
@@ -52,13 +53,13 @@ describe('deployable Pages Worker', () => {
     let queue = Promise.resolve()
     try {
       await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql']) {
+      for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql']) {
         await pg.exec(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'))
       }
       vi.stubGlobal('fetch', (url, options) => {
         if (!String(url).startsWith(env.SUPABASE_URL + '/rest/v1/rpc/')) throw Error('External network forbidden')
         const name = new URL(url).pathname.split('/').at(-1)
-        if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|readiness)$/.test(name)) throw Error('Unknown RPC')
+        if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|actor_(claim_rate_limit|rate_state|release_rate_limit)|readiness)$/.test(name)) throw Error('Unknown RPC')
         const result = queue.then(async () => {
           try {
             await pg.exec('SET ROLE service_role')
@@ -70,8 +71,9 @@ for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_lo
         queue = result.catch(() => {})
         return result
       })
-      const request = (path, cookie = '', body, method = body ? 'POST' : 'GET', key = crypto.randomUUID()) => worker.fetch(new Request('https://ilson.test' + path, {
-        method, headers: { Origin: 'https://ilson.test', 'X-Ilson-Request': '1', Cookie: cookie, 'X-Idempotency-Key': key },
+      const scopeFor = async cookie => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('workspace:' + cookie.split('=')[1]))), byte => byte.toString(16).padStart(2, '0')).join('')
+      const request = async (path, cookie = '', body, method = body ? 'POST' : 'GET', key = crypto.randomUUID()) => worker.fetch(new Request('https://ilson.test' + path, {
+        method, headers: { Origin: 'https://ilson.test', 'X-Ilson-Request': '1', Cookie: cookie, 'X-Idempotency-Key': key, ...(cookie ? { 'X-Ilson-Scope': await scopeFor(cookie) } : {}) },
         ...(body ? { body: JSON.stringify(body) } : {}),
       }), env, context)
       const openedA = await request('/api/demo/workspace', '', {})
@@ -80,6 +82,12 @@ for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_lo
       expect(openedB.status).toBe(201)
       const a = openedA.headers.get('Set-Cookie').split(';')[0]
       const b = openedB.headers.get('Set-Cookie').split(';')[0]
+      const missingScope = await worker.fetch(new Request('https://ilson.test/api/override', { headers: { Cookie: a } }), env, context)
+      expect(missingScope.status).toBe(428)
+      expect(await missingScope.json()).toMatchObject({ code: 'SESSION_SCOPE_REQUIRED' })
+      const crossedScope = await worker.fetch(new Request('https://ilson.test/api/override', { headers: { Cookie: b, 'X-Ilson-Scope': await scopeFor(a) } }), env, context)
+      expect(crossedScope.status).toBe(409)
+      expect(await crossedScope.json()).toMatchObject({ code: 'SESSION_SCOPE_CHANGED' })
       expect((await request('/api/override', a)).status).toBe(200)
       expect((await request('/api/override', b)).status).toBe(200)
       const created = await request('/api/override', a, { role: 'product', action: 'create_experiment', clusterId: 'olc_policy', title: 'Built-worker verification', changeTarget: '검색', hypothesis: '오류 감소', scope: '검증', comparator: 'v1', successMetric: '수정률', approver: '검토자', rollbackPlan: 'v1 복귀', guardrails: ['위반 0건'], stopConditions: ['위반 1건'], metricDirection: 'lower', targetImprovement: 20,
@@ -98,7 +106,7 @@ for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_lo
       const other = await (await request('/api/override', b)).json()
       expect(other.experiments.some(item => item.id === id)).toBe(false)
       expect((await request('/api/demo/workspace', a, { confirm: 'reset-my-workspace' }, 'DELETE')).status).toBe(200)
-      expect((await request('/api/override', a)).status).toBe(428)
+      expect((await request('/api/override', a)).status).toBe(401)
       expect((await request('/api/override', b)).status).toBe(200)
       expect((await pg.query('SELECT count(*)::int AS n FROM public.change_experiment')).rows[0].n).toBe(0)
     } finally {

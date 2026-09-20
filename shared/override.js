@@ -255,6 +255,31 @@ export function evaluateExperimentRun({
   }
 }
 
+function utcMeasurementTime(value) {
+  if (typeof value !== 'string' || !value.trim()) return NaN
+  const normalized = value.trim().replace(' ', 'T')
+  // PostgreSQL's datetime helper returns UTC without a zone. Never interpret
+  // that value in the browser's local timezone when checking an approval.
+  return Date.parse(/^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized+'T00:00:00Z'
+    : /(?:Z|[+-]\d{2}:?\d{2})$/i.test(normalized) ? normalized : normalized+'Z')
+}
+
+export function experimentRunTimingError(experiment, run, previousRun = null, now = Date.now()) {
+  const plan = safeJson(experiment?.evaluation_plan_json)
+  const start = utcMeasurementTime(run?.measurement_start), end = utcMeasurementTime(run?.measurement_end)
+  if (!Number.isFinite(start) || !Number.isFinite(end) || end > now
+      || !Number.isSafeInteger(plan?.minimumWindowSeconds) || plan.minimumWindowSeconds <= 0
+      || (end-start)/1000 < plan.minimumWindowSeconds) return '사전에 정한 기간 이상의 유효한 시작·종료 시각이 필요합니다.'
+  // Historical uses the replay dataset's time range. Live phases instead
+  // measure the currently approved change, not traffic from an older cycle.
+  if (run.phase === 'historical') return null
+  const approval = utcMeasurementTime(experiment?.approved_at)
+  if (!Number.isFinite(approval) || start < approval) return 'Shadow·제한 배포의 측정은 현재 승인 시각 이후여야 합니다.'
+  const previousEnd = utcMeasurementTime(previousRun?.measurement_end)
+  if (!Number.isFinite(previousEnd) || start < previousEnd) return '측정 시작은 앞 단계의 종료 시각 이후여야 합니다. 같은 경계 시각은 허용합니다.'
+  return null
+}
+
 export function canExpandExperiment(experiment, runs = []) {
   const latestByPhase = new Map()
   const currentRuns = runs.filter(run => experiment?.approval_id && run.approval_id === experiment.approval_id && run.change_version === experiment.change_version)
@@ -268,13 +293,20 @@ export function canExpandExperiment(experiment, runs = []) {
   const needsApproval = !experiment?.approved_at || !experiment?.approval_id
   const needsPlan = !validEvaluationPlan(safeJson(experiment?.evaluation_plan_json))
   const stateAllowed = ['approved','running'].includes(experiment?.status)
+  const timingIssues = needsPlan || needsApproval ? [] : EXPERIMENT_PHASES.flatMap((phase,index) => {
+    const run = latestByPhase.get(phase.key)
+    if (!run) return []
+    const reason = experimentRunTimingError(experiment, run, index ? latestByPhase.get(EXPERIMENT_PHASES[index-1].key) : null)
+    return reason ? [{ phase: phase.label, reason }] : []
+  })
   return {
-    ok: stateAllowed && missing.length === 0 && blocked.length === 0 && !needsApproval && !needsPlan,
+    ok: stateAllowed && missing.length === 0 && blocked.length === 0 && timingIssues.length === 0 && !needsApproval && !needsPlan,
     missing,
     blocked: blocked.map((run) => run.phase),
     needsApproval,
     needsPlan,
     stateAllowed,
+    timingIssues,
   }
 }
 

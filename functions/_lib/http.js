@@ -4,6 +4,8 @@
 // 라우트마다 응답 모양이 다르면 화면에서 매번 다르게 풀어야 하고, 그러다
 // 어느 한 곳을 빠뜨리면 사용자에게 빈 화면이 뜬다.
 
+import { databaseAccessFailure } from './dbBridge.js'
+
 const JSON_HEADERS = {
   'Content-Type': 'application/json; charset=utf-8',
   'Cache-Control': 'private, no-store',
@@ -45,8 +47,10 @@ export function failFields(fields, message = '적어 주신 내용을 확인해�
 }
 
 // Exception messages can contain SQL, credentials, or user data even when truncated.
-export function failUnexpected(_err, what) {
-  return fail(what, 503)
+export function failUnexpected(err, what, fallbackStatus = 503) {
+  const access = databaseAccessFailure(err)
+  if (access) return ok({ error: access.error, code: access.code }, access.status)
+  return fail(what, fallbackStatus)
 }
 
 export const jsonResponse = ok
