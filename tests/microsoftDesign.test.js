@@ -53,8 +53,8 @@ describe('single Microsoft design foundation', () => {
     expect(tokens).toContain("'Segoe UI Variable'")
     expect(tokens).toContain("'Malgun Gothic'")
     const base = read(files[1])
-    expect(base).toContain('400 16px/1.6 var(--font-sans)')
-    expect(base).toContain('font-size: 36px')
+    expect(base).toContain('400 17px/1.6 var(--font-sans)')
+    expect(base).toContain('font-size: 40px')
     for (const file of files) {
       for (const match of read(file).matchAll(/font-size:\s*(\d+(?:\.\d+)?)px/g)) {
         expect(Number(match[1]), `${file}: ${match[0]}`).toBeGreaterThanOrEqual(12)
@@ -70,7 +70,7 @@ describe('single Microsoft design foundation', () => {
   })
   it('keeps workspaces fluid while giving the entry a complete responsive layout', () => {
     const shell = read(files[2])
-    expect(tokens).toContain('--page-max: 1600px')
+    expect(tokens).toContain('--page-max: 1760px')
     expect(shell).toContain('.app-main { width: 100%; max-width: var(--page-max); margin-inline: auto;')
     expect(shell).toContain('max-width: 1080px')
     expect(shell).toContain('.workspace-entry-panel { grid-template-columns: minmax(0, 1fr); }')

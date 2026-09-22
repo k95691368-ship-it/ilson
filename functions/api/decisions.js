@@ -8,7 +8,7 @@
 // 계세요"로 온다. 그 질문에 답하려면 결정을 가로로 훑을 수 있어야 한다.
 
 import { jsonResponse, failUnexpected } from '../_lib/http.js'
-import { DEPT_KINDS, PROXY_KINDS, sideTally, sideLine } from '../../shared/side.js'
+import { DEPT_KINDS, PROXY_KINDS, sideOf, sideLine } from '../../shared/side.js'
 
 const STAGES = ['신청서', '검토', '협의안', '제작', '베타테스트', '사용법서', '배포', '성과']
 
@@ -114,11 +114,17 @@ export async function onRequestGet({ env, data: requestData, request }) {
          LEFT JOIN review r ON r.application_id = d.application_id`
       ).first(),
 
-      // 누가 남긴 것인지 세려면 종류가 필요하다. 거르기와 상관없이 전부
-      // 가져온다 — 걸러 놓고 세면 "부서가 0건"이 필터 때문인지 진짜인지
-      // 알 수 없다.
-      env.DB.prepare('SELECT link_kind FROM decision_log').all(),
+      // Aggregate within the already-authorized DB scope. Return one row per
+      // kind instead of transferring every historical decision to the Worker.
+      env.DB.prepare('SELECT link_kind, COUNT(*) AS n FROM decision_log GROUP BY link_kind').all(),
     ])
+
+    const sides = { ax: 0, dept: 0, proxy: 0, total: 0 }
+    for (const row of allKinds.results) {
+      const count = Number(row.n)
+      sides[sideOf(row.link_kind)] += count
+      sides.total += count
+    }
 
     return jsonResponse({
       items: rows.results,
@@ -134,8 +140,8 @@ export async function onRequestGet({ env, data: requestData, request }) {
       filtered: rows.results.length,
       // 누가 한 것인지. 거르기와 무관하게 **전체**를 센다 — 걸러 놓고 세면
       // "부서가 0건"이 필터 때문인지 진짜인지 알 수 없다.
-      sides: sideTally(allKinds.results),
-      sideLine: sideLine(sideTally(allKinds.results)),
+      sides,
+      sideLine: sideLine(sides),
     })
   } catch (error) {
     return failUnexpected(error, '결정 기록을 불러오지 못했습니다.')

@@ -96,13 +96,30 @@ describe('API resource and information boundary', () => {
     })
     expect(await saved.json()).toEqual({ title: '신청서', file: 'col\nvalue' })
   })
-  it('uses larger limits only for the existing attachment and settlement endpoints', () => {
+  it('allows a larger body only for browser-computed settlement results', () => {
     const make = (path, method = 'POST', type = 'application/json') => new Request('https://ilson.test' + path, { method, headers: { 'Content-Type': type } })
     expect(requestBodyLimit(make('/api/override'))).toBe(1024 * 1024)
     expect(requestBodyLimit(make('/api/applications/a/build'))).toBe(16 * 1024 * 1024)
-    expect(requestBodyLimit(make('/api/applications', 'POST', 'multipart/form-data; boundary=test'))).toBe(51 * 1024 * 1024)
+    expect(requestBodyLimit(make('/api/applications', 'POST', 'multipart/form-data; boundary=test'))).toBe(1024 * 1024)
     expect(requestBodyLimit(make('/api/override', 'POST', 'multipart/form-data; boundary=test'))).toBe(1024 * 1024)
     expect(requestBodyLimit(make('/api/applications/a/build', 'PUT'))).toBe(1024 * 1024)
+  })
+  it('rejects chunked oversized application forms without a length header', async () => {
+    const cancel = vi.fn()
+    const stream = new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(65536).fill(32)) }, cancel })
+    const request = new Request('https://ilson.test/api/applications', {
+      method: 'POST', body: stream, duplex: 'half', headers: { 'Content-Type': 'multipart/form-data; boundary=test' },
+    })
+    let saved = false
+    const response = await run(request, async bounded => {
+      await bounded.text()
+      saved = true
+      return ok({ ok: true })
+    })
+    expect(response.status).toBe(413)
+    expect(saved).toBe(false)
+    await new Promise(resolve => setTimeout(resolve, 0))
+    expect(cancel).toHaveBeenCalled()
   })
   it('accepts an exact-limit UTF-8 body but not one byte more', async () => {
     const bytes = new TextEncoder().encode(JSON.stringify({ value: '한글' }))

@@ -10,6 +10,12 @@
 //   3) 값 안에 쉼표가 들어 있다 ("₩24,200")
 //   4) 맨 앞에 눈에 안 보이는 표시가 붙어 있다 (BOM)
 
+const MAX_BYTES = 10 * 1024 * 1024
+const MAX_ROWS = 100000
+const MAX_COLUMNS = 1024
+const MAX_CELLS = 2000000
+const limitError = () => new Error('CSV 처리 한도를 초과했습니다. 파일이나 열을 나누어 다시 시도해주세요.')
+
 // 엑셀이 CSV를 저장하면 맨 앞에 EF BB BF 세 바이트를 붙인다. 눈에 안 보이지만
 // 첫 컬럼 이름 앞에 붙어서, 그냥 읽으면 '주문일자'가 아니라 '﻿주문일자'가 된다.
 function stripBom(text) {
@@ -71,6 +77,7 @@ export function splitLine(line, delimiter) {
         inQuote = !inQuote
       }
     } else if (ch === delimiter && !inQuote) {
+      if (out.length >= MAX_COLUMNS - 1) throw limitError()
       out.push(cur)
       cur = ''
     } else {
@@ -89,8 +96,7 @@ export function splitLine(line, delimiter) {
 // 따옴표 안의 줄바꿈을 소비만 하고 세지 않아서, 상품명에 줄바꿈이 든
 // 정산서를 올리면 그 지점 이후 '줄' 칸이 통째로 당겨졌다. 되짚기가 가리키는
 // 원본 줄이 실제와 어긋난다 — 이 사이트가 내세우는 것이 바로 그 되짚기다.
-function splitLines(text) {
-  const lines = []
+function* splitLines(text) {
   let cur = ''
   let inQuote = false
   let physical = 1 // 지금 읽는 문자가 파일 몇 번째 줄에 있나
@@ -111,7 +117,7 @@ function splitLines(text) {
         continue
       }
       if (crlf) i += 1
-      lines.push({ rowNo: startedAt, line: cur })
+      yield { rowNo: startedAt, line: cur }
       cur = ''
       physical += 1
       startedAt = physical
@@ -119,8 +125,7 @@ function splitLines(text) {
       cur += ch
     }
   }
-  if (cur !== '') lines.push({ rowNo: startedAt, line: cur })
-  return lines
+  if (cur !== '') yield { rowNo: startedAt, line: cur }
 }
 
 // CSV 파일 하나를 { 머리글, 데이터줄 } 로 정리한다.
@@ -128,27 +133,35 @@ function splitLines(text) {
 // 구분하지 않아도 되게 한다.
 export function readCsv(buffer) {
   const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer)
+  if (bytes.byteLength > MAX_BYTES) throw limitError()
   const { text, encoding, confident } = detectEncoding(bytes)
 
-  // 완전히 빈 줄은 세지 않되, 원본 몇 번째 줄이었는지는 기억한다.
-  // 줄 번호는 splitLines가 물리적으로 세어 준 값을 그대로 쓴다.
-  const numbered = splitLines(stripBom(text)).filter((r) => r.line.trim() !== '')
-
-  if (numbered.length === 0) {
+  // Consume one record at a time; do not retain a second full array of raw
+  // records alongside parsed cells. Check each bound before appending output.
+  let header = null, headerRowNo = 0, delimiter, cells = 0
+  const rows = []
+  for (const record of splitLines(stripBom(text))) {
+    if (record.line.trim() === '') continue
+    if (header === null) {
+      delimiter = detectDelimiter(record.line)
+      header = splitLine(record.line, delimiter)
+      headerRowNo = record.rowNo
+      cells = header.length
+      continue
+    }
+    if (rows.length >= MAX_ROWS) throw limitError()
+    const values = splitLine(record.line, delimiter)
+    cells += values.length
+    if (cells > MAX_CELLS) throw limitError()
+    rows.push({ rowNo: record.rowNo, cells: values })
+  }
+  if (header === null) {
     return { sheetName: '', headerRowNo: 0, header: [], rows: [], encoding, encodingConfident: confident }
   }
 
-  const delimiter = detectDelimiter(numbered[0].line)
-  const header = splitLine(numbered[0].line, delimiter)
-
-  const rows = numbered.slice(1).map((r) => ({
-    rowNo: r.rowNo,
-    cells: splitLine(r.line, delimiter),
-  }))
-
   return {
     sheetName: '',
-    headerRowNo: numbered[0].rowNo,
+    headerRowNo,
     header,
     rows,
     encoding,

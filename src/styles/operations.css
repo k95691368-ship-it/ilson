@@ -3,7 +3,7 @@
   min-width: 0;
   color: var(--ms-ink);
   background: var(--ms-gray-050);
-  font: 400 16px/1.6 var(--font-sans);
+  font: 400 17px/1.6 var(--font-sans);
   overflow-wrap: anywhere;
 }
 .ol-globalbar {
@@ -99,7 +99,7 @@
   padding-bottom: 8px;
 }
 .ol-page-intro > div { min-width: 0; }
-.ol-page-intro h1 { margin: 0; font: 600 36px/1.14 var(--font-display); letter-spacing: -.02em; }
+.ol-page-intro h1 { margin: 0; font: 600 40px/1.14 var(--font-display); letter-spacing: -.02em; }
 .ol-page-intro p { max-width: 760px; margin: 12px 0 0; color: var(--ms-muted); }
 .ol-page-actions { justify-content: flex-end; flex-shrink: 0; }
 .ol-section-head { display: flex; justify-content: space-between; align-items: flex-start; flex-wrap: wrap; gap: 12px 24px; margin-bottom: 24px; }
@@ -411,7 +411,7 @@ p.field-error, div.field-error { color: var(--danger-text); background: var(--da
   .ol-role-select select { flex: 1 1 160px; max-width: 240px; }
   .ol-page, .ol-skeleton { padding-block: 32px 48px; }
   .ol-page-intro { gap: 20px; }
-  .ol-page-intro h1 { font-size: 28px; line-height: 1.14; }
+  .ol-page-intro h1 { font-size: 30px; line-height: 1.14; }
   .ol-page-intro p { margin-top: 12px; }
   .ol-page-actions { width: 100%; }
   .ol-page-actions > button { flex: 1 1 140px; }

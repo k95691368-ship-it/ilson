@@ -3,9 +3,8 @@
 const MIB = 1024 * 1024
 export function requestBodyLimit(request) {
   const path = new URL(request.url).pathname.replace(/\/$/, '')
-  // Preserve the existing five 10 MiB attachment allowance plus form overhead.
-  if (request.method === 'POST' && path === '/api/applications' &&
-      /^multipart\/form-data\s*;/i.test(request.headers.get('Content-Type') || '')) return 51 * MIB
+  // Application forms contain text only. Local settlement files never upload
+  // through this route, so multipart must use the same 1 MiB limit as JSON.
   // Browser-computed settlement rows carry more data than ordinary forms.
   if (request.method === 'POST' && /^\/api\/applications\/[^/]+\/build$/.test(path)) return 16 * MIB
   return MIB

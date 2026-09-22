@@ -150,9 +150,13 @@ export async function onRequestPost({ env, data: requestData, request }) {
     return jsonError('신청서 형식이 올바르지 않습니다.', 400)
   }
 
-  const fields = Object.fromEntries(
-    [...form.entries()].filter(([, v]) => typeof v === 'string')
-  )
+  for (const value of form.values()) {
+    if (typeof value !== 'string') {
+      await releaseRateLimit(env, `apply:${ip}`, ticket)
+      return jsonError('신청서는 텍스트만 받습니다. 정산 파일은 제작 화면에서 처리해주세요.', 400)
+    }
+  }
+  const fields = Object.fromEntries(form)
   if (env.AUTH_ACTOR) fields.applicant_label = env.AUTH_ACTOR.label
 
   const check = validateApplication(fields)
