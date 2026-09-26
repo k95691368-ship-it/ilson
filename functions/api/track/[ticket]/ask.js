@@ -13,7 +13,7 @@
 // 인증은 답변 쪽과 같은 방식이다 — 접수번호를 아는 사람만. 접수번호는
 // 신청서를 낸 사람에게만 준 것이고, 사내에서 그 정도면 충분하다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { checkRateLimit } from '../../../_lib/rateLimit.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateDeptAsk, DEPT_ASK_KIND, STAFF_REPLY_KIND } from '../../../../shared/thread.js'

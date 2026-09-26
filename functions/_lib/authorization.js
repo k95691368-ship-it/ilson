@@ -1,4 +1,4 @@
-import { jsonError } from './http.js'
+import { jsonError } from './http.ts'
 import { scopedActorDb } from './dataScope.js'
 
 export const isAccessAdmin = actor => ['audit', 'executive'].includes(actor?.role)

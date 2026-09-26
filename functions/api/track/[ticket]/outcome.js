@@ -1,4 +1,4 @@
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'
 import { validateOutcomeConfirm, OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../../../shared/accept.js'

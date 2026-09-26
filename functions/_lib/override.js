@@ -1,6 +1,6 @@
 import { newId } from './ids.js'
 import { verifiedAccessEmail } from './access.js'
-import { atomicMutation, mutationFingerprint } from './atomicMutation.js'
+import { atomicMutation, mutationFingerprint } from './atomicMutation.ts'
 import { OVERRIDE_ROLES, roleCan } from '../../shared/override.js'
 import { actorAssignments } from './dataScope.js'
 

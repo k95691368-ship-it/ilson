@@ -18,6 +18,7 @@ function parseIds(json) {
   }
 }
 
+/** @param {string | null} [ownDept] */
 export async function loadSignoff(env, applicationId, ownDept = null) {
   const [criteria, logs] = await Promise.all([
     loadCriteriaEvidence(env.DB,applicationId),

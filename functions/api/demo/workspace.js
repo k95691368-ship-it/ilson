@@ -1,4 +1,4 @@
-import { jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonError, failUnexpected } from '../../_lib/http.ts'
 import { DEMO_APPLICATIONS } from '../../_lib/demoApplications.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { workspaceEnabled, workspaceToken, workspaceDb, workspaceCookie, sameOrigin } from '../../_lib/workspace.js'

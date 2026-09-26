@@ -5,7 +5,7 @@
 // 되돌릴 수 없는 표시만 붙기 때문이다. 서명을 받게 하려면 푸는 길이
 // 같이 있어야 한다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import {

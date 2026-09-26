@@ -7,7 +7,7 @@
 // 여기서 그 서랍을 연다. 없는 순서를 지어내지는 않는다 — 담당자가 아직
 // 아무것도 안 정했으면 "아직 안 정했습니다"가 정직한 답이다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { waitLine, leadGuess } from '../../../../shared/waitline.js'
 import { PICK_KIND, UNPICK_KIND } from '../../../../shared/priority.js'
 

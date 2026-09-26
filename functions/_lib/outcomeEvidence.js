@@ -1,7 +1,7 @@
-import { mutationFingerprint, atomicMutation } from './atomicMutation.js'
+import { mutationFingerprint, atomicMutation } from './atomicMutation.ts'
 import { computeOutcome, annualize, buildChallenges, daysSince, labelForOutcome } from '../../shared/outcome.js'
 import { OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../shared/accept.js'
-import { jsonError, failUnexpected } from './http.js'
+import { jsonError, failUnexpected } from './http.ts'
 
 export const OUTCOME_RESOLUTION_KIND = '성과검증해소'
 export const OUTCOME_INPUT_KIND = '성과산정변경'

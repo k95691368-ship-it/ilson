@@ -4,7 +4,7 @@
 // 건인가, 말만 비슷하고 다른 일인가 — 은 사람이 한다. 그 판단이 사라지면
 // 다음 사람이 같은 두 건을 놓고 처음부터 다시 견주게 된다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.ts'
 import { compare, COMPARE_VERDICTS, VERDICT_MEANING } from '../../shared/compare.js'
 import { pickPrimary, holdCondition, validateUnmerge, MERGE_KIND, UNMERGE_KIND } from '../../shared/merge.js'
 import { logDecision } from '../_lib/decisions.js'

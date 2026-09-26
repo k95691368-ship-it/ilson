@@ -2,7 +2,7 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
-import { compileSql } from '../functions/_lib/dbBridge.js'
+import { compileSql } from '../functions/_lib/dbBridge.ts'
 import { onRequestGet as outcomeGet } from '../functions/api/applications/[id]/outcome.js'
 import { onRequestGet as toolGet } from '../functions/api/tools/[slug].js'
 import { onRequestGet as deptGet } from '../functions/api/depts/[dept].js'

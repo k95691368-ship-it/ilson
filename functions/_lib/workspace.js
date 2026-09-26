@@ -1,4 +1,4 @@
-import { createSupabaseDb } from './dbBridge.js'
+import { createSupabaseDb } from './dbBridge.ts'
 
 export const WORKSPACE_COOKIE = 'ilson_workspace'
 export const workspaceEnabled = env => env?.DEMO_WORKSPACES === 'true'

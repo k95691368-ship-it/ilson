@@ -11,7 +11,7 @@
 // 여기서 한 건에 붙은 것을 전부 모아 준다. 화면은 이걸 받아 한 문서로 펴서
 // 인쇄하거나 텍스트로 내려받는다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
 import { decodeBetaRound } from '../../../../shared/betaEvidence.ts'
 

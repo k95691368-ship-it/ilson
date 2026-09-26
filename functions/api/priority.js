@@ -7,7 +7,7 @@
 // 표를 새로 만들지 않는다. 점수는 review에 있고, 시간은 손들기 기록에
 // 있고, 먼저 하기로 정한 것은 decision_log에 남긴다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.ts'
 import { newId } from '../_lib/ids.js'
 import { annualHours } from '../_lib/applications.js'
 import {

@@ -11,7 +11,7 @@
 // 중요한 것: 이 화면은 데이터에서 만들어진다. 잘 보이려고 손으로 적은
 // 반성문이 아니다. 반려가 늘면 여기 숫자가 늘고, 격리가 줄면 여기 숫자가 준다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { unprovenList } from '../../shared/unproven.js'
 

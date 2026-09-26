@@ -8,7 +8,7 @@
 // 남의 부서가 무슨 병목을 겪고 있는지 통째로 넘겨줄 자리가 아니다.
 // 여기서 골라 맞는 몇 건만 돌려준다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
 import { findSimilar } from '../../../shared/similar.js'
 import { annualHours } from '../../_lib/applications.js'
 

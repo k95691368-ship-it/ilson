@@ -6,7 +6,7 @@
 // 심는 것은 신청서까지다. 검토·판정은 심지 않는다 — 그 화면에서 실제로
 // 판정해 보이는 것이 이 포트폴리오가 보여주려는 것이기 때문이다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { DEMO_APPLICATIONS } from '../../_lib/demoApplications.js'

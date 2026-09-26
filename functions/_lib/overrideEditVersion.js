@@ -1,4 +1,4 @@
-import { mutationFingerprint } from './atomicMutation.js'
+import { mutationFingerprint } from './atomicMutation.ts'
 
 // Hash the values a person is acting on, not hydrated labels or live aggregates.
 // The token is a precondition, never a substitute for scoped reads/permissions.

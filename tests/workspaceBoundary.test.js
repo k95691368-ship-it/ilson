@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from 'vitest'
 import { onRequest } from '../functions/api/_middleware.js'
 import { workspaceToken, workspaceCookie } from '../functions/_lib/workspace.js'
 import { onRequestPost, onRequestDelete } from '../functions/api/demo/workspace.js'
-import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
+import { createSupabaseDb } from '../functions/_lib/dbBridge.ts'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 

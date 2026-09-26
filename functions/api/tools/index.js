@@ -13,7 +13,7 @@
 //   - 실패한 실행과 그 이유
 //   - 부서가 받았다고 확인 안 한 것
 
-import { jsonResponse, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../../_lib/http.ts'
 import { UNCLEAR_KIND, UNCLEAR_FIXED_KIND } from '../../../shared/unclear.js'
 import { rollbackState } from '../../../shared/rollback.js'
 import { ACCEPT_KIND, REJECT_KIND } from '../../../shared/accept.js'

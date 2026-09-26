@@ -1,4 +1,4 @@
-import { failUnexpected, jsonError, jsonResponse } from '../_lib/http.js'
+import { failUnexpected, jsonError, jsonResponse } from '../_lib/http.ts'
 
 const methodNotAllowed = () => jsonResponse({ error: '세션 확인은 GET 요청만 사용할 수 있습니다.' }, 405, { Allow: 'GET' })
 

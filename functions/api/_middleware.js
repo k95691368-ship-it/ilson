@@ -2,10 +2,10 @@
 // Real deployments require signed Access identity for business reads and writes.
 // Rate limits are additional abuse protection, not a replacement for authentication.
 
-import { jsonError, failUnexpected, privateResponse } from '../_lib/http.js'
-import { boundRequestBody } from '../_lib/requestBody.js'
+import { jsonError, failUnexpected, privateResponse } from '../_lib/http.ts'
+import { boundRequestBody } from '../_lib/requestBody.ts'
 import { checkRateLimit } from '../_lib/rateLimit.js'
-import { withDbBinding } from '../_lib/dbBridge.js'
+import { withDbBinding } from '../_lib/dbBridge.ts'
 import { workspaceEnabled, workspaceToken, workspaceDb, sameOrigin } from '../_lib/workspace.js'
 import { resolveOverrideActor } from '../_lib/override.js'
 import { canUseBusinessRoute, scopeEnvironment, verifiedAttribution } from '../_lib/authorization.js'

@@ -10,7 +10,7 @@
 // 로그인이 없다. 접수번호를 아는 사람이 그 신청서의 부서라고 본다 —
 // 수령 확인·성과 확인과 같은 규칙이다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'

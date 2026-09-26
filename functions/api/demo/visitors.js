@@ -21,8 +21,8 @@
 //
 // 시연 시드(AX-DEM-*)는 어느 쪽에서도 안 건드린다. 그건 옆의 되돌리기 몫이다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
-import { databaseAccessFailure } from '../../_lib/dbBridge.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
+import { databaseAccessFailure } from '../../_lib/dbBridge.ts'
 import { DEMO_PREFIX } from '../../../shared/provenance.js'
 
 // 지울 것을 고르는 단 하나의 규칙. 세는 쪽과 지우는 쪽이 같은 문장을 쓴다 —

@@ -6,8 +6,8 @@
 // 파일이 서버로 올라오지 않는 이유가 둘이다. 정산 자료를 굳이 밖으로 내보낼
 // 이유가 없고, 올리고 기다리는 시간이 없어 결과가 즉시 나온다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
-import { databaseAccessFailure, rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
+import { databaseAccessFailure, rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.ts'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 

@@ -6,7 +6,7 @@
 //
 // 알려준 것은 다음 실행부터 저절로 반영된다. 한 번 알려주면 끝이다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { checkRateLimit } from '../../../_lib/rateLimit.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateTeach } from '../../../../shared/teach.js'

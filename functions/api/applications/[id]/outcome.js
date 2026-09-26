@@ -1,4 +1,4 @@
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateOutcomeInputs } from '../../../../shared/outcomeInputs.ts'
 import { OUTCOME_PROXY_KIND } from '../../../../shared/accept.js'

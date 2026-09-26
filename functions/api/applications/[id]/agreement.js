@@ -4,8 +4,8 @@
 // 화면 하나가 쓰는 것이라 한 곳에 모았다. 여러 라우트로 나누면 화면이 요청을
 // 예닐곱 번 보내야 하고, 그중 일부만 온 중간 상태가 화면에 남는다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
-import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
+import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.ts'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'

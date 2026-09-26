@@ -8,7 +8,7 @@
 // "이건 누가 답한 거지"에 답할 수는 있어야 한다. 화면에도 증명이 아니라고
 // 적어 둔다 — 아닌 것을 맞다고 하지 않는다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { checkRateLimit } from '../../../_lib/rateLimit.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateAnswer, ASK_KIND, ANSWER_KIND } from '../../../../shared/thread.js'

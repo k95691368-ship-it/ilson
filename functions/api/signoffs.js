@@ -7,7 +7,7 @@
 //
 // 첫 화면 할 일 목록에 올리려고 여기서 센다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
 
 export async function onRequestGet({ env, data: requestData }) {

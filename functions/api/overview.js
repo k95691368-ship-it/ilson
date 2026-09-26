@@ -8,7 +8,7 @@
 //   어느 단계에 몇 건이 머물러 있는가 — 병목은 신청서에만 있는 게 아니다.
 //   접수부터 인수인계까지 실제로 며칠 걸렸는가 — 이 조직의 처리 속도.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { REFUSE_LABELS } from '../../shared/review.ts'
 import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'

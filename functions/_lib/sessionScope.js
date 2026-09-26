@@ -1,4 +1,4 @@
-import { jsonResponse } from './http.js'
+import { jsonResponse } from './http.ts'
 
 // This is an expected-scope precondition, never an authentication credential or
 // a selector for another user's database. DB is already bound by middleware.

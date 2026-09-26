@@ -10,7 +10,7 @@
 // 도구 주소를 아는 사람이면 신고할 수 있다. 로그인을 요구하면 그 순간
 // 아무도 신고하지 않고, 신고가 없으면 도구가 멀쩡한 줄 알게 된다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { checkRateLimit } from '../../../_lib/rateLimit.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import {

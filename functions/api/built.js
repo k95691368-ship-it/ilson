@@ -10,7 +10,7 @@
 // 런타임에 알 수 없는 것은 아예 안 보낸다. 화면은 값이 없으면 그 줄을
 // 통째로 빼도록 되어 있다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 
 export async function onRequestGet({ env, data: requestData }) {
   env = requestData?.requestEnv ?? env

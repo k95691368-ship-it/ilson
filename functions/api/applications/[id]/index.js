@@ -4,7 +4,7 @@
 // 내려보낸다. 서버에서 미리 합쳐 버리면 화면에서 "이건 누가 쓴 것인가"를
 // 구분할 수 없게 되고, 그 구분이 이 앱의 전부다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { annualHours } from '../../../_lib/applications.js'
 
 export async function onRequestGet({ env, data: requestData, params }) {

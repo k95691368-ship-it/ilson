@@ -7,8 +7,8 @@
 // 화면의 revision과 현재 값을 부모행 잠금 안에서 비교한 뒤 세 쓰기를 묶는다.
 // 오래된 화면은 최신 판정을 덮어쓰지 않고, 중간 실패도 근거를 분리하지 않는다.
 
-import { jsonResponse, jsonError } from '../../../_lib/http.js'
-import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.js'
+import { jsonResponse, jsonError } from '../../../_lib/http.ts'
+import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.ts'
 import { validateReview, statusFromVerdict, REFUSE_LABELS } from '../../../../shared/review.ts'
 import { newId } from '../../../_lib/ids.js'
 import type { ApplicationContext, Database } from '../../../_lib/runtimeTypes.ts'

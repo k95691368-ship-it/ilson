@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
+import { createSupabaseDb } from '../functions/_lib/dbBridge.ts'
 import { onRequestPost as build } from '../functions/api/applications/[id]/build.js'
 import { onRequestPatch as agreement } from '../functions/api/applications/[id]/agreement.js'
 

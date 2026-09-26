@@ -6,10 +6,10 @@
 // 다만 **합격이냐 아니냐는 여기서 다시 센다.** 채점하는 일과 합격을 선언하는
 // 일은 다르다. 앞엣것은 브라우저가 해도 되지만 뒤엣것은 게이트라서 안 된다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { betaRoundPayload } from '../../../_lib/betaRound.js'
-import { mutationFingerprint } from '../../../_lib/atomicMutation.js'
+import { mutationFingerprint } from '../../../_lib/atomicMutation.ts'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import { signoffState } from '../../../../shared/signoff.js'
 import { encodeBetaNote, decodeBetaRound } from '../../../../shared/betaEvidence.ts'

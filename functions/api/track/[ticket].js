@@ -10,7 +10,7 @@
 //   2) 접수번호를 찍어 맞히는 것을 막으려고 호출 횟수를 제한한다.
 //      (번호는 헷갈리는 글자를 뺀 31글자 중 6자리라 887억 가지다)
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { annualHours } from '../../_lib/applications.js'
 import { REFUSE_REASONS } from '../../../shared/review.ts'

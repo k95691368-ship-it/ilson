@@ -7,7 +7,7 @@
 // 사람 단위로 온다. "재무 건 반려한 이유가 뭐였죠"가 아니라 "요즘 뭘 반려하고
 // 계세요"로 온다. 그 질문에 답하려면 결정을 가로로 훑을 수 있어야 한다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { DEPT_KINDS, PROXY_KINDS, sideOf, sideLine } from '../../shared/side.js'
 
 const STAGES = ['신청서', '검토', '협의안', '제작', '베타테스트', '사용법서', '배포', '성과']

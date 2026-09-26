@@ -1,4 +1,4 @@
-import { jsonError, jsonResponse, failUnexpected } from '../../_lib/http.js'
+import { jsonError, jsonResponse, failUnexpected } from '../../_lib/http.ts'
 import { ensureOverrideSchema, seedOverrideWorkspace, resolveOverrideActor, overrideDemoMode } from '../../_lib/override.js'
 import { scopeEnvironment } from '../../_lib/authorization.js'
 import { readOverrideEvents } from '../../_lib/overrideEvents.js'

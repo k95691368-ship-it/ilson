@@ -8,7 +8,7 @@
 // 표를 새로 만들지 않고 decision_log에 남긴다. 서명도 결정이고, 이 사이트는
 // 결정을 한 곳에 모으기로 했다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import {

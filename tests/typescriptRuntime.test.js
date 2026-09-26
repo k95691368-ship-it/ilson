@@ -48,12 +48,13 @@ describe('incremental TypeScript runtime coverage', () => {
     expect(() => compileDemoRoutes(['functions/api/[id]/[id].ts'])).toThrow('Duplicate API parameter')
   })
 
-  it('includes every current API source and the migrated review handler', () => {
+  it('includes every current API source and the migrated storage handlers', () => {
     const sources = walk('functions/api').filter(file => /\.[jt]s$/.test(file) && !file.endsWith('.d.ts') && !/_middleware\.[jt]s$/.test(file))
     const routes = compileDemoRoutes(sources)
     expect(routes).toHaveLength(sources.length)
     expect(routes.length).toBeGreaterThan(40)
     expect(routes.find(route => route.regex.test('/api/applications/app_test/review'))?.file.replaceAll('\\', '/')).toBe('functions/api/applications/[id]/review.ts')
+    expect(routes.find(route => route.regex.test('/api/applications/app_test/handover'))?.file.replaceAll('\\', '/')).toBe('functions/api/applications/[id]/handover.ts')
     expect(readFileSync('scripts/dev-demo.mjs', 'utf8')).toContain('compileDemoRoutes(await walk(')
   })
 

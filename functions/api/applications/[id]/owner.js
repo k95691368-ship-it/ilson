@@ -1,4 +1,4 @@
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { resolveOverrideActor } from '../../../_lib/override.js'
 import { isAccessAdmin } from '../../../_lib/authorization.js'
 import { actorAssignments } from '../../../_lib/dataScope.js'

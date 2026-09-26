@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { onRequest } from '../functions/api/_middleware.js'
-import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
+import { createSupabaseDb } from '../functions/_lib/dbBridge.ts'
 import { requireSessionScope } from '../functions/_lib/sessionScope.js'
 
 const scope = 'a'.repeat(64), other = 'b'.repeat(64), token = 'e'.repeat(64)

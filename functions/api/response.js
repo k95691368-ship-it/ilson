@@ -8,7 +8,7 @@
 // 여기가 낮으면 나머지 기록이 아무리 촘촘해도 혼자 만든 것이다. 낮을 때
 // 숨기지 않는 것이 이 사이트가 부서에게 요구하는 태도와 같다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { responseRate, responseLine, responseNote } from '../../shared/response.js'
 import {
   ACCEPT_KIND,

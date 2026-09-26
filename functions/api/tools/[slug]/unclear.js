@@ -7,7 +7,7 @@
 // 로그인이 없고 이름도 안 받는다. 모르겠다고 말하는 일에 이름을 붙이라고
 // 하면, 모르는 것을 밝히는 것 자체가 부담이 되어 아무도 안 짚는다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { loadUnclear } from '../../../_lib/unclear.js'

@@ -10,7 +10,7 @@
 // 있나"를 판정한다. 여기서 따로 받으면 같은 것을 두 곳에서 세게 되고, 그
 // 순간 두 화면이 서로 다른 숫자를 말한다. 이 저장소에서 가장 자주 난 사고다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../_lib/http.ts'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { logDecision } from '../../_lib/decisions.js'
 import { validateFiledReport, REPORT_KIND, REPORT_BY_CODE } from '../../../shared/report.js'

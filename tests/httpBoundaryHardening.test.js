@@ -3,9 +3,9 @@ import { describe, it, expect, vi } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { onRequest } from '../functions/api/_middleware.js'
-import { failUnexpected, ok } from '../functions/_lib/http.js'
+import { failUnexpected, ok } from '../functions/_lib/http.ts'
 import { onRequestGet as health } from '../functions/api/health.js'
-import { requestBodyLimit } from '../functions/_lib/requestBody.js'
+import { requestBodyLimit } from '../functions/_lib/requestBody.ts'
 
 vi.mock('../functions/_lib/rateLimit.js', () => ({ checkRateLimit: vi.fn(async () => true) }))
 const scope = 'a'.repeat(64)

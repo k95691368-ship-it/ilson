@@ -6,7 +6,7 @@
 // 판정 전인 건과 협의 중인 건을 갈라 센다. 한 신청서가 두 줄에 동시에
 // 뜨면 목록이 두 배로 길어 보이고, 그러면 아무도 안 읽는다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { JOIN_KIND, UNJOIN_KIND, joinCounts } from '../../shared/join.js'
 
 export async function onRequestGet({ env, data: requestData }) {

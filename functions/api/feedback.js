@@ -1,5 +1,5 @@
-import { jsonResponse, jsonError, failUnexpected } from '../_lib/http.js'
-import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.js'
+import { jsonResponse, jsonError, failUnexpected } from '../_lib/http.ts'
+import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.ts'
 import { resolveOverrideActor, auditOverride } from '../_lib/override.js'
 import { feedbackActorKey } from '../_lib/fieldFeedback.js'
 import { createIssueFollowup } from '../_lib/issueWorkflow.js'

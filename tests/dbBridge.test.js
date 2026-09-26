@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { compileSql, createSupabaseDb, databaseAccessFailure, withDbBinding } from '../functions/_lib/dbBridge.js'
-import { failUnexpected } from '../functions/_lib/http.js'
+import { compileSql, createSupabaseDb, databaseAccessFailure, withDbBinding } from '../functions/_lib/dbBridge.ts'
+import { failUnexpected } from '../functions/_lib/http.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 const url = 'https://test.supabase.co'

@@ -1,4 +1,4 @@
-import { jsonError } from './http.js'
+import { jsonError } from './http.ts'
 import { actorAssignments } from './dataScope.js'
 
 // Reading an application is not authority to sign on behalf of its department.

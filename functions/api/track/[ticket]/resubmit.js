@@ -6,8 +6,8 @@
 //
 // 규칙은 shared/resubmit.js가 정한다. 화면과 서버가 그 파일 하나를 같이 쓴다.
 
-import { jsonResponse, jsonError, failFields } from '../../../_lib/http.js'
-import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.js'
+import { jsonResponse, jsonError, failFields } from '../../../_lib/http.ts'
+import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.ts'
 import { newId, newTicketNo } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { logDecision } from '../../../_lib/decisions.js'

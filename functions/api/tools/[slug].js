@@ -6,10 +6,10 @@
 // 계산 자체는 브라우저에서 돈다. 여기는 "누가 언제 돌렸고 무엇이 나왔는지"를
 // 기록으로 남기는 자리다. 그 기록이 8단계 성과의 재료가 된다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
 import { quotaState } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
-import { mutationFingerprint } from '../../_lib/atomicMutation.js'
+import { mutationFingerprint } from '../../_lib/atomicMutation.ts'
 import { loadOutcomeEvidence } from '../../_lib/outcomeEvidence.js'
 import { toReports, trustLevel, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
 import { RESTORE_KIND, lastRestore } from '../../../shared/rollback.js'

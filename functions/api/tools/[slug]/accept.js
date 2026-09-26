@@ -12,7 +12,7 @@
 // 로그인이 없다. 도구 주소를 아는 사람이 그 도구를 넘겨받은 사람이라고
 // 본다 — 조회 화면과 같은 규칙이다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'

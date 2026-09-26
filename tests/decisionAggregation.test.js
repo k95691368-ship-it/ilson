@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { PGlite } from '@electric-sql/pglite'
-import { compileSql } from '../functions/_lib/dbBridge.js'
+import { compileSql } from '../functions/_lib/dbBridge.ts'
 import { onRequestGet } from '../functions/api/decisions.js'
 
 let database

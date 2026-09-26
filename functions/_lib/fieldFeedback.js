@@ -1,5 +1,5 @@
 import { newId } from './ids.js'
-import { mutationFingerprint } from './atomicMutation.js'
+import { mutationFingerprint } from './atomicMutation.ts'
 
 // The demo's identity belongs to its isolated visitor workspace, not its role selector.
 export function feedbackActorKey(actor) {

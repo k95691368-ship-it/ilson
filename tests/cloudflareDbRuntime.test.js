@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { Miniflare, convertV4MiniflareOptions } from 'miniflare'
+import { transformWithOxc } from 'vite'
 
 const tables = [
   'application', 'review', 'decision_log', 'acceptance_criterion', 'baseline',
@@ -13,15 +14,17 @@ const tables = [
 let runtime, upstreamStatus, outbound
 
 beforeAll(async () => {
-  // Run the real source modules in workerd, not Node's more permissive fetch.
+  // Strip TypeScript with the installed build tool, then run the real modules
+  // in workerd, not Node's more permissive fetch.
   // Every outbound request is intercepted; no account or real key is used.
-  const modules = ['functions/_lib/dbBridge.js', 'functions/_lib/http.js', 'functions/api/health.js'].map(path => ({
-    type: 'ESModule', path: resolve(path), contents: readFileSync(path, 'utf8'),
+  const modules = await Promise.all(['functions/_lib/dbBridge.ts', 'functions/_lib/http.ts', 'functions/api/health.js'].map(async path => {
+    const source = readFileSync(path, 'utf8')
+    return { type: 'ESModule', path: resolve(path), contents: path.endsWith('.ts') ? (await transformWithOxc(source, path)).code : source }
   }))
   runtime = new Miniflare(convertV4MiniflareOptions({
     modules: [{
       type: 'ESModule', path: resolve('tests/runtime-entry.mjs'),
-      contents: `import { withDbBinding } from '../functions/_lib/dbBridge.js';
+      contents: `import { withDbBinding } from '../functions/_lib/dbBridge.ts';
         import { onRequestGet } from '../functions/api/health.js';
         export default { async fetch(request, env) {
           const requestEnv = { ...env, DB: await withDbBinding(env) };

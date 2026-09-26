@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { pathToFileURL } from 'node:url'
 import { resolve } from 'node:path'
+import { readHandoverEvidence } from '../shared/contracts/handover.ts'
 
 // Run npm run build first: fail rather than silently skip a missing API artifact.
 const worker = (await import(pathToFileURL(resolve('dist/_worker.js/index.js')).href)).default
@@ -47,7 +48,7 @@ describe('deployable Pages Worker', () => {
     expect(denied.headers.get('Cache-Control')).toBe('private, no-store')
   })
 
-  it('runs isolated workspace, approval, evidence, replay and reset through the built Worker', async () => {
+  it('runs isolated storage, review conflict, handover gates, approval, replay and reset through the built Worker', async () => {
     const pg = new PGlite()
     const env = { ASSETS: assets, DEMO_WORKSPACES: 'true', SUPABASE_URL: 'https://artifact-test.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'local-only' }
     let queue = Promise.resolve()
@@ -88,6 +89,41 @@ describe('deployable Pages Worker', () => {
       const crossedScope = await worker.fetch(new Request('https://ilson.test/api/override', { headers: { Cookie: b, 'X-Ilson-Scope': await scopeFor(a) } }), env, context)
       expect(crossedScope.status).toBe(409)
       expect(await crossedScope.json()).toMatchObject({ code: 'SESSION_SCOPE_CHANGED' })
+      // Both newly migrated server handlers must be reachable in the actual
+      // artifact. Exercise middleware, typed bridge and transactional receipts.
+      const applicationPath = '/api/applications/demo_application_1'
+      const originalResponse = await request(applicationPath, a)
+      expect(originalResponse.status).toBe(200)
+      const original = await originalResponse.json()
+      const reviewBody = { expectedRevision: original.application.review_revision,
+        impact_score: 3, difficulty_score: 2, verdict: '수용',
+        verdict_reason: '현재 자료와 사람이 확인하는 범위를 유지합니다.',
+        alternatives_considered: '외부 자동 실행 대신 검증 가능한 파일 처리로 제한합니다.', reviewer_label: '묶음 검증 담당자' }
+      expect((await request(applicationPath + '/review', a, [])).status).toBe(400)
+      const reviewKey = crypto.randomUUID()
+      const reviewed = await request(applicationPath + '/review', a, reviewBody, 'POST', reviewKey)
+      expect(reviewed.status).toBe(200)
+      const reviewedBody = await reviewed.json()
+      expect(reviewedBody).toMatchObject({ ok: true, application_id: 'demo_application_1', verdict: '수용' })
+      const reviewedAgain = await request(applicationPath + '/review', a, reviewBody, 'POST', reviewKey)
+      expect(reviewedAgain.status).toBe(200)
+      expect(reviewedAgain.headers.get('X-Idempotency-Replayed')).toBe('1')
+      expect(await reviewedAgain.json()).toEqual(reviewedBody)
+      expect((await request(applicationPath + '/review', a, reviewBody)).status).toBe(409)
+      const persisted = await (await request(applicationPath, a)).json()
+      expect(persisted.review.verdict_reason).toBe(reviewBody.verdict_reason)
+      expect(persisted.decisions.filter(row => row.link_kind === 'review')).toHaveLength(1)
+      expect((await (await request(applicationPath, b)).json()).review).toBeNull()
+      const handoverResponse = await request(applicationPath + '/handover', a)
+      expect(handoverResponse.status).toBe(200)
+      const handover = readHandoverEvidence(await handoverResponse.json())
+      expect(handover.handover).toBeNull()
+      expect(handover.blockers.length).toBeGreaterThan(0)
+      const blocked = await request(applicationPath + '/handover', a, { action: 'create', expectedEvidence: handover.expectedEvidence,
+        title: '검증 정산', person: '검증 담당자', whenToRun: '합성 자료가 준비된 후', afterRun: '원본 근거와 대조', contact: '검증 담당자',
+        dailyLimit: 20, maxFileMb: 10, reason: '선행 조건 없는 인계를 거절하는지 확인합니다.', scopeAccepted: true, humanChecks: {} })
+      expect(blocked.status).toBe(400)
+      expect((await blocked.json()).blockers).toEqual(handover.blockers)
       const workspaceA = await request('/api/override', a)
       expect(workspaceA.status).toBe(200)
       const viewedCluster = (await workspaceA.json()).clusters.find(item => item.id === 'olc_policy')

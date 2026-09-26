@@ -106,7 +106,7 @@
 React 19 + Vite + react-router (JavaScript → TypeScript 점진 전환)
         │
         ├─ Cloudflare Pages Functions (functions/api/**)
-        │       ├─ _lib/http.js        응답·오류 규격 통일
+        │       ├─ _lib/http.ts        응답·오류 규격 통일
         │       ├─ _lib/applications.js 신청서 조회·집계
         │       ├─ _lib/signoff.js     합격 기준 서명·이의를 읽는 단 하나의 자리
         │       └─ _lib/rateLimit.js   로그인 없이 여는 화면의 남용 방지
@@ -146,6 +146,13 @@ TypeScript는 점진적으로 적용한다. 검토·협의·성과 입력·베�
 프로젝트 전체가 타입 검사되거나 TypeScript로 전환됐다고 주장하지 않는다.
 타입 검사는 GitHub CI와 실제 빌드 명령 모두에 포함하며, 로컬 서버는 Node의
 타입 제거 실행을 사용한다. 타입 도입 자체를 실행 속도나 실제 업무 절감 성과로 보지 않는다.
+
+2차 전환은 Supabase 연결부, 원자적 저장·재시도 처리, 검토 버전 보호,
+HTTP 응답·요청 크기 제한, 인계 근거 조회·저장 API에 적용했다.
+DB의 행 컨테이너와 저장 영수증 형식을 런타임에 확인하며, SQL 행의 generic 타입은
+서버가 선택한 스키마에 대한 선언이지 모든 열 값의 런타임 검증은 아니다.
+DB 스키마·권한·업무 승인 절차·디자인은 바꾸지 않았다. 배포용 Worker 검사에서도
+검토 저장·동일 요청 재시도·오래된 판정 거절·체험 공간 분리·인계 차단을 실행한다.
 
 `test:workflow`는 메모리 PostgreSQL과 합성 자료로 업무 흐름·원본 대조·성과 근거를
 재현한다. 실제 고객의 전후 생산성 측정이나 운영 부하 시험을 대신하지 않는다.

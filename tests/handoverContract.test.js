@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { isHandoverEvidence, readHandoverEvidence } from '../shared/contracts/handover.ts'
-import { onRequestGet } from '../functions/api/applications/[id]/handover.js'
+import { onRequestGet } from '../functions/api/applications/[id]/handover.ts'
 
 const valid = () => ({
   application: { id: 'application-contract', title: '계약 검증', dept: '재무' },

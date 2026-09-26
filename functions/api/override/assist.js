@@ -1,5 +1,5 @@
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
-import { atomicMutation, mutationFingerprint } from '../../_lib/atomicMutation.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
+import { atomicMutation, mutationFingerprint } from '../../_lib/atomicMutation.ts'
 import { newId } from '../../_lib/ids.js'
 import {
   ensureOverrideSchema,

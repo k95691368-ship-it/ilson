@@ -7,7 +7,7 @@
 // 그 코드로 팔린 것이 전부 엉뚱한 상품 매출로 잡힌다. 격리된 줄은 눈에
 // 띄지만 잘못 이어진 줄은 조용히 섞인다. 빠르되 눈감지는 않는다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.ts'
 import { logDecision } from '../_lib/decisions.js'
 import {
   annotate,

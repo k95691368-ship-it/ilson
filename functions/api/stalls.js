@@ -6,7 +6,7 @@
 //
 // 계산은 shared/stall.js가 한다. 여기서는 기록을 모아 넘긴다.
 
-import { jsonResponse, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { stallBoard, boardLine } from '../../shared/stall.js'
 
 export async function onRequestGet({ env, data: requestData }) {

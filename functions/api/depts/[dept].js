@@ -8,7 +8,7 @@
 // 남이 나한테 안 해 준 것을 센다. 그건 만들기 쉽고 보기 편하지만, 부서와
 // 마주 앉을 때 아무 쓸모가 없다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
 import { annualHours } from '../../_lib/applications.js'
 import { sortPending } from '../../../shared/pending.js'
 import { returnedFor } from '../../../shared/returned.js'

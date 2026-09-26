@@ -3,7 +3,7 @@
 // 신청서가 애매할 때 담당자가 할 수 있는 것이 짐작 아니면 보류뿐이었다.
 // 짐작은 틀리고 보류는 안 풀린다. 물어볼 데를 만든다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateAsk, ASK_KIND } from '../../../../shared/thread.js'
 

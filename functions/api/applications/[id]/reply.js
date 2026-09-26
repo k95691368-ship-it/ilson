@@ -8,7 +8,7 @@
 // 답은 짧아도 된다. 담당자 질문에 부서가 답할 때와 같은 기준을 쓴다 —
 // "네", "아니요"도 답이다. 물은 쪽이 알고 싶은 것은 길이가 아니다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { logDecision } from '../../../_lib/decisions.js'
 import { validateAnswer, DEPT_ASK_KIND, STAFF_REPLY_KIND } from '../../../../shared/thread.js'
 

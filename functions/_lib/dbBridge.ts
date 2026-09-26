@@ -1,20 +1,75 @@
 // Server-only Supabase bridge. Route handlers keep the D1 statement interface.
-const statementData = new WeakMap()
-const accessFailures = new WeakMap()
+import type {
+  CommittedMutation, Database, DatabaseResult, MutationRead, MutationReceipt,
+  MutationWrite, PreparedStatement, SqlRow, SqlValue,
+} from './runtimeTypes.ts'
+
+interface StatementData {
+  sql: string
+  binds: readonly SqlValue[]
+  owner: object
+}
+
+export interface DatabaseAccessFailure {
+  readonly status: 401 | 403
+  readonly code: 'ACCESS_REVOKED' | 'ACCESS_DENIED'
+  readonly error: string
+}
+
+export interface AssignApplicationOwnerInput {
+  applicationId: string
+  expectedOwnerEmail: string | null
+  newOwnerEmail: string
+  reason: string
+  requestId: string
+}
+
+export interface SupabaseDatabase extends Database {
+  provider: 'supabase'
+  actorEmail: string | null
+  workspace: boolean
+  forActor(email: string): SupabaseDatabase
+  toolRunScope(): Promise<string>
+  recordToolRun(slug: string, bucket: string, requestId: string, fingerprint: string, run: unknown): Promise<unknown>
+  recordBetaRound(applicationId: string, requestId: string, fingerprint: string, round: unknown): Promise<unknown>
+  workspaceOpen(token: string, applications: unknown): Promise<unknown>
+  workspaceReset(token: string, applications: unknown, newToken: string): Promise<unknown>
+  claimRateLimit(bucket: string, maxHits: number, windowSeconds: number): Promise<unknown>
+  assignApplicationOwner?(input: AssignApplicationOwnerInput): Promise<unknown>
+  rateLimitState?(bucket: string, maxHits: number, windowSeconds: number): Promise<unknown>
+  releaseRateLimit?(bucket: string, ticket: number): Promise<unknown>
+  readiness(): Promise<unknown>
+  mutationReceipt(requestId: string, fingerprint: string): Promise<MutationReceipt | null>
+  commitMutation(requestId: string, fingerprint: string, reads: readonly MutationRead[], writes: readonly MutationWrite[], response: MutationReceipt): Promise<CommittedMutation>
+}
+
+export interface SupabaseBindingEnvironment {
+  SUPABASE_URL?: string
+  SUPABASE_SERVICE_ROLE_KEY?: string
+  DB?: Database
+}
+
+const statementData = new WeakMap<PreparedStatement, StatementData>()
+const accessFailures = new WeakMap<object, DatabaseAccessFailure>()
+
+function isRecord(value: unknown): value is SqlRow {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+}
 
 // Only errors created at a verified scoped RPC boundary may change HTTP access
 // status. Never trust an upstream message or an arbitrary error.status property.
-export function databaseAccessFailure(error) {
+export function databaseAccessFailure(error: unknown): DatabaseAccessFailure | null {
+  if ((typeof error !== 'object' || error === null) && typeof error !== 'function') return null
   return accessFailures.get(error) ?? null
 }
 
 // Optional logging/compatibility failures may be ignored, but a revoked scope
 // must still reach the HTTP boundary. This does not imply earlier writes failed.
-export function rethrowDatabaseAccessFailure(error) {
+export function rethrowDatabaseAccessFailure(error: unknown): void {
   if (databaseAccessFailure(error)) throw error
 }
 
-function integerCasts(tokens) {
+function integerCasts(tokens: string[]): string[] {
   // SQLite truncates integer casts; PostgreSQL rounds. Preserve elapsed-time values.
   for (let i = 0; i < tokens.length; i++) {
     if (!/^CAST$/i.test(tokens[i])) continue
@@ -37,7 +92,7 @@ function integerCasts(tokens) {
   return tokens
 }
 
-function literal(value) {
+function literal(value: unknown): string {
   if (value === null) return 'NULL'
   if (typeof value === 'boolean') return value ? '1' : '0'
   if (typeof value === 'number' && Number.isFinite(value)) return String(value)
@@ -46,7 +101,7 @@ function literal(value) {
   return "E'" + value.replaceAll('\\', '\\\\').replaceAll("'", "''") + "'"
 }
 
-export function compileSql(sql, binds = []) {
+export function compileSql(sql: string, binds: readonly SqlValue[] = []): string {
   if (typeof sql !== 'string' || !sql.trim()) throw new Error('SQL statement is required')
   // A question mark in a literal, identifier or comment is not a parameter.
   const tokens = sql.match(/--[^\n]*|\/\*[\s\S]*?\*\/|'(?:''|[^'])*'|"(?:""|[^"])*"|[a-z_][a-z_0-9]*|\s+|./gi) || []
@@ -63,8 +118,9 @@ export function compileSql(sql, binds = []) {
   return integerCasts(result).join('').trim().replace(/;\s*$/, '')
 }
 
-function resultOf(data) {
-  if (!data || !Array.isArray(data.rows) || !Number.isFinite(Number(data.rowCount))) {
+function resultOf(data: unknown): DatabaseResult {
+  if (!isRecord(data) || !Array.isArray(data.rows) || !data.rows.every(isRecord) || !Number.isFinite(Number(data.rowCount))
+    || (data.last_row_id != null && !Number.isFinite(Number(data.last_row_id)))) {
     throw new Error('Invalid Supabase database response')
   }
   return {
@@ -74,7 +130,29 @@ function resultOf(data) {
   }
 }
 
-export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = null) {
+function isMutationReceipt(data: unknown): data is MutationReceipt {
+  return isRecord(data) && typeof data.status === 'number' && Number.isInteger(data.status)
+    && data.status >= 200 && data.status <= 599 && Object.hasOwn(data, 'body')
+}
+
+function receiptOf(data: unknown): MutationReceipt | null {
+  if (data === null) return null
+  if (!isMutationReceipt(data)) throw new Error('Invalid Supabase mutation receipt')
+  return data
+}
+
+function isCommittedMutation(data: unknown): data is CommittedMutation {
+  return isRecord(data) && isMutationReceipt(data.response) && typeof data.replayed === 'boolean'
+}
+
+function committedOf(data: unknown): CommittedMutation {
+  if (!isCommittedMutation(data)) {
+    throw new Error('Invalid Supabase mutation response')
+  }
+  return data
+}
+
+export function createSupabaseDb(url: string, key: string, workspaceToken: string | null = null, actorEmail: string | null = null): SupabaseDatabase {
   if (actorEmail !== null && (workspaceToken || typeof actorEmail !== 'string' || !/^\S+@\S+\.\S+$/.test(actorEmail))) {
     throw new Error('Invalid database actor scope')
   }
@@ -82,7 +160,7 @@ export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = n
   if (endpoint.protocol !== 'https:' || !endpoint.hostname.endsWith('.supabase.co') || endpoint.username || endpoint.password) {
     throw new Error('Invalid Supabase URL')
   }
-  const rpc = async (name, body) => {
+  const rpc = async (name: string, body: Record<string, unknown>): Promise<unknown> => {
     const response = await fetch(endpoint.origin + '/rest/v1/rpc/' + name, {
       // Workers supports manual/follow, not error. Non-2xx below fails closed
       // without forwarding service credentials to a redirect destination.
@@ -92,9 +170,12 @@ export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = n
     })
     if (!response.ok) {
       // Never expose SQL, user data or service credentials through route errors.
-      let code = ''
-      try { code = (await response.json()).code || '' } catch { /* malformed upstream error */ }
-      const error = new Error('Database request failed (' + response.status + (/^[A-Z0-9]+$/.test(code) ? '/' + code : '') + ')')
+      let code: string | number = ''
+      try {
+        const body: unknown = await response.json()
+        if (isRecord(body) && (typeof body.code === 'string' || typeof body.code === 'number')) code = body.code || ''
+      } catch { /* malformed upstream error */ }
+      const error = new Error('Database request failed (' + response.status + (/^[A-Z0-9]+$/.test(String(code)) ? '/' + code : '') + ')')
       if ((actorEmail || workspaceToken) && (code === '28000' || code === '42501')) {
         error.name = 'DatabaseAccessError'
         accessFailures.set(error, Object.freeze({
@@ -107,27 +188,35 @@ export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = n
       }
       throw error
     }
-    return response.json()
+    const data: unknown = await response.json()
+    return data
   }
-  const scopedSql = sql => workspaceToken
+  const scopedSql = (sql: string): string => workspaceToken
     ? sql.replace(/--[^\n]*|\/\*[\s\S]*?\*\/|E?'(?:''|\\.|[^'])*'|"(?:""|[^"])*"|\b(datetime|julianday|group_concat)\s*\(/gi,
-      (match, name) => name ? `public.${name}(` : match)
+      (match: string, name: string | undefined) => name ? `public.${name}(` : match)
     : sql
-  const queryRpc = (sql) => actorEmail
+  const queryRpc = (sql: string): Promise<unknown> => actorEmail
     ? rpc('ilson_actor_query', { p_actor: actorEmail, p_sql: sql })
     : workspaceToken
     ? rpc('ilson_workspace_query', { p_token: workspaceToken, p_sql: scopedSql(sql) })
     : rpc('ilson_execute', { p_sql: sql })
   const owner = {}
-  const prepare = (sql, binds = []) => {
-    const statement = {
-      bind: (...values) => prepare(sql, values),
-      all: async () => resultOf(await queryRpc(compileSql(sql, binds))),
-      first: async column => {
-        const { results } = await statement.all()
-        return column === undefined ? (results[0] ?? null) : (results[0]?.[column] ?? null)
-      },
-      run: async () => statement.all(),
+  const prepare = (sql: string, binds: readonly SqlValue[] = []): PreparedStatement => {
+    // The RPC validates row containers. A generic supplied by trusted server
+    // code describes that SQL projection; it does not validate column values.
+    const all = async <Row extends object = SqlRow>(): Promise<DatabaseResult<Row>> =>
+      resultOf(await queryRpc(compileSql(sql, binds))) as DatabaseResult<Row>
+    async function first<Row extends object = SqlRow>(): Promise<Row | null>
+    async function first<Value = unknown>(column: string): Promise<Value | null>
+    async function first(column?: string): Promise<unknown> {
+      const { results } = await all()
+      return column === undefined ? (results[0] ?? null) : (results[0]?.[column] ?? null)
+    }
+    const statement: PreparedStatement = {
+      bind: (...values: SqlValue[]) => prepare(sql, values),
+      all,
+      first,
+      run: all,
     }
     statementData.set(statement, { sql, binds, owner })
     return statement
@@ -135,7 +224,7 @@ export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = n
   return {
     provider: 'supabase', prepare,
     actorEmail,
-    forActor: email => {
+    forActor: (email: string) => {
       if (workspaceToken) throw new Error('A demonstration database cannot switch to production actor scope')
       const normalized = String(email).trim().toLowerCase()
       if (actorEmail && normalized !== actorEmail) throw new Error('Database actor scope cannot be switched')
@@ -161,26 +250,26 @@ export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = n
       ...(actorEmail ? { p_actor: actorEmail } : { p_token: workspaceToken }), p_bucket: bucket, p_max: maxHits, p_window: windowSeconds,
     }),
     ...(actorEmail ? {
-      assignApplicationOwner: ({ applicationId, expectedOwnerEmail, newOwnerEmail, reason, requestId }) => rpc('ilson_assign_application_owner', {
+      assignApplicationOwner: ({ applicationId, expectedOwnerEmail, newOwnerEmail, reason, requestId }: AssignApplicationOwnerInput) => rpc('ilson_assign_application_owner', {
         p_actor: actorEmail, p_application: applicationId, p_expected_owner: expectedOwnerEmail,
         p_new_owner: newOwnerEmail, p_reason: reason, p_request_id: requestId,
       }),
-      rateLimitState: (bucket, maxHits, windowSeconds) => rpc('ilson_actor_rate_state', {
+      rateLimitState: (bucket: string, maxHits: number, windowSeconds: number) => rpc('ilson_actor_rate_state', {
         p_actor: actorEmail, p_bucket: bucket, p_max: maxHits, p_window: windowSeconds,
       }),
-      releaseRateLimit: (bucket, ticket) => rpc('ilson_actor_release_rate_limit', {
+      releaseRateLimit: (bucket: string, ticket: number) => rpc('ilson_actor_release_rate_limit', {
         p_actor: actorEmail, p_bucket: bucket, p_ticket: ticket,
       }),
     } : {}),
     readiness: () => rpc('ilson_readiness', { p_token: workspaceToken }),
-    mutationReceipt: (requestId, fingerprint) => rpc(actorEmail ? 'ilson_actor_receipt' : 'ilson_mutation_receipt', {
+    mutationReceipt: async (requestId, fingerprint) => receiptOf(await rpc(actorEmail ? 'ilson_actor_receipt' : 'ilson_mutation_receipt', {
       ...(actorEmail ? { p_actor: actorEmail } : { p_token: workspaceToken }), p_request_id: requestId, p_fingerprint: fingerprint,
-    }),
-    commitMutation: (requestId, fingerprint, reads, writes, response) => rpc(actorEmail ? 'ilson_actor_commit' : 'ilson_commit_mutation', {
+    })),
+    commitMutation: async (requestId, fingerprint, reads, writes, response) => committedOf(await rpc(actorEmail ? 'ilson_actor_commit' : 'ilson_commit_mutation', {
       ...(actorEmail ? { p_actor: actorEmail } : { p_token: workspaceToken }), p_request_id: requestId, p_fingerprint: fingerprint,
       p_reads: reads.map(row => ({ sql: scopedSql(compileSql(row.sql, row.binds)), rows: row.rows })),
       p_writes: writes.map(row => scopedSql(compileSql(row.sql, row.binds))), p_response: response,
-    }),
+    })),
     async batch(statements) {
       const sql = statements.map(statement => {
         const data = statementData.get(statement)
@@ -200,10 +289,10 @@ export function createSupabaseDb(url, key, workspaceToken = null, actorEmail = n
   }
 }
 
-export async function withDbBinding(env) {
+export async function withDbBinding(env: SupabaseBindingEnvironment | null | undefined): Promise<Database | undefined> {
   const hasUrl = Boolean(env?.SUPABASE_URL?.trim())
   const hasKey = Boolean(env?.SUPABASE_SERVICE_ROLE_KEY?.trim())
   if (hasUrl !== hasKey) throw new Error('Incomplete Supabase configuration')
-  if (hasUrl) return createSupabaseDb(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
+  if (hasUrl && env?.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY) return createSupabaseDb(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
   return env?.DB // Local or pre-cutover binding only; production removes D1.
 }

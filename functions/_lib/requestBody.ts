@@ -1,7 +1,7 @@
 // Bound bytes while the existing JSON/multipart parser consumes the request.
 // Do not buffer or clone a second copy of uploaded files in middleware.
 const MIB = 1024 * 1024
-export function requestBodyLimit(request) {
+export function requestBodyLimit(request: Request): number {
   const path = new URL(request.url).pathname.replace(/\/$/, '')
   // Application forms contain text only. Local settlement files never upload
   // through this route, so multipart must use the same 1 MiB limit as JSON.
@@ -10,13 +10,18 @@ export function requestBodyLimit(request) {
   return MIB
 }
 
-export function boundRequestBody(request) {
+export interface BoundedRequestBody {
+  exceeded: boolean
+  request: Request
+}
+
+export function boundRequestBody(request: Request): BoundedRequestBody {
   const limit = requestBodyLimit(request)
   const length = request.headers.get('Content-Length')
-  const state = { exceeded: length !== null && Number(length) > limit, request }
+  const state: BoundedRequestBody = { exceeded: length !== null && Number(length) > limit, request }
   if (state.exceeded || !request.body) return state
   let received = 0
-  const body = request.body.pipeThrough(new TransformStream({
+  const body = request.body.pipeThrough(new TransformStream<Uint8Array, Uint8Array>({
     transform(chunk, controller) {
       received += chunk.byteLength
       if (received > limit) {
@@ -27,6 +32,7 @@ export function boundRequestBody(request) {
       controller.enqueue(chunk)
     },
   }))
-  state.request = new Request(request, { body, duplex: 'half' })
+  const init: RequestInit & { duplex: 'half' } = { body, duplex: 'half' }
+  state.request = new Request(request, init)
   return state
 }

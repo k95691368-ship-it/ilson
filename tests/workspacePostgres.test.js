@@ -2,7 +2,7 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
-import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
+import { createSupabaseDb } from '../functions/_lib/dbBridge.ts'
 import { DEMO_APPLICATIONS } from '../functions/_lib/demoApplications.js'
 import { seedOverrideWorkspace } from '../functions/_lib/override.js'
 import { onRequestGet as journey, onRequestPost as link } from '../functions/api/applications/[id]/journey.js'

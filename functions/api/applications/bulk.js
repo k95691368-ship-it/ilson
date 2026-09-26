@@ -4,8 +4,8 @@
 // 해야 한다 — 한 번에 판정하게 하면 사람은 안 읽고 누르고, 읽지도 않고
 // 반려된 신청서가 생기면 부서는 그걸 알아챈다.
 
-import { jsonResponse, jsonError, failFields } from '../../_lib/http.js'
-import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../_lib/reviewMutation.js'
+import { jsonResponse, jsonError, failFields } from '../../_lib/http.ts'
+import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../_lib/reviewMutation.ts'
 import { validateBulk, partition, resultText, BULK_BY_CODE } from '../../../shared/bulk.js'
 
 export async function onRequestPost({ env, data: requestData, request }) {

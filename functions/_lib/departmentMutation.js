@@ -1,5 +1,5 @@
-import { atomicMutation, mutationFingerprint } from './atomicMutation.js'
-import { jsonError, failUnexpected } from './http.js'
+import { atomicMutation, mutationFingerprint } from './atomicMutation.ts'
+import { jsonError, failUnexpected } from './http.ts'
 
 // Department declarations and their audit records must share one commit. The
 // callback reads the current actor through the staged DB before authorizing it.

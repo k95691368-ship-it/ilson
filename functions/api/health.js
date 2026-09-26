@@ -5,7 +5,7 @@
 //
 // 준비되지 않은 경우 JSON 설명과 HTTP 503을 함께 반환한다.
 
-import { jsonResponse } from '../_lib/http.js'
+import { jsonResponse } from '../_lib/http.ts'
 
 // 여섯 단계를 돌려야 하는 필수 표(데이터베이스가 바뀌어도 동일하게 확인)
 const CORE_TABLES = [

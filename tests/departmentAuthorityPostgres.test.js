@@ -2,7 +2,7 @@
 import { beforeAll, afterAll, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
-import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
+import { createSupabaseDb } from '../functions/_lib/dbBridge.ts'
 import { departmentAuthority } from '../functions/_lib/departmentAuthority.js'
 import { loadCriteriaEvidence } from '../functions/_lib/agreementEvidence.js'
 import { loadOutcomeEvidence } from '../functions/_lib/outcomeEvidence.js'

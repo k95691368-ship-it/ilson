@@ -3,7 +3,7 @@
 // 도구별로 흩어져 있으면 "지금 어느 도구가 못 미더운가"를 볼 수가 없다.
 // 담당자는 도구를 하나씩 열어 보지 않는다 — 한곳에 모여 있어야 본다.
 
-import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.js'
+import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.ts'
 import { logDecision } from '../_lib/decisions.js'
 import { toReports, openReports, REPORT_KIND, REPORT_FIX } from '../../shared/report.js'
 

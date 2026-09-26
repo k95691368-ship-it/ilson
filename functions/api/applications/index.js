@@ -4,7 +4,7 @@
 // 신청하지 않고, 그러면 이 시스템에 들어오는 것이 없다. 대신 접수번호를 주고
 // 남용은 IP 단위 호출 한도로 막는다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
+import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
 import { checkRateLimit, releaseRateLimit } from '../../_lib/rateLimit.js'
 import { newId, newTicketNo, hashIp } from '../../_lib/ids.js'
 import {
