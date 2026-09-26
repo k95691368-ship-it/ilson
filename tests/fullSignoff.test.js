@@ -107,7 +107,7 @@ describe('세 화면이 모두 그 판정을 쓴다', () => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = pathJoin(d, e.name)
       if (e.isDirectory()) walk(p)
-      else if (p.endsWith('.js')) files.push(p)
+      else if (/\.[jt]s$/.test(p)) files.push(p)
     }
   }
   walk(pathJoin(ROOT, 'functions', 'api'))

@@ -14,7 +14,7 @@
 //      한다 — 헛수고를 시키지 않는 것이 이 화면의 핵심이다.
 //   ② 다시 낼 때 무엇을 바꿨는지 반드시 적게 한다.
 
-import { REFUSE_REASONS } from './review.js'
+import { REFUSE_REASONS } from './review.ts'
 
 // 반려 사유별로 다시 내면 어떻게 되는가.
 //
@@ -76,7 +76,7 @@ export const RETRY_ADVICE = {
     change:
       '이미지나 영상은 여기서 만들지 않습니다. 다만 거기 들어갈 정보를 표로 정리하는 일이라면 그것만 따로 내 주세요 — 그건 받습니다.',
   },
-  // shared/review.js의 코드와 같아야 한다. DB CHECK 목록에 있는 값이다.
+  // shared/review.ts의 코드와 같아야 한다. DB CHECK 목록에 있는 값이다.
   unstructured_only: {
     kind: 'later',
     change:
@@ -197,7 +197,7 @@ export function resubmitNote({ previousTicket, changed, times }) {
 // 반려할 때 담당자가 봐야 하는 것.
 //
 // 반려 사유마다 "왜 이게 범위 밖인가"와 "대신 무엇을 해 드릴 수 있나"가
-// shared/review.js에 이미 적혀 있다. 그런데 반려 화면은 사유 이름만
+// shared/review.ts에 이미 적혀 있다. 그런데 반려 화면은 사유 이름만
 // 드롭다운에 늘어놓고 그 둘을 안 보여준다. 담당자는 매번 빈칸에서 시작하고,
 // 실제로 라이브 기록에 "대안: 적지 않음"이 남아 있다.
 //

@@ -4,7 +4,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import WorkspaceGate from '../src/components/WorkspaceGate.jsx'
 import { ToastProvider, useToast } from '../src/context/ToastContext.jsx'
-import { api } from '../src/api/client.js'
+import { api } from '../src/api/client.ts'
 import { useApi } from '../src/hooks/useApi.js'
 import { beginAccessCheck, completeAccessCheck, failAccessCheck, getAccessSession } from '../src/lib/accessSession.js'
 import { keepToolRun, pendingToolRun, forgetToolRun } from '../src/lib/pendingToolRuns.js'

@@ -6,7 +6,7 @@ import BetaPage from '../src/pages/BetaPage.jsx'
 import { forgetBetaRound, pendingBetaRound } from '../src/lib/pendingBetaRounds.js'
 
 const state = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), grade: vi.fn(), read: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn(), info: vi.fn(), scope: 'beta-scope-a', revision: 2, loadError: null }))
-vi.mock('../src/api/client.js', () => ({ api: { post: state.post, get: state.get } }))
+vi.mock('../src/api/client.ts', () => ({ api: { post: state.post, get: state.get } }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: state.success, error: state.error, info: state.info }) }))
 vi.mock('../src/lib/readFiles.js', () => ({ readLocalFiles: state.read }))
 vi.mock('../shared/grade.js', () => ({ gradeAll: state.grade }))

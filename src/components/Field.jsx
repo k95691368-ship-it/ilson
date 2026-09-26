@@ -3,6 +3,7 @@ import { cloneElement, isValidElement, useId } from 'react'
 // 입력 이름, 필수 여부, 도움말, 오류를 한 번에 연결한다.
 // 화면마다 같은 모양의 Field를 따로 만들면 시각은 비슷해도 보조기기에
 // 전달되는 정보가 달라진다. 이 컴포넌트가 실제 required/aria 속성까지 맡는다.
+/** @param {{ label: import('react').ReactNode, required?: boolean, hint?: import('react').ReactNode, error?: import('react').ReactNode, count?: readonly [number, number], children: import('react').ReactNode }} props */
 export default function Field({ label, required = false, hint, error, count, children }) {
   const uid = useId().replaceAll(':', '')
   const controlId = children?.props?.id ?? `field-${uid}`

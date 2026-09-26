@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { reasonText } from '../../shared/similar.js'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { ago, num } from '../lib/format.js'
 import { validateJoin, FREQUENCIES, joinTrackPath } from '../../shared/join.js'
 import Field from './Field.jsx'

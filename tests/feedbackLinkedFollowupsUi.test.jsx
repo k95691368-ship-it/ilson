@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import FieldFeedbackView from '../src/components/FieldFeedbackView.jsx'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 const empty = () => ({ cases: [], casePage: { hasMore: false }, unread: 0, manager: true, reviewer: true,
   batches: [], batchPage: { hasMore: false }, samples: [], followups: [], nonuse: [], nonuseSummary: [] })
 const followup = (id, overrides = {}) => ({ id, cluster_id: 'cluster-old', source_kind: 'feedback', source_id: 'notice-' + id,

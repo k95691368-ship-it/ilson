@@ -9,7 +9,7 @@ import { computeOutcome } from '../shared/outcome.js'
 
 const client=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}))
 const toast=vi.hoisted(()=>({success:vi.fn(),error:vi.fn()}))
-vi.mock('../src/api/client.js',()=>({api:client}))
+vi.mock('../src/api/client.ts',()=>({api:client}))
 vi.mock('../src/context/ToastContext.jsx',()=>({useToast:()=>toast}))
 const baseline={median_seconds:600,min_seconds:600,max_seconds:600,sample_n:5,people:1,hourly_wage_krw:3600}
 const application={id:'a',ticket_no:'AX-111-111',title:'검증 업무',dept:'재무',status:'완료'}

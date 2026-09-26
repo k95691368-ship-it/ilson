@@ -103,7 +103,7 @@
 [`docs/통합이력-개인체험-배포.md`](docs/통합이력-개인체험-배포.md)에 정리했습니다.
 
 ```
-React 19 + Vite + react-router
+React 19 + Vite + react-router (JavaScript → TypeScript 점진 전환)
         │
         ├─ Cloudflare Pages Functions (functions/api/**)
         │       ├─ _lib/http.js        응답·오류 규격 통일
@@ -128,14 +128,28 @@ npm run dev:demo     # 외부 연결 없는 메모리 PostgreSQL + 실제 API, 5
 npm run dev:full     # Cloudflare Pages Functions + Supabase 연결
 
 npm test             # 전체 테스트
+npm run typecheck    # 전환된 TypeScript 코드와 컴파일 전용 데이터 계약 검사
+npm run test:workflow # 신청 이후 인계·성과, 판정 경쟁, 정산 원본 추적 집중 검증
 npm run smoke        # 서버 라우트 + 화면 렌더 스모크
 npm run lint
-npm run build
+npm run build        # 타입 검사 통과 후 클라이언트·Worker 빌드
 
 # 시험 데이터 재생성 (같은 시드 → 같은 출력)
 pip install pandas openpyxl
 python seed/generate_sources.py
 ```
+
+TypeScript는 점진적으로 적용한다. 검토·협의·성과 입력·베타 근거·인계의 공용 규칙,
+검토 API, 브라우저 API 통신과 인계 화면이 1차 대상이다. `strict` 검사를 켜고,
+검증 전 HTTP 데이터는 `unknown`으로 다루며 기존 서버 입력·권한 검사는 유지한다.
+아직 전환하지 않은 JavaScript는 `allowJs`로 함께 사용하지만 `checkJs`는 꺼져 있으므로
+프로젝트 전체가 타입 검사되거나 TypeScript로 전환됐다고 주장하지 않는다.
+타입 검사는 GitHub CI와 실제 빌드 명령 모두에 포함하며, 로컬 서버는 Node의
+타입 제거 실행을 사용한다. 타입 도입 자체를 실행 속도나 실제 업무 절감 성과로 보지 않는다.
+
+`test:workflow`는 메모리 PostgreSQL과 합성 자료로 업무 흐름·원본 대조·성과 근거를
+재현한다. 실제 고객의 전후 생산성 측정이나 운영 부하 시험을 대신하지 않는다.
+Python은 현재 시험 데이터 생성에만 쓰며, 별도 AI 분석 서비스는 추가하지 않았다.
 
 운영 DB는 Supabase PostgreSQL이며 Cloudflare Pages는 프런트와 API를 배포합니다.
 `SUPABASE_URL`은 `wrangler.toml`, `SUPABASE_SERVICE_ROLE_KEY`는 Pages Production의

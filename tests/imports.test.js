@@ -24,7 +24,7 @@ function jsFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) jsFiles(p, out)
-    else if (name.endsWith('.js')) out.push(p)
+    else if (/\.[jt]s$/.test(name) && !name.endsWith('.d.ts')) out.push(p)
   }
   return out
 }
@@ -52,7 +52,7 @@ function importsOf(src) {
     const names = m[1]
       .split(',')
       .map((p) => p.trim().split(/\s+as\s+/)[0].trim())
-      .filter(Boolean)
+      .filter((name) => name && !name.startsWith('type '))
     out.push({ names, from: m[2] })
   }
   return out

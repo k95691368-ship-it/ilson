@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { encodeBetaNote, decodeBetaRound } from '../shared/betaEvidence.js'
+import { encodeBetaNote, decodeBetaRound } from '../shared/betaEvidence.ts'
 it('preserves original notes and does not interpret client text as revision metadata',()=>{
   const forged=encodeBetaNote(999,'pretend')
   expect(decodeBetaRound({note:encodeBetaNote(4,forged)})).toEqual({note:forged,criteriaRevision:4})

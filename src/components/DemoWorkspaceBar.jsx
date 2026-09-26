@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { readWorkspace, resetWorkspace } from '../api/client.js'
+import { readWorkspace, resetWorkspace } from '../api/client.ts'
 import { clearDraft, DRAFT_KEY } from '../lib/draft.js'
 import { getAccessSession } from '../lib/accessSession.js'
 

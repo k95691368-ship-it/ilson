@@ -42,7 +42,7 @@ describe('API resource and information boundary', () => {
   })
   it('does not interpolate raw exception details in any API route', () => {
     const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(item => item.isDirectory() ? walk(join(dir, item.name)) : [join(dir, item.name)])
-    for (const file of walk('functions/api').filter(file => file.endsWith('.js'))) {
+    for (const file of walk('functions/api').filter(file => /\.[jt]s$/.test(file))) {
       expect(readFileSync(file, 'utf8'), file).not.toMatch(/\$\{String\(err(?:or)?\.message\)/)
     }
   })

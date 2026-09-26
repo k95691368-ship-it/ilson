@@ -11,7 +11,7 @@ import { useHotkeys } from '../hooks/useHotkeys.js'
 import { useApi } from '../hooks/useApi.js'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { ago, duration, num, krw } from '../lib/format.js'
 import {
   applyQuery,
@@ -33,7 +33,7 @@ import {
   REFUSE_REASONS,
   IMPACT_SCALE,
   DIFFICULTY_SCALE,
-} from '../../shared/review.js'
+} from '../../shared/review.ts'
 
 const HOTKEYS = [
   { keys: 'j ↓', what: '다음 신청서' },
@@ -1416,7 +1416,7 @@ export function Joined({ id }) {
 // 반려 사유를 고르면 딸려 나오는 것.
 //
 // 사유마다 "왜 이게 범위 밖인가"와 "대신 무엇을 해 드릴 수 있나"가
-// shared/review.js에 이미 적혀 있는데, 반려 화면은 사유 이름만 보여줬다.
+// shared/review.ts에 이미 적혀 있는데, 반려 화면은 사유 이름만 보여줬다.
 // 담당자는 매번 빈칸에서 시작했고, 실제로 기록에 "대안: 적지 않음"이 남았다.
 //
 // **자동으로 안 채운다.** 자동으로 채우면 담당자는 안 읽고 저장하고, 부서는

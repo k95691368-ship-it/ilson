@@ -4,7 +4,7 @@ import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useToast } from '../context/ToastContext.jsx'
 import { ago, duration, num } from '../lib/format.js'
 

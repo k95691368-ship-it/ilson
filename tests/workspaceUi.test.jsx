@@ -5,12 +5,12 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import WorkspaceGate from '../src/components/WorkspaceGate.jsx'
 import DemoWorkspaceBar from '../src/components/DemoWorkspaceBar.jsx'
 import JourneyPage from '../src/pages/JourneyPage.jsx'
-import { ensureWorkspace, readAccessSession, readWorkspace, resetWorkspace, api } from '../src/api/client.js'
+import { ensureWorkspace, readAccessSession, readWorkspace, resetWorkspace, api } from '../src/api/client.ts'
 import { useApi } from '../src/hooks/useApi.js'
 import { DRAFT_KEY, draftKey } from '../src/lib/draft.js'
 import { beginAccessCheck, completeAccessCheck } from '../src/lib/accessSession.js'
 
-vi.mock('../src/api/client.js', () => ({ ensureWorkspace: vi.fn(), readAccessSession: vi.fn(), readWorkspace: vi.fn(), resetWorkspace: vi.fn(), api: { post: vi.fn() } }))
+vi.mock('../src/api/client.ts', () => ({ ensureWorkspace: vi.fn(), readAccessSession: vi.fn(), readWorkspace: vi.fn(), resetWorkspace: vi.fn(), api: { post: vi.fn() } }))
 vi.mock('../src/hooks/useApi.js', () => ({ useApi: vi.fn() }))
 afterEach(() => { cleanup(); vi.restoreAllMocks(); localStorage.clear() })
 beforeEach(() => { vi.clearAllMocks(); readWorkspace.mockResolvedValue({enabled:true,active:false}); readAccessSession.mockResolvedValue({ok:true,mode:'demo',scope:'a'.repeat(64)}) })

@@ -5,13 +5,13 @@ import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { num, ms, ago } from '../lib/format.js'
 import { gradeAll } from '../../shared/grade.js'
 import { passCaveat } from '../../shared/signoff.js'
 import { PERIOD } from '../../shared/master.js'
 import { pendingBetaRound, keepBetaRound, forgetBetaRound, subscribeBetaRounds } from '../lib/pendingBetaRounds.js'
-import HandoverPanel from '../components/HandoverPanel.jsx'
+import HandoverPanel from '../components/HandoverPanel.tsx'
 
 // 시연 파일 다섯 장을 사이트에서 걷어냈다. 그래서 이 화면도 넣은 파일로
 // 채점한다. 정답표가 함께 없어졌으므로 정답 대조 기준 셋은 「판정불가」로

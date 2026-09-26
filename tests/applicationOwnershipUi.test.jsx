@@ -5,7 +5,7 @@ import ApplicationOwnership from '../src/components/ApplicationOwnership.jsx'
 
 const state=vi.hoisted(()=>({data:null,error:null,post:vi.fn(),reload:vi.fn(),success:vi.fn()}))
 vi.mock('../src/hooks/useApi.js',()=>({useApi:()=>({data:state.data,error:state.error,loading:false,reload:state.reload})}))
-vi.mock('../src/api/client.js',()=>({api:{post:state.post}}))
+vi.mock('../src/api/client.ts',()=>({api:{post:state.post}}))
 vi.mock('../src/context/ToastContext.jsx',()=>({useToast:()=>({success:state.success})}))
 beforeEach(()=>{
   vi.clearAllMocks();state.error=null

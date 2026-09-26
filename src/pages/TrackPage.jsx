@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useApi } from '../hooks/useApi.js'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import Thread from '../components/Thread.jsx'

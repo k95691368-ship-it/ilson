@@ -9,37 +9,61 @@
 
 import { jsonResponse, jsonError } from '../../../_lib/http.js'
 import { validReviewRevision, reviewConflict, lockReviewRevision, reviewMutation } from '../../../_lib/reviewMutation.js'
-import { validateReview, statusFromVerdict, REFUSE_LABELS } from '../../../../shared/review.js'
+import { validateReview, statusFromVerdict, REFUSE_LABELS } from '../../../../shared/review.ts'
 import { newId } from '../../../_lib/ids.js'
+import type { ApplicationContext, Database } from '../../../_lib/runtimeTypes.ts'
 
-export async function onRequestPost({ env, data: requestData, params, request }) {
+type ReviewValue = Extract<ReturnType<typeof validateReview>, { ok: true }>['value']
+type ReviewStatus = '접수' | '검토중' | '수용' | '반려' | '보류' | '진행중' | '완료'
+interface ReviewApplication {
+  id: string
+  ticket_no: string
+  dept: string
+  title: string
+  status: ReviewStatus
+  review_revision: number
+}
+
+export interface ReviewResponse {
+  ok: true
+  application_id: string
+  ticket_no: string
+  status: ReviewStatus
+  verdict: ReviewValue['verdict']
+}
+
+export async function onRequestPost({ env, data: requestData, params, request }: ApplicationContext): Promise<Response> {
   env = requestData?.requestEnv ?? env
   const id = params.id
 
-  let body
+  let body: unknown
   try {
     body = await request.json()
   } catch {
     return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
 
-  const check = validateReview(body)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return jsonError('요청 형식이 올바르지 않습니다.', 400)
+  }
+  const input = body as Record<string, unknown>
+  const check = validateReview(input)
   if (!check.ok) {
     return jsonResponse({ error: '적어 주신 내용을 확인해주세요.', fields: check.errors }, 400)
   }
   const v = check.value
-  if (!validReviewRevision(body.expectedRevision)) return reviewConflict()
+  if (!validReviewRevision(input.expectedRevision)) return reviewConflict()
 
-  return reviewMutation(env.DB, request, `review:${id}`, body, async DB => {
+  return reviewMutation(env.DB, request, `review:${id}`, input, async (DB: Database) => {
 
   const application = await DB.prepare(
     `SELECT id, ticket_no, dept, title, status, review_revision FROM application WHERE id = ? OR ticket_no = ?`
   )
     .bind(id, id)
-    .first()
+    .first<ReviewApplication>()
 
   if (!application) return jsonError('그런 신청서가 없습니다.', 404)
-  if (Number(application.review_revision) !== body.expectedRevision) return reviewConflict()
+  if (Number(application.review_revision) !== input.expectedRevision) return reviewConflict()
 
   const advanced = ['진행중', '완료'].includes(application.status)
   if (advanced && v.verdict !== '수용') return jsonError('이미 제작하거나 인수한 신청서를 검토 판정으로 이전 단계로 되돌릴 수 없습니다.', 409)
@@ -133,32 +157,33 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
   await DB.batch(statements)
 
-  return jsonResponse({
+  const response = {
     ok: true,
     application_id: application.id,
     ticket_no: application.ticket_no,
     status: nextStatus,
     verdict: v.verdict,
-  })
+  } satisfies ReviewResponse
+  return jsonResponse(response)
   }, '판정을 저장하지 못했습니다.')
 }
 
-function buildWhat(application, v) {
+function buildWhat(application: ReviewApplication, v: ReviewValue): string {
   const head = `${application.ticket_no} · ${application.dept} · ${application.title}`
   const score = `임팩트 ${v.impact_score} / 난이도 ${v.difficulty_score}`
   // 빈 값을 그대로 문장에 끼우면 안 된다.
   //
-  // shared/review.js는 사유와 대안을 비워 둬도 저장한다 — 억지로 채운
+  // shared/review.ts는 사유와 대안을 비워 둬도 저장한다 — 억지로 채운
   // 스무 글자보다 빈 칸이 정직하기 때문이다. 그런데 여기서 그 null을
   // 그대로 템플릿에 넣어서, 지워지지 않는 결정 기록에
   // "반려(null). 대안: null"이 박혀 있었다.
-  const said = (value, whenEmpty) => {
+  const said = (value: unknown, whenEmpty: string) => {
     const t = String(value ?? '').trim()
     return t || whenEmpty
   }
 
   if (v.verdict === '반려') {
-    const why = REFUSE_LABELS[v.refuse_code] ?? said(v.refuse_code, '사유를 안 고름')
+    const why = (v.refuse_code ? REFUSE_LABELS[v.refuse_code] : null) ?? said(v.refuse_code, '사유를 안 고름')
     return `${head} — 반려(${why}). 대안: ${said(v.refuse_alternative, '적지 않음')} [${score}]`
   }
   if (v.verdict === '보류') {

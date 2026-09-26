@@ -129,7 +129,7 @@ function apiFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) apiFiles(p, out)
-    else if (name.endsWith('.js')) out.push(p)
+    else if (/\.[jt]s$/.test(name) && !name.endsWith('.d.ts')) out.push(p)
   }
   return out
 }

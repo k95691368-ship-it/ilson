@@ -126,7 +126,7 @@ describe('같은 부품을 나눠 쓴다', () => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, e.name)
       if (e.isDirectory()) walk(p)
-      else if (p.endsWith('.js')) files.push(p)
+      else if (/\.[jt]s$/.test(p)) files.push(p)
     }
   }
   walk(join(ROOT, 'functions'))

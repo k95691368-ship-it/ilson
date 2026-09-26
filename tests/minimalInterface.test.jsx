@@ -12,7 +12,7 @@ vi.mock('../src/pages/OverridePage.jsx', () => ({ default: () => <h1>운영판 �
 vi.mock('../src/pages/ApplyPage.jsx', () => ({ default: () => <h1>신청 경로 확인</h1> }))
 vi.mock('../src/hooks/useApi.js', () => ({ useApi: () => ({ data: null, loading: false }) }))
 vi.mock('../src/components/PageViewTracker.jsx', () => ({ default: () => null }))
-vi.mock('../src/api/client.js', () => ({
+vi.mock('../src/api/client.ts', () => ({
   readWorkspace: vi.fn(async () => ({ enabled: true, active: false })),
   readAccessSession: vi.fn(), ensureWorkspace: vi.fn(), resetWorkspace: vi.fn(),
 }))

@@ -6,7 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import App from '../src/App.jsx'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api }))
+vi.mock('../src/api/client.ts', () => ({ api }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: vi.fn(), error: vi.fn() }) }))
 vi.mock('../src/components/DemoWorkspaceBar.jsx', () => ({ default: () => null }))
 vi.mock('../src/components/PageViewTracker.jsx', () => ({ default: () => null }))

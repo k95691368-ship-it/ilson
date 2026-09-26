@@ -15,9 +15,11 @@ const request = (path, method = 'GET', headers = {}, body) => new Request('https
 describe('workspace HTTP boundary', () => {
   it('every Pages API handler receives the request-scoped environment', () => {
     const walk = directory => readdirSync(directory, { withFileTypes: true }).flatMap(entry => entry.isDirectory() ? walk(join(directory, entry.name)) : join(directory, entry.name))
-    for (const file of walk('functions/api').filter(file => file.endsWith('.js') && !file.endsWith('_middleware.js'))) {
+    for (const file of walk('functions/api').filter(file => /\.[jt]s$/.test(file) && !/_middleware\.[jt]s$/.test(file))) {
       const source = readFileSync(file, 'utf8')
-      const signatures = [...source.matchAll(/export async function onRequest\w*\([^)]*\) \{/g)]
+      const declarations = [...source.matchAll(/export async function onRequest\w*\b/g)]
+      const signatures = [...source.matchAll(/export async function onRequest\w*\([^)]*\)(?:\s*:\s*[^{\n]+)?\s*\{/g)]
+      expect(signatures, `${file}: every exported handler must be checked`).toHaveLength(declarations.length)
       for (const signature of signatures) {
         expect(source.slice(signature.index, signature.index + signature[0].length + 140)).toContain('requestEnv')
       }

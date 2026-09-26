@@ -18,7 +18,7 @@ import {
 } from '../shared/tryit.js'
 import { DEMO_PREFIX } from '../shared/provenance.js'
 import { DEMO_APPLICATIONS } from '../functions/_lib/demoApplications.js'
-import { validateReview } from '../shared/review.js'
+import { validateReview } from '../shared/review.ts'
 
 // 이 사이트에는 로그인이 없다. 실수가 아니라 정한 것이다 — 부서 담당자에게
 // 계정을 만들게 하면 그 순간부터 아무도 안 쓴다. 그래서 처음 온 사람도

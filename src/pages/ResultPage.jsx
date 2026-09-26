@@ -5,7 +5,7 @@ import Field from '../components/Field.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { krw, num, duration, ago } from '../lib/format.js'
 import { CHALLENGE_RULES } from '../../shared/outcome.js'
 

@@ -9,7 +9,7 @@ import { useActionLifetime } from '../src/hooks/useActionLifetime.js'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => toast }))
 const A = 'AX-111-111', B = 'AX-222-222'
 let pending, posts, navigate

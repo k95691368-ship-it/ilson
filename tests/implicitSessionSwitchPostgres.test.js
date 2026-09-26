@@ -8,7 +8,7 @@ import { onRequestGet as sessionGet } from '../functions/api/session.js'
 import { onRequestGet as applicationGet } from '../functions/api/applications/[id]/index.js'
 import { onRequestPost as askPost } from '../functions/api/applications/[id]/ask.js'
 import { onRequestDelete as workspaceDelete } from '../functions/api/demo/workspace.js'
-import { api, readAccessSession } from '../src/api/client.js'
+import { api, readAccessSession } from '../src/api/client.ts'
 import { beginAccessCheck, completeAccessCheck, getAccessSession } from '../src/lib/accessSession.js'
 
 // Uses real middleware, signed JWTs, scoped RPCs and an in-memory PostgreSQL DB.

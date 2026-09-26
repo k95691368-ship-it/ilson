@@ -115,7 +115,7 @@ describe('화면에 표시가 새어 나오지 않는가', () => {
 describe('적어 둔 것이 실제로 그런가', () => {
   const src = walk(join(ROOT, 'src'))
     .concat(walk(join(ROOT, 'functions')), walk(join(ROOT, 'shared')))
-    .filter((f) => f.endsWith('.js') || f.endsWith('.jsx'))
+    .filter((f) => /\.[jt]sx?$/.test(f))
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n')
 

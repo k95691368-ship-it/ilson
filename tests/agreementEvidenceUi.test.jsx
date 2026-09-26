@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom'
 import AgreementEvidence from '../src/components/AgreementEvidence.jsx'
 
 const client = vi.hoisted(() => ({ post: vi.fn(), patch: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 let latest, refresh
 const base = () => ({ application: { id: 'a', ticket_no: 'AX-AAA-123', current_people: 2, current_frequency: '매주' },
   criteria_source_version: 'criteria-v1', baseline_source_version: 'baseline-v1', baseline: null, shadowRuns: [], criteria: [] })

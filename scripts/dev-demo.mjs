@@ -7,6 +7,7 @@ import { createServer } from 'vite'
 import { PGlite } from '@electric-sql/pglite'
 import { onRequest } from '../functions/api/_middleware.js'
 import { localAccessFixture } from '../tests/fixtures/localAccess.mjs'
+import { compileDemoRoutes } from './lib/demo-routes.mjs'
 const pg = new PGlite()
 await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
 for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql']) {
@@ -42,11 +43,7 @@ globalThis.fetch = (url, options) => {
 async function walk(dir) {
   return (await Promise.all((await readdir(dir, { withFileTypes: true })).map(entry => entry.isDirectory() ? walk(dir + '/' + entry.name) : dir + '/' + entry.name))).flat()
 }
-const routes = (await walk('functions/api')).filter(file => file.endsWith('.js') && !file.endsWith('_middleware.js')).map(file => {
-  const names = []
-  const path = file.replace('functions', '').replace(/\/index\.js$/, '').replace(/\.js$/, '').replace(/\[([^\]]+)\]/g, (_, name) => { names.push(name); return '([^/]+)' })
-  return { file, names, regex: new RegExp('^' + path + '/?$') }
-}).sort((a, b) => a.names.length - b.names.length)
+const routes = compileDemoRoutes(await walk('functions/api'))
 const server = await createServer({ server: { host: '127.0.0.1', port, strictPort: true }, plugins: [{
   name: 'local-isolated-api', configureServer(vite) {
     vite.middlewares.use(async (req, res, next) => {

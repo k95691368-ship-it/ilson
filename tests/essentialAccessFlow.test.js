@@ -7,7 +7,7 @@ import { onRequest } from '../functions/api/_middleware.js'
 import { onRequestPost as change, onRequestGet as workspace } from '../functions/api/override.js'
 import { onRequestDelete as cleanup } from '../functions/api/demo/visitors.js'
 import { onRequestPost as application } from '../functions/api/applications/index.js'
-import { onRequestPost as review } from '../functions/api/applications/[id]/review.js'
+import { onRequestPost as review } from '../functions/api/applications/[id]/review.ts'
 import { viewedOverrideRequests } from './fixtures/overrideEdit.js'
 
 const pg = new PGlite()

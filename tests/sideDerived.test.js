@@ -29,7 +29,7 @@ const walk = (d) => {
   for (const e of readdirSync(d, { withFileTypes: true })) {
     const p = join(d, e.name)
     if (e.isDirectory()) walk(p)
-    else if (p.endsWith('.js')) files.push(p)
+    else if (/\.[jt]s$/.test(p)) files.push(p)
   }
 }
 walk(join(ROOT, 'functions'))
@@ -41,7 +41,7 @@ const rel = (f) => f.slice(ROOT.length).split('\\').join('/')
 function kindConstants() {
   const map = new Map()
   for (const f of readdirSync(join(ROOT, 'shared'))) {
-    if (!f.endsWith('.js')) continue
+    if (!/\.[jt]s$/.test(f)) continue
     const src = readFileSync(join(ROOT, 'shared', f), 'utf8')
     for (const m of src.matchAll(/export const (\w*KIND\w*) = '([^']+)'/g)) {
       map.set(m[1], m[2])

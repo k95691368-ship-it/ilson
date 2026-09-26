@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { api } from '../src/api/client.js'
+import { api } from '../src/api/client.ts'
 import { beginAccessCheck, completeAccessCheck } from '../src/lib/accessSession.js'
 beforeEach(() => completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'access', scope: 'a'.repeat(64) }))
 afterEach(()=>vi.unstubAllGlobals())

@@ -5,7 +5,7 @@ let client, session
 const activate = scope => session.completeAccessCheck(session.beginAccessCheck(), { ok: true, mode: 'demo', scope })
 beforeEach(async () => {
   vi.resetModules()
-  client = await import('../src/api/client.js')
+  client = await import('../src/api/client.ts')
   session = await import('../src/lib/accessSession.js')
 })
 afterEach(() => vi.unstubAllGlobals())

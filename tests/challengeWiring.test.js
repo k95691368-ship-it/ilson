@@ -25,7 +25,7 @@ function jsFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) jsFiles(p, out)
-    else if (name.endsWith('.js')) out.push(p)
+    else if (/\.[jt]s$/.test(name)) out.push(p)
   }
   return out
 }

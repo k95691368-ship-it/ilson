@@ -12,7 +12,7 @@ import { betaRoundPayload } from '../../../_lib/betaRound.js'
 import { mutationFingerprint } from '../../../_lib/atomicMutation.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import { signoffState } from '../../../../shared/signoff.js'
-import { encodeBetaNote, decodeBetaRound } from '../../../../shared/betaEvidence.js'
+import { encodeBetaNote, decodeBetaRound } from '../../../../shared/betaEvidence.ts'
 
 async function findApplication(env, id) {
   return env.DB.prepare(

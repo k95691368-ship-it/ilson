@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import FieldFeedbackView from '../src/components/FieldFeedbackView.jsx'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 const empty = () => ({ cases: [], casePage: { hasMore: false, nextCursor: null }, unread: 0, manager: false, reviewer: false,
   batches: [], batchPage: { hasMore: false, nextCursor: null }, samples: [], followups: [], nonuse: [], nonuseSummary: [] })
 const sample = (overrides = {}) => ({ id: 'sample-old', batch_id: 'batch-old', event_id: 'approval-original', snapshot: { ai_decision: '추출 당시 원문', human_decision: '원래 직원 승인', policy_refs_json: '["당시 정책"]' }, ...overrides })

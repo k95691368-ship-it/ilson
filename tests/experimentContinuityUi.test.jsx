@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OverridePage from '../src/pages/OverridePage.jsx'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), success: vi.fn(), error: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: client.success, error: client.error }) }))
 const plan = { metricType: 'rate', minimumWindowSeconds: 60, minimumSamples: { historical: 10, shadow: 10, limited: 10 }, rationale: '단계별 측정', datasetVersion: 'd1', modelVersion: 'm1', policyVersion: 'p1' }
 let experiment, workspace

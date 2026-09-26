@@ -116,7 +116,7 @@ describe('걷어낸 기능의 표를 남겨 두지 않는다', () => {
       for (const e of readdirSync(d, { withFileTypes: true })) {
         const p = join(d, e.name)
         if (e.isDirectory()) walk(p)
-        else if (p.endsWith('.js') || p.endsWith('.jsx')) code.push(readFileSync(p, 'utf8'))
+        else if (/\.[jt]sx?$/.test(p)) code.push(readFileSync(p, 'utf8'))
       }
     }
     walk(join(ROOT, 'functions'))

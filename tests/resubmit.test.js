@@ -10,7 +10,7 @@ import {
   MIN_CHANGED,
   refuseHelp,
 } from '../shared/resubmit.js'
-import { REFUSE_CODES } from '../shared/review.js'
+import { REFUSE_CODES } from '../shared/review.ts'
 
 // 반려가 막다른 길이면 부서는 대안을 읽고 끝난다. 그렇다고 다시 내기를
 // 그냥 열어 두면 반려가 뜻이 없어진다 — 같은 것이 그대로 다시 오고,

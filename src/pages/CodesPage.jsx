@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { ago, dateTimeLabel, num } from '../lib/format.js'
 import Field from '../components/Field.jsx'
 

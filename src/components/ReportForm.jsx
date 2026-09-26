@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useToast } from '../context/ToastContext.jsx'
 import { REPORT_KINDS, REPORT_BY_CODE } from '../../shared/report.js'
 import Field from './Field.jsx'

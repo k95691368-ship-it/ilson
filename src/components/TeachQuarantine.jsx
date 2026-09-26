@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useToast } from '../context/ToastContext.jsx'
 import { groupQuarantine, affectedRows, catalog } from '../../shared/teach.js'
 import { QUARANTINE_REASONS } from '../../shared/pipeline.js'

@@ -100,22 +100,46 @@ const CRITERION_CATALOG = [
     kind: 'human',
     safetyDefault: false,
   },
-]
+] as const
 
-export const CRITERION_BY_KEY = Object.fromEntries(CRITERION_CATALOG.map((c) => [c.key, c]))
+export type CriterionDefinition = (typeof CRITERION_CATALOG)[number]
+export type CriterionKey = CriterionDefinition['key']
+export type CriterionKind = CriterionDefinition['kind']
 
-export const CONFLICT_VERDICTS = ['A우선', 'B우선', '절충', '충돌아님']
-export const REQUIREMENT_KINDS = ['요구', '제약', '미결', '가정']
-export const REQUIREMENT_STATUSES = ['초안', '채택', '수정채택', '기각']
-export const PRIORITIES = ['필수', '보통', '있으면좋음']
+export const CRITERION_BY_KEY = Object.fromEntries(CRITERION_CATALOG.map((c) => [c.key, c])) as {
+  [Key in CriterionKey]: Extract<CriterionDefinition, { key: Key }>
+}
+
+export const CONFLICT_VERDICTS = ['A우선', 'B우선', '절충', '충돌아님'] as const
+export const REQUIREMENT_KINDS = ['요구', '제약', '미결', '가정'] as const
+export const REQUIREMENT_STATUSES = ['초안', '채택', '수정채택', '기각'] as const
+export const PRIORITIES = ['필수', '보통', '있으면좋음'] as const
+
+export type ConflictVerdict = (typeof CONFLICT_VERDICTS)[number]
+export type RequirementKind = (typeof REQUIREMENT_KINDS)[number]
+export type RequirementStatus = (typeof REQUIREMENT_STATUSES)[number]
+export type RequirementPriority = (typeof PRIORITIES)[number]
+
+export interface AgreementGateInput {
+  requirements: readonly { status?: unknown }[]
+  conflicts: readonly { verdict?: unknown }[]
+  criteria: readonly { confirmed_at?: unknown }[]
+  baseline: unknown
+  pendingJoins?: readonly { dept?: unknown }[]
+}
+
+export interface AgreementGateResult {
+  ready: boolean
+  blockers: string[]
+}
 
 // 회의록에 그 말이 실제로 있었는지 대조한다.
 //
 // 띄어쓰기와 따옴표 모양만 다른 것까지 "없는 말"로 몰면 멀쩡한 인용이 전부
 // 미확인으로 뜬다. 눈으로 같은 문장이면 같은 것으로 본다.
-export function quoteFound(minutes, quote) {
+export function quoteFound(minutes: unknown, quote: unknown): boolean {
   if (!quote || !minutes) return false
-  const clean = (s) =>
+  const clean = (s: unknown) =>
     String(s)
       .replace(/[\s　]+/g, '')
       .replace(/["'""'']/g, '')
@@ -127,8 +151,8 @@ export function quoteFound(minutes, quote) {
 //
 // 서버가 판단한다. 화면에서만 막으면 요청을 직접 보내 우회할 수 있고,
 // 무엇보다 "왜 다음으로 못 가는지"를 한 곳에서 설명할 수 있어야 한다.
-export function agreementGate({ requirements, conflicts, criteria, baseline, pendingJoins = [] }) {
-  const blockers = []
+export function agreementGate({ requirements, conflicts, criteria, baseline, pendingJoins = [] }: AgreementGateInput): AgreementGateResult {
+  const blockers: string[] = []
 
   // 손든 부서의 사정이 아직 협의안에 안 들어왔으면 만들기 시작하면 안 된다.
   //

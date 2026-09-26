@@ -9,7 +9,7 @@ import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
-import { validateBaselineInputs } from '../../../../shared/outcomeInputs.js'
+import { validateBaselineInputs } from '../../../../shared/outcomeInputs.ts'
 import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
 import { loadCriteriaEvidence, baselineSourceVersion, agreementMutation, agreementConflict } from '../../../_lib/agreementEvidence.js'
 import { pendingJoinDepts } from '../../../../shared/join.js'
@@ -21,7 +21,7 @@ import {
   REQUIREMENT_KINDS,
   REQUIREMENT_STATUSES,
   PRIORITIES,
-} from '../../../../shared/acceptance.js'
+} from '../../../../shared/acceptance.ts'
 
 // 요구를 기각할 때 받는 최소 길이. 판정 근거와 같은 선을 쓴다 — 화면마다
 // 다른 기준을 두면 담당자는 어디서 얼마나 적어야 하는지 매번 헷갈린다.

@@ -2,7 +2,7 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_l
 import { atomicMutation, mutationFingerprint } from '../../../_lib/atomicMutation.js'
 import { loadHandoverEvidence, publicHandoverEvidence } from '../../../_lib/handoverEvidence.js'
 import { logDecision } from '../../../_lib/decisions.js'
-import { HANDOVER_KIND, STOP_KIND, TOOL_SCOPE, validateHandover } from '../../../../shared/handover.js'
+import { HANDOVER_KIND, STOP_KIND, TOOL_SCOPE, validateHandover } from '../../../../shared/handover.ts'
 import { RESTORE_KIND } from '../../../../shared/rollback.js'
 
 const conflict=()=>jsonResponse({error:'인계 근거 또는 권한이 변경되었습니다. 작성한 내용은 유지하고 최신 근거를 확인해주세요.',code:'HANDOVER_CONFLICT',notSaved:true},409)

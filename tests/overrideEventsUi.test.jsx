@@ -5,7 +5,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import OverridePage from '../src/pages/OverridePage.jsx'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), success: vi.fn(), error: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: client.success, error: client.error }) }))
 const event = (id, overrides = {}) => ({ id, product_id: 'p1', product_name: '시험 AI', cluster_id: 'c1', occurred_at: '2026-01-01 00:00:00',
   decision_action: 'modify', is_override: 1, validity: 'pending', ai_decision: `AI 원문 ${id}`, human_decision: `직원 판단 ${id}`, reason_detail: `사건 근거 ${id}`,

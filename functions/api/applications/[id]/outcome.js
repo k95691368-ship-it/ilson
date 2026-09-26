@@ -1,6 +1,6 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { logDecision } from '../../../_lib/decisions.js'
-import { validateOutcomeInputs } from '../../../../shared/outcomeInputs.js'
+import { validateOutcomeInputs } from '../../../../shared/outcomeInputs.ts'
 import { OUTCOME_PROXY_KIND } from '../../../../shared/accept.js'
 import { loadOutcomeEvidence, outcomeMutation, outcomeConflict, evidenceMetadata, OUTCOME_RESOLUTION_KIND, OUTCOME_INPUT_KIND } from '../../../_lib/outcomeEvidence.js'
 

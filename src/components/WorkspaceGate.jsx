@@ -1,5 +1,5 @@
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { ensureWorkspace, readAccessSession, readWorkspace } from '../api/client.js'
+import { ensureWorkspace, readAccessSession, readWorkspace } from '../api/client.ts'
 import { beginAccessCheck, completeAccessCheck, failAccessCheck, getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
 
 export default function WorkspaceGate({ children }) {

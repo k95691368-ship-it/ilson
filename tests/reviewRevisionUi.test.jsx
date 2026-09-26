@@ -7,7 +7,7 @@ import { Retry } from '../src/pages/TrackPage.jsx'
 
 const client = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn() }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => toast }))
 vi.mock('../src/components/StageHeader.jsx', () => ({ default: () => null }))
 vi.mock('../src/components/ApplicationOwnership.jsx', () => ({ default: () => null }))

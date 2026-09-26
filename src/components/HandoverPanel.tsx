@@ -1,22 +1,39 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
+import type { FieldErrors } from '../api/client.ts'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
-import { validateHandover } from '../../shared/handover.js'
+import { validateHandover } from '../../shared/handover.ts'
+import { readHandoverEvidence } from '../../shared/contracts/handover.ts'
+import type { HandoverAction, HandoverDraft, HandoverEvidenceResponse, HandoverRequest } from '../../shared/contracts/handover.ts'
 import Field from './Field.jsx'
 
-export default function HandoverPanel({ id, refreshKey }) {
-  const [open,setOpen]=useState(false), [data,setData]=useState(null), [error,setError]=useState('')
+type Props = { id: string; refreshKey?: number | string }
+type TextField = 'title' | 'person' | 'whenToRun' | 'afterRun' | 'contact' | 'reason'
+
+// Catch values are unknown. Only use individually narrowed error properties.
+function readFailure(error: unknown): { message: string; status: number | null; fields: FieldErrors } {
+  const value = typeof error === 'object' && error !== null ? error : {}
+  const message = 'message' in value && typeof value.message === 'string' ? value.message : '요청에 실패했습니다.'
+  const status = 'status' in value && typeof value.status === 'number' ? value.status : null
+  const errors = 'fields' in value ? value.fields : null
+  const fields = typeof errors === 'object' && errors !== null && !Array.isArray(errors)
+    ? Object.fromEntries(Object.entries(errors).filter((entry): entry is [string, string] => typeof entry[1] === 'string')) : {}
+  return { message, status, fields }
+}
+
+export default function HandoverPanel({ id, refreshKey }: Props) {
+  const [open,setOpen]=useState(false), [data,setData]=useState<HandoverEvidenceResponse | null>(null), [error,setError]=useState('')
   const [loading,setLoading]=useState(false), [saving,setSaving]=useState(false), [conflict,setConflict]=useState(false)
-  const [pending,setPending]=useState(null), [message,setMessage]=useState(''), [fields,setFields]=useState({})
-  const [draft,setDraft]=useState({title:'',person:'',whenToRun:'',afterRun:'',contact:'',dailyLimit:'20',maxFileMb:'10',reason:'',scopeAccepted:false,humanChecks:{}})
-  const current=useActionLifetime(id), busy=useRef(false), initialized=useRef(false), requestSeq=useRef(0), viewedEvidence=useRef(null)
+  const [pending,setPending]=useState<HandoverRequest | null>(null), [message,setMessage]=useState(''), [fields,setFields]=useState<FieldErrors>({})
+  const [draft,setDraft]=useState<HandoverDraft>({title:'',person:'',whenToRun:'',afterRun:'',contact:'',dailyLimit:'20',maxFileMb:'10',reason:'',scopeAccepted:false,humanChecks:{}})
+  const current=useActionLifetime(id), busy=useRef(false), initialized=useRef(false), requestSeq=useRef(0), viewedEvidence=useRef<string | null>(null)
   const path=`/applications/${id}/handover`
   const refresh=useCallback(async()=>{
     const alive=current(), seq=++requestSeq.current
     setLoading(true)
     try {
-      const result=await api.get(path)
+      const result=readHandoverEvidence(await api.get(path))
       if(!alive()||seq!==requestSeq.current) return
       setData(result);setError('');setConflict(false)
       if(!initialized.current) {
@@ -29,15 +46,16 @@ export default function HandoverPanel({ id, refreshKey }) {
         setDraft(d=>({...d,scopeAccepted:false,humanChecks:Object.fromEntries(Object.entries(d.humanChecks).map(([key,value])=>[key,{...value,confirmed:false}]))}))
       }
       viewedEvidence.current=result.expectedEvidence
-    } catch(err) {if(alive()&&seq===requestSeq.current)setError(err.message)}
+    } catch(err) {if(alive()&&seq===requestSeq.current)setError(readFailure(err).message)}
     finally {if(alive()&&seq===requestSeq.current)setLoading(false)}
   },[current,path])
   useEffect(()=>{if(open)void refresh()},[open,refreshKey,refresh])
-  const change=(key,value)=>setDraft(d=>({...d,[key]:value}))
+  const change=<K extends keyof HandoverDraft,>(key: K,value: HandoverDraft[K])=>setDraft(d=>({...d,[key]:value}))
 
-  async function save(action,retry=null) {
+  async function save(action: HandoverAction,retry: HandoverRequest | null=null) {
     if(busy.current||(!retry&&(loading||conflict||error||!data))) return
-    const body=retry??{...draft,action,dailyLimit:Number(draft.dailyLimit),maxFileMb:Number(draft.maxFileMb),expectedEvidence:data.expectedEvidence}
+    const body: HandoverRequest | null=retry??(data?{...draft,action,dailyLimit:Number(draft.dailyLimit),maxFileMb:Number(draft.maxFileMb),expectedEvidence:data.expectedEvidence}:null)
+    if(!body) return
     const errors=validateHandover(body,data?.humanCriteria)
     if(Object.keys(errors).length){setFields(errors);return}
     busy.current=true;setSaving(true);setFields({});setError('');setMessage('')
@@ -50,14 +68,15 @@ export default function HandoverPanel({ id, refreshKey }) {
       await refresh()
     } catch(err) {
       if(!alive()) return
-      setError(err.message)
-      if(err.status===0||err.status>=500) setPending(body)
-      else {setPending(null);setFields(err.fields??{});if(err.status===409)setConflict(true)}
+      const failure=readFailure(err)
+      setError(failure.message)
+      if(failure.status===0||(failure.status!==null&&failure.status>=500)) setPending(body)
+      else {setPending(null);setFields(failure.fields);if(failure.status===409)setConflict(true)}
     } finally {if(alive())setSaving(false);busy.current=false}
   }
   const h=data?.handover, action=h?.rolled_back_at?'restore':'create'
   const locked=loading||saving||!!pending
-  const input=(key,label,max=2000)=><Field key={key} label={label} error={fields[key]}><input value={draft[key]} maxLength={max} disabled={locked} onChange={e=>change(key,e.target.value)}/></Field>
+  const input=(key: TextField,label: string,max=2000)=><Field key={key} label={label} error={fields[key]}><input value={draft[key]} maxLength={max} disabled={locked} onChange={e=>change(key,e.target.value)}/></Field>
   return <details className="card" onToggle={event=>setOpen(event.currentTarget.open)}>
     <summary>현장 정산 도구 인계</summary>
     {open&&<div className="stack" style={{marginTop:16}}>
@@ -76,8 +95,8 @@ export default function HandoverPanel({ id, refreshKey }) {
             <Field label="파일 제한(MB)" error={fields.maxFileMb}><input type="number" min="1" max="10" value={draft.maxFileMb} disabled={locked} onChange={e=>change('maxFileMb',e.target.value)}/></Field>
           </div>
           {data.humanCriteria.map(c=><fieldset key={c.id} disabled={locked}><legend>{c.body}</legend>
-            <Field label="직접 확인했습니다" error={fields.humanChecks&&!draft.humanChecks[c.id]?.confirmed?'이 기준을 직접 확인해주세요.':null}><input type="checkbox" checked={draft.humanChecks[c.id]?.confirmed??false} onChange={e=>change('humanChecks',{...draft.humanChecks,[c.id]:{...draft.humanChecks[c.id],confirmed:e.target.checked}})}/></Field>
-            <Field label="확인 근거" error={fields.humanChecks&&String(draft.humanChecks[c.id]?.evidence??'').trim().length<5?fields.humanChecks:null}><textarea maxLength={2000} value={draft.humanChecks[c.id]?.evidence??''} onChange={e=>change('humanChecks',{...draft.humanChecks,[c.id]:{...draft.humanChecks[c.id],evidence:e.target.value}})}/></Field>
+            <Field label="직접 확인했습니다" error={fields.humanChecks&&!draft.humanChecks[c.id]?.confirmed?'이 기준을 직접 확인해주세요.':null}><input type="checkbox" checked={draft.humanChecks[c.id]?.confirmed??false} onChange={e=>change('humanChecks',{...draft.humanChecks,[c.id]:{evidence:draft.humanChecks[c.id]?.evidence??'',confirmed:e.target.checked}})}/></Field>
+            <Field label="확인 근거" error={fields.humanChecks&&String(draft.humanChecks[c.id]?.evidence??'').trim().length<5?fields.humanChecks:null}><textarea maxLength={2000} value={draft.humanChecks[c.id]?.evidence??''} onChange={e=>change('humanChecks',{...draft.humanChecks,[c.id]:{confirmed:draft.humanChecks[c.id]?.confirmed??false,evidence:e.target.value}})}/></Field>
           </fieldset>)}
           <Field label="지원 기간·상품·고정 환율의 제한을 확인했습니다." error={fields.scopeAccepted}><input type="checkbox" checked={draft.scopeAccepted} disabled={locked} onChange={e=>change('scopeAccepted',e.target.checked)}/></Field>
         </>}

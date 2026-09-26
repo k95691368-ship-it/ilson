@@ -13,7 +13,7 @@
 import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { checkRateLimit } from '../../_lib/rateLimit.js'
 import { annualHours } from '../../_lib/applications.js'
-import { REFUSE_REASONS } from '../../../shared/review.js'
+import { REFUSE_REASONS } from '../../../shared/review.ts'
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
 import { fullySignedIds } from '../../_lib/signoff.js'
 import { loadOutcomeEvidence } from '../../_lib/outcomeEvidence.js'

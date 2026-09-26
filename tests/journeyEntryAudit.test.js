@@ -10,7 +10,7 @@ import { onRequestPost as build } from '../functions/api/applications/[id]/build
 import { onRequestGet as beta, onRequestPost as postBeta } from '../functions/api/applications/[id]/beta.js'
 import { onRequestGet as outcome, onRequestPost as confirm } from '../functions/api/applications/[id]/outcome.js'
 import { onRequestPost as tool } from '../functions/api/tools/[slug].js'
-import { agreementGate } from '../shared/acceptance.js'
+import { agreementGate } from '../shared/acceptance.ts'
 import { loadOutcomeEvidence } from '../functions/_lib/outcomeEvidence.js'
 import { onRequestGet as handover, onRequestPost as postHandover } from '../functions/api/applications/[id]/handover.js'
 import { onRequestGet as signoff, onRequestPost as postSignoff } from '../functions/api/track/[ticket]/signoff.js'

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { agreementGate } from '../shared/acceptance.js'
+import { agreementGate } from '../shared/acceptance.ts'
 
 // 만들기 시작해도 되는지를 정하는 문. 여기가 헐거우면 협의 없이 만든 것이
 // 협의한 것처럼 기록에 남는다.

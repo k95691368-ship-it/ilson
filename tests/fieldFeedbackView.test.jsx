@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import FieldFeedbackView from '../src/components/FieldFeedbackView.jsx'
 const state=vi.hoisted(()=>({data:null,error:null,reload:vi.fn(),post:vi.fn()}))
 vi.mock('../src/hooks/useApi.js',()=>({useApi:()=>({...state,loading:false})}))
-vi.mock('../src/api/client.js',()=>({api:{post:state.post}}))
+vi.mock('../src/api/client.ts',()=>({api:{post:state.post}}))
 const fixture=()=>({cases:[],unread:0,manager:false,reviewer:false,batches:[],samples:[],nonuse:[],nonuseSummary:[]})
 const show=(mode='feedback')=>render(<FieldFeedbackView mode={mode} role="reviewer" products={[{id:'p1',name:'테스트 AI'}]} onCapture={vi.fn()} />)
 beforeEach(()=>{state.data=fixture();state.error=null;state.post.mockReset();state.reload.mockReset()})

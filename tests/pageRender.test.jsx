@@ -32,7 +32,7 @@ const ROOT = process.cwd()
 // 이나 빈 상태에서 멈출 텐데, 그건 상관없다. 잡으려는 것은 그림의 내용이
 // 아니라 **그리다가 터지는 것**이다.
 
-const PAGES = readdirSync(join(ROOT, 'src', 'pages')).filter((f) => f.endsWith('.jsx'))
+const PAGES = readdirSync(join(ROOT, 'src', 'pages')).filter((f) => /\.[jt]sx$/.test(f))
 
 // 데이터 모양과 **무관하게** 나는 오류만 결함으로 센다.
 //

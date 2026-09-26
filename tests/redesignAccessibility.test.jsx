@@ -66,7 +66,7 @@ describe('단일 테마 리디자인 계약', () => {
 
   it('데이터 표마다 제목과 열 머리글 범위를 둔다', () => {
     const pagesDir = join(ROOT, 'src', 'pages')
-    const pageFiles = readdirSync(pagesDir).filter((file) => file.endsWith('.jsx'))
+    const pageFiles = readdirSync(pagesDir).filter((file) => /\.[jt]sx$/.test(file))
 
     for (const file of pageFiles) {
       const source = readFileSync(join(pagesDir, file), 'utf8')
@@ -84,7 +84,7 @@ describe('단일 테마 리디자인 계약', () => {
     const sourceDirs = [join(ROOT, 'src', 'pages'), join(ROOT, 'src', 'components')]
 
     for (const sourceDir of sourceDirs) {
-      for (const file of readdirSync(sourceDir).filter((name) => name.endsWith('.jsx'))) {
+      for (const file of readdirSync(sourceDir).filter((name) => /\.[jt]sx$/.test(name))) {
         const source = readFileSync(join(sourceDir, file), 'utf8')
         expect(source, file).not.toMatch(/<(?:span|div) className="card-title"/)
       }
@@ -97,7 +97,7 @@ describe('단일 테마 리디자인 계약', () => {
     let literalIds = 0
 
     for (const sourceDir of sourceDirs) {
-      for (const file of readdirSync(sourceDir).filter((name) => name.endsWith('.jsx'))) {
+      for (const file of readdirSync(sourceDir).filter((name) => /\.[jt]sx$/.test(name))) {
         const source = readFileSync(join(sourceDir, file), 'utf8')
         const tags = source.match(/<(?:div|em|span)\b[^>]*className="field-error"[^>]*>/g) ?? []
         errors += tags.length
@@ -124,7 +124,7 @@ describe('단일 테마 리디자인 계약', () => {
     let customRadios = 0
 
     for (const sourceDir of sourceDirs) {
-      for (const file of readdirSync(sourceDir).filter((name) => name.endsWith('.jsx'))) {
+      for (const file of readdirSync(sourceDir).filter((name) => /\.[jt]sx$/.test(name))) {
         const source = readFileSync(join(sourceDir, file), 'utf8')
         const groupTags = source.match(/<[^>]+\brole="(?:group|radiogroup)"[^>]*>/gs) ?? []
 

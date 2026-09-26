@@ -73,7 +73,7 @@ describe('글꼴이 첫 그림을 막지 않는가', () => {
 
 describe('서버를 놀리지 않는가', () => {
   const html = readFileSync(join(ROOT, 'public', 'bootstrap.js'), 'utf8')
-  const client = readFileSync(join(ROOT, 'src', 'api', 'client.js'), 'utf8')
+  const client = readFileSync(join(ROOT, 'src', 'api', 'client.ts'), 'utf8')
 
   it('첫 화면이 부를 것을 미리 띄운다', () => {
     expect(html).toContain('__boot')
@@ -140,7 +140,7 @@ describe('서버가 브라우저 몫까지 지고 뜨지 않는가', () => {
     for (const e of readdirSync(d, { withFileTypes: true })) {
       const p = join(d, e.name)
       if (e.isDirectory()) walkServer(p)
-      else if (p.endsWith('.js')) serverFiles.push(p)
+      else if (/\.[jt]s$/.test(p)) serverFiles.push(p)
     }
   }
   walkServer(join(ROOT, 'functions'))
@@ -172,8 +172,8 @@ describe('배포용 API 묶음', () => {
   // https://developers.cloudflare.com/pages/functions/advanced-mode/
   const pkg = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 
-  it('프런트와 API를 같은 빌드에서 생성한다', () => {
-    expect(pkg.scripts.build).toBe('vite build && wrangler pages functions build --outdir dist/_worker.js --output-routes-path dist/_routes.json')
+  it('타입 검사 뒤 프런트와 API를 같은 빌드에서 생성한다', () => {
+    expect(pkg.scripts.build).toBe('npm run typecheck && vite build && wrangler pages functions build --outdir dist/_worker.js --output-routes-path dist/_routes.json')
   })
 
   it('배포 디렉터리에 실행 가능한 Worker 모듈이 있다', () => {

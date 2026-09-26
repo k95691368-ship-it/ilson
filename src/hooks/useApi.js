@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { accessBlocked, getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
 
 // GET 한 번을 상태로 감싼다.

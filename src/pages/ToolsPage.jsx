@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { ago, dateTimeLabel, duration, ms, num } from '../lib/format.js'
 import Field from '../components/Field.jsx'
 

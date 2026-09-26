@@ -6,7 +6,7 @@ import OverridePage from '../src/pages/OverridePage.jsx'
 import FieldFeedbackView from '../src/components/FieldFeedbackView.jsx'
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn(), workspace: null, feedback: null }))
-vi.mock('../src/api/client.js', () => ({ api: { post: mocks.post } }))
+vi.mock('../src/api/client.ts', () => ({ api: { post: mocks.post } }))
 vi.mock('../src/hooks/useApi.js', () => ({ useApi: path => ({ data: path.startsWith('/feedback') ? mocks.feedback : mocks.workspace, loading: false, error: null, reload: mocks.reload }) }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: mocks.success, error: mocks.error }) }))
 

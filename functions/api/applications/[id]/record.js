@@ -13,7 +13,7 @@
 
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
 import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
-import { decodeBetaRound } from '../../../../shared/betaEvidence.js'
+import { decodeBetaRound } from '../../../../shared/betaEvidence.ts'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)

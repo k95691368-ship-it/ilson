@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { dossierText, dossierFilename, progressOf, STAGE_ORDER } from '../../shared/dossier.js'
 import { dateTimeLabel, duration, krw, num } from '../lib/format.js'
 

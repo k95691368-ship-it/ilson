@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useApi } from '../hooks/useApi.js'
 import { useOverrideEvents } from '../hooks/useOverrideEvents.js'
 import { useToast } from '../context/ToastContext.jsx'

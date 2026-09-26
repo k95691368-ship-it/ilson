@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useApi } from '../hooks/useApi.js'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useToast } from '../context/ToastContext.jsx'
 
 export default function ApplicationOwnership({ applicationId, onChanged }) {

@@ -3,7 +3,32 @@
 // 같은 규칙을 양쪽에 각각 두면 반드시 갈라진다. 화면에서는 통과했는데 서버가
 // 막거나 그 반대가 되면, 쓰는 사람은 무엇이 잘못됐는지 알 수 없다.
 
-export const VERDICTS = ['수용', '반려', '보류']
+export const VERDICTS = ['수용', '반려', '보류'] as const
+export type ReviewVerdict = (typeof VERDICTS)[number]
+
+export interface ReviewValue {
+  impact_score: number
+  difficulty_score: number
+  impact_reason: string
+  difficulty_reason: string
+  verdict: ReviewVerdict
+  verdict_reason: string
+  alternatives_considered: string
+  refuse_code: string | null
+  refuse_alternative: string | null
+  hold_until_condition: string | null
+  reviewer_label: string
+}
+
+export type ReviewInput = Partial<Record<keyof ReviewValue, unknown>>
+export type ReviewErrors = Partial<Record<keyof ReviewValue, string>>
+export type ReviewValidationResult =
+  | { ok: true; value: ReviewValue }
+  | { ok: false; errors: ReviewErrors }
+
+function isReviewVerdict(value: string): value is ReviewVerdict {
+  return VERDICTS.some((verdict) => verdict === value)
+}
 
 // 근거·대안·조건에 요구하는 최소 길이.
 //
@@ -99,19 +124,23 @@ export const DIFFICULTY_SCALE = [
 // 중요하다는 뜻이었지만 실제로는 쓰는 사람을 붙잡아 두는 걸림돌이 됐다.
 // 지금은 막지 않는다. 억지로 채운 스무 글자보다 비어 있는 칸이 정직하다.
 
-function text(value) {
+function text(value: unknown): string {
   return String(value ?? '').trim()
 }
 
-function toScore(value) {
+function toScore(value: unknown): number | null {
   const n = Number(value)
   if (!Number.isFinite(n) || n < 1 || n > 5) return null
   return Math.round(n * 2) / 2
 }
 
 // 통과하면 { ok: true, value }, 아니면 { ok: false, errors }.
-export function validateReview(input) {
-  const errors = {}
+export function validateReview(rawInput: unknown): ReviewValidationResult {
+  // Property access on a missing body was an error before the TypeScript
+  // migration. Keep it so, while retaining primitive boxing and field coercion.
+  if (rawInput == null) throw new TypeError('Review input is required.')
+  const input = Object(rawInput) as ReviewInput
+  const errors: ReviewErrors = {}
 
   const impact = toScore(input.impact_score)
   const difficulty = toScore(input.difficulty_score)
@@ -129,7 +158,7 @@ export function validateReview(input) {
 
   if (impact == null) errors.impact_score = '임팩트를 골라주세요.'
   if (difficulty == null) errors.difficulty_score = '난이도를 골라주세요.'
-  if (!VERDICTS.includes(v.verdict)) errors.verdict = '판정을 골라주세요.'
+  if (!isReviewVerdict(v.verdict)) errors.verdict = '판정을 골라주세요.'
 
   // 근거 없이 누른 것은 결정이 아니라 클릭이다.
   //
@@ -169,7 +198,9 @@ export function validateReview(input) {
     errors.hold_until_condition = '무엇이 풀리면 다시 볼지 적어주세요. 조건이 없으면 부서는 언제까지 기다려야 하는지 모릅니다.'
   }
 
-  if (Object.keys(errors).length > 0) return { ok: false, errors }
+  if (Object.keys(errors).length > 0 || impact === null || difficulty === null || !isReviewVerdict(v.verdict)) {
+    return { ok: false, errors }
+  }
 
   return {
     ok: true,
@@ -190,7 +221,7 @@ export function validateReview(input) {
 }
 
 // 판정에 따라 신청서 상태가 어디로 가는지. 한 곳에만 둔다.
-export function statusFromVerdict(verdict) {
+export function statusFromVerdict(verdict: unknown): ReviewVerdict {
   if (verdict === '수용') return '수용'
   if (verdict === '반려') return '반려'
   return '보류'

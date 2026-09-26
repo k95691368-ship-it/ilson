@@ -13,7 +13,7 @@ vi.mock('../src/lib/accessSession.js', () => ({
   getAccessSession: () => state.snapshot,
   subscribeAccessSession: listener => { state.listeners.add(listener); return () => state.listeners.delete(listener) },
 }))
-vi.mock('../src/api/client.js', () => ({ api: { post: (...args) => state.post(...args), form: (...args) => state.form(...args) } }))
+vi.mock('../src/api/client.ts', () => ({ api: { post: (...args) => state.post(...args), form: (...args) => state.form(...args) } }))
 vi.mock('../src/hooks/useApi.js', () => ({ useApi: () => ({ data: { items: [], summary: { total: 0, overdue: 0 } }, error: null, reload: state.reload }) }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: state.success, error: state.error }) }))
 

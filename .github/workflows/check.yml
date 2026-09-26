@@ -45,11 +45,15 @@ jobs:
         id: install
         run: npm ci
 
-      # 셋을 따로 둔다. 하나로 묶으면 먼저 넘어진 것 뒤는 안 돌아서,
+      # 검사를 따로 둔다. 하나로 묶으면 먼저 넘어진 것 뒤는 안 돌아서,
       # "린트가 깨졌나 시험이 깨졌나"를 알려면 두 번 돌려야 한다.
       - name: 린트
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
+
+      - name: 타입 검사
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run typecheck
 
       - name: 빌드
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

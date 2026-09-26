@@ -7,7 +7,7 @@ import ToolPage from '../src/pages/ToolPage.jsx'
 import { forgetToolRun, keepToolRun, pendingToolRun } from '../src/lib/pendingToolRuns.js'
 
 const state = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), pipeline: vi.fn(), readFiles: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn(), remaining: 3, loadError: null, runScope: 'scope-a', rolledBack: false }))
-vi.mock('../src/api/client.js', () => ({ api: { post: state.post, get: state.get } }))
+vi.mock('../src/api/client.ts', () => ({ api: { post: state.post, get: state.get } }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: state.success, error: state.error }) }))
 vi.mock('../src/lib/readFiles.js', () => ({ readLocalFiles: state.readFiles }))
 vi.mock('../shared/pipeline.js', async original => ({ ...await original(), runPipeline: state.pipeline }))

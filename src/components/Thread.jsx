@@ -1,5 +1,5 @@
 import { useId, useState } from 'react'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useToast } from '../context/ToastContext.jsx'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { toThread, openQuestions, waitingOnDept, waitingOnStaff } from '../../shared/thread.js'

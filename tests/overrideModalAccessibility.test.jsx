@@ -6,7 +6,7 @@ import { MemoryRouter } from 'react-router-dom'
 import OverridePage from '../src/pages/OverridePage.jsx'
 
 const mocks = vi.hoisted(() => ({ post: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: { post: mocks.post } }))
+vi.mock('../src/api/client.ts', () => ({ api: { post: mocks.post } }))
 vi.mock('../src/hooks/useApi.js', () => ({
   useApi: () => ({ data: { demo_mode: true, events: [], products: [{ id: 'test-product', name: '시험 AI' }] }, loading: false, error: null, reload: mocks.reload }),
 }))

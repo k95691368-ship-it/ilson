@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { REFUSE_CODES } from '../shared/review.js'
+import { REFUSE_CODES } from '../shared/review.ts'
 
 // 없는 컬럼을 쓰는 SQL을 배포 전에 잡는다.
 //
@@ -79,7 +79,7 @@ function jsFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
     if (statSync(p).isDirectory()) jsFiles(p, out)
-    else if (name.endsWith('.js')) out.push(p)
+    else if (/\.[jt]s$/.test(name)) out.push(p)
   }
   return out
 }
@@ -243,7 +243,7 @@ describe('SQL이 없는 컬럼을 쓰고 있지 않은지', () => {
 
 // 반려 사유 코드가 DB CHECK 목록과 갈라져 있었다.
 //
-// shared/review.js에는 no_input이 있는데 migrations의 CHECK에는 그 자리에
+// shared/review.ts에는 no_input이 있는데 migrations의 CHECK에는 그 자리에
 // unstructured_only가 있었다. 그 사유로 반려하면 판정 저장이 통째로 500이
 // 났고, 같은 배치에 묶인 점수·근거·대안이 전부 롤백됐다. 담당자는 적어 둔
 // 것을 다 잃고 신청서는 '접수' 그대로 남았다.

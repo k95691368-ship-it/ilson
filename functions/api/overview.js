@@ -9,7 +9,7 @@
 //   접수부터 인수인계까지 실제로 며칠 걸렸는가 — 이 조직의 처리 속도.
 
 import { jsonResponse, failUnexpected } from '../_lib/http.js'
-import { REFUSE_LABELS } from '../../shared/review.js'
+import { REFUSE_LABELS } from '../../shared/review.ts'
 import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
 import { PICK_KIND, UNPICK_KIND } from '../../shared/priority.js'

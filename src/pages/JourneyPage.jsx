@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { dateTimeLabel } from '../lib/format.js'
 
 export default function JourneyPage() {

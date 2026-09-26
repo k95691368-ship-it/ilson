@@ -21,7 +21,7 @@ const walk = (d) => {
   for (const n of readdirSync(d)) {
     const p = join(d, n)
     if (statSync(p).isDirectory()) walk(p)
-    else if (p.endsWith('.jsx')) files.push(p)
+    else if (/\.[jt]sx$/.test(p)) files.push(p)
   }
 }
 walk(join(ROOT, 'src'))

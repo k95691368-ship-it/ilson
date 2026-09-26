@@ -4,7 +4,7 @@ import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { ago } from '../lib/format.js'
 import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
 import { joinAsRequirement } from '../../shared/join.js'
@@ -15,7 +15,7 @@ import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import {
   REQUIREMENT_KINDS,
   PRIORITIES,
-} from '../../shared/acceptance.js'
+} from '../../shared/acceptance.ts'
 
 
 export default function AgreementPage() {

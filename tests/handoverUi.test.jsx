@@ -2,10 +2,10 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import HandoverPanel from '../src/components/HandoverPanel.jsx'
+import HandoverPanel from '../src/components/HandoverPanel.tsx'
 
 const client=vi.hoisted(()=>({get:vi.fn(),post:vi.fn()}))
-vi.mock('../src/api/client.js',()=>({api:client}))
+vi.mock('../src/api/client.ts',()=>({api:client}))
 const state=()=>({application:{id:'a',title:'정산',dept:'재무'},expectedEvidence:'a'.repeat(64),blockers:[],humanCriteria:[],handover:null,manual:null,scope:'고정 기간·환율의 기존 정산 도구입니다.'})
 let latest
 beforeEach(()=>{vi.clearAllMocks();latest=state();client.get.mockImplementation(async()=>latest);client.post.mockResolvedValue({ok:true})})

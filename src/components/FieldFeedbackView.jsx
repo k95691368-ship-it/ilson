@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { api } from '../api/client.js'
+import { api } from '../api/client.ts'
 import { useApi } from '../hooks/useApi.js'
 import { safeJson } from '../../shared/override.js'
 import { FEEDBACK_KINDS, FEEDBACK_VERDICTS, QUALITY_VERDICTS, NONUSE_STATES, NONUSE_REASONS, qualitySummary } from '../../shared/fieldFeedback.js'

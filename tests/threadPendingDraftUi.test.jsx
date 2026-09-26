@@ -6,7 +6,7 @@ import Thread from '../src/components/Thread.jsx'
 
 const client = vi.hoisted(() => ({ post: vi.fn() }))
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
-vi.mock('../src/api/client.js', () => ({ api: client }))
+vi.mock('../src/api/client.ts', () => ({ api: client }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => toast }))
 
 function deferred() {

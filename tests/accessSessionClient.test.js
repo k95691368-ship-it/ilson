@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { api, ensureWorkspace, readAccessSession } from '../src/api/client.js'
+import { api, ensureWorkspace, readAccessSession } from '../src/api/client.ts'
 import { beginAccessCheck, completeAccessCheck, getAccessSession, revokeAccess } from '../src/lib/accessSession.js'
 
 const A = 'a'.repeat(64)

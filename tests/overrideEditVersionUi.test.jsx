@@ -5,7 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import OverridePage from '../src/pages/OverridePage.jsx'
 
 const mock = vi.hoisted(() => ({get:vi.fn(),post:vi.fn(),reload:vi.fn(),success:vi.fn(),error:vi.fn(),data:null}))
-vi.mock('../src/api/client.js',()=>({api:{get:mock.get,post:mock.post}}))
+vi.mock('../src/api/client.ts',()=>({api:{get:mock.get,post:mock.post}}))
 vi.mock('../src/hooks/useApi.js',()=>({useApi:()=>({data:mock.data,loading:false,error:null,reload:mock.reload})}))
 vi.mock('../src/hooks/useOverrideEvents.js',()=>({useOverrideEvents:()=>({events:[],loading:false,error:null,page:{total:0},reload:vi.fn(),next:vi.fn(),previous:vi.fn()})}))
 vi.mock('../src/context/ToastContext.jsx',()=>({useToast:()=>({success:mock.success,error:mock.error})}))

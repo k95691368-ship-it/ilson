@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { useState } from 'react'
 import { ago, num } from '../lib/format.js'
-import { REFUSE_LABELS, REFUSE_REASONS } from '../../shared/review.js'
+import { REFUSE_LABELS, REFUSE_REASONS } from '../../shared/review.ts'
 import { QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { askOf } from '../../shared/response.js'
 
