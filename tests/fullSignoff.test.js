@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join as pathJoin } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { fullySignedIds } from '../functions/_lib/signoff.js'
+import { criteriaSourceVersion } from '../functions/_lib/agreementEvidence.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../shared/join.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
@@ -22,9 +23,11 @@ const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
 // decision_log 를 흉내 낸 D1. 넘긴 SQL 을 보고 알맞은 줄을 돌려준다.
 function fakeDB({ signs = [], joins = [] } = {}) {
+  const criterion={id:'c1',application_id:'app_1',ord:1,body:'확정 기준',confirmed_at:'2026-01-01'}
   const stmt = (sql) => ({
     bind: () => stmt(sql),
-    all: async () => ({ results: sql.includes('link_id AS dept') ? signs : joins }),
+    all: async () => ({ results: sql.includes('link_id AS dept') ? await Promise.all(signs.map(async row=>({...row,alternatives:row.dept?JSON.stringify({criteriaSourceVersion:await criteriaSourceVersion('app_1',1,[criterion])}):null})))
+      :sql.includes('FROM acceptance_criterion')?[criterion]:sql.includes('FROM application WHERE')?[{id:'app_1',beta_criteria_revision:1}]:joins }),
     first: async () => null,
   })
   // fullySignedIds 는 env 를 받는다. DB 를 그대로 주면 안 된다.
@@ -87,11 +90,9 @@ describe('걸린 부서가 전부 서명해야 받은 것이다', () => {
     expect((await fullySignedIds(fakeDB(), APPS)).size).toBe(0)
   })
 
-  it('부서가 안 붙은 옛 서명은 낸 부서 것으로 본다', async () => {
-    // 부서를 남기기 전에 받은 서명이 있다. 그것 때문에 옛 건이 영영
-    // '아직'으로 남으면, 담당자 할 일에 지울 수 없는 줄이 생긴다.
+  it('판본 근거가 없는 옛 서명은 현재 확인으로 세지 않는다', async () => {
     const db = fakeDB({ signs: [sign('app_1', null)] })
-    expect((await fullySignedIds(db, APPS)).has('app_1')).toBe(true)
+    expect((await fullySignedIds(db, APPS)).has('app_1')).toBe(false)
   })
 
   it('빈 입력에도 터지지 않는다', async () => {

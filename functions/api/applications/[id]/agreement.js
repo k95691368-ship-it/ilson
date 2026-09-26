@@ -10,7 +10,8 @@ import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
 import { validateBaselineInputs } from '../../../../shared/outcomeInputs.js'
-import { loadOutcomeEvidence, outcomeMutation } from '../../../_lib/outcomeEvidence.js'
+import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
+import { loadCriteriaEvidence, baselineSourceVersion, agreementMutation, agreementConflict } from '../../../_lib/agreementEvidence.js'
 import { pendingJoinDepts } from '../../../../shared/join.js'
 import { loadJoins } from './join.js'
 import {
@@ -70,10 +71,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
         )
           .bind(app.id)
           .all(),
-        env.DB.prepare('SELECT * FROM acceptance_criterion WHERE application_id = ? ORDER BY ord')
-          .bind(app.id)
-          .all(),
-        env.DB.prepare('SELECT * FROM shadow_run WHERE application_id = ? ORDER BY seq')
+        loadCriteriaEvidence(env.DB, app.id),
+        env.DB.prepare('SELECT * FROM shadow_run WHERE application_id = ? ORDER BY seq,id')
           .bind(app.id)
           .all(),
         env.DB.prepare('SELECT * FROM baseline WHERE application_id = ?').bind(app.id).first(),
@@ -114,7 +113,9 @@ export async function onRequestGet({ env, data: requestData, params }) {
         a: reqById.get(c.req_a_id) ?? null,
         b: reqById.get(c.req_b_id) ?? null,
       })),
-      criteria: criteria.results,
+      criteria: criteria.versioned,
+      criteria_source_version: criteria.sourceVersion,
+      baseline_source_version: await baselineSourceVersion(app,shadowRuns.results,baseline),
       shadowRuns: shadowRuns.results.map((s) => ({
         ...s,
         steps: safeParse(s.step_timings_json, null),
@@ -138,6 +139,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
   } catch {
     return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return jsonError('요청 형식이 올바르지 않습니다.',400)
 
   const t = (v) => String(v ?? '').trim()
 
@@ -248,34 +250,21 @@ export async function onRequestPost({ env, data: requestData, params, request })
       case 'criterion': {
         const preset = CRITERION_BY_KEY[t(body.check_key)]
         const text = t(body.body) || preset?.body
-        if (!text) return failFields({ body: '무엇을 통과로 볼지 적어주세요.' })
-
-        const ord =
-          ((
-            await env.DB.prepare(
-              'SELECT MAX(ord) AS n FROM acceptance_criterion WHERE application_id = ?'
-            )
-              .bind(app.id)
-              .first()
-          )?.n ?? 0) + 1
-        const id = newId('acc')
-        await env.DB.prepare(
-          `INSERT INTO acceptance_criterion
-             (id, application_id, ord, body, from_requirement_id, check_kind, check_key, is_required_safety)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-        )
-          .bind(
-            id,
-            app.id,
-            ord,
-            text,
-            t(body.from_requirement_id) || null,
-            preset?.kind ?? 'human',
-            preset?.key ?? null,
-            body.is_required_safety ?? preset?.safetyDefault ? 1 : 0
-          )
-          .run()
-        return jsonResponse({ ok: true, id, ord }, 201)
+        if (!text || text.length > 10000) return failFields({body:'합격 기준은 1~10,000자로 적어주세요.'})
+        if(body.is_required_safety!=null && typeof body.is_required_safety!=='boolean') return failFields({is_required_safety:'필수 안전 여부를 확인해주세요.'})
+        return agreementMutation(env,request,`criterion-create:${app.id}`,body,async DB=>{
+          const evidence=await loadCriteriaEvidence(DB,app.id)
+          if(!evidence) return jsonError('그런 신청서가 없습니다.',404)
+          if(body.expectedVersion!==evidence.sourceVersion) return agreementConflict()
+          const ord=Math.max(0,...evidence.criteria.map(row=>Number(row.ord)))+1
+          const id=newId('acc'),safety=body.is_required_safety??preset?.safetyDefault??false
+          await DB.prepare(`INSERT INTO acceptance_criterion
+            (id,application_id,ord,body,from_requirement_id,check_kind,check_key,is_required_safety)
+            VALUES(?,?,?,?,?,?,?,?)`).bind(id,app.id,ord,text,t(body.from_requirement_id)||null,preset?.kind??'human',preset?.key??null,safety?1:0).run()
+          await logDecision({DB},{applicationId:app.id,stage:'협의안',title:'합격 기준을 추가했다',what:text,
+            why:'부서가 확인할 기준을 기록한다.',alternatives:JSON.stringify({before:evidence.sourceVersion,criterion:{id,body:text,check_key:preset?.key??null,is_required_safety:safety}}),linkKind:'criterion',linkId:id})
+          return jsonResponse({ok:true,id,ord},201)
+        })
       }
 
       case 'shadow_run': {
@@ -284,8 +273,8 @@ export async function onRequestPost({ env, data: requestData, params, request })
         if (!['number','string'].includes(typeof body.total_seconds) || !Number.isFinite(seconds) || Math.round(seconds) <= 0 || seconds > 2147483647) {
           return failFields({ total_seconds: '잰 시간이 없습니다.' })
         }
-        if (!Number.isSafeInteger(errorCount) || errorCount < 0 || errorCount > 2147483647) return failFields({error_count:'오류 수는 0 이상의 정수로 적어주세요.'})
-        return outcomeMutation(env.DB, request, `baseline-measurement:${app.id}`, body, async DB => {
+        if ((body.error_count != null && body.error_count !== '' && !['number','string'].includes(typeof body.error_count)) || !Number.isSafeInteger(errorCount) || errorCount < 0 || errorCount > 2147483647) return failFields({error_count:'오류 수는 0 이상의 정수로 적어주세요.'})
+        return agreementMutation(env, request, `baseline-measurement:${app.id}`, body, async DB => {
         // 세 번을 넘겨도 막지 않는다. 더 재면 기준선이 더 단단해진다.
         const seq =
           ((
@@ -317,7 +306,12 @@ export async function onRequestPost({ env, data: requestData, params, request })
       case 'baseline': {
         const checked = validateBaselineInputs(body, app, HOURLY_WAGE_KRW)
         if (!checked.ok) return failFields(checked.errors)
-        return outcomeMutation(env.DB, request, `baseline:${app.id}`, body, async DB => {
+        return agreementMutation(env, request, `baseline:${app.id}`, body, async DB => {
+        const currentApp=await findApplication({...env,DB},app.id)
+        if(!currentApp) return jsonError('그런 신청서가 없습니다.',404)
+        const sourceRuns=(await DB.prepare('SELECT * FROM shadow_run WHERE application_id=? ORDER BY seq,id').bind(app.id).all()).results
+        const previousBaseline=await DB.prepare('SELECT * FROM baseline WHERE application_id=?').bind(app.id).first()
+        if(body.expectedVersion!==await baselineSourceVersion(currentApp,sourceRuns,previousBaseline)) return agreementConflict()
         // Share the confirmation/tool-run commit lock and recheck the complete
         // prior evidence so a baseline cannot change inside an attestation.
         await loadOutcomeEvidence(DB, app.id)
@@ -417,6 +411,8 @@ export async function onRequestPatch({ env, data: requestData, params, request }
     return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return jsonError('요청 형식이 올바르지 않습니다.',400)
+
   const t = (v) => String(v ?? '').trim()
 
   try {
@@ -501,20 +497,19 @@ export async function onRequestPatch({ env, data: requestData, params, request }
     }
 
     if (body.kind === 'criterion') {
-      await env.DB.prepare(
-        `UPDATE acceptance_criterion
-         SET confirmed_at = CASE WHEN ? <> 0 THEN datetime('now') ELSE NULL END,
-             is_required_safety = ?
-         WHERE id = ? AND application_id = ?`
-      )
-        .bind(
-          body.confirmed ? 1 : 0,
-          body.is_required_safety ? 1 : 0,
-          t(body.id),
-          app.id
-        )
-        .run()
-      return jsonResponse({ ok: true })
+      if(typeof body.confirmed!=='boolean'||typeof body.is_required_safety!=='boolean') return failFields({confirmed:'확정과 필수 안전 여부를 확인해주세요.'})
+      return agreementMutation(env,request,`criterion-update:${app.id}`,body,async DB=>{
+        const evidence=await loadCriteriaEvidence(DB,app.id)
+        const row=evidence?.versioned.find(item=>item.id===t(body.id))
+        if(!row) return jsonError('그런 합격 기준이 없습니다.',404)
+        if(body.expectedVersion!==row.edit_version) return agreementConflict()
+        await DB.prepare(`UPDATE acceptance_criterion SET confirmed_at=CASE WHEN ?<>0 THEN datetime('now') ELSE NULL END,is_required_safety=?
+          WHERE id=? AND application_id=?`).bind(body.confirmed?1:0,body.is_required_safety?1:0,row.id,app.id).run()
+        await logDecision({DB},{applicationId:app.id,stage:'협의안',title:body.confirmed?'합격 기준을 확정했다':'합격 기준 확정을 해제했다',what:row.body,
+          why:'담당자가 확정 여부와 필수 안전 여부를 확인했다.',alternatives:JSON.stringify({before:{confirmed_at:row.confirmed_at,is_required_safety:row.is_required_safety},
+            after:{confirmed:body.confirmed,is_required_safety:body.is_required_safety}}),linkKind:'criterion',linkId:row.id})
+        return jsonResponse({ok:true})
+      })
     }
 
     if (body.kind === 'meeting') {
@@ -561,9 +556,33 @@ export async function onRequestDelete({ env, data: requestData, params, request 
     return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
 
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return jsonError('요청 형식이 올바르지 않습니다.',400)
+
   const table = TABLE_BY_KIND[body.kind]
   if (!table) return jsonError('무엇을 지울지 알 수 없습니다.', 400)
 
+  if(body.kind==='criterion'||body.kind==='shadow_run') {
+    return agreementMutation(env,request,`agreement-delete:${app.id}`,body,async DB=>{
+      if(body.kind==='criterion') {
+        const evidence=await loadCriteriaEvidence(DB,app.id)
+        const row=evidence?.versioned.find(item=>item.id===String(body.id??''))
+        if(!row) return jsonError('그런 합격 기준이 없습니다.',404)
+        if(body.expectedVersion!==row.edit_version) return agreementConflict()
+        const signed=await DB.prepare("SELECT id FROM decision_log WHERE application_id=? AND link_kind='기준서명' LIMIT 1").bind(app.id).first()
+        const tested=await DB.prepare('SELECT r.id FROM beta_result r JOIN beta_round b ON b.id=r.round_id WHERE b.application_id=? AND r.criterion_id=? LIMIT 1').bind(app.id,row.id).first()
+        if(row.confirmed_at||signed||tested) return jsonError('확정·서명·시험에 사용한 기준은 삭제할 수 없습니다. 확정을 해제하고 변경 근거를 남겨주세요.',409)
+        await DB.prepare('DELETE FROM acceptance_criterion WHERE id=? AND application_id=?').bind(row.id,app.id).run()
+        await logDecision({DB},{applicationId:app.id,stage:'협의안',title:'미확정 합격 기준을 삭제했다',what:row.body,why:'확정·서명·시험에 사용하지 않은 초안을 정리했다.',linkKind:'criterion',linkId:row.id})
+      } else {
+        const baseline=await DB.prepare('SELECT * FROM baseline WHERE application_id=?').bind(app.id).first()
+        if(baseline) return jsonError('봉인한 기준선의 측정 원본은 삭제할 수 없습니다. 추가 측정 후 기준선을 다시 확인해주세요.',409)
+        const row=await DB.prepare('SELECT * FROM shadow_run WHERE id=? AND application_id=?').bind(String(body.id??''),app.id).first()
+        if(!row) return jsonError('그런 측정 기록이 없습니다.',404)
+        await DB.prepare('DELETE FROM shadow_run WHERE id=? AND application_id=?').bind(row.id,app.id).run()
+      }
+      return jsonResponse({ok:true})
+    })
+  }
   try {
     await env.DB.prepare(`DELETE FROM ${table} WHERE id = ? AND application_id = ?`)
       .bind(String(body.id ?? ''), app.id)

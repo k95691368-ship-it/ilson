@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { requireSessionScope } from '../functions/_lib/sessionScope.js'
+import { loadCriteriaEvidence } from '../functions/_lib/agreementEvidence.js'
 import { onRequestPost as signoff } from '../functions/api/track/[ticket]/signoff.js'
 import { onRequestPost as accept } from '../functions/api/tools/[slug]/accept.js'
 import { onRequestPost as hold } from '../functions/api/track/[ticket]/hold.js'
@@ -63,6 +64,7 @@ beforeEach(async()=>{
 afterAll(async()=>{vi.unstubAllGlobals();await pg.close()})
 async function invoke(handler,body,key=crypto.randomUUID(),race=false) {
   const scoped=DB.forActor(email)
+  if(handler===signoff) body={...body,expectedVersion:(await loadCriteriaEvidence(scoped,'app-race')).sourceVersion}
   const request=new Request('https://local.invalid/api/department-test',{method:'POST',headers:{'Content-Type':'application/json','X-Idempotency-Key':key,'X-Ilson-Scope':await scoped.toolRunScope()},body:JSON.stringify(body)})
   expect(await requireSessionScope(request,scoped)).toBeNull()
   revokeAtWrite=race

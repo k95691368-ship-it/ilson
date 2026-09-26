@@ -6,7 +6,7 @@ import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { loadOutcomeEvidence, loadOutcomeEvidenceMany, assessOutcomeEvidence, evidenceMetadata } from '../functions/_lib/outcomeEvidence.js'
 import { onRequestGet as getOutcome, onRequestPost as postOutcome } from '../functions/api/applications/[id]/outcome.js'
 import { onRequestGet as getDirect, onRequestPost as postDirect } from '../functions/api/track/[ticket]/outcome.js'
-import { onRequestPost as postAgreement } from '../functions/api/applications/[id]/agreement.js'
+import { onRequestGet as getAgreement, onRequestPost as postAgreement } from '../functions/api/applications/[id]/agreement.js'
 import { OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../shared/accept.js'
 
 const pg = new PGlite()
@@ -149,7 +149,7 @@ describe.sequential('성과 확인 근거와 원자 저장 PostgreSQL 회귀',()
     await post(app,await bodyFor(app,proxyBody))
     for(let i=0;i<3;i++) await pg.query('INSERT INTO shadow_run(id,application_id,seq,total_seconds,error_count) VALUES($1,$2,$3,900,0)',[`${app.id}-shadow-${i}`,app.id,i+1])
     for(const invalid of [{people:-1},{hourly_wage_krw:-5}]) expect((await postAgreement({env,params:{id:app.id},request:request({kind:'baseline',...invalid})})).status).toBe(400)
-    expect((await postAgreement({env,params:{id:app.id},request:request({kind:'baseline',people:2,hourly_wage_krw:7200})})).status).toBe(200)
+    expect((await postAgreement({env,params:{id:app.id},request:request({kind:'baseline',people:2,hourly_wage_krw:7200,expectedVersion:(await(await getAgreement({env,params:{id:app.id}})).json()).baseline_source_version})})).status).toBe(200)
     const after=await get(app)
     expect(after.baseline).toMatchObject({people:2,hourly_wage_krw:7200,median_seconds:900})
     expect(after.confirmation.current).toBe(false)
@@ -160,7 +160,7 @@ describe.sequential('성과 확인 근거와 원자 저장 PostgreSQL 회귀',()
     let announce,release
     const arrived=new Promise(done=>{announce=done}),gate=new Promise(done=>{release=done})
     const delayed={...env,DB:{...DB,commitMutation:async(...args)=>{announce();await gate;return DB.commitMutation(...args)}}}
-    const seal=postAgreement({env:delayed,params:{id:app.id},request:request({kind:'baseline'})})
+    const seal=postAgreement({env:delayed,params:{id:app.id},request:request({kind:'baseline',expectedVersion:(await(await getAgreement({env,params:{id:app.id}})).json()).baseline_source_version})})
     await arrived
     const measurement=await postAgreement({env,params:{id:app.id},request:request({kind:'shadow_run',total_seconds:1800})})
     expect(measurement.status).toBe(201)

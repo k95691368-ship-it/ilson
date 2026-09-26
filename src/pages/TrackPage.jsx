@@ -345,7 +345,7 @@ function Result({ data, as, onChanged }) {
           <h3 className="card-title">진행 상황</h3>
           <span className="spacer" />
           <span className="card-note">
-            여섯 단계 중 {data.timeline.filter((t) => t.status === '완료').length}칸까지 왔습니다
+            진행 항목 {data.timeline.length}개 중 {data.timeline.filter((t) => t.status === '완료').length}개 완료
           </span>
         </summary>
         <ol className="track-timeline">
@@ -738,7 +738,7 @@ function onChangedSafely(fn) {
 // 아닌지를 받는다. 한 항목이라도 안 고르면 못 넘어간다 — 안 고른 것을
 // 동의로 세면, 안 읽은 것을 읽었다고 기록하는 셈이 된다.
 function Signoff({ ticket, as, onDone }) {
-  const { data, reload } = useApi(`/track/${encodeURIComponent(ticket)}/signoff`)
+  const { data, reload, setData } = useApi(`/track/${encodeURIComponent(ticket)}/signoff`)
   const captureView = useActionLifetime(`${ticket}:${as ?? ''}`)
   const [by, setBy] = useState('')
   // 손든 부서가 ?as=부서로 들어왔으면 그 부서를 골라 둔다. 안 그러면
@@ -749,15 +749,20 @@ function Signoff({ ticket, as, onDone }) {
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [viewedVersion,setViewedVersion] = useState(null)
+  const [conflict,setConflict] = useState(false)
+  const [refreshing,setRefreshing] = useState(false)
 
   if (!data) return null
   const { criteria, state } = data
+  const stale = conflict || (viewedVersion !== null && viewedVersion !== data.expectedVersion)
   // 기준 자체가 아직 없으면 이 자리는 아무 말도 하지 않는다. 없는 것을
   // "준비중"이라고 띄우면 화면만 늘어난다.
   if (criteria.length === 0) return null
 
   async function submit(e) {
     e.preventDefault()
+    if(busy || refreshing || stale || !data.expectedVersion) return
     const bad = validateSignoff({
       by,
       dept,
@@ -778,16 +783,37 @@ function Signoff({ ticket, as, onDone }) {
         dept,
         verdicts,
         reasons,
+        expectedVersion:viewedVersion ?? data.expectedVersion,
       })
       if (!current()) return
       setMsg(r.message)
       reload()
       onChangedSafely(onDone)
     } catch (err) {
-      if (current()) setErrors({ by: err.message })
+      if (current()) {
+        setErrors({ by: err.message })
+        if(err.status===409) setConflict(true)
+      }
     } finally {
       if (current()) setBusy(false)
     }
+  }
+
+  async function readLatestCriteria() {
+    if(busy||refreshing) return
+    setRefreshing(true)
+    const current=captureView()
+    try {
+      const latest=await api.get(`/track/${encodeURIComponent(ticket)}/signoff`)
+      if(!current()) return
+      setData(latest)
+      setViewedVersion(latest.expectedVersion)
+      setVerdicts({})
+      setConflict(false)
+      setErrors({})
+      setMsg('작성한 이름과 이유는 유지했습니다. 최신 기준의 각 항목을 다시 확인해주세요.')
+    } catch(error) {if(current()) setErrors({by:error.message})}
+    finally {if(current()) setRefreshing(false)}
   }
 
   return (
@@ -821,6 +847,10 @@ function Signoff({ ticket, as, onDone }) {
         </ul>
       )}
       {msg && <p className="signoff-msg">{msg}</p>}
+      {stale && <div className="notice notice-warn" role="alert">
+        <p>기준이 변경되었습니다. 기존 선택으로는 서명할 수 없습니다.</p>
+        <button type="button" className="btn-ghost btn-sm" disabled={busy||refreshing} onClick={readLatestCriteria}>최신 기준 불러오기</button>
+      </div>}
 
       <ul className="signoff-list">
         {criteria.map((c) => (
@@ -866,7 +896,8 @@ function Signoff({ ticket, as, onDone }) {
                       type="radio"
                       name={`v-${c.id}`}
                       checked={verdicts[c.id] === code}
-                      onChange={() => setVerdicts((s) => ({ ...s, [c.id]: code }))}
+                      disabled={busy||refreshing||stale}
+                      onChange={() => {setViewedVersion(v=>v??data.expectedVersion);setVerdicts((s) => ({ ...s, [c.id]: code }))}}
                     />
                     {v.label}
                   </label>
@@ -953,7 +984,7 @@ function Signoff({ ticket, as, onDone }) {
               성함만 여쭙습니다.
             </small>
           </label>
-          <button type="submit" className="btn-primary" disabled={busy}>
+          <button type="submit" className="btn-primary" disabled={busy||refreshing||stale||!data.expectedVersion}>
             {busy ? '남기는 중…' : '확인했습니다'}
           </button>
         </form>

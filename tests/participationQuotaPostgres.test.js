@@ -22,7 +22,7 @@ const env = email => {
 const request = body => new Request('https://local.invalid/api/test', { method: 'POST', headers: { 'Content-Type': 'application/json', 'CF-Connecting-IP': '127.0.0.1' }, body: JSON.stringify(body) })
 const register = (email, body, id = 'app-main') => join({ env: env(email), params: { id }, request: request(body) })
 const joinBody = dept => ({ dept, by: '담당자', minutes: 30, people: 1, frequency: '주 1회', story: '매주 같은 자료를 다시 모으는 업무를 하고 있습니다.' })
-const sign = (email, department, verdict = 'ok') => signoff({ env: env(email), params: { ticket: 'AX-ABC-123' }, request: request({ by: '확인자', dept: department, verdicts: { criterion: verdict }, reasons: { criterion: '실제 업무 기준과 달라 확인이 필요합니다.' } }) })
+const sign = async (email, department, verdict = 'ok') => signoff({ env: env(email), params: { ticket: 'AX-ABC-123' }, request: request({ by: '확인자', dept: department, expectedVersion:(await(await getSignoff({env:env(email),params:{ticket:'AX-ABC-123'}})).json()).expectedVersion, verdicts: { criterion: verdict }, reasons: { criterion: '실제 업무 기준과 달라 확인이 필요합니다.' } }) })
 
 beforeAll(async () => {
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
@@ -57,7 +57,7 @@ describe.sequential('explicit participation and actor-bound quota PostgreSQL pat
     expect(await env(marketing).DB.prepare("SELECT id FROM application WHERE id='app-unrelated'").first()).toBeNull()
     expect(await requiredDeptsOf(env(finance),'app-unrelated','재무')).toEqual(['재무'])
     await env(finance).DB.prepare("INSERT INTO decision_log(id,application_id,stage,title,what,why,link_kind,link_id) VALUES('unrelated-sign','app-unrelated','협의안','확인자','확인함','기준 확인','기준서명','재무')").run()
-    expect(await fullySignedIds(env(finance),[{id:'app-unrelated',dept:'재무'}])).toEqual(new Set(['app-unrelated']))
+    expect(await fullySignedIds(env(finance),[{id:'app-unrelated',dept:'재무'}])).toEqual(new Set())
     await expect(env(owner).DB.prepare('INSERT INTO application_participation(id,application_id,department_id,granted_by_email) VALUES(?,?,?,?)').bind('free-log','app-unrelated','마케팅',owner).run()).rejects.toThrow('/42501')
   })
   it('registers a verified department and lets its employee read and sign only the linked application', async () => {

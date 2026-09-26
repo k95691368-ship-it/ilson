@@ -10,6 +10,8 @@ import { validateResolve, RESOLUTION_BY_CODE } from '../../shared/signoff.js'
 import { joinAsRequirement } from '../../shared/join.js'
 import { withJosa } from '../../shared/korean.js'
 import Field from '../components/Field.jsx'
+import AgreementEvidence from '../components/AgreementEvidence.jsx'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import {
   REQUIREMENT_KINDS,
   PRIORITIES,
@@ -94,8 +96,16 @@ export default function AgreementPage() {
 }
 
 function Agreement({ id }) {
-  const { data, error, loading, reload } = useApi(`/applications/${id}/agreement`)
+  const { data, error, loading, reload, setData } = useApi(`/applications/${id}/agreement`)
+  const captureView = useActionLifetime(id)
   const toast = useToast()
+
+  async function refreshEvidence() {
+    const current = captureView()
+    const next = await api.get(`/applications/${id}/agreement`)
+    if (current()) setData(next)
+    return next
+  }
 
   async function send(method, body) {
     try {
@@ -127,15 +137,13 @@ function Agreement({ id }) {
       <Stakeholders data={data} send={send} toast={toast} openBy={openBy} />
       <Meetings data={data} send={send} toast={toast} openBy={openBy} />
       <Requirements data={data} send={send} toast={toast} openBy={openBy} />
+      <AgreementEvidence id={id} data={data} refresh={refreshEvidence} />
       <Objections id={id} toast={toast} openBy={openBy} />
     </div>
   )
 }
 
-// 맨 위에 '아직 만들기 시작하면 안 되는 이유' 띠가 있었다. 지웠다.
-// 합격 기준과 기준선을 넣을 자리를 이 화면에서 걷어낸 뒤로는, 그 띠가
-// 미는 두 줄을 아무도 채울 수 없었다 — 시키는 대로 할 수 없는 안내는
-// 안내가 아니다.
+// 기준·실측은 접힌 입력만 제공한다. 이전의 안내 띠나 대시보드는 복원하지 않는다.
 
 // ── 이해관계자 ──────────────────────────────────────────────
 function Stakeholders({ data, send, toast, openBy }) {
@@ -616,8 +624,7 @@ function kindTone(kind) {
   return 'badge-accent'
 }
 
-// 충돌 판정·합격 기준·기준선 실측 세 칸이 여기 있었다. 화면에서 걷어냈다.
-// 세 칸을 만드는 서버 길과 표는 그대로 두었다 — 지운 것은 이 화면이다.
+// 합격 기준·기준선 입력은 AgreementEvidence에서 관리한다.
 
 // ── 부서가 단 이의 ──────────────────────────────────────────
 //

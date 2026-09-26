@@ -16,7 +16,7 @@ let pending, posts, navigate
 function deferred() { let resolve, reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no }); return { promise, resolve, reject } }
 function latest(path) { return pending.get(path)?.at(-1) }
 function result(ticket) { return { ticket, application: { id: ticket, title: `신청 ${ticket}`, dept: '재무', status: '접수', applicant: '작성자', created_at: '2026-01-01' }, timeline: [], decisions: [], currentStage: '신청' } }
-function signoff(ticket) { return { criteria: [{ id: `${ticket}-criterion`, body: `${ticket} 확정 기준`, check_kind: 'human' }], requiredDepts: ['재무', '영업'], state: { canSign: true, status: '확인 전', headline: '기준 확인', requiredDepts: ['재무', '영업'] } } }
+function signoff(ticket) { return { expectedVersion:'v-'+ticket, criteria: [{ id: `${ticket}-criterion`, body: `${ticket} 확정 기준`, check_kind: 'human' }], requiredDepts: ['재무', '영업'], state: { canSign: true, status: '확인 전', headline: '기준 확인', requiredDepts: ['재무', '영업'] } } }
 function beta() { return { state: { canSay: true, round: { seq: 1, overall: '통과' }, total: 0, open: 0, answered: 0, says: [] } } }
 function Controls() { navigate = useNavigate(); const location = useLocation(); return <output data-testid="location">{location.search}</output> }
 function show(query = `?no=${A}`) { return render(<MemoryRouter initialEntries={[`/track${query}`]}><Controls /><TrackPage /></MemoryRouter>) }
@@ -31,6 +31,40 @@ function betaForm() {
   fireEvent.submit(document.querySelector('.betasay form'))
 }
 
+describe('서명은 직접 읽은 최신 기준에만 연결된다',()=>{
+  it('409 후 이름과 이유를 보존하고 최신 기준을 다시 선택해야 서명한다',async()=>{
+    show(`?no=${A}&as=재무`);await load(A);await answer(`/track/${A}/signoff`,signoff(A))
+    fireEvent.click(screen.getByRole('radio',{name:'이건 아닙니다'}))
+    fireEvent.change(screen.getByLabelText(`${A} 확정 기준 — 다른 이유`),{target:{value:'실제 현장의 처리 기준과 다릅니다.'}})
+    fireEvent.change(screen.getByLabelText('확인하신 분'),{target:{value:'김직원'}})
+    fireEvent.submit(screen.getByRole('button',{name:'확인했습니다'}).closest('form'))
+    expect(posts[0].body.expectedVersion).toBe('v-'+A)
+    await act(async()=>posts[0].reject(Object.assign(Error('기준 변경'),{status:409})))
+    expect(screen.getByRole('button',{name:'확인했습니다'}).disabled).toBe(true)
+    expect(screen.getByLabelText('확인하신 분').value).toBe('김직원')
+    fireEvent.click(screen.getByRole('button',{name:'최신 기준 불러오기'}))
+    const changed={...signoff(A),expectedVersion:'new-version',criteria:[{...signoff(A).criteria[0],body:'변경된 안전 기준',is_required_safety:1}]}
+    await answer(`/track/${A}/signoff`,changed)
+    expect(screen.getByRole('radio',{name:'이건 아닙니다'}).checked).toBe(false)
+    fireEvent.click(screen.getByRole('radio',{name:'이건 아닙니다'}))
+    expect(screen.getByLabelText('변경된 안전 기준 — 다른 이유').value).toBe('실제 현장의 처리 기준과 다릅니다.')
+    fireEvent.submit(screen.getByRole('button',{name:'확인했습니다'}).closest('form'))
+    expect(posts[1].body).toMatchObject({expectedVersion:'new-version',by:'김직원',reasons:{[`${A}-criterion`]:'실제 현장의 처리 기준과 다릅니다.'}})
+  })
+  it('최신 기준 조회 실패는 오래된 선택을 다시 제출 가능하게 만들지 않는다',async()=>{
+    show(`?no=${A}&as=재무`);await load(A);await answer(`/track/${A}/signoff`,signoff(A))
+    fireEvent.click(screen.getByRole('radio',{name:'맞습니다'}))
+    fireEvent.change(screen.getByLabelText('확인하신 분'),{target:{value:'김직원'}})
+    fireEvent.submit(screen.getByRole('button',{name:'확인했습니다'}).closest('form'))
+    await act(async()=>posts[0].reject(Object.assign(Error('기준 변경'),{status:409})))
+    fireEvent.click(screen.getByRole('button',{name:'최신 기준 불러오기'}))
+    await fail(latest(`/track/${A}/signoff`),'권한이 변경되었습니다.')
+    expect(screen.getByRole('button',{name:'확인했습니다'}).disabled).toBe(true)
+    expect(screen.getByLabelText('확인하신 분').value).toBe('김직원')
+    expect(posts).toHaveLength(1)
+  })
+})
+
 beforeEach(() => {
   pending = new Map(); posts = []; client.get.mockReset(); client.post.mockReset(); toast.success.mockReset(); toast.error.mockReset()
   client.get.mockImplementation((path, options) => { const item = { ...deferred(), signal: options?.signal }; const items = pending.get(path) ?? []; items.push(item); pending.set(path, items); return item.promise })
@@ -39,6 +73,12 @@ beforeEach(() => {
 afterEach(cleanup)
 
 describe('접수번호 조회는 현재 URL과 화면 생명주기에 귀속된다', () => {
+  it('진행 항목 수는 메뉴 단계 수가 아니라 실제 타임라인 길이로 표시한다', async () => {
+    show()
+    await answer(`/track/${A}`, { ...result(A), timeline: Array.from({ length: 8 }, (_, i) => ({ stage: `항목${i}`, status: i < 7 ? '완료' : '대기' })) })
+    expect(screen.getByText('진행 항목 8개 중 7개 완료')).toBeTruthy()
+    expect(screen.queryByText(/여섯 단계 중 7칸/)).toBeNull()
+  })
   it.each(['success', 'failure'])('늦은 A %s 응답이 B 본문·주소·입력·문서 링크를 바꾸지 않는다', async kind => {
     show(); const old = latest(`/track/${A}`)
     await move(`?no=${B}`); await load(B)

@@ -12,6 +12,7 @@ import { betaRoundPayload } from '../../../_lib/betaRound.js'
 import { mutationFingerprint } from '../../../_lib/atomicMutation.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import { signoffState } from '../../../../shared/signoff.js'
+import { encodeBetaNote, decodeBetaRound } from '../../../../shared/betaEvidence.js'
 
 async function findApplication(env, id) {
   return env.DB.prepare(
@@ -65,7 +66,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       criteriaRevision: Number(app.beta_criteria_revision),
       runScope: await env.DB.toolRunScope?.() ?? null,
       criteria: criteria.results,
-      rounds: rounds.results,
+      rounds: rounds.results.map(decodeBetaRound),
       latestResults: results,
       latestBuild: latestBuild ?? null,
       feedback: feedback.results,
@@ -146,6 +147,9 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
   const payload = betaRoundPayload(body)
   if (!payload) return jsonError('채점 기준·결과·숫자의 형식을 확인해 주십시오.', 400)
+  const encodedNote = encodeBetaNote(payload.criteria_revision, payload.note)
+  if (!encodedNote) return failFields({ note: '메모가 너무 깁니다. 특수문자를 포함한 메모의 길이를 줄여주세요.' })
+  payload.note = encodedNote
   const requestId = body.run_id ?? request.headers.get('X-Idempotency-Key')
   if (typeof requestId !== 'string' || !/^[a-zA-Z0-9_-]{16,100}$/.test(requestId)) return jsonError('채점 실행 번호가 없습니다. 최신 화면에서 다시 채점해 주십시오.', 400)
   if (typeof env.DB.recordBetaRound !== 'function' || typeof env.DB.toolRunScope !== 'function') return jsonError('베타 저장 기능의 데이터베이스 설정이 필요합니다.', 503)

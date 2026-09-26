@@ -6,12 +6,13 @@
 
 import { SIGNOFF_KIND, OBJECTION_KIND, RESOLVE_KIND } from '../../shared/signoff.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
+import { loadCriteriaEvidence, criteriaSourceVersion } from './agreementEvidence.js'
 
 function parseIds(json) {
   if (!json) return null
   try {
     const v = JSON.parse(json)
-    return Array.isArray(v) ? v : null
+    return Array.isArray(v) ? v : Array.isArray(v?.criterionIds) ? v.criterionIds : null
   } catch {
     return null
   }
@@ -19,12 +20,7 @@ function parseIds(json) {
 
 export async function loadSignoff(env, applicationId, ownDept = null) {
   const [criteria, logs] = await Promise.all([
-    env.DB.prepare(
-      `SELECT id, ord, body, check_kind, is_required_safety, confirmed_at
-       FROM acceptance_criterion WHERE application_id = ? ORDER BY ord`
-    )
-      .bind(applicationId)
-      .all(),
+    loadCriteriaEvidence(env.DB,applicationId),
     env.DB.prepare(
       `SELECT id, title, what, why, alternatives, link_kind, link_id, created_at
        FROM decision_log WHERE application_id = ? AND link_kind IN (?, ?, ?)
@@ -49,9 +45,10 @@ export async function loadSignoff(env, applicationId, ownDept = null) {
       by: l.title,
       dept: String(l.link_id ?? '').startsWith('app_') ? ownDept : l.link_id,
       at: l.created_at,
-      // 그때 무엇에 서명했는지. 옛 기록에는 없다 — 그때는 전부에
-      // 서명한 것으로 본다. 안 그러면 이미 끝난 신청서가 되돌아간다.
+      // 과거의 항목 목록과 원문은 보존하되 현재 판본의 증거가 없으면
+      // 현재 확인으로 세지 않는다.
       criterionIds: parseIds(l.alternatives),
+      current: Boolean(criteria?.sourceVersion) && signatureVersion(l.alternatives) === criteria.sourceVersion,
     }))
 
   // 같은 부서가 다시 서명하면 뒤엣것만 남긴다. 기준이 고쳐진 뒤 다시 받는
@@ -105,7 +102,11 @@ export async function loadSignoff(env, applicationId, ownDept = null) {
       at: l.created_at,
     }))
 
-  return { criteria: criteria.results, signoff, signatures, objections, resolutions }
+  return { criteria: criteria?.criteria??[], criteriaSourceVersion:criteria?.sourceVersion??null, signoff, signatures, objections, resolutions }
+}
+
+function signatureVersion(value) {
+  try { return JSON.parse(value)?.criteriaSourceVersion??null } catch { return null }
 }
 
 // 이 일에 걸린 부서 전부.
@@ -173,8 +174,8 @@ export async function fullySignedIds(env, apps) {
 
   const [signs, joins] = await Promise.all([
     env.DB.prepare(
-      `SELECT application_id, link_id AS dept FROM decision_log
-       WHERE link_kind = ? AND application_id IN (${holes})`
+      `SELECT id,application_id,link_id AS dept,alternatives,created_at FROM decision_log
+       WHERE link_kind = ? AND application_id IN (${holes}) ORDER BY created_at,id`
     )
       .bind(SIGNOFF_KIND, ...ids)
       .all(),
@@ -186,8 +187,22 @@ export async function fullySignedIds(env, apps) {
       .all(),
   ])
 
+  const [criterionRows,applications] = await Promise.all([
+    env.DB.prepare(`SELECT * FROM acceptance_criterion WHERE application_id IN (${holes}) ORDER BY application_id,ord,id`).bind(...ids).all(),
+    env.DB.prepare(`SELECT id,beta_criteria_revision FROM application WHERE id IN (${holes}) ORDER BY id`).bind(...ids).all(),
+  ])
+  const criteriaByApp=new Map()
+  for(const row of criterionRows.results) {
+    if(!criteriaByApp.has(row.application_id)) criteriaByApp.set(row.application_id,[])
+    criteriaByApp.get(row.application_id).push(row)
+  }
+  const versions=new Map(await Promise.all(applications.results.map(async app=>{
+    const criteria=criteriaByApp.get(app.id)??[]
+    return [app.id,criteria.length&&criteria.every(row=>row.confirmed_at)?await criteriaSourceVersion(app.id,app.beta_criteria_revision,criteria):null]
+  })))
   const signedBy = new Map()
   for (const r of signs.results) {
+    if(!versions.get(r.application_id)||signatureVersion(r.alternatives)!==versions.get(r.application_id)) continue
     if (!signedBy.has(r.application_id)) signedBy.set(r.application_id, new Set())
     // 옛 기록에는 부서가 안 붙어 있다. 그때는 낸 부서가 한 것으로 본다.
     signedBy.get(r.application_id).add(r.dept ?? null)

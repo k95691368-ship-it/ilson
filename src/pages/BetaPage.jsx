@@ -11,6 +11,7 @@ import { gradeAll } from '../../shared/grade.js'
 import { passCaveat } from '../../shared/signoff.js'
 import { PERIOD } from '../../shared/master.js'
 import { pendingBetaRound, keepBetaRound, forgetBetaRound, subscribeBetaRounds } from '../lib/pendingBetaRounds.js'
+import HandoverPanel from '../components/HandoverPanel.jsx'
 
 // 시연 파일 다섯 장을 사이트에서 걷어냈다. 그래서 이 화면도 넣은 파일로
 // 채점한다. 정답표가 함께 없어졌으므로 정답 대조 기준 셋은 「판정불가」로
@@ -307,6 +308,7 @@ function BetaSession({ id, data, error, loading, reload }) {
       {data.rounds.length > 0 && <Rounds rounds={data.rounds} />}
 
       <Feedback data={data} id={id} toast={toast} onDone={reload} />
+      <HandoverPanel id={id} refreshKey={`${latest?.id??''}:${data.criteriaRevision}:${data.feedback.map(f=>`${f.id}:${f.resolved_at??''}`).join(',')}`} />
     </div>
   )
 }
@@ -324,7 +326,7 @@ function VerdictBanner({ round, signoff }) {
       <div className="verdict verdict-passed">
         <div className="verdict-head">{round.seq}차 — 통과</div>
         <p className="verdict-body">
-          합격 기준 {round.passed}개를 전부 통과했습니다. 사용법서를 쓰고 부서에 넘길 수 있습니다.
+          자동 판정 기준 {round.passed}개를 통과했습니다. 아래 인계 항목에서 현재 협의 근거와 사용법을 확인해주세요.
           {round.human_needed > 0 &&
             ` 다만 사람이 직접 확인해야 하는 기준이 ${round.human_needed}개 남아 있습니다.`}
         </p>

@@ -177,7 +177,7 @@ export function signoffState({
   // 그 기준을 본 적도 없다.
   const need = [...new Set((requiredDepts ?? []).filter(Boolean))]
   const signed = signatures ?? (signoff ? [{ ...signoff, dept: signoff.dept ?? null }] : [])
-  const signedDepts = new Set(signed.map((s) => s.dept).filter(Boolean))
+  const signedDepts = new Set(signed.filter(s=>s.current!==false).map((s) => s.dept).filter(Boolean))
   const waiting = need.filter((d) => !signedDepts.has(d))
   const multi = need.length > 1
 
@@ -224,15 +224,20 @@ export function signoffState({
   //
   // 위쪽 canAsk가 이미 "기준이 없으면 서명 못 받는다"고 정해 뒀는데,
   // 서명이 이미 있는 경우에만 그 분기를 건너뛰고 있었다.
-  if (list.length === 0) {
+  if (!ask.ok) {
     return {
       ...base0(),
       status: '준비중',
       canSign: false,
       why: ask.why,
-      headline: '합격 기준이 없습니다. 확인해드릴 것이 없습니다',
+      headline: list.length ? '확정되지 않은 기준이 있습니다. 이전 서명은 현재 기준의 확인이 아닙니다' : '합격 기준이 없습니다. 확인해드릴 것이 없습니다',
       binding: false,
     }
+  }
+
+  if(signed.some(s=>s.current===false && (!need.length || need.includes(s.dept)))) {
+    return {...base0(),status:'다시 받아야 함',canSign:true,why:'이전 서명과 현재 기준의 판본이 다릅니다.',
+      headline:'변경된 기준을 부서가 다시 확인해야 합니다',binding:false}
   }
 
   const open = objs.filter((o) => !o.resolution)

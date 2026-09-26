@@ -24,7 +24,7 @@ export function canUseBusinessRoute(actor, path, method) {
   if (/^\/api\/applications\/[^/]+\/owner$/.test(path)) return method === 'POST' && isAccessAdmin(actor)
   if (/^\/api\/applications\/[^/]+\/(review|ask|reply|agreement|signoff|join)$/.test(path)) return ['POST', 'PATCH', 'DELETE'].includes(method) && reviewers.includes(actor.role)
   if (/^\/api\/applications\/[^/]+\/journey$/.test(path)) return method === 'POST' && operators.includes(actor.role)
-  if (/^\/api\/applications\/[^/]+\/(build|beta|outcome)$/.test(path)) return method === 'POST' && builders.includes(actor.role)
+  if (/^\/api\/applications\/[^/]+\/(build|beta|outcome|handover)$/.test(path)) return method === 'POST' && builders.includes(actor.role)
   if (path === '/api/bugs') return method === 'POST'
   if (['/api/reports', '/api/codes', '/api/priority'].includes(path)) return method === 'POST' && operators.includes(actor.role)
   return false

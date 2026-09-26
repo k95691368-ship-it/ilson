@@ -22,6 +22,7 @@ import {
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
 import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'
 import { departmentMutation } from '../../../_lib/departmentMutation.js'
+import { agreementConflict } from '../../../_lib/agreementEvidence.js'
 
 // 확인해주신 뒤에 뭐라고 답할 것인가.
 //
@@ -59,6 +60,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
   const state = signoffState(loaded)
   return jsonResponse({
     criteria: loaded.criteria,
+    expectedVersion: loaded.criteriaSourceVersion,
     state,
     // 어느 부서로 서명할지 고르게 하려면 목록이 필요하다. 자유 입력으로
     // 두면 "마케팅"과 "마케팅팀"이 다른 부서가 되어 영영 다 안 모인다.
@@ -97,23 +99,24 @@ export async function onRequestPost({ env, data: requestData, request, params })
   const response = await departmentMutation(env, request, `signoff:${ticket}`, body, async DB => {
     const loaded = await load({ ...env, DB }, ticket)
     if (!loaded) return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+    const dept = String(body.dept ?? '').trim() || (loaded.requiredDepts.length === 1 ? loaded.requiredDepts[0] : '')
+    if (!loaded.requiredDepts.includes(dept)) return failFields({dept:`${loaded.requiredDepts.join(', ')} 중에서 골라주세요.`}, '어느 부서로 확인하시는지 알 수 없습니다.')
+    const forbidden = await currentDepartmentAuthority(env, DB, dept)
+    if (forbidden) return forbidden
+    if (body.expectedVersion !== loaded.criteriaSourceVersion) return agreementConflict()
     const ask = canAsk(loaded.criteria)
     if (!ask.ok) return jsonError(ask.why, 409)
     const errors = validateSignoff({ by:body.by, dept:body.dept, requiredDepts:loaded.requiredDepts,
       criteria:loaded.criteria, verdicts:body.verdicts, reasons:body.reasons })
     if (Object.keys(errors).length) return failFields(errors, '확인해주셔야 할 것이 남았습니다.')
     const by = String(body.by).trim().slice(0, 60)
-    const dept = String(body.dept ?? '').trim() || (loaded.requiredDepts.length === 1 ? loaded.requiredDepts[0] : '')
-    if (!loaded.requiredDepts.includes(dept)) return failFields({dept:`${loaded.requiredDepts.join(', ')} 중에서 골라주세요.`}, '어느 부서로 확인하시는지 알 수 없습니다.')
-    const forbidden = await currentDepartmentAuthority(env, DB, dept)
-    if (forbidden) return forbidden
     const objected = loaded.criteria.filter(c => VERDICTS[body.verdicts[c.id]]?.needsReason)
     const statements = [DB.prepare(`INSERT INTO decision_log
       (id,application_id,stage,actor,title,what,why,alternatives,link_kind,link_id)
       VALUES(?,?,'협의안','human',?,?,?,?,?,?)`).bind(newId('dec'), loaded.app.id, by,
       objected.length ? `합격 기준 ${loaded.criteria.length}개를 확인했다. ${objected.length}개에 이의를 달았다.` : `합격 기준 ${loaded.criteria.length}개를 모두 확인했고 이의 없다.`,
       '담당자 혼자 정한 기준으로 통과 판정을 내리면, 부서가 아니라고 할 때 통과의 근거가 사라진다.',
-      JSON.stringify(loaded.criteria.map(c => c.id)), SIGNOFF_KIND, dept)]
+      JSON.stringify({criterionIds:loaded.criteria.map(c=>c.id),criteriaSourceVersion:loaded.criteriaSourceVersion}), SIGNOFF_KIND, dept)]
     for (const c of objected) {
       statements.push(DB.prepare(`INSERT INTO decision_log
         (id,application_id,stage,actor,title,what,why,alternatives,link_kind,link_id)

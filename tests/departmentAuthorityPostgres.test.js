@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { departmentAuthority } from '../functions/_lib/departmentAuthority.js'
+import { loadCriteriaEvidence } from '../functions/_lib/agreementEvidence.js'
 import { loadOutcomeEvidence } from '../functions/_lib/outcomeEvidence.js'
 import { onRequest } from '../functions/api/_middleware.js'
 import { onRequestPost as signoff } from '../functions/api/track/[ticket]/signoff.js'
@@ -67,6 +68,7 @@ beforeAll(async () => {
 afterAll(async () => { vi.unstubAllGlobals(); await pg.close() })
 const enc = value => Buffer.from(JSON.stringify(value)).toString('base64url')
 async function invoke(email, path, handler, body) {
+  if(path.endsWith('/signoff')) body={...body,expectedVersion:(await loadCriteriaEvidence(DB.forActor(email),'app-dept'))?.sourceVersion}
   if(path.endsWith('/outcome')) body={...body,expectedEvidence:(await loadOutcomeEvidence(DB.forActor(email),'app-dept')).mutationToken}
   const now = Math.floor(Date.now() / 1000)
   const unsigned = enc({ alg: 'RS256', kid: 'department-local' }) + '.' + enc({ iss: issuer, aud: ['department-local'], iat: now, exp: now + 300, email })
