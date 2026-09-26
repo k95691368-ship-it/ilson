@@ -16,6 +16,7 @@ import { annualHours } from '../../_lib/applications.js'
 import { REFUSE_REASONS } from '../../../shared/review.js'
 import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
 import { fullySignedIds } from '../../_lib/signoff.js'
+import { loadOutcomeEvidence } from '../../_lib/outcomeEvidence.js'
 import { bulkHoldFrom } from '../../../shared/holdlift.js'
 
 // 기록이 다른 신청서를 가리키고 있으면 그 접수번호를 붙여 준다.
@@ -82,7 +83,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
     // 쿼리만 지우고 이름(files)은 안 지워서 그 뒤가 전부 한 칸씩 밀렸다.
     // 부서가 접수번호를 넣으면 그 자리에서 500이 났다. tests/schema.test.js가
     // 이제 개수를 센다.
-    const [review, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcome, decisions, feedbackCount] =
+    const [review, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcomeEvidence, decisions, feedbackCount] =
       await Promise.all([
         env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id).first(),
         env.DB.prepare(
@@ -127,9 +128,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
         env.DB.prepare('SELECT COUNT(*) AS n, MAX(used_at) AS last FROM tool_use WHERE application_id = ?')
           .bind(app.id)
           .first(),
-        env.DB.prepare('SELECT dept_confirmed_at FROM outcome WHERE application_id = ?')
-          .bind(app.id)
-          .first(),
+        loadOutcomeEvidence(env.DB, app.id),
         // 신청자에게 보여 줄 결정만 고른다. 내부 메모까지 다 보여 주지는 않는다.
         //
         // id와 link_kind를 같이 준다. 담당자가 되물은 것을 부서가 보고
@@ -150,6 +149,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
 
     // 한 번에 미룬 기록. review 행이 없는 보류는 여기에만 남아 있다.
     const bulkHold = bulkHoldFrom(decisions.results)
+    const outcome = outcomeEvidence.currentSaved
 
     const refuseReason = review?.refuse_code
       ? REFUSE_REASONS.find((r) => r.code === review.refuse_code)
@@ -269,7 +269,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
         at: outcome?.dept_confirmed_at ?? null,
         summary:
           (uses?.n ?? 0) > 0
-            ? `넘긴 뒤 ${uses.n}번 쓰였습니다.${outcome?.dept_confirmed_at ? ' 성과를 확인해 주셨습니다.' : ''}`
+            ? `넘긴 뒤 ${uses.n}번 쓰였습니다.${outcomeEvidence.confirmation.current ? ' 현재 성과를 확인해 주셨습니다.' : outcomeEvidence.confirmation.previous ? ' 수치가 바뀌어 다시 확인이 필요합니다.' : ''}`
             : '아직 쓰인 기록이 없습니다.',
       },
     ]
@@ -322,7 +322,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
     if (handover && !handover.accepted_at && !handover.rolled_back_at) {
       needs.push({ code: 'handover_unconfirmed', link: `/t/${handover.slug}` })
     }
-    if (outcome && !outcome.dept_confirmed_at && (uses?.n ?? 0) > 0) {
+    if (outcomeEvidence.canConfirm && !outcomeEvidence.confirmation.current) {
       needs.push({ code: 'outcome_unconfirmed' })
     }
 

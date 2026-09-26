@@ -4,7 +4,7 @@ import { api } from '../api/client.js'
 import { useApi } from '../hooks/useApi.js'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import Thread from '../components/Thread.jsx'
-import { ago, dateTimeLabel, duration, num } from '../lib/format.js'
+import { ago, dateTimeLabel, duration, num, krw } from '../lib/format.js'
 import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice.js'
 import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
@@ -1457,7 +1457,7 @@ function BetaSay({ ticket, onDone }) {
 // 실제로 한 번에 몇 분쯤 걸린다고 느끼는지를 숫자로 받고, 우리가 잰 값과
 // 20% 넘게 다르면 성과 화면의 금액이 '보수적 추정'으로 내려간다.
 function OutcomeCheck({ ticket, onDone }) {
-  const { data, setData } = useApi(`/track/${encodeURIComponent(ticket)}/outcome`)
+  const { data, reload, setData, error, loading } = useApi(`/track/${encodeURIComponent(ticket)}/outcome`)
   const state = data?.state
   const captureView = useActionLifetime(ticket)
   const [by, setBy] = useState('')
@@ -1467,6 +1467,7 @@ function OutcomeCheck({ ticket, onDone }) {
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [conflict, setConflict] = useState(false)
 
   // 아직 한 번도 안 돌았거나 기준선이 없으면 물어볼 것이 없다. 쓰지도 않은
   // 것에 "얼마나 줄었습니까"를 물으면 그 화면은 그때부터 안 읽힌다.
@@ -1476,6 +1477,7 @@ function OutcomeCheck({ ticket, onDone }) {
 
   async function submit(e) {
     e.preventDefault()
+    if (busy || conflict) return
     const bad = validateOutcomeConfirm({ by, agree, felt })
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
@@ -1487,13 +1489,14 @@ function OutcomeCheck({ ticket, onDone }) {
         agree,
         felt: agree === false ? Number(felt) : null,
         comment,
+        expectedEvidence: state.expectedEvidence,
       })
       if (!current()) return
       setMsg(r.message)
-      setData(r)
+      await reload()
       onChangedSafely(onDone)
     } catch (err) {
-      if (current()) setErrors({ by: err.message })
+      if (current()) { setErrors({ by: err.message }); setConflict(err.status === 409) }
     } finally {
       if (current()) setBusy(false)
     }
@@ -1511,6 +1514,24 @@ function OutcomeCheck({ ticket, onDone }) {
       <h3>
         자동화 전 소요 시간 <strong>{num(state.measuredMinutes, 0)}분</strong>
       </h3>
+      <p>현재 순금액 <strong>{krw(state.netKrw)}</strong> · 성공 {state.successCount}회 · 실패 {state.failedCount}회{state.unknownCount > 0 ? ` · 미확인 ${state.unknownCount}회` : ''}</p>
+      <p className="card-note">제작 공수·운영비·실패 비용을 포함한 값입니다. 이 화면의 계산 근거에 대해 확인 기록을 남깁니다.</p>
+      {!done && state.previous && <p className="notice notice-warn">이전 확인 기록은 보존되어 있습니다. 현재 계산 근거를 다시 확인해주세요.</p>}
+      {error && <p role="alert" className="notice notice-danger">{error}</p>}
+      {conflict && <button type="button" className="btn-secondary" disabled={loading || busy}
+        onClick={async () => {
+          const current=captureView();setBusy(true)
+          try {
+            const latest=await api.get(`/track/${encodeURIComponent(ticket)}/outcome`)
+            if(!current())return
+            setData(latest);setConflict(false)
+            setErrors(previous=>{const next={...previous};delete next.by;return next})
+            setMsg('최신 수치를 불러왔습니다. 작성한 의견을 확인한 뒤 다시 저장해주세요.')
+          }
+          catch(err){if(current())setErrors({by:err.message})}finally{if(current())setBusy(false)}
+        }}>
+        최신 수치 확인
+      </button>}
       <p className="dconf-why">
         절감액 계산에 쓰이는 기준선입니다. 실제 소요 시간과 맞는지 확인해 주세요.
       </p>
@@ -1650,7 +1671,7 @@ function OutcomeCheck({ ticket, onDone }) {
             )}
           </label>
 
-          <button type="submit" className="btn-primary" disabled={busy}>
+          <button type="submit" className="btn-primary" disabled={busy || conflict}>
             {busy ? '남기는 중…' : '이대로 확인합니다'}
           </button>
         </form>

@@ -61,7 +61,12 @@ export async function localAccessFixture(pg, { role = 'audit', revokeAfterFeedba
   }
   await pg.exec(`INSERT INTO override_decision_record(id,experiment_id,decision,basis,metrics_snapshot_json,decided_by,created_at)
     VALUES('local-first-expansion','local-expanded','expand','최초 확대 시 보존한 가상 근거','{"scope":"가상 입력 20건","runs":[]}','가상 책임자','2026-09-18 00:00:00');`)
-  if (role === 'product') await pg.query("UPDATE override_actor SET role='product',display_name='로컬 실험 담당자',departments_json='[\"재무\"]',product_ids_json='[\"product-local\"]' WHERE email=$1", [email])
+  if (role === 'product') {
+    await pg.query("UPDATE override_actor SET role='product',display_name='로컬 실험 담당자',departments_json='[\"재무\"]',product_ids_json='[\"product-local\"]' WHERE email=$1", [email])
+    // This application already has a handover, baseline and a recorded attempt.
+    // Keep it reachable in the actual result UI for save/reconfirmation checks.
+    await pg.exec("UPDATE application SET status='수용' WHERE id='app-local-verify'")
+  }
   const pair = await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1,0,1]), hash: 'SHA-256' }, true, ['sign','verify'])
   const jwk = { ...await crypto.subtle.exportKey('jwk', pair.publicKey), kid: 'local-browser-fixture', alg: 'RS256', use: 'sig' }
   const issuer = 'https://local-verification.cloudflareaccess.com'

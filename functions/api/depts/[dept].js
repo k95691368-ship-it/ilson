@@ -12,8 +12,8 @@ import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { annualHours } from '../../_lib/applications.js'
 import { sortPending } from '../../../shared/pending.js'
 import { returnedFor } from '../../../shared/returned.js'
-import { computeOutcome, liveChallenges, runsFromTotals, daysSince } from '../../../shared/outcome.js'
-import { ACCEPT_KIND, OUTCOME_KIND } from '../../../shared/accept.js'
+import { loadOutcomeEvidenceMany } from '../../_lib/outcomeEvidence.js'
+import { ACCEPT_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 import { fullySignedIds } from '../../_lib/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
@@ -147,12 +147,6 @@ export async function onRequestGet({ env, data: requestData, params }) {
                     WHERE h.application_id = a.id) AS handed_at,
                   (SELECT COUNT(*) FROM decision_log d
                     WHERE d.application_id = a.id AND d.link_kind = ?) AS accepted,
-                  (SELECT COUNT(*) FROM outcome o
-                    WHERE o.application_id = a.id) AS has_outcome,
-                  (SELECT COUNT(*) FROM tool_use u
-                    WHERE u.application_id = a.id) AS runs,
-                  (SELECT COUNT(*) FROM decision_log d
-                    WHERE d.application_id = a.id AND d.link_kind = ?) AS outcome_ok,
                   (SELECT COUNT(*) FROM beta_round br
                     WHERE br.application_id = a.id) AS beta_rounds,
                   (SELECT MAX(br.created_at) FROM beta_round br
@@ -165,7 +159,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            LEFT JOIN review r ON r.application_id = a.id
            WHERE a.dept = ? AND a.status NOT IN ('반려')`
         )
-          .bind(SIGNOFF_KIND, ACCEPT_KIND, OUTCOME_KIND, HOLD_LIFT_KIND, dept)
+          .bind(SIGNOFF_KIND, ACCEPT_KIND, HOLD_LIFT_KIND, dept)
           .all(),
 
         // 이 부서에 얼마를 돌려드렸는가.
@@ -174,46 +168,26 @@ export async function onRequestGet({ env, data: requestData, params }) {
         // 말한다. 둘 다 빚 이야기다. 준 것은 한 마디도 안 해서, 만날 때마다
         // 사과만 하는 자리가 되어 있었다.
         env.DB.prepare(
-          `SELECT a.ticket_no, a.title,
-                  b.median_seconds, b.people,
-                  o.dept_confirmed_at,
-                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id) AS runs,
-                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id AND u.ok = 1) AS success_count,
-                  (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = a.id AND u.ok = 0) AS failed_count,
-                  (SELECT COALESCE(SUM(u.duration_ms), 0) FROM tool_use u
-                    WHERE u.application_id = a.id) AS duration_total_ms,
-                  (SELECT COALESCE(SUM(u.human_review_seconds), 0) FROM tool_use u
-                    WHERE u.application_id = a.id) AS review_seconds,
-                  (SELECT COALESCE(SUM(u.rework_seconds), 0) FROM tool_use u
-                    WHERE u.application_id = a.id) AS rework_seconds,
-                  b.sample_n, b.sealed_at,
-                  o.dev_hours, o.ops_cost_krw, o.amortize_months,
-                  -- 마지막 실행에서 아직 안 푼 격리 줄.
-                  (SELECT u.quarantined FROM tool_use u
-                    WHERE u.application_id = a.id ORDER BY u.used_at DESC LIMIT 1) AS quarantine_left,
-                  -- 부서가 체감으로 말한 분. 우리가 잰 값과 크게 다르면
-                  -- 반박이 붙는다.
-                  (SELECT d.alternatives FROM decision_log d
-                    WHERE d.application_id = a.id AND d.link_kind = ?
-                    ORDER BY d.created_at DESC LIMIT 1) AS dept_said,
-                  -- **해소한 반박만** 이 표에 저장된다. 살아 있는 반박은
-                  -- 읽을 때 계산한다 — 그래서 여기서 미해소를 세면 영원히
-                  -- 0이다. 실제로 그렇게 짰다가 성과 화면은 '보수적 추정'인데
-                  -- 부서 화면은 '반박 없음'이라고 말했다.
-                  -- 해소한 반박을 **개수**로 세고 있었다. 아래에서 살아 있는
-                  -- 개수에서 그 수를 빼는데, 규칙에서 이미 빠진 반박이 해소
-                  -- 목록에 들어 있으면 그만큼 또 빠진다. 코드로 가져와 걸러낸다.
-                  (SELECT GROUP_CONCAT(c.rule_code) FROM outcome_challenge c
-                    WHERE c.application_id = a.id AND c.resolved_at IS NOT NULL) AS resolved_codes
-           FROM application a
-           JOIN baseline b ON b.application_id = a.id
-           LEFT JOIN outcome o ON o.application_id = a.id
+          `SELECT a.id, a.ticket_no, a.title
+           FROM application a JOIN baseline b ON b.application_id = a.id
            WHERE a.dept = ?`
-        )
-          .bind(OUTCOME_KIND, dept)
-          .all(),
+        ).bind(dept).all(),
       ])
 
+    const evidence = await loadOutcomeEvidenceMany(env.DB, returnedRows.results.map(row => row.id))
+    const returnedRowsCurrent = returnedRows.results.map(row => {
+      const current = evidence.get(row.id)
+      const outcome = current.outcome
+      return {
+        ...row, ...current.baseline,
+        runs: outcome.runCount, success_count: outcome.successCount, failed_count: outcome.failedCount,
+        duration_total_ms: outcome.autoSeconds * 1000,
+        review_seconds: outcome.reviewSeconds, rework_seconds: outcome.reworkSeconds,
+        currentConfirmed: current.confirmation.current,
+        computedSavedSeconds: outcome.savedSeconds,
+        open_challenges: current.unresolvedCount,
+      }
+    })
     const items = apps.results.map((r) => ({ ...r, annual_hours: annualHours(r) }))
 
     // 이 부서가 답해 주셔야 할 것.
@@ -242,7 +216,8 @@ export async function onRequestGet({ env, data: requestData, params }) {
         // 그대로 남아 있는 것이라 여기서 빼지 않는다.
         if (r.handed && !r.rolled_back && !r.accepted) add('accept', r.handed_at)
         // 한 번이라도 돌았는데 성과 확인이 없다.
-        if (r.has_outcome && r.runs > 0 && !r.outcome_ok) add('outcome', r.handed_at)
+        const currentEvidence = evidence.get(r.id)
+        if (currentEvidence?.canConfirm && !currentEvidence.directConfirmed) add('outcome', r.handed_at)
         // 시험판이 나왔는데 의견이 한 건도 없다.
         if (r.beta_rounds > 0 && r.beta_says === 0) add('beta', r.beta_at)
         // 보류인데 아직 아무 말도 없다.
@@ -380,45 +355,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       // 부서 몫. owed 와 시점이 정반대다.
       pending,
       // 이 부서에 돌려드린 시간. 부서가 확인한 것과 아직 아닌 것을 가른다.
-      returned: returnedFor(
-        returnedRows.results.map((r) => {
-          // 성과 화면과 **같은 함수**로 센다. 저장된 줄을 세면 안 된다 —
-          // 살아 있는 반박은 저장되지 않기 때문이다.
-          let deptFelt = null
-          try {
-            deptFelt = JSON.parse(r.dept_said)?.felt ?? null
-          } catch {
-            // 옛 기록에는 숫자가 없다.
-          }
-          const outcome = computeOutcome({
-            baseline: r,
-            // 정직 화면과 **같은 함수**로 되돌린다. 각자 복사해 두면
-            // 한쪽만 고쳐지고 두 화면이 다른 말을 한다.
-            runs: runsFromTotals({
-              count: r.runs,
-              successCount: r.success_count,
-              failedCount: r.failed_count,
-              durationMs: r.duration_total_ms,
-              reviewSeconds: r.review_seconds,
-              reworkSeconds: r.rework_seconds,
-            }),
-            devHours: r.dev_hours ?? 0,
-            opsCostKrw: r.ops_cost_krw ?? 0,
-            amortizeMonths: r.amortize_months ?? 24,
-          })
-          // 세는 자리를 shared/outcome.js 한 곳으로 모았다. 여기서 따로
-          // 세다가 뺄셈으로 어긋났다.
-          const { openCount } = liveChallenges({
-            outcome,
-            quarantineLeft: r.quarantine_left ?? 0,
-            deptConfirmed: Boolean(r.dept_confirmed_at),
-            baselineAgeDays: daysSince(r.sealed_at),
-            deptFelt,
-            resolvedCodes: r.resolved_codes,
-          })
-          return { ...r, open_challenges: openCount }
-        })
-      ),
+      returned: returnedFor(returnedRowsCurrent),
     })
   } catch (err) {
     return failUnexpected(err, '부서 기록을 모으지 못했습니다.')

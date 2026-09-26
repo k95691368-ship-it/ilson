@@ -69,6 +69,7 @@ export function runsFromTotals({ count, successCount, failedCount, durationMs, r
 export function computeOutcome({
   baseline, // 3단계에서 봉인한 값 { median_seconds, sample_n, people, frequency, hourly_wage_krw }
   runs = [], // 실제 실행 기록 [{ ok, duration_ms, human_review_seconds, rework_seconds }]
+  runTotals = null, // DB에서 같은 순서로 집계한 실행 합계. 전체 행 전송 없이 같은 계산식 사용.
   devHours = 0, // 만드는 데 든 시간
   opsCostKrw = 0, // 운영비 (있으면)
   amortizeMonths = 24, // 제작 공수를 몇 달에 나눠 볼 것인가
@@ -82,9 +83,9 @@ export function computeOutcome({
 
   const wage = baseline.hourly_wage_krw || HOURLY_WAGE_KRW
   const people = baseline.people || 1
-  const runCount = runs.length
-  const successCount = runs.filter(run => [1, '1', true].includes(run.ok)).length
-  const failedCount = runs.filter(run => [0, '0', false].includes(run.ok)).length
+  const runCount = runTotals ? Number(runTotals.count) : runs.length
+  const successCount = runTotals ? Number(runTotals.successCount) : runs.filter(run => [1, '1', true].includes(run.ok)).length
+  const failedCount = runTotals ? Number(runTotals.failedCount) : runs.filter(run => [0, '0', false].includes(run.ok)).length
   const unknownCount = runCount - successCount - failedCount
 
   if (runCount === 0) {
@@ -100,9 +101,9 @@ export function computeOutcome({
   const manualSeconds = baseline.median_seconds * people * successCount
 
   // 자동화 뒤에 실제로 든 시간
-  const autoSeconds = runs.reduce((a, r) => a + (r.duration_ms ?? 0) / 1000, 0)
-  const reviewSeconds = runs.reduce((a, r) => a + (r.human_review_seconds ?? 0), 0)
-  const reworkSeconds = runs.reduce((a, r) => a + (r.rework_seconds ?? 0), 0)
+  const autoSeconds = runTotals ? Number(runTotals.autoSeconds) : runs.reduce((a, r) => a + (r.duration_ms ?? 0) / 1000, 0)
+  const reviewSeconds = runTotals ? Number(runTotals.reviewSeconds) : runs.reduce((a, r) => a + (r.human_review_seconds ?? 0), 0)
+  const reworkSeconds = runTotals ? Number(runTotals.reworkSeconds) : runs.reduce((a, r) => a + (r.rework_seconds ?? 0), 0)
   const afterSeconds = autoSeconds + reviewSeconds + reworkSeconds
 
   const savedSeconds = manualSeconds - afterSeconds

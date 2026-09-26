@@ -9,12 +9,12 @@
 // 수령 확인·성과 확인과 같은 규칙이다.
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
-import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
 import { validateBetaSay, betaSayState, BETA_SAY_KIND } from '../../../../shared/betasay.js'
 import { logDecision } from '../../../_lib/decisions.js'
-import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
+import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'
+import { departmentMutation } from '../../../_lib/departmentMutation.js'
 
 async function load(env, ticket) {
   const app = await env.DB.prepare(
@@ -50,84 +50,42 @@ export async function onRequestGet({ env, data: requestData, params }) {
 
 export async function onRequestPost({ env, data: requestData, request, params }) {
   env = requestData?.requestEnv ?? env
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
-  const ticket = await checkRateLimit(env, `betasay:${ip}`, 20, 3600)
-  if (!ticket) return jsonError('의견은 시간당 20건까지 남기실 수 있습니다.', 429)
-
-  const loaded = await load(env, String(params.ticket ?? '').trim().toUpperCase())
-  if (!loaded) {
-    await releaseRateLimit(env, `betasay:${ip}`, ticket)
-    return jsonError('그 접수번호를 찾지 못했습니다.', 404)
-  }
-  const forbidden = departmentAuthority(env, loaded.app.dept)
-  if (forbidden) {
-    await releaseRateLimit(env, `betasay:${ip}`, ticket)
-    return forbidden
-  }
-
-  // 시험판을 아직 안 돌렸으면 써 볼 것이 없다. 없는 것에 대고 의견을
-  // 받으면 담당자는 무엇을 두고 하신 말인지 모른다.
-  if (!loaded.round) {
-    await releaseRateLimit(env, `betasay:${ip}`, ticket)
-    return jsonError('아직 시험판이 나오지 않았습니다. 나오면 이 화면에 뜹니다.', 409)
-  }
-
+  const bucket = `betasay:${request.headers.get('CF-Connecting-IP') || 'unknown'}`
+  const rateTicket = await checkRateLimit(env,bucket,20,3600)
+  if (!rateTicket) return jsonError('의견은 시간당 20건까지 남기실 수 있습니다.',429)
   let body
+  try { body = await request.json() } catch {
+    await releaseRateLimit(env,bucket,rateTicket)
+    return jsonError('보내주신 내용을 읽지 못했습니다.',400)
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    await releaseRateLimit(env,bucket,rateTicket)
+    return jsonError('요청 형식이 올바르지 않습니다.',400)
+  }
+  const ticket = String(params.ticket ?? '').trim().toUpperCase()
+  const response = await departmentMutation(env,request,`betasay:${ticket}`,body,async DB => {
+    const loaded = await load({...env,DB},ticket)
+    if (!loaded) return jsonError('그 접수번호를 찾지 못했습니다.',404)
+    const forbidden = await currentDepartmentAuthority(env,DB,loaded.app.dept)
+    if (forbidden) return forbidden
+    if (!loaded.round) return jsonError('아직 시험판이 나오지 않았습니다. 나오면 이 화면에 뜹니다.',409)
+    const errors = validateBetaSay(body)
+    if (Object.keys(errors).length) return failFields(errors,'적어 주신 내용을 확인해주세요.')
+    const by = String(body.by).trim().slice(0,60), said = String(body.body).trim().slice(0,1000)
+    await DB.prepare(`INSERT INTO beta_feedback (id,application_id,round_id,dept,person_label,body,kind)
+      VALUES(?,?,?,?,?,?,?)`).bind(newId('bfb'),loaded.app.id,loaded.round.id,loaded.app.dept,by,said,body.kind).run()
+    await logDecision({DB},{applicationId:loaded.app.id,stage:'베타테스트',actor:'human',title:by,what:said,
+      why:`${loaded.app.dept}에서 시험판을 써 보고 적어 주셨습니다. 기계 채점은 "쓰기 불편하다"를 채점하지 못합니다.`,
+      linkKind:BETA_SAY_KIND,linkId:loaded.round.id})
+    return jsonResponse({ok:true,blocked:body.kind === '막힌곳'})
+  })
+  if (!response.ok || response.headers.get('X-Idempotency-Replayed') === '1') await releaseRateLimit(env,bucket,rateTicket)
+  if (!response.ok) return response
   try {
-    body = await request.json()
-  } catch {
-    await releaseRateLimit(env, `betasay:${ip}`, ticket)
-    return jsonError('보내주신 내용을 읽지 못했습니다.', 400)
-  }
-
-  const errors = validateBetaSay(body)
-  if (Object.keys(errors).length > 0) {
-    await releaseRateLimit(env, `betasay:${ip}`, ticket)
-    return failFields(errors, '적어 주신 내용을 확인해주세요.')
-  }
-
-  const by = String(body.by).trim().slice(0, 60)
-  const said = String(body.body).trim().slice(0, 1000)
-
-  try {
-    await env.DB.prepare(
-      `INSERT INTO beta_feedback (id, application_id, round_id, dept, person_label, body, kind)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(newId('bfb'), loaded.app.id, loaded.round.id, loaded.app.dept, by, said, body.kind)
-      .run()
-
-    // 결정 기록에도 남긴다.
-    //
-    // 여기만 안 남기고 있었다. 부서가 하는 일 열대여섯 가지 중 이것만
-    // beta_feedback 표에서 끝났다. 그래서 결정 기록 화면이 "부서가 직접
-    // 누른 것 N건"을 셀 때 시험판 의견은 한 건도 안 세어졌다.
-    //
-    // 시험판을 써 보고 걸리는 것을 적는 일은 부서가 하는 일 중 손이 제일
-    // 많이 가는 축이다. 그게 안 잡히면 이 화면이 하려는 말 — 이 기록은
-    // 혼자 만든 것이 아니다 — 이 실제보다 약하게 보인다.
-    await logDecision(env, {
-      applicationId: loaded.app.id,
-      stage: '베타테스트',
-      actor: 'human',
-      title: by,
-      what: said,
-      why: `${loaded.app.dept}에서 시험판을 써 보고 적어 주셨습니다. 기계 채점은 "쓰기 불편하다"를 채점하지 못합니다.`,
-      linkKind: BETA_SAY_KIND,
-      linkId: loaded.round.id,
-    }).catch(rethrowDatabaseAccessFailure)
-
-    const after = await load(env, loaded.app.ticket_no)
-    return jsonResponse({
-      ok: true,
-      state: betaSayState(after),
-      message:
-        body.kind === '막힌곳'
-          ? '알려주셔서 고맙습니다. 막힌 곳은 고치고 나서 여기에 답을 적어 두겠습니다.'
-          : '알려주셔서 고맙습니다. 여기에 답을 적어 두겠습니다.',
-    })
-  } catch (err) {
-    await releaseRateLimit(env, `betasay:${ip}`, ticket)
-    return failUnexpected(err, '남기지 못했습니다.')
-  }
+    const receipt = await response.json(), state = betaSayState(await load(env,ticket))
+    return jsonResponse({ok:true,state,message:receipt.blocked
+      ? '알려주셔서 고맙습니다. 막힌 곳은 고치고 나서 여기에 답을 적어 두겠습니다.'
+      : '알려주셔서 고맙습니다. 여기에 답을 적어 두겠습니다.'},200,
+      {'X-Idempotency-Replayed':response.headers.get('X-Idempotency-Replayed') || '0'})
+  } catch(error) { return failUnexpected(error,'시험판 의견 상태를 불러오지 못했습니다.') }
 }

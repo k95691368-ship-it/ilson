@@ -7,6 +7,7 @@ import { seedOverrideWorkspace } from '../functions/_lib/override.js'
 import { onRequest } from '../functions/api/_middleware.js'
 import { onRequestGet as events } from '../functions/api/override/events.js'
 import { onRequestGet as workspace, onRequestPost as mutate } from '../functions/api/override.js'
+import { viewedOverrideBody } from './fixtures/overrideEdit.js'
 
 const pg = new PGlite(), base = 'https://events-local.supabase.co', issuer = 'https://events-local.cloudflareaccess.com'
 const DB = createSupabaseDb(base, 'test-only')
@@ -17,6 +18,7 @@ const demos = tokens.map(token => createSupabaseDb(base, 'test-only', token))
 let queue = Promise.resolve(), pair, jwk
 const enc = value => Buffer.from(JSON.stringify(value)).toString('base64url')
 async function invoke(mode, handler, query = '', body = null, email = 'manager@local.invalid') {
+  if (body && handler === mutate) body = await viewedOverrideBody(mode.startsWith('demo') ? demos[mode === 'demo-other' ? 1 : 0] : DB,body)
   const headers = { Origin: 'https://local.invalid', 'X-Ilson-Request': '1', 'X-Idempotency-Key': crypto.randomUUID(), 'Content-Type': 'application/json' }
   const bindings = mode.startsWith('demo') ? { ...env, DEMO_WORKSPACES: 'true', OVERRIDE_DEMO_MODE: 'true' } : env
   if (mode.startsWith('demo')) headers.Cookie = `ilson_workspace=${tokens[mode === 'demo-other' ? 1 : 0]}`

@@ -5,7 +5,7 @@ import { returnedFor, returnedLine, returnedNote } from '../shared/returned.js'
 const baseline = { median_seconds: 600, min_seconds: 600, max_seconds: 600, sample_n: 5, people: 1, hourly_wage_krw: 3600 }
 const success = { ok: 1, duration_ms: 1000, human_review_seconds: 30, rework_seconds: 0 }
 const failure = { ok: 0, duration_ms: 1000, human_review_seconds: 30, rework_seconds: 60 }
-const department = (overrides = {}) => ({ ...baseline, ticket_no: 'A', runs: 1, success_count: 0, failed_count: 1, duration_total_ms: 1000, review_seconds: 30, rework_seconds: 60, dept_confirmed_at: '2026-01-01', ...overrides })
+const department = (overrides = {}) => ({ ...baseline, ticket_no: 'A', runs: 1, success_count: 0, failed_count: 1, duration_total_ms: 1000, review_seconds: 30, rework_seconds: 60, dept_confirmed_at: '2026-01-01', currentConfirmed: true, ...overrides })
 
 describe('실패 시도의 비용과 성공 기준선을 구분한다', () => {
   it('실패만 있으면 절감 크레딧 없이 모든 비용을 남긴다', () => {
@@ -53,7 +53,7 @@ describe('실패 시도의 비용과 성공 기준선을 구분한다', () => {
     expect(combined.confirmed).toHaveLength(2)
   })
   it('확인 전 손실도 화면에서 확인할 수 있다', () => {
-    const result = returnedFor([department({ dept_confirmed_at: null })])
+    const result = returnedFor([department({ dept_confirmed_at: null, currentConfirmed: false })])
     expect(result).toMatchObject({ show: true, unconfirmedSeconds: -91 })
     expect(returnedNote(result)).toContain('실패 비용과 손실도 제외하지 않았습니다')
   })

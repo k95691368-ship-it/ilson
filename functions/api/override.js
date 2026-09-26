@@ -5,6 +5,7 @@ import { createFeedbackCase } from '../_lib/fieldFeedback.js'
 import { hydrateEvent } from '../_lib/overrideEvents.js'
 import { overrideMetrics } from '../_lib/overrideMetrics.js'
 import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.js'
+import { assertOverrideEditVersion, withOverrideEditVersion } from '../_lib/overrideEditVersion.js'
 import { isAccessAdmin, scopeEnvironment } from '../_lib/authorization.js'
 import { assertClusterClosable } from '../_lib/issueWorkflow.js'
 import { validDate } from '../../shared/fieldFeedback.js'
@@ -161,7 +162,7 @@ function buildAlerts(clusters, experiments) {
 
 function accountRow(row) {
   return { email:row.email, display_name:row.display_name, role:row.role, active:Number(row.active) === 1,
-    departments:safeJson(row.departments_json,[]), product_ids:safeJson(row.product_ids_json,[]) }
+    departments:safeJson(row.departments_json,[]), product_ids:safeJson(row.product_ids_json,[]), edit_version:row.edit_version }
 }
 
 function accountCanHandle(account, product) {
@@ -172,7 +173,7 @@ function accountCanHandle(account, product) {
 async function assignmentDirectory(env, actor, products) {
   if (actor.role === 'reviewer') return {candidates:[],actors:[]}
   const rows = (await (env.UNSCOPED_DB ?? env.DB).prepare('SELECT email,display_name,role,active,departments_json,product_ids_json FROM override_actor ORDER BY display_name,email').all()).results
-  const accounts = rows.map(accountRow)
+  const accounts = await Promise.all(rows.map(async row => accountRow(await withOverrideEditVersion('actor', row))))
   return {actors:isAccessAdmin(actor) ? accounts : [], candidates:accounts
     .filter(account=>account.active && roleCan(account.role,'update_cluster') && (isAccessAdmin(actor) || products.some(product=>accountCanHandle(account,product))))
     .map(account=>({email:account.email,label:account.display_name,departments:account.departments,product_ids:account.product_ids}))}
@@ -219,14 +220,14 @@ async function loadWorkspace(env) {
     ])
 
   const products = productRows.results ?? []
-  const events = (eventRows.results ?? []).map(hydrateEvent)
-  const rawClusters = (clusterRows.results ?? []).map(hydrateCluster)
+  const events = await Promise.all((eventRows.results ?? []).map(async row => hydrateEvent(await withOverrideEditVersion('event', row))))
+  const rawClusters = await Promise.all((clusterRows.results ?? []).map(async row => hydrateCluster(await withOverrideEditVersion('cluster', row))))
   const runs = runRows.results ?? []
   const decisions = decisionRows.results ?? []
-  const experiments = (experimentRows.results ?? []).map((row) =>
-    hydrateExperiment(row, runs, decisions)
-  )
-  const volumes = volumeRows.results ?? []
+  const experiments = await Promise.all((experimentRows.results ?? []).map(async row =>
+    hydrateExperiment(await withOverrideEditVersion('experiment', row), runs, decisions)
+  ))
+  const volumes = await Promise.all((volumeRows.results ?? []).map(row => withOverrideEditVersion('volume', row)))
 
   const analytics = await overrideMetrics(env.DB, products)
   const clusters = rawClusters.map(cluster => ({ ...cluster,
@@ -247,7 +248,7 @@ async function loadWorkspace(env) {
       metrics_snapshot: safeJson(row.metrics_snapshot_json, {}),
     })),
     volumes,
-    integrations: integrationRows.results ?? [],
+    integrations: await Promise.all((integrationRows.results ?? []).map(row => withOverrideEditVersion('integration', row))),
     audit: (auditRows.results ?? []).map((row) => ({ ...row, detail: safeJson(row.detail_json, {}) })),
     ai_calls: aiRows.results ?? [],
     fairness: analytics.fairness,
@@ -288,6 +289,29 @@ export async function onRequestGet({ env, data: requestData, request }) {
     const actor = await resolveOverrideActor(env, request)
     if (!actor) return jsonError('인증된 사내 계정이 필요합니다.',401)
     if (!overrideDemoMode(env)) env = scopeEnvironment(env, actor)
+    const params = new URL(request?.url ?? 'https://ilson.invalid/api/override').searchParams
+    if (params.has('editKind')) {
+      const kind = params.get('editKind')
+      const tables = { cluster:'issue_cluster', event:'override_event', experiment:'change_experiment', integration:'override_integration', actor:'override_actor', volume:'override_volume' }
+      if (!Object.hasOwn(tables, kind)) return jsonError('조회할 자료 종류를 확인해주세요.',400)
+      if (kind === 'actor' && !isAccessAdmin(actor)) return jsonError('계정 설정은 관리자만 조회할 수 있습니다.',403)
+      let row
+      if (kind === 'volume') {
+        row = await env.DB.prepare('SELECT * FROM override_volume WHERE product_id=? AND measured_on=? AND segment=?')
+          .bind(text(params.get('productId'),100),text(params.get('measuredOn'),10),text(params.get('segment'),120) || '전체').first()
+      } else {
+        const id = text(params.get('editId'), kind === 'actor' ? 240 : 100)
+        if (!id) return jsonError('조회할 자료 번호를 확인해주세요.',400)
+        row = await env.DB.prepare(`SELECT * FROM ${tables[kind]} WHERE ${kind === 'actor' ? 'email' : 'id'}=?`).bind(id).first()
+      }
+      if (!row) return jsonError('현재 권한으로 이 자료를 찾을 수 없습니다.',404)
+      const versioned = await withOverrideEditVersion(kind, row)
+      const entity = kind === 'actor' ? accountRow(versioned) : kind === 'event' ? hydrateEvent(versioned) : kind === 'cluster' ? hydrateCluster(versioned)
+        : kind === 'experiment' ? hydrateExperiment(versioned,
+          (await env.DB.prepare('SELECT * FROM experiment_run WHERE experiment_id=? ORDER BY run_sequence').bind(row.id).all()).results,
+          (await env.DB.prepare('SELECT * FROM override_decision_record WHERE experiment_id=? ORDER BY created_at').bind(row.id).all()).results) : versioned
+      return jsonResponse({ entity })
+    }
     const workspace = await loadWorkspace(env)
     if (!overrideDemoMode(env)) {
       workspace.current_actor = {role:actor.role,label:actor.label,email:actor.email,is_admin:isAccessAdmin(actor)}
@@ -500,6 +524,7 @@ async function validateEvent(env, actor, body) {
     .bind(eventId)
     .first()
   if (!event) return jsonError('그 수정 사건을 찾지 못했습니다.', 404)
+  await assertOverrideEditVersion('event', event, body.expectedVersion)
   await env.DB.prepare(
     `UPDATE override_event SET validity = ?, validity_reason = ?, updated_at = datetime('now') WHERE id = ?`
   )
@@ -517,6 +542,7 @@ async function updateCluster(env, actor, body) {
     .bind(clusterId)
     .first()
   if (!cluster) return jsonError('그 문제 군집을 찾지 못했습니다.', 404)
+  await assertOverrideEditVersion('cluster', cluster, body.expectedVersion)
   const causeCode = ALLOWED_CAUSES.has(body.causeCode) ? body.causeCode : cluster.cause_code
   const causeStatus = ['candidate', 'confirmed', 'disputed'].includes(body.causeStatus)
     ? body.causeStatus
@@ -645,10 +671,11 @@ async function createExperiment(env, actor, body) {
   if (!guardrails.length) fields.guardrails = '안전 가드레일을 한 개 이상 적어주세요.'
   if (!stopConditions.length) fields.stopConditions = '중단 조건을 한 개 이상 적어주세요.'
   if (Object.keys(fields).length) return failFields(fields)
-  const cluster = await env.DB.prepare('SELECT id FROM issue_cluster WHERE id = ?')
+  const cluster = await env.DB.prepare('SELECT * FROM issue_cluster WHERE id = ?')
     .bind(body.clusterId)
     .first()
   if (!cluster) return jsonError('그 문제 군집을 찾지 못했습니다.', 404)
+  await assertOverrideEditVersion('cluster', cluster, body.expectedVersion)
   const id = newId('olx')
   await env.DB.prepare(
     `INSERT INTO change_experiment
@@ -697,6 +724,7 @@ async function approveExperiment(env, actor, body) {
     .bind(experimentId)
     .first()
   if (!experiment) return jsonError('그 실험을 찾지 못했습니다.', 404)
+  await assertOverrideEditVersion('experiment', experiment, body.expectedVersion)
   if (!['draft','held','stopped'].includes(experiment.status)) return jsonError('초안·보류·중단 상태에서만 새 시험 주기를 승인할 수 있습니다. 종료된 실험은 새 실험으로 이어주세요.', 409)
   if (!validEvaluationPlan(safeJson(experiment.evaluation_plan_json))) return jsonError('사전 측정 계획이 없는 기존 실험입니다. 계획과 원본 버전을 지정한 후속 실험을 만들어주세요.', 409)
   if (experiment.risk_level === 'high' && !['policy', 'audit', 'executive'].includes(actor.role)) {
@@ -722,6 +750,7 @@ async function recordRun(env, actor, body) {
     .bind(experimentId)
     .first()
   if (!experiment) return jsonError('그 실험을 찾지 못했습니다.', 404)
+  await assertOverrideEditVersion('experiment', experiment, body.expectedVersion)
   if (!experiment.approved_at || !experiment.approval_id || !['approved','running'].includes(experiment.status)) return jsonError('현재 상태에서는 결과를 추가할 수 없습니다. 중단·보류 후에는 새 시험 주기 승인이 필요합니다.', 409)
   const plan = safeJson(experiment.evaluation_plan_json)
   if (!validEvaluationPlan(plan)) return jsonError('사전 측정 계획이 없습니다. 새 실험을 작성해주세요.', 409)
@@ -829,6 +858,7 @@ async function decideExperiment(env, actor, body) {
     .bind(experimentId)
     .first()
   if (!experiment) return jsonError('그 실험을 찾지 못했습니다.', 404)
+  await assertOverrideEditVersion('experiment', experiment, body.expectedVersion)
   const { results: runs } = await env.DB.prepare(
     'SELECT * FROM experiment_run WHERE experiment_id = ? ORDER BY run_sequence'
   )
@@ -919,7 +949,9 @@ async function recordVolume(env, actor, body) {
   if (!product) return jsonError('그 제품을 찾지 못했습니다.',404)
   const existingRows = (await env.DB.prepare('SELECT * FROM override_volume WHERE product_id=? AND measured_on=? ORDER BY id').bind(productId,measuredOn).all()).results
   if (existingRows.some(row=>row.segment!==segment && (row.segment==='전체' || segment==='전체'))) return failFields({segment:'같은 제품·날짜에 전체와 세부 고객군의 분모를 중복 등록할 수 없습니다.'})
-  const id = existingRows.find(row=>row.segment===segment)?.id || newId('olv')
+  const existing = existingRows.find(row=>row.segment===segment)
+  if (existing) await assertOverrideEditVersion('volume', existing, body.expectedVersion)
+  const id = existing?.id || newId('olv')
   await env.DB.prepare(
     `INSERT INTO override_volume
      (id, product_id, measured_on, segment, total_cases, applicable_cases)
@@ -960,6 +992,7 @@ async function saveIntegration(env, actor, body) {
     .bind(id)
     .first()
   if (existing) {
+    await assertOverrideEditVersion('integration', existing, body.expectedVersion)
     await env.DB.prepare(
       `UPDATE override_integration
        SET kind = ?, name = ?, endpoint_url = ?, secret_binding = ?, status = 'configured',
@@ -1056,6 +1089,7 @@ async function saveActor(env, actor, body) {
     return failFields({ email: '메일·이름·역할을 확인해주세요.' })
   }
   const previous = await env.DB.prepare('SELECT * FROM override_actor WHERE email=?').bind(email).first()
+  if (previous) await assertOverrideEditVersion('actor', previous, body.expectedVersion)
   const active = Object.hasOwn(body,'active') ? body.active : previous ? Number(previous.active) === 1 : true
   if (typeof active !== 'boolean') return failFields({active:'계정 활성 여부를 확인해주세요.'})
   const departments = body.departments ?? safeJson(previous?.departments_json,[])
@@ -1130,8 +1164,11 @@ export async function onRequestPost({ env, data: requestData, request }) {
     return jsonError('지원하지 않는 작업입니다.', 400)
     })
   } catch (error) {
-    if (error.message?.includes('/40001')) return jsonError('다른 요청으로 기록이 변경되었습니다. 새로고침 후 다시 확인해 주세요.', 409)
+    if (error.message?.includes('/40001')) return body.expectedVersion
+      ? jsonResponse({ error:'다른 요청으로 기록이 변경되었습니다. 작성 내용은 유지되며, 최신 자료를 확인한 뒤 다시 저장할 수 있습니다.', code:'OVERRIDE_EDIT_CONFLICT' },409)
+      : jsonError('다른 요청으로 기록이 변경되었습니다. 새로고침 후 다시 확인해 주세요.',409)
     if (error.message?.includes('/23505')) return jsonError('이미 저장된 기록입니다. 새로고침해서 확인해 주세요.', 409)
+    if (error?.code === 'OVERRIDE_EDIT_CONFLICT') return jsonResponse({ error: error.message, code: error.code }, error.status)
     if (error?.status) return jsonError(error.message, error.status)
     return failUnexpected(error, 'OverrideLoop 작업을 저장하지 못했습니다.')
   }

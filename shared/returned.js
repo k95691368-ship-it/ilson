@@ -29,6 +29,9 @@ export function returnedSecondsOf(row) {
   if (runs <= 0) return 0
   const base = Number(row?.median_seconds)
   if (!Number.isFinite(base) || base <= 0) return 0
+  // Server evidence already computed this from unrounded totals. Do not round
+  // each display component and then recompute a different department total.
+  if (Number.isFinite(row?.computedSavedSeconds)) return row.computedSavedSeconds
   return computeOutcome({ baseline: row, runs: runsFromTotals({
     count: runs, successCount: row.success_count, failedCount: row.failed_count,
     durationMs: row.duration_total_ms, reviewSeconds: row.review_seconds, reworkSeconds: row.rework_seconds,
@@ -61,7 +64,7 @@ export function returnedFor(rows) {
       // 그렇게 말한다.
       shaky: (Number(r.open_challenges) || 0) > 0,
     }
-    if (r.dept_confirmed_at) {
+    if (r.currentConfirmed === true) {
       confirmedSeconds += secs
       confirmed.push(item)
     } else {

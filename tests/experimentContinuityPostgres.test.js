@@ -4,8 +4,10 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { onRequestPost } from '../functions/api/override.js'
+import { seedOverrideWorkspace } from '../functions/_lib/override.js'
 import { onRequestPost as feedbackPost } from '../functions/api/feedback.js'
 import { canExpandExperiment, experimentRunTimingError } from '../shared/override.js'
+import { viewedOverrideRequests } from './fixtures/overrideEdit.js'
 
 const pg = new PGlite(), base = 'https://experiment-continuity.supabase.co'
 const DB = createSupabaseDb(base, 'memory-only')
@@ -33,6 +35,7 @@ beforeAll(async () => {
     return result
   })
   await DB.workspaceOpen(token, [])
+  await seedOverrideWorkspace({ DB:demoDB, DEMO_WORKSPACE:true })
   await pg.exec(`INSERT INTO override_product(id,name,domain,owner_team,model_name,model_version,prompt_version,policy_version)
     VALUES('p','시험 AI','지원','team','model','m1','prompt1','policy1');
     INSERT INTO issue_cluster(id,title,summary,owner_team,scope_product_id) VALUES('c','시험 문제','근거 점검','team','p');
@@ -48,6 +51,7 @@ beforeAll(async () => {
 }, 60000)
 afterAll(async () => { clock?.mockRestore(); vi.unstubAllGlobals(); await queue; await pg.close() })
 
+const viewedRequest = viewedOverrideRequests()
 async function post(scope, body, role = 'product', key = crypto.randomUUID()) {
   if (body.action === 'record_run') testNow = Math.max(testNow, Date.parse(body.measurementEnd) + 1)
   const actor = { email: role + '@local.invalid', role: role === 'other' ? 'product' : role, label: role, mode: 'access' }
@@ -55,7 +59,7 @@ async function post(scope, body, role = 'product', key = crypto.randomUUID()) {
     : { DB: DB.forActor(actor.email), UNSCOPED_DB: DB, AUTH_ACTOR: actor, OVERRIDE_DEMO_MODE: 'false' }
   const feedback = ['publish_update','confirm_update'].includes(body.action)
   const response = await (feedback ? feedbackPost : onRequestPost)({ env, request: new Request('https://local.invalid/api/' + (feedback ? 'feedback' : 'override'), {
-    method: 'POST', headers: { 'X-Idempotency-Key': key }, body: JSON.stringify({ role, ...body }),
+    method: 'POST', headers: { 'X-Idempotency-Key': key }, body: JSON.stringify({ role, ...await viewedRequest(scope.DB,body,key) }),
   }) })
   return { status: response.status, body: await response.json(), replayed: response.headers.get('X-Idempotency-Replayed') }
 }

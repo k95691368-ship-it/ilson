@@ -6,6 +6,7 @@ import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { atomicMutation, mutationFingerprint } from '../functions/_lib/atomicMutation.js'
 import { scopedActorDb, actorAssignments } from '../functions/_lib/dataScope.js'
 import { onRequestGet as loadOverride, onRequestPost as mutateOverride } from '../functions/api/override.js'
+import { viewedOverrideBody } from './fixtures/overrideEdit.js'
 
 const pg = new PGlite()
 const DB = createSupabaseDb('https://access-scope-test.supabase.co','local-test-only')
@@ -47,6 +48,7 @@ const impactColumns='customer_impact_score,operations_cost_krw,regulatory_risk_s
 const missingImpact={customer_impact_score:null,operations_cost_krw:null,regulatory_risk_score:null}
 const zeroImpact={customer_impact_score:0,operations_cost_krw:0,regulatory_risk_score:0}
 async function changeOverride(body,email=a,bindings) {
+  body = await viewedOverrideBody(bindings?.DB ?? DB,body)
   return mutateOverride({env:bindings ?? {DB:db(email),UNSCOPED_DB:DB,OVERRIDE_DEMO_MODE:'false',
     AUTH_ACTOR:{email,label:email,role:email===staff?'product':'reviewer',mode:'access',departments:[],product_ids:[]}},
   request:new Request('https://local.invalid/api/override',{method:'POST',headers:{'X-Idempotency-Key':crypto.randomUUID()},body:JSON.stringify(body)})})
@@ -109,7 +111,7 @@ describe.sequential('server-verified actor data scope on real PostgreSQL RLS',()
     const response=await mutateOverride({env:{DB:scoped,UNSCOPED_DB:DB,OVERRIDE_DEMO_MODE:'false',
       AUTH_ACTOR:{email:a,label:'A',role:'reviewer',mode:'access',departments:[],product_ids:[]}},
     request:new Request('https://local.invalid/api/override',{method:'POST',headers:{'X-Idempotency-Key':'scoped-aggregate-00001'},
-      body:JSON.stringify({action:'validate_event',eventId:'event-a',validity:'valid',reason:'Validated original evidence'})})})
+      body:JSON.stringify(await viewedOverrideBody(scoped,{action:'validate_event',eventId:'event-a',validity:'valid',reason:'Validated original evidence'}))})})
     expect(response.status,await response.clone().text()).toBe(200)
     const totals=await DB.prepare("SELECT recurrence_count,customer_impact_score,operations_cost_krw,regulatory_risk_score FROM issue_cluster WHERE id='own-cluster'").first()
     expect(totals).toEqual({recurrence_count:2,customer_impact_score:3,operations_cost_krw:30,regulatory_risk_score:3})

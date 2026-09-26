@@ -9,6 +9,8 @@ import { rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.js'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HOURLY_WAGE_KRW } from '../../../../shared/outcome.js'
+import { validateBaselineInputs } from '../../../../shared/outcomeInputs.js'
+import { loadOutcomeEvidence, outcomeMutation } from '../../../_lib/outcomeEvidence.js'
 import { pendingJoinDepts } from '../../../../shared/join.js'
 import { loadJoins } from './join.js'
 import {
@@ -278,20 +280,23 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
       case 'shadow_run': {
         const seconds = Number(body.total_seconds)
-        if (!Number.isFinite(seconds) || seconds <= 0) {
+        const errorCount = body.error_count == null || body.error_count === '' ? 0 : Number(body.error_count)
+        if (!['number','string'].includes(typeof body.total_seconds) || !Number.isFinite(seconds) || Math.round(seconds) <= 0 || seconds > 2147483647) {
           return failFields({ total_seconds: '잰 시간이 없습니다.' })
         }
+        if (!Number.isSafeInteger(errorCount) || errorCount < 0 || errorCount > 2147483647) return failFields({error_count:'오류 수는 0 이상의 정수로 적어주세요.'})
+        return outcomeMutation(env.DB, request, `baseline-measurement:${app.id}`, body, async DB => {
         // 세 번을 넘겨도 막지 않는다. 더 재면 기준선이 더 단단해진다.
         const seq =
           ((
-            await env.DB.prepare(
+            await DB.prepare(
               'SELECT MAX(seq) AS n FROM shadow_run WHERE application_id = ?'
             )
               .bind(app.id)
               .first()
           )?.n ?? 0) + 1
         const id = newId('shd')
-        await env.DB.prepare(
+        await DB.prepare(
           `INSERT INTO shadow_run (id, application_id, seq, total_seconds, error_count, step_timings_json, note)
            VALUES (?, ?, ?, ?, ?, ?, ?)`
         )
@@ -300,16 +305,23 @@ export async function onRequestPost({ env, data: requestData, params, request })
             app.id,
             seq,
             Math.round(seconds),
-            Number(body.error_count) || 0,
+            errorCount,
             body.steps ? JSON.stringify(body.steps) : null,
             t(body.note) || null
           )
           .run()
         return jsonResponse({ ok: true, id, seq }, 201)
+        })
       }
 
       case 'baseline': {
-        const { results: runs } = await env.DB.prepare(
+        const checked = validateBaselineInputs(body, app, HOURLY_WAGE_KRW)
+        if (!checked.ok) return failFields(checked.errors)
+        return outcomeMutation(env.DB, request, `baseline:${app.id}`, body, async DB => {
+        // Share the confirmation/tool-run commit lock and recheck the complete
+        // prior evidence so a baseline cannot change inside an attestation.
+        await loadOutcomeEvidence(DB, app.id)
+        const { results: runs } = await DB.prepare(
           'SELECT total_seconds, error_count FROM shadow_run WHERE application_id = ? ORDER BY total_seconds'
         )
           .bind(app.id)
@@ -328,7 +340,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
             ? times[(times.length - 1) / 2]
             : (times[times.length / 2 - 1] + times[times.length / 2]) / 2
 
-        await env.DB.prepare(
+        await DB.prepare(
           `INSERT INTO baseline
              (application_id, median_seconds, min_seconds, max_seconds, sample_n, error_rate,
               people, frequency, hourly_wage_krw, sealed_at)
@@ -341,6 +353,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
              error_rate = excluded.error_rate,
              people = excluded.people,
              frequency = excluded.frequency,
+             hourly_wage_krw = excluded.hourly_wage_krw,
              sealed_at = datetime('now')`
         )
           .bind(
@@ -361,13 +374,13 @@ export async function onRequestPost({ env, data: requestData, params, request })
             // 주기도 같았다. 늘 null이라 성과 화면의
             // `baseline?.frequency ?? app.current_frequency` 앞가지가
             // 죽은 코드였다.
-            Number(body.people) || app.current_people || 1,
+            checked.value.people,
             t(body.frequency) || app.current_frequency || null,
-            Number(body.hourly_wage_krw) || HOURLY_WAGE_KRW
+            checked.value.wage
           )
           .run()
 
-        await logDecision(env, {
+        await logDecision({ DB }, {
           applicationId: app.id,
           stage: '협의안',
           title: '기준선을 봉인했다',
@@ -377,9 +390,10 @@ export async function onRequestPost({ env, data: requestData, params, request })
             '지난 몇 주를 회상해 적게 하는 안. 회상 편향이 크고 바쁜 주가 과대 대표된다.',
           linkKind: 'baseline',
           linkId: app.id,
-        }).catch(rethrowDatabaseAccessFailure)
+        })
 
         return jsonResponse({ ok: true, median_seconds: median, sample_n: times.length })
+        })
       }
 
       default:

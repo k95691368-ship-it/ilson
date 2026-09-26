@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs'
 import { PGlite } from '@electric-sql/pglite'
 import { createSupabaseDb } from '../functions/_lib/dbBridge.js'
 import { departmentAuthority } from '../functions/_lib/departmentAuthority.js'
+import { loadOutcomeEvidence } from '../functions/_lib/outcomeEvidence.js'
 import { onRequest } from '../functions/api/_middleware.js'
 import { onRequestPost as signoff } from '../functions/api/track/[ticket]/signoff.js'
 import { onRequestPost as accept } from '../functions/api/tools/[slug]/accept.js'
@@ -16,7 +17,7 @@ const issuer = 'https://department-local.cloudflareaccess.com'
 const DB = createSupabaseDb(base, 'test-only')
 const env = { DB, DBBridgeApplied: true, SUPABASE_URL: base, SUPABASE_SERVICE_ROLE_KEY: 'test-only',
   ACCESS_TEAM_DOMAIN: issuer, ACCESS_AUD: 'department-local', OVERRIDE_DEMO_MODE: 'false', DEMO_WORKSPACES: 'false' }
-let queue = Promise.resolve(), pair, jwk
+let queue = Promise.resolve(), pair, jwk, beforeCommit = null
 const cases = [
   ['signoff', '/api/track/AX-TEST/signoff', signoff, { by: '이름 위조', dept: '재무', verdicts: { criterion: 'ok' }, reasons: {} }],
   ['accept', '/api/tools/department-test/accept', accept, { by: '이름 위조' }],
@@ -34,8 +35,13 @@ beforeAll(async () => {
     if (!String(url).startsWith(base + '/rest/v1/rpc/')) throw Error('External network blocked')
     const task = queue.then(async () => {
       try {
-        await pg.exec('SET ROLE service_role')
         const args = Object.values(JSON.parse(options.body)), name = new URL(url).pathname.split('/').at(-1)
+        if (name === 'ilson_actor_commit' && beforeCommit) {
+          const change = beforeCommit
+          beforeCommit = null
+          await change()
+        }
+        await pg.exec('SET ROLE service_role')
         return Response.json((await pg.query(`SELECT public.${name}(${args.map((_, i) => '$' + (i + 1)).join(',')}) data`, args)).rows[0].data)
       } catch (error) { return Response.json({ code: error.code }, { status: 400 }) }
       finally { await pg.exec('RESET ROLE') }
@@ -55,10 +61,13 @@ beforeAll(async () => {
   await DB.forActor('admin@local.invalid').prepare("INSERT INTO application_participation(id,application_id,department_id,granted_by_email) VALUES('join-hr','app-dept','인사','admin@local.invalid')").run()
   await DB.prepare("INSERT INTO handover(application_id,slug,title,handed_to_dept,handed_to_person) VALUES('app-dept','department-test','도구','재무','담당자')").run()
   await DB.prepare("INSERT INTO beta_round(id,application_id,seq,overall) VALUES('round','app-dept',1,'통과')").run()
+  await DB.prepare("INSERT INTO baseline(application_id,median_seconds,min_seconds,max_seconds,sample_n,people) VALUES('app-dept',600,600,600,5,1)").run()
+  await DB.prepare("INSERT INTO tool_use(id,application_id,ok,duration_ms) VALUES('dept-run','app-dept',1,1000)").run()
 }, 60000)
 afterAll(async () => { vi.unstubAllGlobals(); await pg.close() })
 const enc = value => Buffer.from(JSON.stringify(value)).toString('base64url')
 async function invoke(email, path, handler, body) {
+  if(path.endsWith('/outcome')) body={...body,expectedEvidence:(await loadOutcomeEvidence(DB.forActor(email),'app-dept')).mutationToken}
   const now = Math.floor(Date.now() / 1000)
   const unsigned = enc({ alg: 'RS256', kid: 'department-local' }) + '.' + enc({ iss: issuer, aud: ['department-local'], iat: now, exp: now + 300, email })
   const jwt = unsigned + '.' + Buffer.from(await crypto.subtle.sign('RSASSA-PKCS1-v1_5', pair.privateKey, new TextEncoder().encode(unsigned))).toString('base64url')
@@ -88,6 +97,27 @@ describe.sequential('department attestations through signed middleware and Postg
   })
   it('allows the explicit account administrator exception', async () => {
     expect((await invoke('admin@local.invalid', cases[0][1], signoff, cases[0][3])).status).toBe(200)
+  })
+  it.each([
+    ['department revoked', "UPDATE override_actor SET departments_json='[]' WHERE email='owner@local.invalid'", 'operations', '["재무"]'],
+    ['administrator downgraded', "UPDATE override_actor SET role='operations' WHERE email='owner@local.invalid'", 'audit', '[]'],
+    ['account disabled', "UPDATE override_actor SET active=0 WHERE email='owner@local.invalid'", 'operations', '["재무"]'],
+  ])('outcome rejects %s before commit despite retained application ownership', async (_label, change, role, departments) => {
+    await DB.prepare('UPDATE override_actor SET role=?,departments_json=?,active=1 WHERE email=?')
+      .bind(role, departments, 'owner@local.invalid').run()
+    const prior = await DB.prepare("SELECT * FROM outcome WHERE application_id='app-dept'").first()
+    const before = Number((await DB.prepare("SELECT count(*) n FROM decision_log WHERE application_id='app-dept'").first()).n)
+    beforeCommit = () => pg.exec(change)
+    try {
+      const result = await invoke('owner@local.invalid', cases[2][1], outcome, cases[2][3])
+      expect(result.status, JSON.stringify(result.body)).toBe(409)
+      expect(beforeCommit).toBeNull()
+      expect(await DB.prepare("SELECT * FROM outcome WHERE application_id='app-dept'").first()).toEqual(prior)
+      expect(Number((await DB.prepare("SELECT count(*) n FROM decision_log WHERE application_id='app-dept'").first()).n)).toBe(before)
+    } finally {
+      beforeCommit = null
+      await DB.prepare("UPDATE override_actor SET role='reviewer',departments_json='[\"인사\"]',active=1 WHERE email='owner@local.invalid'").run()
+    }
   })
   it('fails closed without a verified account and keeps isolated demo behavior', () => {
     expect(departmentAuthority({ OVERRIDE_DEMO_MODE: 'false' }, '재무').status).toBe(401)

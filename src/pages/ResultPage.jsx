@@ -1,8 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import Field from '../components/Field.jsx'
 import { useApi } from '../hooks/useApi.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.js'
 import { krw, num, duration, ago } from '../lib/format.js'
@@ -62,27 +63,66 @@ export default function ResultPage() {
 }
 
 function Result({ id }) {
-  const { data, error, loading, reload } = useApi(`/applications/${id}/outcome`)
+  const { data, error, loading, reload, setData } = useApi(`/applications/${id}/outcome`)
+  const captureView = useActionLifetime(id)
   const toast = useToast()
   const [inputs, setInputs] = useState({ dev_hours: '', ops_cost_krw: '', next_bottleneck: '' })
+  const dirty = useRef(false)
+  const saving = useRef(false)
+  const [busy, setBusy] = useState(false)
+  const [conflict, setConflict] = useState(false)
+  const [saveError, setSaveError] = useState('')
+  const [inputsLoaded, setInputsLoaded] = useState(false)
 
   useEffect(() => {
-    if (!data) return
+    if (!data || dirty.current) return
     setInputs({
       dev_hours: String(data.saved?.dev_hours ?? ''),
       ops_cost_krw: String(data.saved?.ops_cost_krw ?? ''),
       next_bottleneck: data.saved?.next_bottleneck ?? '',
     })
+    setInputsLoaded(true)
   }, [data])
 
   async function send(body, msg) {
+    if (saving.current || conflict) return
+    saving.current = true
+    setBusy(true)
+    setSaveError('')
+    const current = captureView()
     try {
-      await api.post(`/applications/${id}/outcome`, body)
+      await api.post(`/applications/${id}/outcome`, { ...body, expectedEvidence: data.expectedEvidence })
+      if (!current()) return
+      if (body.kind === 'inputs') dirty.current = false
       toast.success(msg)
       await reload()
     } catch (err) {
+      if (!current()) return
+      setConflict(err.status === 409)
+      setSaveError(Object.values(err.fields ?? {}).join(' ') || err.message)
       toast.error(err.message)
+    } finally {
+      saving.current = false
+      if (current()) setBusy(false)
     }
+  }
+
+  function editInputs(next) {
+    dirty.current = true
+    setInputs(next)
+  }
+
+  async function refreshEvidence() {
+    const current = captureView()
+    setBusy(true)
+    try {
+      const latest = await api.get(`/applications/${id}/outcome`)
+      if (!current()) return
+      setData(latest)
+      setConflict(false)
+      setSaveError('최신 수치를 불러왔습니다. 보존된 입력 내용과 함께 확인 후 다시 저장해주세요.')
+    } catch (err) { if(current()) setSaveError(err.message) }
+    finally { if(current()) setBusy(false) }
   }
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
@@ -107,6 +147,11 @@ function Result({ id }) {
 
   return (
     <div className="stack">
+      {saveError && <div className="notice notice-danger" role="alert">{saveError}</div>}
+      {conflict && <button type="button" className="btn-secondary" disabled={loading || busy}
+        onClick={refreshEvidence}>
+        최신 수치 확인
+      </button>}
       <section className={`outcome-headline tone-${data.label.tone}`}>
         <div className="row" style={{ marginBottom: 6 }}>
           <span
@@ -217,16 +262,18 @@ function Result({ id }) {
           <Field label="만드는 데 든 시간" hint="회의·시험·고친 시간까지">
             <input
               inputMode="numeric"
+              disabled={busy}
               value={inputs.dev_hours}
-              onChange={(e) => setInputs({ ...inputs, dev_hours: e.target.value })}
+              onChange={(e) => editInputs({ ...inputs, dev_hours: e.target.value })}
               placeholder="시간"
             />
           </Field>
           <Field label="운영비" hint="있으면">
             <input
               inputMode="numeric"
+              disabled={busy}
               value={inputs.ops_cost_krw}
-              onChange={(e) => setInputs({ ...inputs, ops_cost_krw: e.target.value })}
+              onChange={(e) => editInputs({ ...inputs, ops_cost_krw: e.target.value })}
               placeholder="원"
             />
           </Field>
@@ -234,24 +281,29 @@ function Result({ id }) {
         <Field label="이 과정에서 새로 발견한 병목" hint="다음 신청서가 됩니다">
           <input
             value={inputs.next_bottleneck}
-            onChange={(e) => setInputs({ ...inputs, next_bottleneck: e.target.value })}
+            disabled={busy}
+            onChange={(e) => editInputs({ ...inputs, next_bottleneck: e.target.value })}
           />
         </Field>
         <button
           type="button"
           className="btn-ghost"
+          disabled={busy || conflict || !inputsLoaded}
           onClick={() => send({ kind: 'inputs', ...inputs }, '다시 계산했습니다.')}
         >
           저장하고 다시 계산
         </button>
       </section>
 
-      <Challenges data={data} send={send} toast={toast} />
+      <Challenges data={data} send={send} toast={toast} busy={busy || conflict} />
 
       <section className="card">
         <div className="card-head">
           <h2 className="card-title">부서가 확인했나</h2>
         </div>
+        {!data.confirmation?.current && data.confirmation?.previous && (
+          <p className="notice notice-warn">과거 확인 기록은 보존되어 있지만 현재 계산 근거에 대한 확인은 아닙니다. 수치를 다시 확인해주세요.</p>
+        )}
         {data.saved?.dept_confirmed_at ? (
           <div className="decided">
             <span className="origin-label origin-human">
@@ -264,6 +316,7 @@ function Result({ id }) {
             <button
               type="button"
               className="btn-primary"
+              disabled={busy || conflict}
               onClick={() => {
                 const by = window.prompt('누가 확인했나요?')
                 if (by == null) return
@@ -323,7 +376,7 @@ function ClaimedVsMeasured({ claimed, baseline }) {
   )
 }
 
-function Challenges({ data, send, toast }) {
+function Challenges({ data, send, toast, busy }) {
   return (
     <section className="card">
       <div className="card-head">
@@ -354,16 +407,18 @@ function Challenges({ data, send, toast }) {
                 <strong style={{ color: 'var(--text-h)' }}>{c.title}</strong>
               </div>
               <div className="card-note">{c.body}</div>
+              {c.previousResolution && <p className="card-note">이전 근거: {c.previousResolution} · 현재 수치는 다시 확인해야 합니다.</p>}
               {c.resolution && (
                 <div className="decision-why">
                   <strong>어떻게 확인했나</strong> {c.resolution}
                 </div>
               )}
-              {!c.resolved_at && (
+              {!c.resolved_at && c.code !== 'no_dept_confirm' && (
                 <div className="item-actions">
                   <button
                     type="button"
                     className="btn-ghost btn-sm"
+                    disabled={busy}
                     onClick={() => {
                       const r = window.prompt('어떻게 확인하셨나요?')
                       if (!r) {

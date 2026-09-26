@@ -20,7 +20,8 @@ import {
   OBJECTION_KIND,
 } from '../../../../shared/signoff.js'
 import { loadSignoff, requiredDeptsOf } from '../../../_lib/signoff.js'
-import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
+import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'
+import { departmentMutation } from '../../../_lib/departmentMutation.js'
 
 // 확인해주신 뒤에 뭐라고 답할 것인가.
 //
@@ -80,131 +81,55 @@ export async function onRequestGet({ env, data: requestData, params }) {
 
 export async function onRequestPost({ env, data: requestData, request, params }) {
   env = requestData?.requestEnv ?? env
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
-  const ticket = await checkRateLimit(env, `signoff:${ip}`, 10, 3600)
-  if (!ticket) return jsonError('확인은 시간당 10회까지 가능합니다.', 429)
-
+  const bucket = `signoff:${request.headers.get('CF-Connecting-IP') || 'unknown'}`
+  const rateTicket = await checkRateLimit(env, bucket, 10, 3600)
+  if (!rateTicket) return jsonError('확인은 시간당 10회까지 가능합니다.', 429)
   let body
-  try {
-    body = await request.json()
-  } catch {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
+  try { body = await request.json() } catch {
+    await releaseRateLimit(env, bucket, rateTicket)
     return jsonError('보내주신 내용을 읽지 못했습니다.', 400)
   }
-
-  const loaded = await load(env, String(params.ticket ?? '').trim().toUpperCase())
-  if (!loaded) {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
-    return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    await releaseRateLimit(env, bucket, rateTicket)
+    return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
-
-  // 화면이 막았어도 서버가 다시 본다. 확정 안 된 기준에 서명이 붙으면
-  // 나중에 기준이 바뀌는데 서명은 남는다.
-  const ask = canAsk(loaded.criteria)
-  if (!ask.ok) {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
-    return jsonError(ask.why, 409)
-  }
-
-  const errors = validateSignoff({
-    by: body.by,
-    dept: body.dept,
-    requiredDepts: loaded.requiredDepts,
-    criteria: loaded.criteria,
-    verdicts: body.verdicts,
-    reasons: body.reasons,
-  })
-  if (Object.keys(errors).length > 0) {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
-    return failFields(errors, '확인해주셔야 할 것이 남았습니다.')
-  }
-
-  const by = String(body.by).trim().slice(0, 60)
-
-  // 어느 부서로 확인하시는지 받는다.
-  //
-  // 목록에 있는 부서만 받는다. 자유 입력으로 두면 "마케팅"과 "마케팅팀"이
-  // 다른 부서가 되어, 다 모였는데도 영영 "일부만 확인"으로 남는다.
-  // 부서가 하나뿐일 때만 채워 넣는다.
-  //
-  // 여럿일 때 채워 넣으면 손든 부서의 서명이 낸 부서 서명으로 기록되고,
-  // 낸 부서가 앞서 단 이의까지 그 서명에 덮여 사라진다.
-  const dept =
-    String(body.dept ?? '').trim() ||
-    (loaded.requiredDepts.length === 1 ? loaded.requiredDepts[0] : '')
-  if (!loaded.requiredDepts.includes(dept)) {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
-    return failFields(
-      { dept: `${loaded.requiredDepts.join(', ')} 중에서 골라주세요.` },
-      '어느 부서로 확인하시는지 알 수 없습니다.'
-    )
-  }
-  const forbidden = departmentAuthority(env, dept)
-  if (forbidden) {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
-    return forbidden
-  }
-  const objected = loaded.criteria.filter((c) => VERDICTS[body.verdicts[c.id]]?.needsReason)
-
-  try {
-    const stmts = [
-      env.DB.prepare(
-        `INSERT INTO decision_log
-           (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
-         VALUES (?, ?, '협의안', 'human', ?, ?, ?, ?, ?, ?)`
-      ).bind(
-        newId('dec'),
-        loaded.app.id,
-        by,
-        objected.length > 0
-          ? `합격 기준 ${loaded.criteria.length}개를 확인했다. ${objected.length}개에 이의를 달았다.`
-          : `합격 기준 ${loaded.criteria.length}개를 모두 확인했고 이의 없다.`,
-        '담당자 혼자 정한 기준으로 통과 판정을 내리면, 부서가 아니라고 할 때 통과의 근거가 사라진다.',
-        // **어느 기준에 한 서명인지 남긴다.**
-        //
-        // 이걸 안 남기면, 서명을 받은 뒤에 담당자가 기준을 하나 더
-        // 추가·확정해도 상태가 그대로 '확인됨'으로 남는다. 화면은
-        // "6개 항목을 모두 확인하셨습니다"라고 적는데 부서는 다섯 개만
-        // 봤다. 그 여섯 번째로 통과 판정이 나가고, 부서가 "그건 합의한
-        // 적 없다"고 하면 화면이 거짓으로 반박한다.
-        JSON.stringify(loaded.criteria.map((c) => c.id)),
-        SIGNOFF_KIND,
-        // 어느 부서의 서명인지. 여러 부서가 걸린 일이면 부서마다 한 장씩 받는다.
-        dept
-      ),
-    ]
-
+  const ticket = String(params.ticket ?? '').trim().toUpperCase()
+  const response = await departmentMutation(env, request, `signoff:${ticket}`, body, async DB => {
+    const loaded = await load({ ...env, DB }, ticket)
+    if (!loaded) return jsonError('그 접수번호를 찾지 못했습니다.', 404)
+    const ask = canAsk(loaded.criteria)
+    if (!ask.ok) return jsonError(ask.why, 409)
+    const errors = validateSignoff({ by:body.by, dept:body.dept, requiredDepts:loaded.requiredDepts,
+      criteria:loaded.criteria, verdicts:body.verdicts, reasons:body.reasons })
+    if (Object.keys(errors).length) return failFields(errors, '확인해주셔야 할 것이 남았습니다.')
+    const by = String(body.by).trim().slice(0, 60)
+    const dept = String(body.dept ?? '').trim() || (loaded.requiredDepts.length === 1 ? loaded.requiredDepts[0] : '')
+    if (!loaded.requiredDepts.includes(dept)) return failFields({dept:`${loaded.requiredDepts.join(', ')} 중에서 골라주세요.`}, '어느 부서로 확인하시는지 알 수 없습니다.')
+    const forbidden = await currentDepartmentAuthority(env, DB, dept)
+    if (forbidden) return forbidden
+    const objected = loaded.criteria.filter(c => VERDICTS[body.verdicts[c.id]]?.needsReason)
+    const statements = [DB.prepare(`INSERT INTO decision_log
+      (id,application_id,stage,actor,title,what,why,alternatives,link_kind,link_id)
+      VALUES(?,?,'협의안','human',?,?,?,?,?,?)`).bind(newId('dec'), loaded.app.id, by,
+      objected.length ? `합격 기준 ${loaded.criteria.length}개를 확인했다. ${objected.length}개에 이의를 달았다.` : `합격 기준 ${loaded.criteria.length}개를 모두 확인했고 이의 없다.`,
+      '담당자 혼자 정한 기준으로 통과 판정을 내리면, 부서가 아니라고 할 때 통과의 근거가 사라진다.',
+      JSON.stringify(loaded.criteria.map(c => c.id)), SIGNOFF_KIND, dept)]
     for (const c of objected) {
-      stmts.push(
-        env.DB.prepare(
-          `INSERT INTO decision_log
-             (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
-           VALUES (?, ?, '협의안', 'human', ?, ?, ?, ?, ?, ?)`
-        ).bind(
-          newId('dec'),
-          loaded.app.id,
-          `${dept} ${by} — 이 기준은 아니라고 하셨다`,
-          String(body.reasons?.[c.id] ?? '').trim().slice(0, 1000),
-          `원래 기준: ${c.body}`,
-          // 어느 부서가 단 이의인지. 다른 부서가 서명해도 이 이의는
-          // 안 사라져야 한다.
-          dept,
-          OBJECTION_KIND,
-          c.id
-        )
-      )
+      statements.push(DB.prepare(`INSERT INTO decision_log
+        (id,application_id,stage,actor,title,what,why,alternatives,link_kind,link_id)
+        VALUES(?,?,'협의안','human',?,?,?,?,?,?)`).bind(newId('dec'), loaded.app.id,
+        `${dept} ${by} — 이 기준은 아니라고 하셨다`, String(body.reasons?.[c.id] ?? '').trim().slice(0, 1000),
+        `원래 기준: ${c.body}`, dept, OBJECTION_KIND, c.id))
     }
-
-    await env.DB.batch(stmts)
-
-    const after = await load(env, loaded.app.ticket_no)
-    return jsonResponse({
-      ok: true,
-      state: signoffState(after),
-      message: signoffMessage(signoffState(after), objected.length),
-    })
-  } catch (err) {
-    await releaseRateLimit(env, `signoff:${ip}`, ticket)
-    return failUnexpected(err, '확인을 남기지 못했습니다.')
-  }
+    await DB.batch(statements)
+    return jsonResponse({ok:true,objectedCount:objected.length})
+  })
+  if (!response.ok || response.headers.get('X-Idempotency-Replayed') === '1') await releaseRateLimit(env,bucket,rateTicket)
+  if (!response.ok) return response
+  try {
+    const receipt = await response.json()
+    const state = signoffState(await load(env, ticket))
+    return jsonResponse({ok:true,state,message:signoffMessage(state,receipt.objectedCount)},200,
+      {'X-Idempotency-Replayed':response.headers.get('X-Idempotency-Replayed') || '0'})
+  } catch(error) { return failUnexpected(error,'확인 상태를 불러오지 못했습니다.') }
 }

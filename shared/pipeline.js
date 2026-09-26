@@ -177,6 +177,8 @@ export function toNumber(value) {
     s = s.slice(1)
   }
 
+  // A currency symbol alone is not zero, and hexadecimal is not a settlement amount.
+  if (!/^\+?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(s)) return null
   const n = Number(s)
   if (!Number.isFinite(n)) return null
   return negative ? -n : n
@@ -195,15 +197,15 @@ export function toDate(value, channel) {
   const s = String(value).trim()
 
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
-  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+  if (iso) return calendarDate(iso[1], iso[2], iso[3])
 
   const slash = /^(\d{4})\/(\d{1,2})\/(\d{1,2})/.exec(s)
-  if (slash) return `${slash[1]}-${pad(slash[2])}-${pad(slash[3])}`
+  if (slash) return calendarDate(slash[1], slash[2], slash[3])
 
   // 미국식은 월이 앞이다.
   const us = /^(\d{1,2})\/(\d{1,2})\/(\d{4})/.exec(s)
   if (us) {
-    if (channel === 'Amazon US') return `${us[3]}-${pad(us[1])}-${pad(us[2])}`
+    if (channel === 'Amazon US') return calendarDate(us[3], us[1], us[2])
     // 채널을 모르면 판단하지 않는다. 틀린 날짜보다 없는 날짜가 낫다.
     return null
   }
@@ -213,6 +215,14 @@ export function toDate(value, channel) {
 
 function pad(n) {
   return String(n).padStart(2, '0')
+}
+
+function calendarDate(year, month, day) {
+  const y = Number(year), m = Number(month), d = Number(day)
+  const leap = y % 4 === 0 && (y % 100 !== 0 || y % 400 === 0)
+  const days = [31, leap ? 29 : 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+  if (y < 1 || m < 1 || m > 12 || d < 1 || d > days[m - 1]) return null
+  return `${year}-${pad(month)}-${pad(day)}`
 }
 
 // 상품명에 전각 공백이 섞여 들어오는 경우가 있다(한글 입력기에서 흔하다).
@@ -225,6 +235,17 @@ function cleanText(value) {
 function round2(n) {
   return Math.round(n * 100) / 100
 }
+
+const MONEY_COLUMNS = [
+  'gross_krw', 'discount_krw', 'return_krw', 'net_revenue_krw', 'commission_krw',
+  'reported_commission_krw', 'cogs_krw', 'logistics_krw', 'ad_krw', 'contribution_krw',
+]
+const TOTAL_MONEY_COLUMNS = [
+  'gross_krw', 'net_revenue_krw', 'commission_krw', 'reported_commission_krw', 'contribution_krw',
+]
+const safeNumber = value => Number.isFinite(value) && Math.abs(value) <= Number.MAX_SAFE_INTEGER
+const safeMoney = value => Number.isFinite(value) && Number.isSafeInteger(Math.round(value * 100))
+const moneyRangeNote = '금액 또는 합계가 안전하게 계산할 수 있는 범위를 벗어났습니다. 원본 값을 확인해주세요.'
 
 // ─────────────────────────────────────────────────────────────
 // 검토함으로 보낼 이유들
@@ -286,8 +307,10 @@ function processRow({ channel, columns, row, source, aliases }) {
 
   // 상품코드 통일 — 채널 코드를 우리 표준코드로.
   // aliases는 사람이 나중에 알려 준 것. 기본 표 위에 덮어쓴다.
-  const canonical = aliases?.[rawSku] ?? SKU_ALIAS[rawSku] ?? null
-  if (!canonical) {
+  const canonical = (Object.hasOwn(aliases ?? {}, rawSku) ? aliases[rawSku] : null)
+    ?? (Object.hasOwn(SKU_ALIAS, rawSku) ? SKU_ALIAS[rawSku] : null)
+  const sku = typeof canonical === 'string' && Object.hasOwn(SKU_BY_CODE, canonical) ? SKU_BY_CODE[canonical] : null
+  if (!sku) {
     return {
       quarantine: {
         reason: 'unknown_sku',
@@ -299,7 +322,6 @@ function processRow({ channel, columns, row, source, aliases }) {
       },
     }
   }
-  const sku = SKU_BY_CODE[canonical]
   trace.push({ step: '코드 통일', value: `${rawSku} → ${canonical} (${sku.name_ko})` })
 
   // 날짜
@@ -311,7 +333,7 @@ function processRow({ channel, columns, row, source, aliases }) {
   // 수량과 금액
   const qtyRaw = toNumber(cell('qty'))
   const grossRaw = toNumber(cell('gross'))
-  if (qtyRaw == null || grossRaw == null) {
+  if (qtyRaw == null || grossRaw == null || !safeNumber(qtyRaw) || !safeMoney(grossRaw)) {
     return { quarantine: { reason: 'bad_amount', source, raw: rawCells, externalCode: rawSku } }
   }
 
@@ -326,7 +348,14 @@ function processRow({ channel, columns, row, source, aliases }) {
     trace.push({ step: '반품 분리', value: `수량 ${qtyRaw} → 반품 ${returnQty}건` })
   }
 
-  const discountSrc = Math.abs(toNumber(cell('discount')) ?? 0)
+  const discountCell = cell('discount')
+  const discountRaw = toNumber(discountCell)
+  // Empty discount cells retain their established zero-discount meaning. A
+  // nonempty invalid value must not silently increase the settlement total.
+  if (String(discountCell ?? '').trim() !== '' && (discountRaw == null || !safeMoney(discountRaw))) {
+    return { quarantine: { reason: 'bad_amount', source, raw: rawCells, externalCode: rawSku, note: '할인액을 숫자로 읽을 수 없습니다. 원본 값을 확인해주세요.' } }
+  }
+  const discountSrc = Math.abs(discountRaw ?? 0)
 
   // 통화 환산
   const ch = CHANNEL_BY_NAME[channel]
@@ -363,9 +392,14 @@ function processRow({ channel, columns, row, source, aliases }) {
   trace.push({ step: '최종', value: `순매출 ${net}원 · 기여이익 ${contribution}원` })
 
   // 정산서에 적힌 수수료. 우리 계산과 견주면 계약보다 더 떼인 것이 보인다.
-  const reportedRaw = Math.abs(toNumber(cell('reported_commission')) ?? 0)
+  const reportedCell = cell('reported_commission')
+  const reportedValue = toNumber(reportedCell)
+  if (String(reportedCell ?? '').trim() !== '' && (reportedValue == null || !safeMoney(reportedValue))) {
+    return { quarantine: { reason: 'bad_amount', source, raw: rawCells, externalCode: rawSku, note: '정산서상 수수료를 숫자로 읽을 수 없습니다. 원본 값을 확인해주세요.' } }
+  }
+  const reportedRaw = Math.abs(reportedValue ?? 0)
 
-  return {
+  const result = {
     row: {
       date,
       iso_week: isoWeek(date),
@@ -391,6 +425,10 @@ function processRow({ channel, columns, row, source, aliases }) {
       trace,
     },
   }
+  if (!MONEY_COLUMNS.every(key => result.row[key] == null || safeMoney(result.row[key]))) {
+    return { quarantine: { reason: 'bad_amount', source, raw: rawCells, externalCode: rawSku, note: moneyRangeNote } }
+  }
+  return result
 }
 
 // 이 시트가 정산 대상 기간의 것인지 판단한다.
@@ -481,6 +519,7 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
   const rows = []
   const quarantine = []
   const fileReports = []
+  const summary = createSummary()
 
   const { unique: files, skipped } = await dedupeFiles(inputFiles)
   for (const s of skipped) {
@@ -608,11 +647,11 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
       for (const row of table.rows) {
         const source = { ...source0, rowNo: row.rowNo }
         const result = processRow({ channel, columns, row, source, aliases })
-        if (result.row) {
+        if (result.row && summary.add(result.row)) {
           rows.push(result.row)
           okCount += 1
         } else {
-          quarantine.push(result.quarantine)
+          quarantine.push(result.quarantine ?? { reason: 'bad_amount', source, raw: row.cells, note: moneyRangeNote })
           quarantineCount += 1
         }
       }
@@ -669,12 +708,20 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
       // 이 숫자가 이 화면의 주장이다. 외부 서비스를 한 번도 부르지 않았다.
       externalCalls: 0,
     },
-    totals: summarize(rows),
+    totals: summary.result(),
   }
 }
 
 // 채널별·주차별 합계.
 export function summarize(rows) {
+  const summary = createSummary()
+  for (const row of rows) {
+    if (!summary.add(row)) throw new Error(moneyRangeNote)
+  }
+  return summary.result()
+}
+
+function createSummary() {
   const byChannel = new Map()
   const byChannelWeek = new Map()
 
@@ -689,49 +736,52 @@ export function summarize(rows) {
     rows: 0,
   })
 
-  const add = (map, key, r) => {
-    if (!map.has(key)) map.set(key, blank())
-    const t = map.get(key)
-    t.qty += r.qty
-    t.return_qty += r.return_qty
-    t.gross_krw += r.gross_krw
-    t.net_revenue_krw += r.net_revenue_krw
-    t.commission_krw += r.commission_krw
-    t.reported_commission_krw += r.reported_commission_krw ?? 0
-    t.contribution_krw += r.contribution_krw
-    t.rows += 1
+  // Each row is already rounded according to the calculation rules. Sum those
+  // amounts as integer cents, not repeated binary floating-point additions.
+  const next = (current, row) => {
+    const value = { ...current, rows: current.rows + 1 }
+    for (const key of ['qty', 'return_qty']) {
+      value[key] += row[key]
+      if (!safeNumber(value[key])) return null
+    }
+    for (const key of TOTAL_MONEY_COLUMNS) {
+      const amount = row[key] ?? 0
+      if (!safeMoney(amount)) return null
+      value[key] += Math.round(amount * 100)
+      if (!Number.isSafeInteger(value[key])) return null
+    }
+    return value
   }
-
-  const all = blank()
-  for (const r of rows) {
-    add(byChannel, r.channel, r)
-    add(byChannelWeek, `${r.channel}|${r.iso_week}`, r)
-    all.qty += r.qty
-    all.return_qty += r.return_qty
-    all.gross_krw += r.gross_krw
-    all.net_revenue_krw += r.net_revenue_krw
-    all.commission_krw += r.commission_krw
-    all.reported_commission_krw += r.reported_commission_krw ?? 0
-    all.contribution_krw += r.contribution_krw
-    all.rows += 1
+  let all = blank()
+  const fix = total => {
+    const result = { ...total }
+    for (const key of TOTAL_MONEY_COLUMNS) result[key] /= 100
+    return result
   }
-
-  const fix = (t) => ({
-    ...t,
-    gross_krw: round2(t.gross_krw),
-    net_revenue_krw: round2(t.net_revenue_krw),
-    commission_krw: round2(t.commission_krw),
-    reported_commission_krw: round2(t.reported_commission_krw),
-    contribution_krw: round2(t.contribution_krw),
-  })
 
   return {
-    byChannel: [...byChannel.entries()].map(([channel, t]) => ({ channel, ...fix(t) })),
-    byChannelWeek: [...byChannelWeek.entries()].map(([key, t]) => {
-      const [channel, iso_week] = key.split('|')
-      return { channel, iso_week, ...fix(t) }
-    }),
-    all: fix(all),
+    add(row) {
+      const weekKey = `${row.channel}|${row.iso_week}`
+      const nextAll = next(all, row)
+      const nextChannel = next(byChannel.get(row.channel) ?? blank(), row)
+      const nextWeek = next(byChannelWeek.get(weekKey) ?? blank(), row)
+      // Reject atomically: no total may contain a row excluded from the others.
+      if (!nextAll || !nextChannel || !nextWeek) return false
+      all = nextAll
+      byChannel.set(row.channel, nextChannel)
+      byChannelWeek.set(weekKey, nextWeek)
+      return true
+    },
+    result() {
+      return {
+        byChannel: [...byChannel.entries()].map(([channel, total]) => ({ channel, ...fix(total) })),
+        byChannelWeek: [...byChannelWeek.entries()].map(([key, total]) => {
+          const [channel, iso_week] = key.split('|')
+          return { channel, iso_week, ...fix(total) }
+        }),
+        all: fix(all),
+      }
+    },
   }
 }
 

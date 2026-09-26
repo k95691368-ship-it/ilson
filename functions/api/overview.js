@@ -10,7 +10,7 @@
 
 import { jsonResponse, failUnexpected } from '../_lib/http.js'
 import { REFUSE_LABELS } from '../../shared/review.js'
-import { OUTCOME_KIND } from '../../shared/accept.js'
+import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
 import { PICK_KIND, UNPICK_KIND } from '../../shared/priority.js'
 import { unrankedPressure } from '../../shared/waitline.js'
@@ -27,7 +27,6 @@ export async function onRequestGet({ env, data: requestData }) {
       uses,
       decisions,
       refuseNoAlt,
-      deptSaid,
       betaOpen,
       holdLifts,
       pickRows,
@@ -56,8 +55,7 @@ export async function onRequestGet({ env, data: requestData }) {
                 (SELECT COUNT(*) FROM build_run br WHERE br.application_id = a.id) AS built,
                 (SELECT COUNT(*) FROM beta_round bt WHERE bt.application_id = a.id AND bt.overall = '통과') AS tested,
                 (SELECT COUNT(*) FROM manual m WHERE m.application_id = a.id AND m.published_at IS NOT NULL) AS documented,
-                (SELECT COUNT(*) FROM handover h WHERE h.application_id = a.id AND h.rolled_back_at IS NULL) AS handed,
-                (SELECT COUNT(*) FROM outcome o WHERE o.application_id = a.id AND o.dept_confirmed_at IS NOT NULL) AS confirmed
+                (SELECT COUNT(*) FROM handover h WHERE h.application_id = a.id AND h.rolled_back_at IS NULL) AS handed
          FROM application a`
       ).all(),
 
@@ -97,12 +95,6 @@ export async function onRequestGet({ env, data: requestData }) {
       // 부서가 "그거 그렇게 안 걸립니다"라고 했는데 담당자가 그걸 모르면,
       // 그 금액은 부서가 아니라고 한 채로 보고에 올라간다. 여기서 세서
       // 첫 화면 할 일 목록에 올린다.
-      env.DB.prepare(
-        `SELECT id, application_id, alternatives FROM decision_log
-         WHERE link_kind = ? ORDER BY created_at DESC`
-      )
-        .bind(OUTCOME_KIND)
-        .all(),
 
       // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
       env.DB.prepare(
@@ -226,20 +218,15 @@ export async function onRequestGet({ env, data: requestData }) {
 
     // 체감이 우리가 잰 값과 크게 다르다고 한 건. 숫자는 alternatives에
     // JSON으로 들어 있다 — why 칸에 넣었다가 첫 화면에 그대로 찍힌 적이 있다.
-    const disagreed = new Set()
-    for (const r of deptSaid.results) {
-      try {
-        const said = JSON.parse(r.alternatives)
-        if (said?.agree === false) disagreed.add(r.application_id)
-      } catch {
-        // 옛 기록에는 숫자가 없다. 그건 세지 않는다.
-      }
-    }
-
     const items = apps.results
-    const stageBy = new Map(stageRows.results.map((s) => [s.id, s]))
+    const evidence = await loadOutcomeEvidenceMany(env.DB, items.map(row => row.id))
+    const disagreed = new Set(items.filter(row => evidence.get(row.id)?.challenges.some(
+      challenge => challenge.code === 'dept_disagrees' && !challenge.resolved_at
+    )).map(row => row.id))
+    const stageBy = new Map(stageRows.results.map(row => [row.id, {
+      ...row, confirmed: evidence.get(row.id)?.confirmation.current === true,
+    }]))
 
-    // 각 신청서가 지금 어느 단계인지
     const stageOf = (a) => {
       if (a.status === '반려') return '반려'
       if (a.status === '보류') return '보류'

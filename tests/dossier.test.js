@@ -284,9 +284,18 @@ describe('성과 문서에 금액이 있는가', () => {
       join(ROOT, 'functions', 'api', 'applications', '[id]', 'record.js'),
       'utf8'
     )
-    expect(src).toContain('annualize(')
-    expect(src).toContain('labelForOutcome(')
+    expect(src).toContain('annual: evidence.annual')
+    expect(src).toContain('loadOutcomeEvidence(')
+    expect(src).toContain('const moneyLabel = money ? evidence.label : null')
     expect(src).toContain('money,')
     expect(src).toContain('moneyLabel,')
+  })
+  it('과거 확인은 보존하지만 현재 확인으로 문서에 적지 않는다', () => {
+    const text = dossierText({ ...base, money, outcome: { ...base.outcome,
+      previous_confirmation: { by: '검증자', at: '2026-09-01', comment: '당시 확인' },
+    } })
+    expect(text).toContain('과거 확인')
+    expect(text).toContain('현재 수치는 다시 확인해야 합니다')
+    expect(text).toContain('아직 확인받지 못했습니다')
   })
 })

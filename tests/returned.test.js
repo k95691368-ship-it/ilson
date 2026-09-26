@@ -23,6 +23,7 @@ const row = (over = {}) => ({
   rework_seconds: 0,
   open_challenges: 0,
   dept_confirmed_at: '2026-08-01 00:00:00',
+  currentConfirmed: true,
   ...over,
 })
 
@@ -59,10 +60,18 @@ describe('한 건이 돌려준 시간', () => {
 })
 
 describe('부서가 확인한 것만 성과로 센다', () => {
+  it('과거 확인 시각만으로 현재 수치를 확인했다고 세지 않는다', () => {
+    const result = returnedFor([row({ currentConfirmed: undefined })])
+    expect(result.confirmed).toHaveLength(0)
+    expect(result.unconfirmed).toHaveLength(1)
+  })
+  it('공통 산정의 초 단위 결과를 다시 반올림하지 않는다', () => {
+    expect(returnedSecondsOf(row({ computedSavedSeconds: 53339 }))).toBe(53339)
+  })
   it('확인 안 된 것은 따로 센다', () => {
     // 만든 사람만 아는 성과는 성과가 아니다. 합쳐 세면 이 사이트가
     // 자기 입으로 한 말이 된다.
-    const r = returnedFor([row(), row({ ticket_no: 'AX-2', dept_confirmed_at: null })])
+    const r = returnedFor([row(), row({ ticket_no: 'AX-2', dept_confirmed_at: null, currentConfirmed: false })])
     expect(r.confirmed).toHaveLength(1)
     expect(r.unconfirmed).toHaveLength(1)
     expect(r.confirmedHours).toBeGreaterThan(0)
@@ -70,7 +79,7 @@ describe('부서가 확인한 것만 성과로 센다', () => {
   })
 
   it('확인된 것이 없으면 성과라고 말하지 않는다', () => {
-    const r = returnedFor([row({ dept_confirmed_at: null })])
+    const r = returnedFor([row({ dept_confirmed_at: null, currentConfirmed: false })])
     expect(returnedLine('재무', r)).toContain('아직 확인해 주신 성과가 없습니다')
   })
 
@@ -84,7 +93,7 @@ describe('부서가 확인한 것만 성과로 센다', () => {
   })
 
   it('확인 못 받은 것도 숨기지 않는다', () => {
-    const note = returnedNote(returnedFor([row({ dept_confirmed_at: null })]))
+    const note = returnedNote(returnedFor([row({ dept_confirmed_at: null, currentConfirmed: false })]))
     expect(note).toContain('아직 부서 확인을 못 받았습니다')
     expect(note).toContain('확인 전까지는 성과로 세지 않습니다')
   })

@@ -108,9 +108,15 @@ describe('전수로 세는가', () => {
     // 목록은 LIMIT 40 이 맞다. 계산에 그걸 쓰면 안 된다.
     expect(src).toContain('LIMIT 40')
     expect(src).not.toMatch(/runs:\s*recent\.results/)
-    expect(src).toContain('runsFromTotals')
-    // 전수 합계를 뽑는 쿼리가 실제로 있어야 한다.
-    expect(src).toContain('COUNT(*) AS n')
+    expect(src).toContain('loadOutcomeEvidence(env.DB, h.application_id)')
+    // 화면 목록과 별개인 공통 helper가 전수 집계를 계산에 전달해야 한다.
+    const evidence = readFileSync(join(ROOT, 'functions/_lib/outcomeEvidence.js'), 'utf8')
+    expect(evidence).toContain('COUNT(*) AS count')
+    expect(evidence).toContain('GROUP BY application_id')
+    expect(evidence).toContain('runTotals:runSummary')
+    const aggregate = evidence.match(/`SELECT application_id,COUNT\(\*\) AS count,[\s\S]*?`/)?.[0]
+    expect(aggregate).toBeDefined()
+    expect(aggregate).not.toMatch(/\bLIMIT\b/i)
   })
 })
 

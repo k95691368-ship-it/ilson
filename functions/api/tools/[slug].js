@@ -10,15 +10,7 @@ import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.js'
 import { quotaState } from '../../_lib/rateLimit.js'
 import { newId } from '../../_lib/ids.js'
 import { mutationFingerprint } from '../../_lib/atomicMutation.js'
-import {
-  computeOutcome,
-  labelForOutcome,
-  liveChallenges,
-  runsFromTotals,
-  daysSince,
-  deptFeltFrom,
-} from '../../../shared/outcome.js'
-import { OUTCOME_KIND } from '../../../shared/accept.js'
+import { loadOutcomeEvidence } from '../../_lib/outcomeEvidence.js'
 import { toReports, trustLevel, REPORT_KIND, REPORT_FIX } from '../../../shared/report.js'
 import { RESTORE_KIND, lastRestore } from '../../../shared/rollback.js'
 
@@ -63,11 +55,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       manual,
       recent,
       aliases,
-      baseline,
-      totals,
-      resolved,
-      deptSaid,
-      saved,
+      evidence,
       reportRows,
     ] = await Promise.all([
       quotaState(env, bucket, h.daily_limit, DAY_SECONDS),
@@ -87,56 +75,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
       // 반영되지 않는다. 알려주고 나서 그대로 또 밀려나면, 부서는 그
       // 뒤로 아무것도 안 알려준다.
       env.DB.prepare('SELECT external_code, canonical_code, product_name, taught_by FROM sku_alias').all(),
-      // 이 도구를 쓰기 전에 사람이 하면 얼마나 걸렸나.
-      //
-      // 부서는 매주 이 도구를 돌리면서도 그게 얼마나 줄여 줬는지를 못 봤다.
-      // 그 숫자는 담당자 화면에만 있었다. 정작 시간을 아낀 쪽은 부서인데,
-      // 자기가 뭘 얻었는지는 남의 화면에 있었던 것이다.
-      // sealed_at 이 빠져 있었다. 반박 규칙 하나가 "기준선을 잰 지 오래됐다"를
-      // 이 값으로 보는데, 안 뽑으니 부서 화면에서만 그 반박이 영영 안 떴다.
-      env.DB.prepare(
-        'SELECT median_seconds, sample_n, people, hourly_wage_krw, sealed_at FROM baseline WHERE application_id = ?'
-      )
-        .bind(h.application_id)
-        .first(),
-
-      // 계산에 쓸 전수 합계. 위의 recent 는 화면에 그릴 최근 40번이라
-      // 계산에 쓰면 41번째부터 통째로 빠진다.
-      env.DB.prepare(
-        `SELECT COUNT(*) AS n,
-                SUM(CASE WHEN ok=1 THEN 1 ELSE 0 END) AS success_count,
-                SUM(CASE WHEN ok=0 THEN 1 ELSE 0 END) AS failed_count,
-                SUM(duration_ms) AS duration_ms,
-                SUM(human_review_seconds) AS review_seconds,
-                SUM(rework_seconds) AS rework_seconds
-         FROM tool_use WHERE application_id = ?`
-      )
-        .bind(h.application_id)
-        .first(),
-
-      // 담당자가 이미 해소한 반박. 안 빼면 다 해소해도 부서에게는 영원히
-      // '보수적 추정'이라고 적힌다.
-      env.DB.prepare(
-        `SELECT GROUP_CONCAT(rule_code) AS codes FROM outcome_challenge
-         WHERE application_id = ? AND resolved_at IS NOT NULL`
-      )
-        .bind(h.application_id)
-        .first(),
-
-      // 부서가 체감으로 말한 분. 담당자 성과 화면이 보는 것과 같은 줄이다.
-      env.DB.prepare(
-        `SELECT alternatives FROM decision_log
-         WHERE application_id = ? AND link_kind = ?
-         ORDER BY created_at DESC LIMIT 1`
-      )
-        .bind(h.application_id, OUTCOME_KIND)
-        .first(),
-
-      env.DB.prepare(
-        'SELECT dev_hours, ops_cost_krw, amortize_months, dept_confirmed_at FROM outcome WHERE application_id = ?'
-      )
-        .bind(h.application_id)
-        .first(),
+      loadOutcomeEvidence(env.DB, h.application_id),
 
       // 이 부서가 낸 신고와 그 처리.
       //
@@ -177,43 +116,9 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
     const reports = toReports(reportRows.results.filter((r) => r.link_kind !== RESTORE_KIND))
 
     let payoff = null
-    if (baseline && (totals?.n ?? 0) > 0) {
-      const computed = computeOutcome({
-        baseline,
-        // 아래 recent 는 화면에 목록으로 그릴 **최근 40번**이다. 그걸 그대로
-        // 계산에 넣고 있었다. 그래서 41번 넘게 돌린 도구는 부서 화면에서만
-        // 절감이 40회분에서 멈췄다 — 담당자 쪽은 전수를 세는데.
-        //
-        // 더 나쁜 것은 만든 공수는 전액 빼면서 절감만 얼어붙는다는 점이었다.
-        // 그래서 실제로는 본전을 넘긴 도구가 부서 화면에서는 영영 '아직
-        // 본전'에 갇혔다. 숫자만 작아지는 것이 아니라 판정 문구까지 갈렸다.
-        runs: runsFromTotals({
-          count: totals.n,
-          successCount: totals.success_count,
-          failedCount: totals.failed_count,
-          durationMs: totals.duration_ms,
-          reviewSeconds: totals.review_seconds,
-          reworkSeconds: totals.rework_seconds,
-        }),
-        devHours: saved?.dev_hours ?? 0,
-        opsCostKrw: saved?.ops_cost_krw ?? 0,
-        amortizeMonths: saved?.amortize_months ?? 24,
-      })
-      // 반박을 세는 자리는 이제 한 곳이다(shared/outcome.js 의 liveChallenges).
-      // 여기서만 baselineAgeDays·deptFelt 를 안 넘겨 규칙 둘이 영영 안 걸렸고,
-      // 해소한 반박도 안 빼서 담당자가 전부 해소해도 부서에게는 영원히
-      // '보수적 추정'이라고 적혔다.
-      const { openCount } = liveChallenges({
-        outcome: computed,
-        quarantineLeft: recent.results[0]?.quarantined ?? 0,
-        // 실제 값을 넘긴다. false 로 굳혀 뒀더니 부서 화면은 "확인 못 한
-        // 것 5가지", 담당자 화면은 4가지가 됐다. 같은 것을 두 화면이
-        // 다른 숫자로 말하면 읽는 사람은 둘 다 안 믿는다.
-        deptConfirmed: Boolean(saved?.dept_confirmed_at),
-        baselineAgeDays: daysSince(baseline.sealed_at),
-        deptFelt: deptFeltFrom(deptSaid),
-        resolvedCodes: resolved?.codes,
-      })
+    if (evidence.baseline && evidence.outcome.runCount > 0) {
+      const computed = evidence.outcome
+      const openCount = evidence.unresolvedCount
       if (computed.status !== '산정불가') {
         payoff = {
           runs: computed.runCount,
@@ -230,7 +135,7 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
           // 부서는 "그만큼 안 줄었는데"라고 느끼고 이 숫자를 안 믿는다.
           reviewMinutes: Math.round(computed.reviewSeconds / 60),
           reworkMinutes: Math.round(computed.reworkSeconds / 60),
-          label: labelForOutcome(computed, openCount).label,
+          label: evidence.label.label,
           openChallenges: openCount,
         }
       }

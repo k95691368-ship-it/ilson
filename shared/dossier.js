@@ -280,6 +280,9 @@ export function dossierText(record) {
             : null,
           line('만든 공수', `${outcome.dev_hours}시간 (${outcome.amortize_months}개월 상각)`),
           line('운영 비용', `${outcome.ops_cost_krw}원`),
+          outcome.previous_confirmation
+            ? line('과거 확인', `${when(outcome.previous_confirmation.at)} · ${outcome.previous_confirmation.by ?? ''} — 현재 수치는 다시 확인해야 합니다.`)
+            : null,
           line(
             '부서 확인',
             outcome.dept_confirmed_at
@@ -291,7 +294,7 @@ export function dossierText(record) {
             ? `자기 반박 ${challenges.length}건 (미해소 ${unresolved.length}건)\n${challenges
                 .map(
                   (c) =>
-                    `· [${c.resolved_at ? '해소' : '미해소'}] ${c.title}\n    ${c.body}${c.resolution ? `\n    → ${c.resolution}` : ''}`
+                    `· [${c.resolved_at ? '해소' : '미해소'}] ${c.title}\n    ${c.body}${c.resolution ? `\n    → ${c.resolution}` : ''}${c.previousResolution ? `\n    과거 해소 · ${when(c.previousResolvedAt)} · ${c.previousResolution} (현재 근거로 재확인 필요)` : ''}`
                 )
                 .join('\n')}`
             : null,

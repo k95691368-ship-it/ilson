@@ -56,7 +56,7 @@ export function validateOutcomeConfirm({ by, agree, felt } = {}) {
   }
   if (agree === false) {
     const n = Number(felt)
-    if (!Number.isFinite(n) || n < 0) {
+    if (!['number', 'string'].includes(typeof felt) || String(felt).trim() === '' || !Number.isFinite(n) || n < 0 || n > 1000000) {
       errors.felt = '그럼 실제로는 한 번에 몇 분쯤 걸리십니까. 숫자로 적어주세요.'
     }
   }

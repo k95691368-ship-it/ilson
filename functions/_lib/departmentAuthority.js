@@ -14,3 +14,15 @@ export function departmentAuthority(env, department) {
   }
   return null
 }
+
+// Call inside an atomic mutation: the identity row becomes part of the read set
+// checked under the commit lock, including revocations after request middleware.
+export async function currentDepartmentAuthority(env, DB, department) {
+  if (env.DEMO_WORKSPACE === true || env.OVERRIDE_DEMO_MODE === 'true') return null
+  const identity = env.AUTH_ACTOR
+  if (identity?.mode !== 'access' || !identity.email) return jsonError('인증된 사내 계정이 필요합니다.', 401)
+  const actor = await DB.prepare('SELECT email,display_name,role,active,departments_json,product_ids_json FROM override_actor WHERE email = ?')
+    .bind(identity.email).first()
+  if (!actor || Number(actor.active) !== 1) return jsonError('현재 계정의 접근 권한을 확인할 수 없습니다.', 401)
+  return departmentAuthority({ ...env, AUTH_ACTOR: { ...actor, mode: 'access' } }, department)
+}

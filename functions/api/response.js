@@ -13,9 +13,9 @@ import { responseRate, responseLine, responseNote } from '../../shared/response.
 import {
   ACCEPT_KIND,
   ACCEPT_PROXY_KIND,
-  OUTCOME_KIND,
   OUTCOME_PROXY_KIND,
 } from '../../shared/accept.js'
+import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { fullySignedIds } from '../_lib/signoff.js'
 import { HOLD_LIFT_KIND } from '../../shared/holdlift.js'
 
@@ -63,22 +63,10 @@ export async function onRequestGet({ env, data: requestData }) {
 
       // ③ 성과가 체감과 맞는지 봐 달라 — 한 번이라도 돌아간 건.
       env.DB.prepare(
-        `SELECT
-           COUNT(*) AS asked,
-           SUM(CASE WHEN direct > 0 THEN 1 ELSE 0 END) AS answered,
-           SUM(CASE WHEN direct = 0 AND proxy > 0 THEN 1 ELSE 0 END) AS proxied
-         FROM (
-           SELECT o.application_id,
-             (SELECT COUNT(*) FROM decision_log d
-               WHERE d.application_id = o.application_id AND d.link_kind = ?) AS direct,
-             (SELECT COUNT(*) FROM decision_log d
-               WHERE d.application_id = o.application_id AND d.link_kind = ?) AS proxy
-           FROM outcome o
-           WHERE (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = o.application_id) > 0
-         )`
-      )
-        .bind(OUTCOME_KIND, OUTCOME_PROXY_KIND)
-        .first(),
+        `SELECT a.id FROM application a
+         JOIN baseline b ON b.application_id = a.id
+         WHERE EXISTS (SELECT 1 FROM tool_use u WHERE u.application_id = a.id)`
+      ).all(),
 
       // ④ 시험판을 써 보고 알려 달라 — 시험판이 한 번이라도 나온 건.
       env.DB.prepare(
@@ -111,10 +99,20 @@ export async function onRequestGet({ env, data: requestData }) {
     const asked = signoff.results
     const fully = await fullySignedIds(env, asked)
 
+    const evidence = await loadOutcomeEvidenceMany(env.DB, outcome.results.map(row => row.id))
+    const outcomeResponses = { asked: outcome.results.length, answered: 0, proxied: 0 }
+    for (const row of outcome.results) {
+      const currentEvidence = evidence.get(row.id)
+      const confirmation = currentEvidence?.confirmation
+      if (!confirmation?.current) continue
+      if (currentEvidence.directConfirmed) outcomeResponses.answered += 1
+      else if (confirmation.kind === OUTCOME_PROXY_KIND) outcomeResponses.proxied += 1
+    }
+
     const rows = [
       { key: 'signoff', asked: asked.length, answered: fully.size, proxied: 0 },
       { key: 'accept', ...accept },
-      { key: 'outcome', ...outcome },
+      { key: 'outcome', ...outcomeResponses },
       { key: 'beta', ...beta },
       { key: 'hold', ...hold },
     ]

@@ -8,6 +8,7 @@ import { onRequestPost as change, onRequestGet as workspace } from '../functions
 import { onRequestDelete as cleanup } from '../functions/api/demo/visitors.js'
 import { onRequestPost as application } from '../functions/api/applications/index.js'
 import { onRequestPost as review } from '../functions/api/applications/[id]/review.js'
+import { viewedOverrideRequests } from './fixtures/overrideEdit.js'
 
 const pg = new PGlite()
 const base = 'https://essential-local.supabase.co'
@@ -56,7 +57,8 @@ async function invoke(email,path,method,handler,body,bindings=env,key=crypto.ran
   const response=await onRequest(context)
   return {status:response.status,body:await response.json()}
 }
-const post=(email,body,bindings=env,key)=>invoke(email,'/api/override','POST',change,body,bindings,key)
+const viewedRequest = viewedOverrideRequests()
+const post=async(email,body,bindings=env,key)=>invoke(email,'/api/override','POST',change,await viewedRequest(DB,body,key),bindings,key)
 const capture=productId=>({action:'capture_event',productId,decisionAction:'modify',aiDecision:'기존 답변',humanDecision:'필요한 답변',reasonDetail:'정책 내용을 다시 확인해야 합니다.'})
 let captured
 describe.sequential('approved essential workflow through signed middleware and real PostgreSQL',()=>{

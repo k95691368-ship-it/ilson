@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { onRequestPost } from '../functions/api/applications/[id]/outcome.js'
+import { loadOutcomeEvidence } from '../functions/_lib/outcomeEvidence.js'
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 
@@ -34,21 +35,28 @@ function db({ runs = 0, baseline = false } = {}) {
       if (sql.includes('FROM baseline')) return baseline ? { application_id: 'app_1' } : null
       return null
     },
-    all: async () => ({ results: [] }),
+    all: async () => ({ results: sql.includes('FROM application') ? [APP]
+      : sql.includes('FROM baseline') ? baseline ? [{ application_id: APP.id, median_seconds:600, sample_n:5,people:1 }] : []
+      : sql.includes('FROM tool_use') ? [{application_id:APP.id,count:runs,successCount:runs,failedCount:0,autoSeconds:runs,reviewSeconds:0,reworkSeconds:0,quarantineLeft:0,digest:`runs-${runs}`}]
+      : [] }),
     run: async () => ({ meta: {} }),
   })
-  return { written, prepare: stmt, batch: async (l) => (l ?? []).map(() => ({})), exec: async () => ({}) }
+  return { written, prepare: stmt, batch: async (l) => (l ?? []).map(() => ({})), exec: async () => ({}),
+    mutationReceipt:async()=>null,commitMutation:async(_id,_fingerprint,_reads,writes,response)=>{
+      written.push(...writes);return {response,replayed:false}
+    } }
 }
 
 const confirm = async (state) => {
   const d = db(state)
+  const evidence = await loadOutcomeEvidence(d, APP.id)
   const res = await onRequestPost({
     env: { DB: d },
     params: { id: 'app_1' },
     request: new Request('https://x/api/applications/app_1/outcome', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ kind: 'dept_confirm', by: '재무 정산 담당', comment: '줄었습니다.' }),
+      body: JSON.stringify({ kind: 'dept_confirm', by: '재무 정산 담당', comment: '줄었습니다.', expectedEvidence:evidence.mutationToken }),
     }),
   })
   return { res, body: await res.json(), d }
@@ -85,8 +93,10 @@ describe('확인할 숫자가 있어야 확인이다', () => {
   it('부서 쪽 화면과 같은 조건이다', () => {
     // 한쪽에서는 누를 수 있고 다른 쪽에서는 못 누르면 둘 다 못 믿는다.
     const track = readFileSync(join(ROOT, 'functions', 'api', 'track', '[ticket]', 'outcome.js'), 'utf8')
-    expect(track).toContain('canConfirm: runs > 0 && Boolean(baseline)')
+    expect(track).toContain('if(!e.canConfirm)')
     const mine = readFileSync(join(ROOT, 'functions', 'api', 'applications', '[id]', 'outcome.js'), 'utf8')
-    expect(mine).toContain('SELECT COUNT(*) AS n FROM tool_use WHERE application_id = ?')
+    expect(mine).toContain('!e.canConfirm')
+    expect(track).toContain('loadOutcomeEvidence(DB,app.id)')
+    expect(mine).toContain('loadOutcomeEvidence(DB,app.id)')
   })
 })

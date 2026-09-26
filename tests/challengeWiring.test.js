@@ -62,8 +62,12 @@ describe('살아 있는 반박을 저장된 표에서 세지 않는가', () => {
     const shows = ['functions/api/honesty.js', 'functions/api/applications/[id]/record.js']
     for (const rel of shows) {
       const src = readFileSync(join(ROOT, rel), 'utf8')
-      expect(src, rel).toMatch(/liveChallenges|buildChallenges/)
+      expect(src, rel).toMatch(/loadOutcomeEvidence(?:Many)?\(/)
+      expect(src, rel).toContain('_lib/outcomeEvidence.js')
     }
+    const evidence = readFileSync(join(ROOT, 'functions/_lib/outcomeEvidence.js'), 'utf8')
+    expect(evidence).toContain('buildChallenges(context)')
+    expect(evidence).toContain('challenges.filter(row => row.resolved_at)')
   })
 
   it('성과 화면과 같은 함수를 쓴다', () => {
@@ -73,17 +77,22 @@ describe('살아 있는 반박을 저장된 표에서 세지 않는가', () => {
     // 전부 해소해도 부서에게는 영원히 '보수적 추정'이라고 적혔다. 부서별
     // 화면은 개수 뺄셈으로 세어 두 번 빼기도 했다.
     //
-    // 그래서 '규칙 돌리기 + 해소 걷어내기'를 shared/outcome.js 의
-    // liveChallenges 하나로 모았다.
+    // 규칙 계산과 현재 근거에 유효한 해소 판정을 outcomeEvidence로 모았다.
     const users = []
     for (const file of files) {
       const src = readFileSync(file, 'utf8')
-      if (src.includes('liveChallenges') || src.includes('buildChallenges')) {
+      if (/loadOutcomeEvidence(?:Many)?\(/.test(src)) {
         users.push(file.slice(ROOT.length).split('\\').join('/'))
       }
     }
     // 성과·부서·인쇄·정직·부서도구 다섯이 같은 함수를 부른다.
-    expect(users.length).toBeGreaterThanOrEqual(4)
+    expect(users).toEqual(expect.arrayContaining([
+      'functions/api/applications/[id]/outcome.js',
+      'functions/api/depts/[dept].js',
+      'functions/api/applications/[id]/record.js',
+      'functions/api/honesty.js',
+      'functions/api/tools/[slug].js',
+    ]))
   })
 
   it('해소한 반박을 개수 뺄셈으로 세지 않는다', () => {

@@ -8,6 +8,7 @@ import { onRequestPost as mutate, onRequestGet as workspace } from '../functions
 import { onRequestGet as health } from '../functions/api/health.js'
 import { checkRateLimit } from '../functions/_lib/rateLimit.js'
 import { onRequestPost as assist } from '../functions/api/override/assist.js'
+import { viewedOverrideRequests } from './fixtures/overrideEdit.js'
 
 // JWT verification is exercised with real signatures in accessHardening.test.js.
 vi.mock('../functions/_lib/access.js',()=>({verifiedAccessEmail:async env=>env.TEST_VERIFIED_EMAIL||null}))
@@ -42,11 +43,12 @@ for (const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop
   vi.spyOn(Date,'now').mockImplementation(()=>testNow)
 },60000)
 afterAll(async()=>{ vi.restoreAllMocks(); vi.unstubAllGlobals(); await pg.close() })
+const viewedRequest = viewedOverrideRequests()
 const post = async(body,key=crypto.randomUUID())=>{
   // Model elapsed live measurement time after approval, not pre-approval data.
   if(body.action==='record_run' && Number.isFinite(Date.parse(body.measurementEnd))) testNow=Math.max(testNow,Date.parse(body.measurementEnd)+1)
   const response=await mutate({env,request:new Request('https://ilson.test/api/override',{
-    method:'POST',headers:{'X-Idempotency-Key':key},body:JSON.stringify({role:'product',...body}) })})
+    method:'POST',headers:{'X-Idempotency-Key':key},body:JSON.stringify({role:'product',...await viewedRequest(DB,body,key)}) })})
   if(body.action==='approve_experiment' && response.status===200) {
     const row=await DB.prepare('SELECT approved_at FROM change_experiment WHERE id=?').bind(body.experimentId).first()
     approvalTimes.set(body.experimentId,Date.parse(row.approved_at.replace(' ','T')+'Z'))

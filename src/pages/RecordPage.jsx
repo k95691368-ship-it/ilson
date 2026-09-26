@@ -522,6 +522,12 @@ export default function RecordPage() {
                 <dd>{krw(rec.outcome.ops_cost_krw)}</dd>
                 <dt>부서 확인</dt>
                 <dd>
+                  {rec.outcome.previous_confirmation && (
+                    <p className="muted">
+                      과거 확인: {dateTimeLabel(rec.outcome.previous_confirmation.at)} · {rec.outcome.previous_confirmation.by}.
+                      현재 수치에는 재확인이 필요합니다.
+                    </p>
+                  )}
                   {rec.outcome.dept_confirmed_at ? (
                     <>
                       {dateTimeLabel(rec.outcome.dept_confirmed_at)} ·{' '}
@@ -558,6 +564,7 @@ export default function RecordPage() {
                         <strong>{c.title}</strong>
                         <div>{c.body}</div>
                         {c.resolution && <div className="record-aside">→ {c.resolution}</div>}
+                        {c.previousResolution && <div className="record-aside">과거 해소 · {dateTimeLabel(c.previousResolvedAt)} · {c.previousResolution} (현재 근거로 재확인 필요)</div>}
                       </li>
                     ))}
                   </ul>

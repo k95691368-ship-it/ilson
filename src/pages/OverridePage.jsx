@@ -120,6 +120,28 @@ function formObject(form) {
   return Object.fromEntries(new FormData(form).entries())
 }
 
+function editTarget(action, payload) {
+  const kinds = { update_cluster:'cluster', create_experiment:'cluster', validate_event:'event', approve_experiment:'experiment', record_run:'experiment', decide_experiment:'experiment', save_integration:'integration', save_actor:'actor', record_volume:'volume' }
+  const kind = kinds[action]
+  if (!kind) return null
+  const id = kind === 'actor' ? payload.email?.trim().toLowerCase() : payload[`${kind}Id`]
+  const params = new URLSearchParams({ editKind: kind })
+  if (kind === 'volume') for (const field of ['productId','measuredOn','segment']) params.set(field, payload[field]?.trim() || (field === 'segment' ? '전체' : ''))
+  else if (id) params.set('editId', id)
+  else return null
+  return { kind, id, query: params.toString() }
+}
+
+function modalEditVersion(modal, target) {
+  if (!modal || !target) return undefined
+  if (modal.reviewedTarget === target.query) return modal.reviewedVersion
+  // A blank registration form has not shown an existing account/volume to the
+  // user. Never silently borrow its token from a background list.
+  if (target.kind === 'volume') return undefined
+  if (target.kind === 'actor') return modal.entity?.email === target.id ? modal.entity.edit_version : undefined
+  return modal.entity?.id === target.id ? modal.entity.edit_version : undefined
+}
+
 export default function OverridePage() {
   const { data, error, loading, reload } = useApi('/override')
   const toast = useToast()
@@ -153,11 +175,15 @@ export default function OverridePage() {
   }, [demoRole])
 
   async function mutate(action, payload = {}, success = '저장했습니다.') {
+    if (mutationProblem?.conflict) return null
+    const target = editTarget(action, payload)
+    const expectedVersion = modalEditVersion(modal, target)
     setBusy(true)
     setMutationProblem(null)
     try {
       const result = await api.post('/override', {
         ...payload,
+        ...(expectedVersion ? { expectedVersion } : {}),
         action,
         role,
         actorLabel: `${roleLabel(role)} 시연`,
@@ -168,7 +194,8 @@ export default function OverridePage() {
       return result
     } catch (mutationError) {
       const fields = [...new Set(Object.values(mutationError.fields ?? {}).filter(value => typeof value === 'string' && value.trim()))]
-      setMutationProblem({ message: mutationError.message, fields })
+      setMutationProblem({ message: mutationError.message, fields,
+        conflict: mutationError.code === 'OVERRIDE_EDIT_CONFLICT' ? target : null })
       toast.error(fields.length ? fields.join(' ') : mutationError.message)
       return null
     } finally {
@@ -204,6 +231,27 @@ export default function OverridePage() {
     setMutationProblem(null)
     setModal({ type, entity })
   }
+
+  async function readLatestEdit() {
+    const conflict = mutationProblem?.conflict
+    if (!conflict) return
+    setBusy(true)
+    try {
+      const result = await api.get(`/override?${conflict.query}`)
+      setMutationProblem(previous => previous?.conflict?.query === conflict.query ? { ...previous, latest:result.entity, readError:null } : previous)
+    } catch (readError) {
+      setMutationProblem(previous => previous?.conflict?.query === conflict.query ? { ...previous, latest:null, readError:readError.message } : previous)
+    } finally { setBusy(false) }
+  }
+
+  function confirmLatestEdit() {
+    const { conflict, latest } = mutationProblem ?? {}
+    if (!conflict || !latest?.edit_version) return
+    setModal(previous => ({ ...previous, reviewedTarget:conflict.query, reviewedVersion:latest.edit_version }))
+    setMutationProblem(null)
+  }
+
+  const formBlocked = Boolean(mutationProblem?.conflict)
 
   return (
     <div className="ol-shell">
@@ -277,46 +325,86 @@ export default function OverridePage() {
           {mutationProblem && <div className="notice notice-danger" role="alert">
             <p>{mutationProblem.message}</p>
             {mutationProblem.fields.length > 0 && <ul>{mutationProblem.fields.map(message => <li key={message}>{message}</li>)}</ul>}
+            {mutationProblem.conflict && <>
+              <button type="button" className="ol-secondary" disabled={busy} onClick={readLatestEdit}>최신 저장 내용 조회</button>
+              {mutationProblem.readError && <p>{mutationProblem.readError}</p>}
+              {mutationProblem.latest && <EditConflictReview kind={mutationProblem.conflict.kind} entity={mutationProblem.latest} busy={busy} onConfirm={confirmLatestEdit} />}
+            </>}
           </div>}
           {modal.type === 'event' && (
             <EventForm data={data} busy={busy} onSubmit={(payload) => mutate('capture_event', payload, '판단과 근거를 저장했습니다.')} />
           )}
           {modal.type === 'eventDetail' && <EventDetail eventId={modal.entity} open={open} askAi={askAi} refresh={data?.generated_at} />}
           {modal.type === 'validate' && (
-            <ValidateForm event={modal.entity} busy={busy} onSubmit={(payload) => mutate('validate_event', payload, '사람의 수정 타당성을 기록했습니다.')} />
+            <ValidateForm event={modal.entity} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('validate_event', payload, '사람의 수정 타당성을 기록했습니다.')} />
           )}
           {modal.type === 'cluster' && (
-            <ClusterForm cluster={modal.entity} candidates={data.assignment_candidates ?? []} busy={busy} onSubmit={(payload) => mutate('update_cluster', payload, '원인과 담당을 확정했습니다.')} />
+            <ClusterForm cluster={modal.entity} candidates={data.assignment_candidates ?? []} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('update_cluster', payload, '원인과 담당을 확정했습니다.')} />
           )}
           {modal.type === 'experiment' && (
-            <ExperimentForm cluster={modal.entity} busy={busy} onSubmit={(payload) => mutate('create_experiment', payload, '개선 실험 카드를 만들었습니다.')} onAssist={() => askAi('experiment', modal.entity, 'issue_cluster', modal.entity?.id)} />
+            <ExperimentForm cluster={modal.entity} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('create_experiment', payload, '개선 실험 카드를 만들었습니다.')} onAssist={() => askAi('experiment', modal.entity, 'issue_cluster', modal.entity?.id)} />
           )}
           {modal.type === 'approve' && (
-            <ApproveForm experiment={modal.entity} busy={busy} onSubmit={(payload) => mutate('approve_experiment', payload, '실험을 승인했습니다.')} />
+            <ApproveForm experiment={modal.entity} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('approve_experiment', payload, '실험을 승인했습니다.')} />
           )}
           {modal.type === 'run' && (
-            <RunForm experiment={modal.entity} busy={busy} onSubmit={(payload) => mutate('record_run', payload, '실험 결과를 판정했습니다.')} />
+            <RunForm experiment={modal.entity} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('record_run', payload, '실험 결과를 판정했습니다.')} />
           )}
           {modal.type === 'decision' && (
-            <DecisionForm experiment={modal.entity} busy={busy} onSubmit={(payload) => mutate('decide_experiment', payload, '최종 결정과 근거를 남겼습니다.')} />
+            <DecisionForm experiment={modal.entity} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('decide_experiment', payload, '최종 결정과 근거를 남겼습니다.')} />
           )}
           {modal.type === 'volume' && (
-            <VolumeForm data={data} busy={busy} onSubmit={(payload) => mutate('record_volume', payload, '처리량을 반영했습니다.')} />
+            <VolumeForm data={data} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('record_volume', payload, '처리량을 반영했습니다.')} />
           )}
           {modal.type === 'integration' && (
-            <IntegrationForm busy={busy} onSubmit={(payload) => mutate('save_integration', payload, '연동 설정을 저장했습니다.')} />
+            <IntegrationForm busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('save_integration', payload, '연동 설정을 저장했습니다.')} />
           )}
           {modal.type === 'product' && (
             <ProductForm busy={busy} onSubmit={(payload) => mutate('create_product', payload, 'AI 제품을 등록했습니다.')} />
           )}
           {modal.type === 'actor' && (
-            <ActorForm actor={modal.entity} products={data.products ?? []} busy={busy} onSubmit={(payload) => mutate('save_actor', payload, '접근 권한을 저장했습니다.')} />
+            <ActorForm actor={modal.entity} products={data.products ?? []} busy={busy} blocked={formBlocked} onSubmit={(payload) => mutate('save_actor', payload, '접근 권한을 저장했습니다.')} />
           )}
           {modal.type === 'ai' && <AiDraft result={aiDraft} busy={busy} />}
         </Modal>
       )}
     </div>
   )
+}
+
+function EditConflictReview({ kind, entity, busy, onConfirm }) {
+  const fields = {
+    cluster: [['문제','title'],['설명','summary'],['원인','cause_code'],['판정','cause_status'],['상태','status'],['책임 조직','owner_team'],['담당자','assignee_label'],['회신 기한','next_response_on'],['고객 영향','customer_impact_score'],['규제 위험','regulatory_risk_score'],['운영 비용','operations_cost_krw']],
+    event: [['타당성','validity'],['검증 근거','validity_reason']],
+    experiment: [['실험','title'],['상태','status'],['단계','current_phase'],['승인자','approved_by'],['승인 시각','approved_at'],['승인 주기','approval_id'],['변경 버전','change_version']],
+    integration: [['연동','name'],['종류','kind'],['전송 주소','endpoint_url'],['바인딩 이름','secret_binding']],
+    actor: [['계정','email'],['이름','display_name'],['역할','role'],['활성','active'],['부서','departments'],['제품 범위','product_ids']],
+    volume: [['측정일','measured_on'],['고객·업무군','segment'],['전체 건수','total_cases'],['적용 가능 건수','applicable_cases']],
+  }
+  const formatted = key => {
+    const value = entity[key]
+    if (key === 'status') return statusLabel(value)
+    if (key === 'current_phase') return EXPERIMENT_PHASES.find(phase => phase.key === value)?.label ?? statusLabel(value)
+    if (key === 'cause_code') return causeByKey(value).label
+    if (key === 'cause_status') return {candidate:'후보',confirmed:'사람이 확정',disputed:'이견 있음'}[value] ?? value
+    if (key === 'validity') return {pending:'검토 대기',valid:'타당함',invalid:'사람의 수정이 잘못됨',uncertain:'근거 부족'}[value] ?? value
+    if (key === 'role') return roleLabel(value)
+    return Array.isArray(value) ? value.join(', ') || '없음' : typeof value === 'boolean' ? value ? '활성' : '비활성' : String(value ?? '—')
+  }
+  return <section aria-label="최신 저장 내용">
+    <dl>{(fields[kind] ?? []).map(([label,key]) => <div key={key}><dt>{label}</dt><dd>{formatted(key)}</dd></div>)}</dl>
+    {kind === 'experiment' && <div aria-label="최신 승인 주기의 측정 근거">
+      {(entity.runs ?? []).filter(run => run.approval_id === entity.approval_id).map(run => <article key={run.id}>
+        <strong>{EXPERIMENT_PHASES.find(phase => phase.key === run.phase)?.label ?? run.phase} · {runLabel(run.status)}</strong>
+        <p>대조군 {run.control_value} → 변경군 {run.variant_value} · 표본 {run.sample_size} · 위반 {run.guardrail_breaches}</p>
+        <p>{run.measurement_start} — {run.measurement_end}</p>
+        <p>{safeJson(run.evidence_refs_json,[]).join(' · ')}</p>
+      </article>)}
+      {(entity.decisions ?? []).map(decision => <p key={decision.id}>{statusLabel(decision.decision)} · {decision.basis}</p>)}
+    </div>}
+    <p>위 최신 내용과 아래 초안을 비교해주세요. 확인 후에도 입력한 내용은 유지됩니다.</p>
+    <button type="button" className="ol-secondary" disabled={busy} onClick={onConfirm}>최신 내용을 확인했습니다. 초안으로 다시 저장 준비</button>
+  </section>
 }
 
 function WorkspaceSkeleton() {
@@ -1048,18 +1136,18 @@ function EventForm({ data, busy, onSubmit }) {
   )
 }
 
-function ValidateForm({ event, busy, onSubmit }) {
+function ValidateForm({ event, busy, blocked, onSubmit }) {
   return (
     <form className="ol-form" onSubmit={(formEvent) => { formEvent.preventDefault(); onSubmit({ ...formObject(formEvent.currentTarget), eventId: event.id }) }}>
       <div className="ol-compare-small"><div><span>AI</span><p>{event.ai_decision}</p></div><div><span>사람</span><p>{event.human_decision}</p></div></div>
       <Field label="수정의 타당성" required><select name="validity" defaultValue="valid"><option value="valid">타당함</option><option value="invalid">사람의 수정이 잘못됨</option><option value="uncertain">근거로 판단할 수 없음</option></select></Field>
       <Field label="검증 근거" required><textarea name="reason" rows="5" required placeholder="정책 원문, 실제 결과 또는 전문가 검토로 확인한 내용" /></Field>
-      <SubmitBar busy={busy} label="타당성 확정" note="타당 확인 전에는 학습 데이터나 정답으로 내보내지 않습니다." />
+      <SubmitBar busy={busy} disabled={blocked} label="타당성 확정" note="타당 확인 전에는 학습 데이터나 정답으로 내보내지 않습니다." />
     </form>
   )
 }
 
-function ClusterForm({ cluster, candidates, busy, onSubmit }) {
+function ClusterForm({ cluster, candidates, busy, blocked, onSubmit }) {
   const [assigned, setAssigned] = useState(cluster.assignee_email || '')
   function submit(event) {
     event.preventDefault()
@@ -1087,12 +1175,12 @@ function ClusterForm({ cluster, candidates, busy, onSubmit }) {
         <Field label="문제 설명" wide><textarea name="summary" rows="4" defaultValue={cluster.summary} /></Field>
         <Field label="판정·배정 근거" wide required><textarea name="reason" rows="4" required placeholder="왜 이 원인이고 왜 이 조직이 책임져야 하는지" /></Field>
       </div>
-      <SubmitBar busy={busy} label="원인과 담당 확정" note="우선순위는 고객 25% · 규제 30% · 재발 25% · 비용 20%로 다시 계산합니다." />
+      <SubmitBar busy={busy} disabled={blocked} label="원인과 담당 확정" note="우선순위는 고객 25% · 규제 30% · 재발 25% · 비용 20%로 다시 계산합니다." />
     </form>
   )
 }
 
-function ExperimentForm({ cluster, busy, onSubmit, onAssist }) {
+function ExperimentForm({ cluster, busy, blocked, onSubmit, onAssist }) {
   if (!cluster) return <Empty title="먼저 반복 문제를 선택해주세요." />
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); const values = formObject(event.currentTarget); onSubmit({ ...values, clusterId: cluster.id,
@@ -1122,22 +1210,22 @@ function ExperimentForm({ cluster, busy, onSubmit, onAssist }) {
         <Field label="위험 수준"><select name="riskLevel" defaultValue="medium"><option value="low">낮음</option><option value="medium">중간</option><option value="high">고위험</option></select></Field>
         <Field label="롤백 방법" wide required><textarea name="rollbackPlan" rows="3" required placeholder="몇 분 안에 어느 버전과 라우팅으로 되돌리는가" /></Field>
       </div>
-      <SubmitBar busy={busy} label="실험 카드 생성" note="AI 초안은 저장되지 않습니다. 사람이 확인해 제출한 내용만 실험이 됩니다." />
+      <SubmitBar busy={busy} disabled={blocked} label="실험 카드 생성" note="AI 초안은 저장되지 않습니다. 사람이 확인해 제출한 내용만 실험이 됩니다." />
     </form>
   )
 }
 
-function ApproveForm({ experiment, busy, onSubmit }) {
+function ApproveForm({ experiment, busy, blocked, onSubmit }) {
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit({ ...formObject(event.currentTarget), experimentId: experiment.id }) }}>
       <div className="ol-form-context"><span>{experiment.risk_level === 'high' ? '고위험 변경' : '변경 실험'}</span><strong>{experiment.title}</strong></div>
       <Field label="승인 근거" required><textarea name="basis" rows="6" required placeholder="범위·지표·가드레일·롤백을 검토한 근거" /></Field>
-      <SubmitBar busy={busy} label="사람 승인 기록" note={experiment.risk_level === 'high' ? '고위험 실험은 정책·감사·사업 책임자 역할만 승인할 수 있습니다.' : '승인 전에는 실험 결과를 등록할 수 없습니다.'} />
+      <SubmitBar busy={busy} disabled={blocked} label="사람 승인 기록" note={experiment.risk_level === 'high' ? '고위험 실험은 정책·감사·사업 책임자 역할만 승인할 수 있습니다.' : '승인 전에는 실험 결과를 등록할 수 없습니다.'} />
     </form>
   )
 }
 
-function RunForm({ experiment, busy, onSubmit }) {
+function RunForm({ experiment, busy, blocked, onSubmit }) {
   const completed = new Set(experiment.runs.filter((run) => run.status === 'passed' && run.approval_id === experiment.approval_id && run.change_version === experiment.change_version).map((run) => run.phase))
   const suggested = EXPERIMENT_PHASES.find((phase, index) => index === 0 ? !completed.has(phase.key) : completed.has(EXPERIMENT_PHASES[index - 1].key) && !completed.has(phase.key))?.key ?? 'limited'
   const [phase, setPhase] = useState(suggested)
@@ -1158,12 +1246,12 @@ function RunForm({ experiment, busy, onSubmit }) {
         <Field label="실행 근거·관찰" wide><textarea name="notes" rows="4" placeholder="데이터셋 버전, 트래픽 범위, 예상 밖의 변화" /></Field>
       </div>
       <p className="ol-gate-copy">{phase === 'historical' ? '과거 사건 재생은 대상 데이터의 기간을 기록합니다. 승인 전 데이터도 사용할 수 있습니다.' : 'Shadow·제한 배포는 현재 승인 이후의 실제 측정 기간을 기록합니다. 앞 단계 종료와 다음 단계 시작이 같은 시각인 경우는 허용합니다.'} 입력 시각은 현재 기기 시간대에서 UTC로 변환해 비교합니다.</p>
-      <SubmitBar busy={busy} label="결과 판정" note={`목표는 ${experiment.success_metric} ${experiment.target_improvement}% 개선입니다. 위반 1건이면 성과와 관계없이 차단합니다.`} />
+      <SubmitBar busy={busy} disabled={blocked} label="결과 판정" note={`목표는 ${experiment.success_metric} ${experiment.target_improvement}% 개선입니다. 위반 1건이면 성과와 관계없이 차단합니다.`} />
     </form>
   )
 }
 
-function DecisionForm({ experiment, busy, onSubmit }) {
+function DecisionForm({ experiment, busy, blocked, onSubmit }) {
   const gate = canExpandExperiment(experiment, experiment.runs)
   const rollbackOnly = experiment.status === 'expanded'
   return (
@@ -1171,26 +1259,26 @@ function DecisionForm({ experiment, busy, onSubmit }) {
       <div className={`ol-gate ${gate.ok ? 'ok' : 'blocked'}`}><strong>{rollbackOnly ? '확대 이후 롤백 결정' : gate.ok ? '확대 조건 충족' : '확대 조건 미충족'}</strong><p>{rollbackOnly ? '최초 확대 결정과 근거는 그대로 보존하고, 새 롤백 결정을 추가합니다. 외부 시스템의 배포나 복귀를 실행하지 않습니다.' : gate.ok ? '현재 승인 주기의 수동 입력값이 세 단계의 사전 기준을 충족했습니다. 통계적 유의성이나 실제 배포 완료를 뜻하지 않습니다.' : gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 기록이 없습니다.' : gate.missing.length ? `${gate.missing.join(' → ')} 결과가 없습니다.` : gate.timingIssues.length ? gate.timingIssues.map(issue=>`${issue.phase} · ${issue.reason}`).join(' / ') : `${gate.blocked.join(' · ')} 단계가 통과하지 못했습니다.`}</p></div>
       <Field label="결정" required><select name="decision" defaultValue={rollbackOnly ? 'rollback' : gate.ok ? 'expand' : 'hold'}>{!rollbackOnly && <><option value="expand" disabled={!gate.ok}>적용 범위 확대</option><option value="hold">보류 및 추가 실험</option><option value="stop">중단</option></>}<option value="rollback">롤백 결정 기록</option></select></Field>
       <Field label="결정 근거" required><textarea name="basis" rows="6" required placeholder="어떤 지표와 안전 근거로 이 결정을 내렸는지" /></Field>
-      <SubmitBar busy={busy} label="결정 기록" note="결정 당시의 모든 실험 결과가 스냅샷으로 함께 보존됩니다." />
+      <SubmitBar busy={busy} disabled={blocked} label="결정 기록" note="결정 당시의 모든 실험 결과가 스냅샷으로 함께 보존됩니다." />
     </form>
   )
 }
 
-function VolumeForm({ data, busy, onSubmit }) {
+function VolumeForm({ data, busy, blocked, onSubmit }) {
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit(formObject(event.currentTarget)) }}>
       <Field label="AI 제품" required><select name="productId" defaultValue={data.products[0]?.id}>{data.products.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
       <div className="ol-form-grid"><Field label="측정일" required><input name="measuredOn" type="date" required defaultValue={new Date().toISOString().slice(0, 10)} /></Field><Field label="고객·업무군" required><input name="segment" required defaultValue="전체" /></Field><Field label="전체 처리 건수" required><input name="totalCases" type="number" min="0" required /></Field><Field label="AI 적용 가능 건수" required><input name="applicableCases" type="number" min="0" required /></Field></div>
-      <SubmitBar busy={busy} label="분모 저장" note="수정 건수만으로 비율을 만들지 않습니다. 같은 기간·고객군의 적용 가능 사건 수가 필요합니다." />
+      <SubmitBar busy={busy} disabled={blocked} label="분모 저장" note="수정 건수만으로 비율을 만들지 않습니다. 같은 기간·고객군의 적용 가능 사건 수가 필요합니다." />
     </form>
   )
 }
 
-function IntegrationForm({ busy, onSubmit }) {
+function IntegrationForm({ busy, blocked, onSubmit }) {
   return (
     <form className="ol-form" onSubmit={(event) => { event.preventDefault(); onSubmit(formObject(event.currentTarget)) }}>
       <div className="ol-form-grid"><Field label="연동 종류" required><select name="kind" defaultValue="ticket"><option value="mlops">MLOps</option><option value="policy">정책 저장소</option><option value="ticket">업무 티켓</option><option value="evaluation">평가 파이프라인</option><option value="webhook">일반 Webhook</option></select></Field><Field label="연동 이름" required><input name="name" required placeholder="예: Jira AI 개선 보드" /></Field><Field label="HTTPS Endpoint" wide required><input name="endpointUrl" type="url" required placeholder="https://…" /></Field><Field label="Cloudflare 시크릿 바인딩" wide hint="서버 허용 목록에 등록한 전용 환경 변수 이름만"><input name="secretBinding" placeholder="OVERRIDE_INTEGRATION_JIRA_TOKEN" pattern="OVERRIDE_INTEGRATION_[A-Z0-9_]+_TOKEN" /></Field></div>
-      <SubmitBar busy={busy} label="연동 설정 저장" note="localhost·사설 IP·HTTP 주소는 서버가 거절합니다. 전송할 때마다 응답 상태를 감사로그에 남깁니다." />
+      <SubmitBar busy={busy} disabled={blocked} label="연동 설정 저장" note="localhost·사설 IP·HTTP 주소는 서버가 거절합니다. 전송할 때마다 응답 상태를 감사로그에 남깁니다." />
     </form>
   )
 }
@@ -1204,7 +1292,7 @@ function ProductForm({ busy, onSubmit }) {
   )
 }
 
-function ActorForm({ actor, products, busy, onSubmit }) {
+function ActorForm({ actor, products, busy, blocked, onSubmit }) {
   const [active, setActive] = useState(actor ? Boolean(actor.active) : true)
   const [confirmed, setConfirmed] = useState(false)
   const disabling = Boolean(actor?.active && !active)
@@ -1217,7 +1305,7 @@ function ActorForm({ actor, products, busy, onSubmit }) {
       <fieldset className="ol-scope-products"><legend>접근 가능한 AI 제품</legend>{products.map(product => <label key={product.id}><input type="checkbox" name="productIds" value={product.id} defaultChecked={actor?.product_ids?.includes(product.id)} />{product.name}</label>)}{(actor?.product_ids ?? []).filter(id => !products.some(product => product.id === id)).map(id => <label key={id}><input type="checkbox" name="productIds" value={id} defaultChecked />{id} · 기존 범위</label>)}</fieldset>
       <label className="ol-assignment-filter"><input type="checkbox" checked={active} onChange={event => { setActive(event.target.checked); setConfirmed(false) }} />계정 활성</label>
       {disabling && <label className="ol-disable-confirm"><input type="checkbox" checked={confirmed} onChange={event => setConfirmed(event.target.checked)} required />이 계정의 접근을 차단합니다. 기존 업무 기록은 삭제하지 않습니다.</label>}
-      <SubmitBar busy={busy} disabled={disabling && !confirmed} label="접근 역할 저장" note="범위가 없는 일반 계정에는 제품·부서 전체 접근을 허용하지 않습니다. 보안·감사 및 사업 책임자 역할은 관리자 권한입니다." />
+      <SubmitBar busy={busy} disabled={blocked || (disabling && !confirmed)} label="접근 역할 저장" note="범위가 없는 일반 계정에는 제품·부서 전체 접근을 허용하지 않습니다. 보안·감사 및 사업 책임자 역할은 관리자 권한입니다." />
     </form>
   )
 }

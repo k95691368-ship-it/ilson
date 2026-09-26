@@ -88,15 +88,22 @@ describe('deployable Pages Worker', () => {
       const crossedScope = await worker.fetch(new Request('https://ilson.test/api/override', { headers: { Cookie: b, 'X-Ilson-Scope': await scopeFor(a) } }), env, context)
       expect(crossedScope.status).toBe(409)
       expect(await crossedScope.json()).toMatchObject({ code: 'SESSION_SCOPE_CHANGED' })
-      expect((await request('/api/override', a)).status).toBe(200)
+      const workspaceA = await request('/api/override', a)
+      expect(workspaceA.status).toBe(200)
+      const viewedCluster = (await workspaceA.json()).clusters.find(item => item.id === 'olc_policy')
       expect((await request('/api/override', b)).status).toBe(200)
-      const created = await request('/api/override', a, { role: 'product', action: 'create_experiment', clusterId: 'olc_policy', title: 'Built-worker verification', changeTarget: '검색', hypothesis: '오류 감소', scope: '검증', comparator: 'v1', successMetric: '수정률', approver: '검토자', rollbackPlan: 'v1 복귀', guardrails: ['위반 0건'], stopConditions: ['위반 1건'], metricDirection: 'lower', targetImprovement: 20,
+      const created = await request('/api/override', a, { role: 'product', action: 'create_experiment', clusterId: 'olc_policy', expectedVersion: viewedCluster.edit_version, title: 'Built-worker verification', changeTarget: '검색', hypothesis: '오류 감소', scope: '검증', comparator: 'v1', successMetric: '수정률', approver: '검토자', rollbackPlan: 'v1 복귀', guardrails: ['위반 0건'], stopConditions: ['위반 1건'], metricDirection: 'lower', targetImprovement: 20,
         evaluationPlan: { metricType: 'rate', minimumWindowSeconds: 60, minimumSamples: { historical: 10, shadow: 10, limited: 10 }, rationale: '배포 묶음 검증용 사전 계획', datasetVersion: 'data-v1', modelVersion: 'model-v1', policyVersion: 'policy-v1' },
       })
       expect(created.status).toBe(201)
       const id = (await created.json()).id
-      expect((await request('/api/override', a, { role: 'product', action: 'approve_experiment', experimentId: id, basis: '계획 확인' })).status).toBe(200)
-      const body = { role: 'product', action: 'record_run', experimentId: id, phase: 'historical', controlValue: 10, variantValue: 7, sampleSize: 20, guardrailBreaches: 0, evidenceRefs: ['artifact-test/run-1'], measurementStart: new Date(Date.now() - 3600000).toISOString(), measurementEnd: new Date(Date.now() - 1800000).toISOString() }
+      const viewedExperiment = async () => {
+        const response = await request('/api/override?editKind=experiment&editId=' + encodeURIComponent(id), a)
+        expect(response.status).toBe(200)
+        return (await response.json()).entity
+      }
+      expect((await request('/api/override', a, { role: 'product', action: 'approve_experiment', experimentId: id, expectedVersion: (await viewedExperiment()).edit_version, basis: '계획 확인' })).status).toBe(200)
+      const body = { role: 'product', action: 'record_run', experimentId: id, expectedVersion: (await viewedExperiment()).edit_version, phase: 'historical', controlValue: 10, variantValue: 7, sampleSize: 20, guardrailBreaches: 0, evidenceRefs: ['artifact-test/run-1'], measurementStart: new Date(Date.now() - 3600000).toISOString(), measurementEnd: new Date(Date.now() - 1800000).toISOString() }
       const key = crypto.randomUUID()
       const first = await request('/api/override', a, body, 'POST', key)
       const replay = await request('/api/override', a, body, 'POST', key)

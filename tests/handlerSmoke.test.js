@@ -47,6 +47,8 @@ function fakeDB() {
   }
   return {
     prepare: () => stmt,
+    mutationReceipt: async () => null,
+    commitMutation: async (_requestId, _fingerprint, _reads, _writes, response) => ({ response, replayed: false }),
     batch: async (list) => (list ?? []).map(() => ({ meta: {} })),
     exec: async () => ({}),
   }
@@ -86,6 +88,8 @@ function fakeDBWithRows() {
   }
   return {
     prepare: () => stmt,
+    mutationReceipt: async () => null,
+    commitMutation: async (_requestId, _fingerprint, _reads, _writes, response) => ({ response, replayed: false }),
     // ANY_ROW.rolled_back_at is set: the new atomic RPC owns this guard.
     recordToolRun: async () => ({ response: { status:409,body:{error:'이 도구는 잠시 내려가 있습니다.'} }, replayed:false }),
     batch: async (list) => (list ?? []).map(() => ({ meta: {} })),

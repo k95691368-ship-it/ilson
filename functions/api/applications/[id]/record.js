@@ -12,14 +12,7 @@
 // 인쇄하거나 텍스트로 내려받는다.
 
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.js'
-import {
-  computeOutcome,
-  annualize,
-  labelForOutcome,
-  liveChallenges,
-  daysSince,
-} from '../../../../shared/outcome.js'
-import { OUTCOME_KIND } from '../../../../shared/accept.js'
+import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)
@@ -54,8 +47,6 @@ export async function onRequestGet({ env, data: requestData, params }) {
       faqs,
       handover,
       uses,
-      outcome,
-      challenges,
       decisions,
     ] = await Promise.all([
       q(env, 'SELECT * FROM review WHERE application_id = ?', id).first(),
@@ -72,80 +63,28 @@ export async function onRequestGet({ env, data: requestData, params }) {
       q(env, 'SELECT * FROM manual WHERE application_id = ?', id).first(),
       q(env, 'SELECT * FROM manual_faq WHERE application_id = ? ORDER BY ord', id).all(),
       q(env, 'SELECT * FROM handover WHERE application_id = ?', id).first(),
-      q(env, 'SELECT * FROM tool_use WHERE application_id = ? ORDER BY used_at', id).all(),
-      q(env, 'SELECT * FROM outcome WHERE application_id = ?', id).first(),
-      q(env, 'SELECT * FROM outcome_challenge WHERE application_id = ? ORDER BY rule_code', id).all(),
-      q(env, 'SELECT * FROM decision_log WHERE application_id = ? ORDER BY created_at', id).all(),
+      q(env, 'SELECT * FROM tool_use WHERE application_id = ? ORDER BY used_at, id', id).all(),
+      q(env, 'SELECT * FROM decision_log WHERE application_id = ? ORDER BY created_at, id', id).all(),
     ])
 
-    // 살아 있는 반박을 성과 화면과 **같은 함수**로 만든다. 저장된 해소분은
-    // 그대로 지킨다.
-    // 문서에 실을 금액. 성과 화면과 **같은 함수**로 낸다.
-    //
-    // 여태 이 라우트는 computeOutcome 을 부르고도 그 결과를 반박 만드는 데만
-    // 쓰고 버렸다. 그래서 인쇄 문서의 성과 칸에 만든 공수와 반박은 있는데
-    // **정작 얼마나 줄었는지가 없었다.** 여섯 단계가 만들어 내는 숫자가
-    // 그 여섯 단계를 편 문서에 안 실린 것이다.
-    //
-    // 따로 계산하지 않는다. 두 벌로 만들면 화면과 종이가 다른 금액을 말하는
-    // 날이 오고, 그날 둘 다 못 믿게 된다.
-    let money = null
-    let moneyLabel = null
-    let challengeRows = challenges.results
-    if (baseline && uses.results.length > 0) {
-      let deptFelt = null
-      const said = decisions.results
-        .filter((d) => d.link_kind === OUTCOME_KIND)
-        .at(-1)
-      try {
-        deptFelt = JSON.parse(said?.alternatives)?.felt ?? null
-      } catch {
-        // 옛 기록에는 숫자가 없다.
-      }
-      const computed = computeOutcome({
-        baseline,
-        runs: uses.results,
-        devHours: outcome?.dev_hours ?? 0,
-        opsCostKrw: outcome?.ops_cost_krw ?? 0,
-        amortizeMonths: outcome?.amortize_months ?? 24,
-      })
-      // 세는 자리를 shared/outcome.js 한 곳으로 모았다.
-      const { all: shouldHave } = liveChallenges({
-        outcome: computed,
-        quarantineLeft: uses.results.at(-1)?.quarantined ?? 0,
-        deptConfirmed: Boolean(outcome?.dept_confirmed_at),
-        baselineAgeDays: daysSince(baseline?.sealed_at),
-        deptFelt,
-      })
-      if (computed.status !== '산정불가') {
-        money = {
-          ...computed,
-          annual: annualize(computed, baseline?.frequency ?? app.current_frequency, {
-            devKrw: computed.devKrw ?? 0,
-            opsCostKrw: outcome?.ops_cost_krw ?? 0,
-          }),
-        }
-      }
-
-      const byCode = new Map(challenges.results.map((c) => [c.rule_code, c]))
-      challengeRows = shouldHave.map((c) => {
-        const saved = byCode.get(c.code)
-        return {
-          rule_code: c.code,
-          title: c.title,
-          body: c.body,
-          resolved_at: saved?.resolved_at ?? null,
-          resolution: saved?.resolution ?? null,
-        }
-      })
+    // The printed record and the live result use the same evidence validity.
+    // Earlier confirmations and resolutions remain in decisions, never as proof
+    // for amounts computed from a different baseline, run set or cost input.
+    const evidence = await loadOutcomeEvidence(env.DB, id)
+    const money = evidence.outcome.status === '산정불가' ? null : {
+      ...evidence.outcome,
+      annual: evidence.annual,
     }
-
-    // 금액에 붙일 딱지. 미해소 반박 수에 따라 '보수적 추정'으로 내려간다.
-    // 화면이 쓰는 것과 같은 함수다.
-    if (money) {
-      const unresolved = challengeRows.filter((c) => !c.resolved_at).length
-      moneyLabel = labelForOutcome(money, unresolved)
-    }
+    const moneyLabel = money ? evidence.label : null
+    const challengeRows = evidence.challenges.map(challenge => ({
+      rule_code: challenge.code, title: challenge.title, body: challenge.body,
+      resolved_at: challenge.resolved_at, resolution: challenge.resolution,
+      previousResolution: challenge.previousResolution, previousResolvedAt: challenge.previousResolvedAt,
+    }))
+    const currentOutcome = evidence.currentSaved ? {
+      ...evidence.currentSaved,
+      previous_confirmation: evidence.confirmation.current ? null : evidence.confirmation.previous,
+    } : null
 
     // 회차별 기준 판정. 회차가 없으면 한 번도 안 돌린 것이고, 그것도 기록이다.
     const roundIds = betaRounds.results.map((r) => r.id)
@@ -172,7 +111,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       베타테스트: betaRounds.results.length > 0,
       사용법서: Boolean(manual),
       배포: Boolean(handover),
-      성과: Boolean(outcome),
+      성과: evidence.confirmation.current,
     }
 
     return jsonResponse({
@@ -193,7 +132,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       faqs: faqs.results,
       handover,
       uses: uses.results,
-      outcome,
+      outcome: currentOutcome,
       // 살아 있는 반박까지 넣는다.
       //
       // `outcome_challenge` 표에는 **해소한 것만** 저장된다. 살아 있는

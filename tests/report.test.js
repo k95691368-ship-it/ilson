@@ -345,14 +345,14 @@ describe('부서도 자기 도구의 성과를 보는가', () => {
 
   it('담당자 화면과 같은 함수로 낸다', () => {
     // 두 벌로 계산하면 부서가 보는 숫자와 담당자가 보는 숫자가 갈라진다.
-    expect(route).toContain('computeOutcome(')
-    expect(route).toContain('labelForOutcome(')
+    expect(route).toContain('loadOutcomeEvidence(')
+    expect(route).toContain('const computed = evidence.outcome')
   })
 
   it('딱지를 함께 준다', () => {
     // 숫자만 던지면 부서는 확정으로 읽고 위에 보고한다 — 담당자 화면은
     // 같은 값을 잠정이라고 부르고 있는데.
-    expect(route).toContain('label: labelForOutcome')
+    expect(route).toContain('label: evidence.label.label')
     expect(page).toContain('data.payoff.label')
   })
 
@@ -375,8 +375,8 @@ describe('부서도 자기 도구의 성과를 보는가', () => {
     // deptConfirmed 를 false 로 굳혀 뒀더니 부서 화면은 "확인 못 한 것
     // 5가지", 담당자 화면은 4가지가 됐다. 같은 것을 두 화면이 다른 숫자로
     // 말하면 읽는 사람은 둘 다 안 믿는다.
-    expect(route).toContain('deptConfirmed: Boolean(saved?.dept_confirmed_at)')
-    expect(route).toContain('dept_confirmed_at FROM outcome')
+    expect(route).toContain('const openCount = evidence.unresolvedCount')
+    expect(route).toContain('openChallenges: openCount')
   })
 
   it('기준선이 없으면 아무 숫자도 안 낸다', () => {
@@ -384,7 +384,7 @@ describe('부서도 자기 도구의 성과를 보는가', () => {
     // 읽히는데, 실제로는 모르는 것이다.
     // 조건이 recent(최근 40번)에서 totals(전수)로 바뀌었다. 최근 40번으로
     // 계산하면 41번 넘게 돌린 도구의 절감이 부서 화면에서만 멈춘다.
-    expect(route).toContain("if (baseline && (totals?.n ?? 0) > 0)")
+    expect(route).toContain('if (evidence.baseline && evidence.outcome.runCount > 0)')
     expect(page).toContain('{data.payoff && (')
   })
 })
@@ -457,15 +457,15 @@ describe('성과에 토를 단 부서가 답을 받는가', () => {
   const page = readFileSync(join(ROOT6, 'src', 'pages', 'TrackPage.jsx'), 'utf8')
 
   it('담당자가 푼 반박을 부서 쪽으로 내려보낸다', () => {
-    expect(route).toContain("rule_code = 'dept_disagrees'")
-    expect(route).toContain('resolved_at IS NOT NULL')
-    expect(route).toContain('answer: answered?.resolution')
+    expect(route).toContain("row.code === 'dept_disagrees' && row.resolved_at")
+    expect(route).toContain('answer:answer?.resolution')
+    expect(route).toContain('loadOutcomeEvidence')
   })
 
   it('불러온 값을 실제로 돌려준다', () => {
     // load 에서 뽑아 놓고 return 에 안 넣으면 화면은 영영 못 받는다.
     // 린트가 "선언만 하고 안 쓴다"고 잡아 줬다.
-    expect(route).toContain('records: rows, answered }')
+    expect(route).toContain('state:stateOf(await loadOutcomeEvidence(env.DB,app.id))')
   })
 
   it('화면이 그 답을 그린다', () => {

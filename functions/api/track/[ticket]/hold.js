@@ -13,7 +13,8 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.js'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
-import { departmentAuthority } from '../../../_lib/departmentAuthority.js'
+import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'
+import { departmentMutation } from '../../../_lib/departmentMutation.js'
 import {
   validateHoldLift,
   holdState,
@@ -85,119 +86,46 @@ export async function onRequestGet({ env, data: requestData, params }) {
 
 export async function onRequestPost({ env, data: requestData, request, params }) {
   env = requestData?.requestEnv ?? env
-  const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
-  const ticket = await checkRateLimit(env, `holdlift:${ip}`, 10, 3600)
-  if (!ticket) return jsonError('알림은 시간당 10회까지 가능합니다.', 429)
-
-  const loaded = await load(env, String(params.ticket ?? '').trim().toUpperCase())
-  if (!loaded) {
-    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-    return jsonError('그 접수번호를 찾지 못했습니다.', 404)
-  }
-  const forbidden = departmentAuthority(env, loaded.app.dept)
-  if (forbidden) {
-    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-    return forbidden
-  }
-
-  // 보류가 아닌 것에 "조건이 풀렸다"는 말이 오면 담당자는 무엇을 두고 하신
-  // 말인지 모른다.
-  if (loaded.app.status !== '보류') {
-    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-    return jsonError('이 신청서는 지금 보류 상태가 아닙니다. 화면을 새로 열어 보세요.', 409)
-  }
-
+  const bucket = `holdlift:${request.headers.get('CF-Connecting-IP') || 'unknown'}`
+  const rateTicket = await checkRateLimit(env,bucket,10,3600)
+  if (!rateTicket) return jsonError('알림은 시간당 10회까지 가능합니다.',429)
   let body
+  try { body = await request.json() } catch {
+    await releaseRateLimit(env,bucket,rateTicket)
+    return jsonError('보내주신 내용을 읽지 못했습니다.',400)
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    await releaseRateLimit(env,bucket,rateTicket)
+    return jsonError('요청 형식이 올바르지 않습니다.',400)
+  }
+  const ticket = String(params.ticket ?? '').trim().toUpperCase()
+  const response = await departmentMutation(env,request,`holdlift:${ticket}`,body,async DB => {
+    const loaded = await load({...env,DB},ticket)
+    if (!loaded) return jsonError('그 접수번호를 찾지 못했습니다.',404)
+    const forbidden = await currentDepartmentAuthority(env,DB,loaded.app.dept)
+    if (forbidden) return forbidden
+    if (loaded.app.status !== '보류') return jsonError('이 신청서는 지금 보류 상태가 아닙니다. 화면을 새로 열어 보세요.',409)
+    const cancelled = body.kind === 'cancel'
+    const by = String(body.by ?? '').trim().slice(0,60)
+    const errors = cancelled ? (by.length < 2 ? {by:'취소하시는 분 성함을 적어주세요.'} : {}) : validateHoldLift(body)
+    if (Object.keys(errors).length) return failFields(errors,'적어 주신 내용을 확인해주세요.')
+    const kind = cancelled ? null : liftKindOf(body.kind)
+    await DB.prepare(`INSERT INTO decision_log
+      (id,application_id,stage,actor,title,what,why,alternatives,link_kind,link_id)
+      VALUES(?,?,'검토','human',?,?,?,?,?,?)`).bind(newId('dec'),loaded.app.id,by,
+      cancelled ? '앞서 알려주신 것을 거두셨습니다.' : `${kind.label} — ${String(body.body).trim().slice(0,1000)}`,
+      cancelled ? '잘못 눌렀을 때 되돌릴 자리가 없으면 부서는 아예 안 누른다.' : '조건이 풀린 것은 부서만 안다. 저희가 모르면 이 신청서는 미뤄 둔 채로 그대로 묻힌다.',
+      kind?.code ?? null,cancelled ? HOLD_LIFT_CANCEL_KIND : HOLD_LIFT_KIND,loaded.app.id).run()
+    return jsonResponse({ok:true,cancelled,ready:Boolean(kind?.ready)})
+  })
+  if (!response.ok || response.headers.get('X-Idempotency-Replayed') === '1') await releaseRateLimit(env,bucket,rateTicket)
+  if (!response.ok) return response
   try {
-    body = await request.json()
-  } catch {
-    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-    return jsonError('보내주신 내용을 읽지 못했습니다.', 400)
-  }
-
-  // 잘못 눌렀을 때 되돌릴 자리가 없으면 부서는 아예 안 누른다.
-  if (body.kind === 'cancel') {
-    const by = String(body.by ?? '').trim().slice(0, 60)
-    if (by.length < 2) {
-      await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-      return failFields({ by: '취소하시는 분 성함을 적어주세요.' }, '적어 주신 내용을 확인해주세요.')
-    }
-    try {
-      await env.DB.prepare(
-        `INSERT INTO decision_log
-           (id, application_id, stage, actor, title, what, why, link_kind, link_id)
-         VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?)`
-      )
-        .bind(
-          newId('dec'),
-          loaded.app.id,
-          by,
-          '앞서 알려주신 것을 거두셨습니다.',
-          '잘못 눌렀을 때 되돌릴 자리가 없으면 부서는 아예 안 누른다.',
-          HOLD_LIFT_CANCEL_KIND,
-          loaded.app.id
-        )
-        .run()
-      const after = await load(env, loaded.app.ticket_no)
-      return jsonResponse({
-        ok: true,
-        state: holdState({
-          application: after.app,
-          review: after.review,
-          records: after.records,
-          decisions: after.decisions,
-        }),
-        message: '거두었습니다. 다시 알려주셔도 됩니다.',
-      })
-    } catch (err) {
-      await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-      return failUnexpected(err, '거두지 못했습니다.')
-    }
-  }
-
-  const errors = validateHoldLift(body)
-  if (Object.keys(errors).length > 0) {
-    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-    return failFields(errors, '적어 주신 내용을 확인해주세요.')
-  }
-
-  const by = String(body.by).trim().slice(0, 60)
-  const kind = liftKindOf(body.kind)
-  const said = String(body.body).trim().slice(0, 1000)
-
-  try {
-    await env.DB.prepare(
-      `INSERT INTO decision_log
-         (id, application_id, stage, actor, title, what, why, alternatives, link_kind, link_id)
-       VALUES (?, ?, '검토', 'human', ?, ?, ?, ?, ?, ?)`
-    )
-      .bind(
-        newId('dec'),
-        loaded.app.id,
-        by,
-        `${kind.label} — ${said}`,
-        '조건이 풀린 것은 부서만 안다. 저희가 모르면 이 신청서는 미뤄 둔 채로 그대로 묻힌다.',
-        kind.code,
-        HOLD_LIFT_KIND,
-        loaded.app.id
-      )
-      .run()
-
-    const after = await load(env, loaded.app.ticket_no)
-    return jsonResponse({
-      ok: true,
-      state: holdState({
-          application: after.app,
-          review: after.review,
-          records: after.records,
-          decisions: after.decisions,
-        }),
-      message: kind.ready
-        ? '알려주셔서 고맙습니다. 담당자 할 일 목록에 올려 두었습니다 — 다시 판정하면 이 화면에 뜹니다.'
-        : '알려주셔서 고맙습니다. 조건은 그대로여도 사정이 달라진 것은 판정에 반영됩니다.',
-    })
-  } catch (err) {
-    await releaseRateLimit(env, `holdlift:${ip}`, ticket)
-    return failUnexpected(err, '알리지 못했습니다.')
-  }
+    const receipt = await response.json(), after = await load(env,ticket)
+    const state = holdState({application:after.app,review:after.review,records:after.records,decisions:after.decisions})
+    return jsonResponse({ok:true,state,message:receipt.cancelled ? '거두었습니다. 다시 알려주셔도 됩니다.'
+      : receipt.ready ? '알려주셔서 고맙습니다. 담당자 할 일 목록에 올려 두었습니다 — 다시 판정하면 이 화면에 뜹니다.'
+      : '알려주셔서 고맙습니다. 조건은 그대로여도 사정이 달라진 것은 판정에 반영됩니다.'},200,
+      {'X-Idempotency-Replayed':response.headers.get('X-Idempotency-Replayed') || '0'})
+  } catch(error) { return failUnexpected(error,'보류 알림 상태를 불러오지 못했습니다.') }
 }

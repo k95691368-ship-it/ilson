@@ -1,4 +1,5 @@
 import { DECISION_ACTIONS, safeJson } from '../../shared/override.js'
+import { withOverrideEditVersion } from './overrideEditVersion.js'
 
 const PAGE_SIZE = 100
 function demand(condition, message, status = 400) {
@@ -51,5 +52,5 @@ export async function readOverrideEvents(db, params) {
   ])
   const total = Number(count.results[0]?.n ?? 0), rows = result.results.slice(0, PAGE_SIZE), hasMore = result.results.length > PAGE_SIZE
   if (params.get('eventId')) demand(total > 0, '이 판단 사건을 찾을 수 없습니다.', 404)
-  return { events: rows.map(hydrateEvent), page: { limit: PAGE_SIZE, total, hasMore, nextCursor: hasMore ? encodeCursor(rows.at(-1)) : null } }
+  return { events: await Promise.all(rows.map(async row => hydrateEvent(await withOverrideEditVersion('event', row)))), page: { limit: PAGE_SIZE, total, hasMore, nextCursor: hasMore ? encodeCursor(rows.at(-1)) : null } }
 }
