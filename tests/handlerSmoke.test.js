@@ -132,6 +132,7 @@ function fakeReportFeedDB(withRows) {
     counts: [{ application_id: 'app_x', total: 1, open: 1, urgent: 1, fixed: 0, digest: 'a'.repeat(32) }],
     rows: [{
       id: 'dec_report', application_id: 'app_x', title: '재무 담당', what: '합계가 다릅니다.', why: '원장과 대조했습니다.',
+      stage: '배포', actor: 'human', alternatives: null, unrequested: 0,
       link_kind: '신고', link_id: 'wrong_number', created_at: '2026-08-01 00:00:00', ticket_no: 'AX-XXX-000', dept: '재무',
       slug: null, tool_title: null, handed_to_dept: null,
       fix_id: null, fix_application_id: null, fix_how: null, fix_why: null, fix_at: null, open_rank: 1, urgent_rank: 1,

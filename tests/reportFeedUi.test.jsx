@@ -15,6 +15,7 @@ const BASIS = 'a'.repeat(64), NEXT_BASIS = 'b'.repeat(64)
 const deferred = () => { let resolve; const promise = new Promise(r => { resolve = r }); return { promise, resolve } }
 const reply = (body, status = 200) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } })
 const report = (number, { fixed = false, prefix = '신고 원문' } = {}) => ({ id: `r${number}`, body: `${prefix} ${number}`,
+  version: 'c'.repeat(64),
   code: 'wrong_number', label: '숫자가 안 맞습니다', urgent: true, open: !fixed, reporter: '합성 제보자', at: '2026-01-01',
   fix: fixed ? { how: '수정한 내용', why: '확인된 원인' } : null })
 const feed = (number = 1, { total = 205, basis = BASIS, size, prefix, fixed, appOpen = total - 5 } = {}) => {
@@ -36,7 +37,7 @@ beforeEach(() => {
   vi.stubGlobal('crypto', webcrypto)
   completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'demo', scope: 'a'.repeat(64) })
   getReports = url => reply(feed(Number(url.searchParams.get('page') ?? 1)))
-  postReply = () => reply({ ok: true, id: `dec_${'a'.repeat(20)}`, ticket_no: 'AX-AAA-001' })
+  postReply = (_path, options) => reply({ ok: true, id: `dec_${'a'.repeat(20)}`, ticket_no: 'AX-AAA-001', reportId: JSON.parse(options.body).reportId, author: 'AX 담당자' })
   toolsResponse = { items: [], summary: { total: 0 }, failures: [] }
   vi.stubGlobal('fetch', vi.fn(async (input, options = {}) => {
     const url = new URL(String(input), 'https://local.invalid'), path = url.pathname.replace(/^\/api/, '') + url.search
@@ -292,7 +293,7 @@ it('a confirmed fix supersedes an already-pending same-page read with fresh firs
   fireEvent.click(nav().getByRole('button', { name: '첫 페이지 다시 확인' }))
   await waitFor(() => expect(reads()).toHaveLength(2))
   getReports = () => reply(feed(1, { basis: NEXT_BASIS, prefix: '저장 후 최신 원문' }))
-  await release(write, reply({ ok: true, id: `dec_${'a'.repeat(20)}` }))
+  await release(write, reply({ ok: true, id: `dec_${'a'.repeat(20)}`, reportId: 'r1', author: 'AX 담당자' }))
   await screen.findByText('저장 후 최신 원문 1')
   expect(reads()).toHaveLength(3)
   await release(oldRead, reply(feed()))

@@ -92,6 +92,22 @@ async function ordinary(a,n,{prefix='ordinary-',time=null,body=null}={}){
 const ids=result=>result.body.tools.flatMap(t=>t.reports).map(r=>r.id)
 
 describe.sequential('bounded report GET through signed scope and actual PostgreSQL',()=>{
+  it('adds a bounded original version without conflating a fix or feed change with the source',async()=>{
+    const a=await app();await log(a,'version-original')
+    await pg.query('UPDATE decision_log SET alternatives=$1 WHERE id=$2',['PRIVATE_SOURCE_ALTERNATIVES_SENTINEL','version-original'])
+    const first=await invoke(),original=first.body.tools[0].reports[0]
+    expect(first.status).toBe(200);expect(original.version).toMatch(/^[a-f0-9]{64}$/)
+    expect(JSON.stringify(first.body)).not.toContain('PRIVATE_SOURCE_ALTERNATIVES_SENTINEL')
+    const b=await app();await log(b,'unrelated-original','신고','hard_to_use')
+    await log(a,'version-fix','신고처리','version-original',at(900),'다른 처리 내용')
+    const changed=await invoke(),same=changed.body.tools.flatMap(t=>t.reports).find(r=>r.id==='version-original')
+    expect(changed.status).toBe(200);expect(changed.body.page.basis).not.toBe(first.body.page.basis)
+    expect(same.version).toBe(original.version);expect(same.fix.how).toBe('다른 처리 내용')
+    await pg.query('UPDATE decision_log SET alternatives=$1 WHERE id=$2',['UPDATED_PRIVATE_SOURCE_SENTINEL','version-original'])
+    const revised=await invoke(),latest=revised.body.tools.flatMap(t=>t.reports).find(r=>r.id==='version-original')
+    expect(revised.status).toBe(200);expect(latest.version).not.toBe(original.version)
+    expect(JSON.stringify(revised.body)).not.toContain('UPDATED_PRIVATE_SOURCE_SENTINEL')
+  })
   it('puts an old urgent report before 200 ordinary reports and agrees with whole tool trust',async()=>{
     const old=await app(),recent=await app()
     await log(old,'old-urgent');await ordinary(recent,200)

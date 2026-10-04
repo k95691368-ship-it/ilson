@@ -33,6 +33,9 @@ const healthFailureFixture = process.argv.includes('--health-failure-fixture')
 const agreementSaveFixture = Boolean(fixture) && process.argv.includes('--agreement-save-fixture')
 const feedbackRetryFixture = Boolean(fixture) && process.argv.includes('--feedback-retry-fixture')
 const reportFeedFixture = Boolean(fixture) && process.argv.includes('--report-feed-fixture')
+const reportFixFixture = Boolean(fixture) && process.argv.includes('--report-fix-fixture')
+let reportFixReplyLost = false
+let reportFixSourceChanged = false
 let reportPageChanged = false
 let reportRefreshPending = false
 let agreementWriteRejected = false
@@ -40,6 +43,12 @@ let agreementReadRejected = false
 let agreementReadPending = false
 const feedbackRepliesLost = new Set()
 let unclearReadPending = false
+if (reportFixFixture) {
+  await pg.exec(`INSERT INTO decision_log(id,application_id,stage,actor,title,what,why,link_kind,link_id,created_at) VALUES
+    ('c24-local-lost','app-local-verify','배포','human','가상 제보자','처리 응답이 끊긴 뒤 같은 의도로 확인하는 합성 신고입니다.','합성 재시도 검증','신고','wrong_number','2026-01-01 00:00:00'),
+    ('c24-local-source','app-local-verify','배포','human','가상 제보자','처리 폼을 연 뒤 원문이 바뀌는 합성 신고입니다.','합성 판본 검증','신고','other','2026-01-02 00:00:00'),
+    ('c24-local-valid','app-local-beta','제작','human','가상 제보자','도구 인계 전에도 처리할 수 있는 합성 신고입니다.','합성 호환 검증','신고','other','2026-01-03 00:00:00');`)
+}
 if (reportFeedFixture) {
   // Disposable, explicitly synthetic reports: originals must not share a page
   // budget with fixes, and reports without a handover must remain reachable.
@@ -114,6 +123,12 @@ globalThis.fetch = (url, options) => {
         buildReplyLost = true
         return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
       }
+      if (reportFixFixture && !reportFixReplyLost && name === 'ilson_actor_commit'
+        && result.rows[0].data?.response?.body?.reportId === 'c24-local-lost'
+        && result.rows[0].data?.response?.body?.ok === true) {
+        reportFixReplyLost = true
+        return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
+      }
       if (fixture?.loseReply(name, args, result.rows[0].data)) return Response.json({code:'LOCAL_LOST_REPLY'},{status:503})
       return Response.json(result.rows[0].data)
     } catch (error) { return Response.json({ code: error.code || 'LOCAL' }, { status: 400 }) }
@@ -144,6 +159,22 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
         const bindings = context.env
         // Reproduce Pages: next() gets original bindings and shared request data.
         context.next = async (forwarded = context.request) => {
+          if (reportFixFixture && url.pathname === '/api/reports') {
+            if (req.method === 'POST' && !reportFixSourceChanged) {
+              const input = await forwarded.clone().json().catch(() => null)
+              if (input?.reportId === 'c24-local-source') {
+                reportFixSourceChanged = true
+                const change = queue.then(() => pg.query('UPDATE decision_log SET what=$1 WHERE id=$2',
+                  ['새 근거로 바뀐 신고입니다. 이전 초안으로 처리하지 않아야 합니다.', 'c24-local-source']))
+                queue = change.catch(() => {})
+                await change
+              }
+            }
+            if (req.method === 'GET' && reportRefreshPending) {
+              reportRefreshPending = false
+              return Response.json({ error: '로컬 검증: 처리 저장 뒤 목록 조회가 실패했습니다.' }, { status: 503 })
+            }
+          }
           if (reportFeedFixture && url.pathname === '/api/reports') {
             if (req.method === 'GET' && url.searchParams.get('page') === '2' && !reportPageChanged) {
               // A concurrent synthetic edit invalidates the previously read
@@ -179,6 +210,10 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
           }
           const result = handler ? await handler({ ...context, request: forwarded, env: bindings }) : Response.json({ error: 'Method not allowed' }, { status: 405 })
           if (reportFeedFixture && url.pathname === '/api/reports' && req.method === 'POST' && result.ok) reportRefreshPending = true
+          if (reportFixFixture && url.pathname === '/api/reports' && req.method === 'POST' && result.ok) {
+            const saved = await result.clone().json()
+            if (saved.reportId === 'c24-local-lost') reportRefreshPending = true
+          }
           if (agreementSaveFixture && agreementPath && req.method === 'PATCH' && result.ok) agreementReadPending = true
           if (feedbackRetryFixture && req.method === 'POST' && /^\/api\/tools\/local-retry-tool\/(report|unclear)$/.test(url.pathname) && result.ok) {
             const saved = await result.clone().json()

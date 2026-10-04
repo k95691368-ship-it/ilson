@@ -30,7 +30,8 @@ function validFeed(value, number, basis) {
     let open = 0, fixed = 0, urgent = 0
     for (const report of tool.reports) {
       if (!report || typeof report.id !== 'string' || !report.id || originals.has(report.id) || typeof report.body !== 'string'
-        || typeof report.open !== 'boolean' || typeof report.urgent !== 'boolean') return false
+        || typeof report.open !== 'boolean' || typeof report.urgent !== 'boolean'
+        || typeof report.version !== 'string' || !/^[a-f0-9]{64}$/.test(report.version)) return false
       originals.add(report.id)
       if (report.open) { open += 1; if (report.urgent) urgent += 1 } else fixed += 1
       shown += 1

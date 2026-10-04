@@ -303,7 +303,7 @@ export default function ToolsPage() {
         {reports && !feed.error && <p>전체 미처리 {reports.summary.open}건 · 긴급 {reports.summary.urgent}건 · 처리 {reports.summary.fixed}건</p>}
         {reports && !feed.error && reports.summary.toolsUntrusted > 0 && <p className="card-note">긴급 미처리 신고가 있는 기능 {reports.summary.toolsUntrusted}개</p>}
         <ReportPagination feed={feed} />
-        {reports?.tools.map(t => <ReportTool key={`${feed.identity}:${reports.page.basis}:${reports.page.number}:${t.applicationId}`} tool={t} onFixed={feed.afterWrite} locked={feed.locked} />)}
+        {reports?.tools.map(t => <ReportTool key={`${feed.identity}:${reports.page.number}:${t.applicationId}`} tool={t} onFixed={feed.afterWrite} locked={feed.locked} />)}
       </section>
     </div>
   )
@@ -339,80 +339,127 @@ function ReportTool({ tool, onFixed, locked }) {
 
       <ul className="honest-list">
         {tool.reports.map((r) => (
-          <ReportItem key={r.id} report={r} onFixed={onFixed} locked={locked} />
+          <ReportItem key={r.id} report={r} recordPath={`/record/${encodeURIComponent(tool.ticket_no)}`} onFixed={onFixed} locked={locked} />
         ))}
       </ul>
     </article>
   )
 }
 
-function ReportItem({ report, onFixed, locked }) {
+function ReportItem({ report, recordPath, onFixed, locked }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ how: '', why: '', author: 'AX 담당자' })
   const [fieldErrors, setFieldErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const [source, setSource] = useState(null)
+  const [submitted, setSubmitted] = useState(false)
+  const [outcome, setOutcome] = useState(null)
+  const [receipt, setReceipt] = useState(null)
+  const intent = useRef(null)
   const pending = useRef(false)
-  const capture = useActionLifetime(report.id)
+  const sourceIdentity = JSON.stringify([report.id, report.version, report.open, report.fix])
+  const capture = useActionLifetime(sourceIdentity)
+  const captureForm = useActionLifetime(report.id)
+  const changed = source !== null && source.identity !== sourceIdentity
+  const historicalReceipt = receipt !== null && receipt.sourceVersion !== report.version
+  const visible = source?.report ?? report
+  const blocked = changed || ['conflict', 'denied'].includes(outcome?.kind)
+
+  function begin() {
+    if (pending.current || locked || receipt) return
+    if (!source) {
+      const session = getAccessSession()
+      if (session.status !== 'active' || accessBlocked(session)) return
+      // These are the exact report/version the operator starts reviewing. A
+      // later GET must never combine a new body with this draft's old version.
+      setSource({ identity: sourceIdentity, generation: session.generation, scope: session.scope, recordPath,
+        report: Object.freeze({ id: report.id, version: report.version, body: report.body, label: report.label,
+          reporter: report.reporter, at: report.at, urgent: report.urgent, open: report.open }) })
+    }
+    setOpen(true)
+  }
 
   async function send(e) {
     e.preventDefault()
-    if (pending.current || locked) return
-    const viewCurrent = capture(), generation = getAccessSession().generation
-    const current = () => viewCurrent() && getAccessSession().generation === generation && !accessBlocked(getAccessSession())
+    if (pending.current || locked || !source || !open || blocked || receipt) return
+    const viewCurrent = capture(), formCurrent = captureForm()
+    const sameSession = () => getAccessSession().generation === source.generation
+      && getAccessSession().scope === source.scope && !accessBlocked(getAccessSession())
+    const current = () => viewCurrent() && sameSession()
     if (!current()) return
     pending.current = true
     setSaving(true)
     setFieldErrors({})
+    let attempt = intent.current, confirmed = false
     try {
-      await api.post('/reports', { ...form, reportId: report.id }, {
-        validateResponse: value => value?.ok === true && typeof value.id === 'string' && /^dec_[a-f0-9]{20}$/.test(value.id),
+      if (!attempt) {
+        attempt = { key: crypto.randomUUID(), uncertain: false, body: Object.freeze({
+          reportId: source.report.id, expectedVersion: source.report.version, how: form.how, why: form.why, author: form.author,
+        }) }
+        intent.current = attempt
+        setSubmitted(true)
+      }
+      const saved = await api.post('/reports', attempt.body, {
+        idempotencyKey: attempt.key,
+        validateResponse: value => value?.ok === true && typeof value.id === 'string' && /^dec_[a-f0-9]{20}$/.test(value.id)
+          && value.reportId === source.report.id && typeof value.author === 'string' && value.author.trim().length > 0,
       })
       if (!current()) return
+      setReceipt({ ...saved, sourceVersion: source.report.version })
+      intent.current = null
+      setSubmitted(false)
+      setSource(null)
+      setOutcome(null)
+      confirmed = true
       toast.success('처리한 것을 남겼습니다.')
       setOpen(false)
     } catch (err) {
       if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
-      toast.error(!err.status || err.status >= 500 ? '처리 결과를 확인하지 못했습니다. 입력은 유지했습니다. 목록을 다시 확인해주세요.' : err.message)
-      return
+      const safeCorrection = err.status === 400 && err.notSaved === true && !attempt?.uncertain
+      if (safeCorrection) { intent.current = null; setSubmitted(false) }
+      else if (attempt && (!err.status || err.status >= 500 || err.status === 400)) attempt.uncertain = true
+      const message = !attempt ? '저장 요청 번호를 만들지 못했습니다. 다시 시도해주세요.'
+        : !err.status || err.status >= 500 ? '처리 결과를 확인하지 못했습니다. 입력은 유지했습니다. 같은 내용으로 저장을 다시 확인하거나 현재 기록을 확인해주세요.' : err.message
+      setOutcome({ kind: err.status === 409 ? 'conflict' : [401, 403, 404, 410].includes(err.status) ? 'denied' : 'retry', message })
+      toast.error(message)
     } finally {
       pending.current = false
-      if (current()) setSaving(false)
+      // A changed report may end its spinner, but may not accept the old write's
+      // success, close the draft, or start another feed request.
+      if (formCurrent() && sameSession()) setSaving(false)
     }
-    if (current()) await onFixed()
+    if (confirmed && current()) await onFixed()
   }
 
   return (
-    <li className={`report-item${report.open ? ' open' : ''}${report.urgent ? ' urgent' : ''}`}>
+    <li className={`report-item${visible.open ? ' open' : ''}${visible.urgent ? ' urgent' : ''}`}>
       <div className="row" style={{ marginBottom: 4 }}>
-        <span className={`badge ${report.urgent ? 'badge-danger' : 'badge-warning'}`}>
-          {report.label}
+        <span className={`badge ${visible.urgent ? 'badge-danger' : 'badge-warning'}`}>
+          {visible.label}
         </span>
-        {!report.open && <span className="badge badge-success">고쳤습니다</span>}
+        {!visible.open && <span className="badge badge-success">고쳤습니다</span>}
         <span className="spacer" />
         <span className="card-note">
-          {report.reporter} · {ago(report.at)}
+          {visible.reporter} · {ago(visible.at)}
         </span>
       </div>
-      <div className="thread-body">{report.body}</div>
+      <div className="thread-body">{visible.body}</div>
+      {source && <p className="card-note">작성 시작 당시의 신고입니다. 초안과 재시도 정보는 이 화면에 머무르는 동안만 보관됩니다.</p>}
+      {changed && <p role="alert" className="notice notice-warn">작성 중인 신고 기록이 바뀌었습니다. 초안은 유지했습니다. 현재 기록을 확인해주세요.</p>}
+      {outcome && <p role="alert" className="notice notice-warn">{outcome.message}</p>}
+      {historicalReceipt && <p className="card-note">저장 확인 이후 신고 원문이 바뀌었습니다. 현재 기록을 확인해주세요.</p>}
+      {(changed || outcome || submitted || historicalReceipt) && <Link to={source?.recordPath ?? recordPath} target="_blank" rel="noopener noreferrer" className="card-note">현재 기록 보기 (새 탭)</Link>}
 
-      {report.fix ? (
-        <div className="report-fix">
-          <div>
-            <strong>고친 것</strong> {report.fix.how}
-          </div>
-          <div style={{ marginTop: 4 }}>
-            {/* 원인이 남아야 다음에 같은 것을 또 안 겪는다. */}
-            <strong>왜 그랬나</strong> {report.fix.why}
-          </div>
-        </div>
-      ) : open ? (
+      {receipt ? <p role="status">{historicalReceipt ? '이전 판본의 처리 기록 저장 확인' : '처리 기록 저장 확인'} · {receipt.author}</p> : open ? (
         <form className="thread-form" onSubmit={send}>
           <fieldset disabled={saving || locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <Field label="무엇을 하셨습니까" required error={fieldErrors.how}>
             <textarea
               rows={2}
+              maxLength={2000}
+              disabled={submitted || blocked}
               value={form.how}
               onChange={(e) => setForm((f) => ({ ...f, how: e.target.value }))}
               placeholder="할인액 컬럼 이름이 바뀐 것을 못 잡고 있었습니다. 컬럼이 사라지면 막도록 고쳤습니다."
@@ -421,30 +468,37 @@ function ReportItem({ report, onFixed, locked }) {
           <Field label="왜 그랬던 것입니까" required error={fieldErrors.why}>
             <textarea
               rows={2}
+              maxLength={2000}
+              disabled={submitted || blocked}
               value={form.why}
               onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
               placeholder="필수 컬럼이 아니어서 없어도 넘어가게 해 뒀습니다. 금액에 들어가는 컬럼은 없으면 막아야 합니다."
             />
           </Field>
           <div className="row">
-            <button type="submit" className="btn-primary btn-sm" disabled={saving}>
-              {saving ? '남기는 중…' : '처리했다고 남기기'}
+            <button type="submit" className="btn-primary btn-sm" disabled={saving || blocked}>
+              {saving ? '남기는 중…' : submitted ? '같은 내용으로 저장 확인' : '처리했다고 남기기'}
             </button>
             <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
-              그만두기
+              닫기
             </button>
           </div>
           </fieldset>
         </form>
+      ) : report.fix && !changed ? (
+        <div className="report-fix">
+          <div><strong>고친 것</strong> {report.fix.how}</div>
+          <div style={{ marginTop: 4 }}><strong>왜 그랬나</strong> {report.fix.why}</div>
+        </div>
       ) : (
         <button
           type="button"
           className="btn-ghost btn-sm"
           style={{ marginTop: 8 }}
           disabled={locked}
-          onClick={() => setOpen(true)}
+          onClick={begin}
         >
-          처리했다고 남기기
+          {source ? '작성 중인 처리 내용 보기' : '처리했다고 남기기'}
         </button>
       )}
     </li>

@@ -5,6 +5,7 @@ import { onRequestGet } from '../functions/api/reports.js'
 const url=query=>new Request('https://local.invalid/api/reports'+query)
 const count=(extra={})=>({application_id:'a',total:1,open:1,urgent:1,fixed:0,digest:'a'.repeat(32),...extra})
 const row=(extra={})=>({id:'r',application_id:'a',title:'직원',what:'다른 숫자입니다.',why:'확인한 제보',link_kind:'신고',link_id:'wrong_number',created_at:'2026-10-01 00:00:00',
+  stage:'배포',actor:'human',alternatives:null,unrequested:0,
   ticket_no:'IL-1',dept:'Finance',slug:null,tool_title:null,handed_to_dept:null,fix_id:null,fix_application_id:null,fix_how:null,fix_why:null,fix_at:null,open_rank:1,urgent_rank:1,...extra})
 const payload=()=>({counts:[count()],rows:[row()]})
 const adapter=value=>{const all=vi.fn(async()=>({success:true,results:[value],meta:{changes:1,row_count:1}})),DB={provider:'supabase',toolRunScope:async()=>'1'.repeat(64),prepare:vi.fn(()=>({bind:vi.fn(()=>({all}))}))};return{DB,all}}
@@ -39,7 +40,7 @@ describe('typed PG report result boundary',()=>{
   it.each([{total:0},{open:2},{urgent:2},{fixed:1},{digest:'wrong'},{application_id:''}])('rejects inconsistent count %j',changes=>{
     expect(()=>decodeReportFeedPayload({counts:[count(changes)],rows:[row()]})).toThrow()
   })
-  it.each([{id:0},{application_id:'different'},{what:null},{link_kind:'신고처리'},{open_rank:2},{urgent_rank:0},
+  it.each([{id:0},{application_id:'different'},{what:null},{stage:undefined},{actor:undefined},{alternatives:[]},{unrequested:null},{link_kind:'신고처리'},{open_rank:2},{urgent_rank:0},
     {slug:undefined},{fix_id:'f'},{fix_id:'f',fix_application_id:'other',fix_how:'처리',fix_why:'근거',fix_at:'2026',open_rank:0},
     {fix_how:'있지만ID없음'}])('rejects malformed or cross-app row %j',changes=>{
     expect(()=>decodeReportFeedPayload({counts:[count()],rows:[row(changes)]})).toThrow()

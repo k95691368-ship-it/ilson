@@ -11,7 +11,7 @@ const BASE = '/api'
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue | undefined }
 export type FieldErrors = Record<string, string>
 export type ReadOptions = { signal?: AbortSignal }
-export type MutationOptions = { validateResponse?: (value: unknown) => boolean }
+export type MutationOptions = { validateResponse?: (value: unknown) => boolean; idempotencyKey?: string }
 export type FormOptions = { confirmedNewIntent?: boolean }
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type RequestOptions = Omit<RequestInit, 'method'> & {
@@ -20,6 +20,7 @@ type RequestOptions = Omit<RequestInit, 'method'> & {
   sessionGeneration?: number
   confirmedNewIntent?: boolean
   validateResponse?: (value: unknown) => boolean
+  idempotencyKey?: string
 }
 type WorkspaceState = { enabled: boolean; active?: boolean; expired?: boolean; expiresAt?: string; reset?: boolean }
 type AccessSnapshot = { generation: number; status: string; scope: string | null; error: string }
@@ -155,6 +156,11 @@ function textFormSnapshot(body: FormData): { body: FormData; identity: string } 
 
 async function send(path: string, options: RequestOptions = {}): Promise<unknown> {
   const validateResponse = options.validateResponse
+  const explicitKey = options.idempotencyKey
+  if (explicitKey !== undefined && (typeof explicitKey !== 'string' || explicitKey.length !== 36
+    || !/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(explicitKey))) {
+    throw new ApiError('저장 요청 번호의 형식을 확인해주세요.', { status: 400, code: 'MUTATION_KEY_INVALID', notSaved: true })
+  }
   const access: AccessSnapshot = getAccessSession()
   const generation = options.sessionGeneration ?? access.generation
   const sessionProbe = options.sessionProbe === true && path === '/session' && !options.method
@@ -167,7 +173,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
   let res: Response
   const application = path === '/applications' && options.method === 'POST' && options.body instanceof FormData
   let identity: string | null = null
-  let key: string | undefined
+  let key: string | undefined = explicitKey
   const recoverReceipt = async () => {
     if (!application || !key || !identity) return null
     try {
@@ -180,7 +186,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
       throw error
     }
   }
-  if (application || (options.method && options.method !== 'GET' && typeof options.body === 'string')) {
+  if (application || (explicitKey === undefined && options.method && options.method !== 'GET' && typeof options.body === 'string')) {
     // Capture FormData synchronously: callers can edit their form during hashing.
     let input = typeof options.body === 'string' ? options.body : ''
     if (application) {
@@ -226,7 +232,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
     if (!sessionProbe) headers.set('X-Ilson-Scope', String(access.scope))
     else headers.delete('X-Ilson-Scope')
     if (key) headers.set('X-Idempotency-Key', key)
-    const { sessionProbe: _probe, sessionGeneration: _generation, confirmedNewIntent: _confirmed, validateResponse: _validate, ...requestOptions } = options
+    const { sessionProbe: _probe, sessionGeneration: _generation, confirmedNewIntent: _confirmed, validateResponse: _validate, idempotencyKey: _key, ...requestOptions } = options
     options = { ...requestOptions, headers, credentials: 'same-origin', cache: 'no-store' }
     // 미리 띄워 둔 것이 있으면 그것을 쓴다. 그것이 실패했으면 null 이 오고,
     // 그때는 아무 일 없었던 것처럼 지금 부른다.
@@ -321,7 +327,7 @@ function withJson(method: HttpMethod, body?: JsonValue): RequestOptions {
 export const api = {
   // Success JSON deliberately remains unknown until a consuming boundary validates it.
   get: (path: string, { signal }: ReadOptions = {}): Promise<unknown> => send(path, { signal }),
-  post: (path: string, body?: JsonValue, { validateResponse }: MutationOptions = {}): Promise<unknown> => send(path, { ...withJson('POST', body), validateResponse }),
+  post: (path: string, body?: JsonValue, { validateResponse, idempotencyKey }: MutationOptions = {}): Promise<unknown> => send(path, { ...withJson('POST', body), validateResponse, idempotencyKey }),
   put: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('PUT', body)),
   patch: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('PATCH', body)),
   remove: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('DELETE', body)),

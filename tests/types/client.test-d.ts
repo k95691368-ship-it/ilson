@@ -12,6 +12,8 @@ export type SuccessJsonRemainsUnknown = Assert<Equal<Awaited<ReturnType<typeof a
 export type MutationJsonRemainsUnknown = Assert<Equal<Awaited<ReturnType<typeof api.post>>, unknown>>
 export type MutationDecoderReceivesUnknown = Assert<Equal<Parameters<NonNullable<MutationOptions['validateResponse']>>[0], unknown>>
 export type MutationDecoderIsSynchronous = Assert<Equal<ReturnType<NonNullable<MutationOptions['validateResponse']>>, boolean>>
+export type MutationIntentKeyIsOptionalText = Assert<Equal<MutationOptions['idempotencyKey'], string | undefined>>
+export type MutationIntentKeyExcludesNumbers = Assert<Equal<number extends MutationOptions['idempotencyKey'] ? true : false, false>>
 export type DecoderAcceptsUnknown = Assert<Equal<Parameters<typeof readHandoverEvidence>[0], unknown>>
 export type DecoderChecksNumericLimits = Assert<Equal<NonNullable<ReturnType<typeof readHandoverEvidence>['handover']>['daily_limit'], number>>
 export type JsonBodyExcludesFunctions = Assert<Equal<(() => void) extends JsonValue ? true : false, false>>

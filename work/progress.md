@@ -1,5 +1,27 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 시간 제한 자율 개선 — 회차 11 구현·실제 화면 검증
+
+22:49 KST 최종 npm test가 exit0으로 종료되어 **209파일4,006개(일반208파일4,000+규모6)**를 확인했다. 마지막 동결 backend를 포함한 build·typecheck와 재실행 lint도 통과했다. 결과 회수 누락을 성공으로 추정하지 않고 전체 명령의 종료까지 다시 확인했다. 독립 최종 검토와 CLI·운영 반영이 남았다.
+
+22:52 KST 독립 최종 읽기 검토에서 GET/POST 동일 판본, actor/app/source/처리 존재 CAS, prior/commit replay의 현재 근거 확인, UI intent/수명/확정응답 보호에 새로운 P1/P2 릴리스 차단 증거는 없었다. 알려진 수명·ABA·snapshot 한계는 유지한다. 검증한 C24 18파일만 CLI 커밋·푸시 대상으로 선택하며 기존 public/og.png는 제외한다. 운영 확인 전까지 배포 성공으로 적지 않는다.
+
+22:47 KST C24 소스를 동결했다. 원신고 12필드의 서버 SHA-256 판본과 현재 actor·신청서·same-app 처리 존재 읽기를 기존 원자 mutation/receipt에 연결했다. 같은 의도의 응답 유실·겹친 처리에는 한 처리 기록만 남고, 읽은 근거·권한이 변경되면 명시적으로 거절한다. 실계정 작성자는 현재 서버 계정이며 체험만 가상 label을 허용한다. 잘못된 타입·저장 불가능 문자·2,000자 초과를 조용히 잘라 저장하지 않는다. 신규 DB/RPC/ACL/Auth·구매 AX·원문 사본 전송은 없다.
+
+최초 실패 재현을 포함한 typed command 80개·실제 signed middleware/현행 migrations의 격리 PG 57개·actual client/access UI 22개를 검증했다. 추가 독립 인수에서 invalid AUTH_ACTOR 세 문맥이 체험 저장으로 진행하는 방어 누락을 확인해 기존 toolFeedback와 같은 fail-closed 조건으로 수정했고 세 경우 조회·receipt·commit 0회다. 운영 middleware에서 현재 재현된 계정 우회라고 확대하지 않는다. 과거 receipt는 원문 판본 변경 후 현재 확인으로 표시하지 않으며, UI에서도 이전 판본의 저장 확인으로 분리한다.
+
+실제 IAB·외부 연결 없는 메모리 PG에서 처리 저장 commit 후 응답503 → 입력/같은 의도 보존 → 재확인200 → 목록GET503을 재현했다. 저장 확인과 목록 미확인을 분리하고 GET만 복구해 처리1/미처리2를 확인했다. 원문 변경409는 최초 원문·초안·잠금을 유지하며, 새 탭 현재 기록에서 바뀐 원문과 기존 처리 한 건을 확인했다. 인계 전 신고도 처리되어 최종 처리2/미처리1이다. 1440×1000/360×800 문서폭1425/345px, 가로 넘침0·textarea 최대2000/잠금/초안 보존을 확인했다. 캡처는 .tmpcheck/cycle11-*.png이며 이번 탭5/6·viewport·5188 시험 서버만 정리했다. 기존 탭·OG는 보존한다.
+
+lint/typecheck·137모듈/Worker build·시험 script syntax/diff check를 통과했다. 일반208파일4,000검사 통과 뒤 마지막 실행 결과 회수가 끊겨 종료 성공을 추정하지 않고 전체 명령을 다시 실행 중이다. 최종 전체 결과·CLI 반영·운영 검증은 아직 남았다. 합성 개선은 같은 의도 중복2→1, 초안 손실 방지·저장/조회 오해 방지·근거 변경 차단이다. 직원 시간·운영 빈도·다중 PostgreSQL 연결 부하는 미측정이다. 현재 판본의 상태 비교는 변경 후 원상 복귀(ABA)나 전 변경 이력의 증명이 아니며, 7일 receipt/현재 화면 수명을 넘어 영구 exactly-once·페이지 이동 후 초안 복구를 보장하지 않는다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 11 시작
+
+22:31 KST C22/C23의 CLI푸시285807cec9dafb14145012a287e427f8fc5da9a8·[CI37205721262](https://github.com/k95691368-ship-it/ilson/actions/runs/37205721262) success·Git연결Production12d26120-784e-4bec-b684-6269a906638b source285807c를 확인했다. 주주소47개SHA256·Git원본OG·health200/ready:true/workspace200/active:false/session·override428 actualJSON/no-store가 일치했다. 최초 전파 중 Agreement asset은 불일치로 실패했고, 해당asset의 실제내용·hash가 주주소와배포주소 모두 동일해진 변경근거를 확인한 뒤 전체검증을 통과했다. 직접중복배포/운영DB/ACL/공유Auth/구매AX변경0·기존OG유지다.
+
+C24는 기존 신고 처리의 필수P2 근거/재시도 경계로 채택한다. 담당자는 같은신고를처리할때 중복fix/불확실응답/원문판본변경을 수동 추측할 필요가 없어야 한다. actualsigned PG interleaving은 두처리200/fix2, commit응답유실503→같은key409/receipt0, 원문/역할 읽기후변경에도200, object문자화/2000자조용한절단을 확인했다. 이미 inactive/접근회수/서버작성자귀속은 막혀있으므로 전체권한우회로 주장하지 않는다. 더단순한대안은 기존 atomicMutation/receipt·현재actor/app/sameapp 처리존재 CAS를 재사용하는 것이다. 새테이블/RPC/ACL/신고서비스/별도승인/영구초안·전역feed잠금은 제외한다.
+
+GET에는 명시원신고12필드의서버SHA256 version만추가하고 POSTexpectedVersion은 담당자가본판본으로고정한다. 원문재전송/판본원문복사없이4xx에서명시거절한다. feed전체basis는 무관한신고/자기처리에도바뀌므로 명령판본으로쓰지않는다. 처리존재검사는sameapp이고receipt재생뒤action안에둔다. 과거receipt는보관하되 replay반환전 현재권한/visibility/appbinding/sourceversion을읽어 바뀐근거를현재성공처럼보이지않게하는 보수적안을선택한다. 이조회가 DB단일snapshot/과거저장취소/영구exactlyonce는아니다. UI는open원신고/최초body/key를현재화면수명동안고정하고 pending잠금·2000자·409확인/초안유지·확정POST뒤GET실패분리를보존한다. 기존client의30분자동키/<500정리규칙을전역변경하지않고 이caller만 명시UUID옵션을사용한다. actualPG/typedcommand/client/UI·1440/360·전체gate·CLI검증후만반영한다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 10 화면·검증 교정
 
 22:28 KST 최종 동결 소스의 전체 검사 **206파일3,834개(일반205파일3,828+규모6)** 통과를 확인했다. build를 먼저 완료한 뒤 test를 실행해 deployArtifact suite도 정상 통과했다. lint/typecheck/137모듈/Worker build·격리 시험 script syntax/lint·diff check가 완료됐고 CLI 커밋·푸시/운영검증이 남았다.

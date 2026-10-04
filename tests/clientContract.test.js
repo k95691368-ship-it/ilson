@@ -3,7 +3,7 @@ import { api, ApiError, readWorkspace } from '../src/api/client.ts'
 import { beginAccessCheck, completeAccessCheck, getAccessSession } from '../src/lib/accessSession.js'
 
 beforeEach(() => completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'demo', scope: 'a'.repeat(64) }))
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks() })
 
 describe('API JSON boundary normalization', () => {
   it('retains valid per-field messages without treating arbitrary field JSON as display text', () => {
@@ -35,5 +35,45 @@ describe('API JSON boundary normalization', () => {
     await expect(api.post('/contract-only', { reason: 'same body' })).rejects.toMatchObject({ status: 502 })
     await expect(api.post('/contract-only', { reason: 'same body' })).rejects.toMatchObject({ status: 502 })
     expect(keys[1]).toBe(keys[0])
+  })
+
+  it('keeps a caller-owned UUID across 409, 429, malformed success and more than 30 minutes', async () => {
+    const idempotencyKey = '11111111-1111-4111-8111-111111111111', calls = []
+    let time = 100000, status = 409
+    vi.spyOn(Date, 'now').mockImplementation(() => time)
+    vi.stubGlobal('fetch', vi.fn(async (_url, options) => {
+      calls.push(options)
+      return Response.json(status === 200 ? {} : { error: 'uncertain result' }, { status })
+    }))
+    const options = { idempotencyKey, validateResponse: value => value?.ok === true }
+    for (const next of [409,429,200]) {
+      status = next
+      await expect(api.post('/contract-explicit', { reason: 'same body' }, options)).rejects.toBeInstanceOf(ApiError)
+      time += 31 * 60000
+    }
+    expect(calls.map(call => call.headers.get('X-Idempotency-Key'))).toEqual([idempotencyKey,idempotencyKey,idempotencyKey])
+    expect(calls.every(call => !Object.hasOwn(call, 'idempotencyKey') && !Object.hasOwn(call, 'validateResponse'))).toBe(true)
+    expect(calls.every(call => call.headers.get('X-Ilson-Scope') === 'a'.repeat(64))).toBe(true)
+  })
+
+  it.each(['', 'not-a-uuid', null, 42, {}, '11111111-1111-4111-8111-111111111111\n'])('rejects an invalid explicit key before fetch: %j', async idempotencyKey => {
+    const fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    await expect(api.post('/contract-explicit', {}, { idempotencyKey })).rejects.toMatchObject({ status: 400, notSaved: true })
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('does not change automatic callers when explicit keys are used for the same body', async () => {
+    const keys = [], idempotencyKey = '22222222-2222-4222-8222-222222222222'
+    vi.stubGlobal('fetch', vi.fn(async (_url, options) => {
+      keys.push(options.headers.get('X-Idempotency-Key'))
+      return Response.json({ error: 'retry' }, { status: 503 })
+    }))
+    await expect(api.post('/contract-mixed', { a: 1 })).rejects.toMatchObject({ status: 503 })
+    await expect(api.post('/contract-mixed', { a: 1 }, { idempotencyKey })).rejects.toMatchObject({ status: 503 })
+    await expect(api.post('/contract-mixed', { a: 1 })).rejects.toMatchObject({ status: 503 })
+    expect(keys[1]).toBe(idempotencyKey)
+    expect(keys[2]).toBe(keys[0])
+    expect(keys[0]).not.toBe(idempotencyKey)
   })
 })

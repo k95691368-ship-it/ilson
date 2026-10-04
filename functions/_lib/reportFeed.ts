@@ -34,7 +34,7 @@ const REPORT_FEED_SQL = `WITH latest_fix AS (
   FROM decision_log WHERE link_kind='신고처리'
   ORDER BY application_id,link_id,created_at COLLATE "C" DESC,id COLLATE "C" DESC
 ), report_state AS (
-  SELECT r.id,r.application_id,r.title,r.what,r.why,r.link_kind,r.link_id,r.created_at,
+  SELECT r.id,r.application_id,r.stage,r.actor,r.title,r.what,r.why,r.alternatives,r.unrequested,r.link_kind,r.link_id,r.created_at,
     a.ticket_no,a.dept,h.slug,h.title AS tool_title,h.handed_to_dept,
     f.id AS fix_id,f.application_id AS fix_application_id,f.what AS fix_how,f.why AS fix_why,f.created_at AS fix_at,
     CASE WHEN f.id IS NULL THEN 1 ELSE 0 END AS open_rank,
@@ -55,7 +55,7 @@ const REPORT_FEED_SQL = `WITH latest_fix AS (
     SUM(1-open_rank) AS fixed,md5(string_agg(evidence_digest,'' ORDER BY id COLLATE "C")) AS digest
   FROM report_state GROUP BY application_id
 ), bounded AS (
-  SELECT id,application_id,title,what,why,link_kind,link_id,created_at,ticket_no,dept,slug,tool_title,handed_to_dept,
+  SELECT id,application_id,stage,actor,title,what,why,alternatives,unrequested,link_kind,link_id,created_at,ticket_no,dept,slug,tool_title,handed_to_dept,
     fix_id,fix_application_id,fix_how,fix_why,fix_at,open_rank,urgent_rank
   FROM report_state ORDER BY open_rank DESC,urgent_rank DESC,created_at COLLATE "C" ASC,id COLLATE "C" ASC
   LIMIT 100 OFFSET ?
@@ -67,7 +67,8 @@ SELECT jsonb_build_object(
 
 interface FeedCount { application_id: string; total: number; open: number; urgent: number; fixed: number; digest: string }
 export interface FeedRow extends SqlRow {
-  id: string; application_id: string; title: string; what: string; why: string; link_kind: '신고'; link_id: string | null;
+  id: string; application_id: string; stage: string; actor: string; title: string; what: string; why: string;
+  alternatives: string | null; unrequested: 0 | 1; link_kind: '신고'; link_id: string | null;
   created_at: string; ticket_no: string; dept: string; slug: string | null; tool_title: string | null; handed_to_dept: string | null;
   fix_id: string | null; fix_application_id: string | null; fix_how: string | null; fix_why: string | null; fix_at: string | null;
   open_rank: 0 | 1; urgent_rank: 0 | 1
@@ -96,8 +97,9 @@ export function decodeReportFeedPayload(value: unknown): { rows: FeedRow[]; coun
   const rows: FeedRow[] = [], seenRows = new Set<string>()
   const pageCounts = new Map<string,{ total:number; open:number; urgent:number; fixed:number }>()
   for (const r of value.rows) {
-    if (!record(r) || !['id','application_id','title','what','why','created_at','ticket_no','dept'].every(key => typeof r[key] === 'string')
+    if (!record(r) || !['id','application_id','stage','actor','title','what','why','created_at','ticket_no','dept'].every(key => typeof r[key] === 'string')
       || !r.id || !seenApps.has(r.application_id as string) || seenRows.has(r.id as string) || r.link_kind !== '신고'
+      || !nullableString(r.alternatives) || (r.unrequested !== 0 && r.unrequested !== 1)
       || !['link_id','slug','tool_title','handed_to_dept','fix_id','fix_application_id','fix_how','fix_why','fix_at'].every(key=>nullableString(r[key]))
       || (r.open_rank !== 0 && r.open_rank !== 1) || (r.urgent_rank !== 0 && r.urgent_rank !== 1)) throw Error('Invalid report row')
     const hasFix = r.fix_id !== null
