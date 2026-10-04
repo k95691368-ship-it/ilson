@@ -6,7 +6,7 @@ import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import ToolPage from '../src/pages/ToolPage.jsx'
 import { forgetToolRun, keepToolRun, pendingToolRun } from '../src/lib/pendingToolRuns.js'
 
-const state = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), pipeline: vi.fn(), readFiles: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn(), remaining: 3, loadError: null, runScope: 'scope-a', rolledBack: false }))
+const state = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn(), pipeline: vi.fn(), readFiles: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn(), remaining: 3, maxFileMb: 10, loadError: null, runScope: 'scope-a', rolledBack: false }))
 vi.mock('../src/api/client.ts', () => ({ api: { post: state.post, get: state.get } }))
 vi.mock('../src/context/ToastContext.jsx', () => ({ useToast: () => ({ success: state.success, error: state.error }) }))
 vi.mock('../src/lib/readFiles.js', () => ({ readLocalFiles: state.readFiles }))
@@ -14,7 +14,7 @@ vi.mock('../shared/pipeline.js', async original => ({ ...await original(), runPi
 vi.mock('../src/hooks/useApi.js', () => ({ useApi: path => ({ data: ['/tools/tool-local', '/tools/other-tool'].includes(path) ? {
   slug: path.split('/').at(-1), ticket: 'APP-LOCAL', title: path.endsWith('other-tool') ? '다른 정산 도구' : '가상 정산 도구', handedTo: { dept: '재무', person: '가상 담당자' },
   runScope: state.runScope, rolledBack: state.rolledBack, message: state.rolledBack ? '이 도구는 잠시 내려가 있습니다.' : undefined,
-  limits: { remainingToday: state.remaining, dailyLimit: 3, maxFileMb: 10 }, recent: [], reports: [], taught: [], aliases: {},
+  limits: { remainingToday: state.remaining, dailyLimit: 3, maxFileMb: state.maxFileMb }, recent: [], reports: [], taught: [], aliases: {},
 } : null, loading: false, error: state.loadError, reload: state.reload }) }))
 
 beforeEach(() => {
@@ -22,6 +22,7 @@ beforeEach(() => {
   clearPending()
   window.localStorage.clear()
   state.remaining = 3
+  state.maxFileMb = 10
   state.loadError = null
   state.runScope = 'scope-a'
   state.rolledBack = false
@@ -51,6 +52,53 @@ function startRun() {
 }
 
 describe('도구 계산과 실행 기록의 실패 구분', () => {
+  it.each(['picker', 'drop'])('6개 파일 %s 선택은 읽기·계산·실패 실행 저장 전에 거절한다', async mode => {
+    const view = renderTool()
+    const files = Array.from({ length: 6 }, (_, i) => new File(['x'], `synthetic-${i}.csv`))
+    if (mode === 'drop') fireEvent.drop(view.container.querySelector('.dropzone'), { dataTransfer: { files } })
+    else fireEvent.change(view.container.querySelector('input[type="file"]'), { target: { files } })
+    await act(async () => {})
+    expect(state.error).toHaveBeenCalledWith(expect.stringContaining('5개'))
+    expect(state.readFiles).not.toHaveBeenCalled()
+    expect(state.pipeline).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+    expect(pendingToolRun(state.runScope, 'tool-local')).toBeNull()
+  })
+  it('정확히5개 파일은 기존 계산·기록 경로로 한 번만 처리한다', async () => {
+    const view = renderTool()
+    const files = Array.from({ length: 5 }, (_, i) => new File(['x'], `synthetic-${i}.csv`))
+    fireEvent.change(view.container.querySelector('input[type="file"]'), { target: { files } })
+    await waitFor(() => expect(state.post).toHaveBeenCalledTimes(1))
+    expect(state.readFiles).toHaveBeenCalledWith(files)
+    expect(state.pipeline).toHaveBeenCalledTimes(1)
+    expect(state.post.mock.calls[0][1].ok).toBe(true)
+  })
+  it('선택 거절 뒤에는 새 정상 파일을 처리할 수 있고 거절 기록을 저장하지 않는다', async () => {
+    const view = renderTool()
+    const input = view.container.querySelector('input[type="file"]')
+    const excess = Array.from({ length: 6 }, (_, i) => new File(['x'], `synthetic-${i}.csv`))
+    fireEvent.change(input, { target: { files: excess } })
+    expect(state.post).not.toHaveBeenCalled()
+    const valid = [new File(['x'], 'valid.csv')]
+    fireEvent.change(input, { target: { files: valid } })
+    await waitFor(() => expect(state.post).toHaveBeenCalledTimes(1))
+    expect(state.readFiles).toHaveBeenCalledTimes(1)
+    expect(state.readFiles).toHaveBeenCalledWith(valid)
+    expect(state.pipeline).toHaveBeenCalledTimes(1)
+    expect(state.post.mock.calls[0][1].ok).toBe(true)
+  })
+  it.each([1, 20])('도구 한도%sMB에서도 뒤의 초과 파일은 읽기·계산·실패 저장 전에 거절한다', async limit => {
+    state.maxFileMb = limit
+    const view = renderTool()
+    const large = new File(['x'], 'large.csv')
+    Object.defineProperty(large, 'size', { value: Math.min(limit, 10) * 1024 * 1024 + 1 })
+    fireEvent.change(view.container.querySelector('input[type="file"]'), { target: { files: [new File(['x'], 'small.csv'), large] } })
+    await act(async () => {})
+    expect(state.error).toHaveBeenCalledWith(expect.stringContaining('large.csv'))
+    expect(state.readFiles).not.toHaveBeenCalled()
+    expect(state.pipeline).not.toHaveBeenCalled()
+    expect(state.post).not.toHaveBeenCalled()
+  })
   it('실제 내려받기 버튼은 전체 원본 지문을 내보내고 원본 셀·지문을 실행 요약 API로 보내지 않는다', async () => {
     const hash = 'a'.repeat(64)
     state.pipeline.mockResolvedValueOnce({

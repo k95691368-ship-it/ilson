@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { readLocalFiles } from '../lib/readFiles.js'
+import { LOCAL_FILE_LIMITS } from '../../shared/fileLimits.js'
 import { Link, useParams } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
@@ -142,7 +143,10 @@ function ToolSession({ slug, data, error, loading, reload }) {
     if (picked.length === 0) return
 
     // 걸리는 것을 한꺼번에 짚어 준다. 하나만 말하면 고치고 나서 또 걸린다.
-    const problems = checkFiles(picked, { maxFileMb: data.limits.maxFileMb, maxFiles: 200 })
+    const problems = checkFiles(picked, {
+      maxFileMb: Math.min(data.limits.maxFileMb ?? LOCAL_FILE_LIMITS.maxFileMb, LOCAL_FILE_LIMITS.maxFileMb),
+      maxFiles: LOCAL_FILE_LIMITS.maxFiles,
+    })
     if (problems.length > 0) {
       toast.error(problems.join(' '))
       return
@@ -751,7 +755,7 @@ function Quota({ limits }) {
           최근 {limits.windowHours ?? 24}시간의 성공 실행 한도 <strong>{state.remaining}</strong> /{' '}
           {state.limit}회 남았습니다
         </span>
-        <span>파일 하나당 {limits.maxFileMb}MB까지</span>
+        <span>한 번에 {LOCAL_FILE_LIMITS.maxFiles}개 · 파일 하나당 {Math.min(limits.maxFileMb ?? LOCAL_FILE_LIMITS.maxFileMb, LOCAL_FILE_LIMITS.maxFileMb)}MB까지</span>
         <span>계산은 이 브라우저에서 돕니다 — 파일이 서버로 가지 않습니다</span>
       </div>
 

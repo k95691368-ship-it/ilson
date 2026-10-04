@@ -1,11 +1,28 @@
-import { useState } from 'react'
+import { useMemo, useReducer, useRef, useSyncExternalStore } from 'react'
 import { api } from '../api/client.ts'
 import { useToast } from '../context/ToastContext.jsx'
-import { groupQuarantine, affectedRows, catalog } from '../../shared/teach.js'
+import { groupQuarantine, catalog } from '../../shared/teach.js'
 import { QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { num } from '../lib/format.js'
+import { indexTeachQuarantine } from '../lib/teachQuarantine.js'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 import Field from './Field.jsx'
 import { SourceFile } from './SourceReference.jsx'
+
+const PAGE_SIZE = 20
+const CATALOG = catalog()
+const EMPTY_STATE = { open: false, form: { canonicalCode: '', teacher: '', note: '' }, fieldErrors: {}, saving: false, done: null, refreshError: '' }
+
+function readTeachingResult(value, canonicalCode) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.ok !== true
+    || value.canonicalCode !== canonicalCode || typeof value.already !== 'boolean'
+    || (value.productName !== undefined && typeof value.productName !== 'string')
+    || (value.next !== undefined && typeof value.next !== 'string')) {
+    throw new Error('저장 응답을 확인하지 못했습니다. 같은 내용으로 다시 시도해주세요.')
+  }
+  return { canonicalCode: value.canonicalCode, already: value.already, productName: value.productName, next: value.next }
+}
 
 // 밀려난 줄을 부서가 되돌려 알려준다.
 //
@@ -16,8 +33,65 @@ import { SourceFile } from './SourceReference.jsx'
 // 아무 줄에나 "알려주기"를 달지 않는다. 알려줘도 안 풀리는 것을 알려주게
 // 하면, 부서는 그 뒤로 아무것도 안 알려준다.
 export default function TeachQuarantine({ slug, quarantine, onTaught }) {
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  const toast = useToast()
+  const [, redraw] = useReducer(value => value + 1, 0)
+  const lifetime = useRef(null)
+  // Paging unmounts individual forms, not their calculation-local state.
+  // A new result/tool/access lifetime discards every old form synchronously.
+  if (!lifetime.current || lifetime.current.quarantine !== quarantine || lifetime.current.slug !== slug || lifetime.current.session !== session) {
+    lifetime.current = { quarantine, slug, session, page: 0, query: '', states: new Map() }
+  }
+  const view = lifetime.current
+  const capture = useActionLifetime(view)
+  const { groups, byCode } = useMemo(() => ({
+    groups: groupQuarantine(quarantine, QUARANTINE_REASONS),
+    byCode: indexTeachQuarantine(quarantine),
+  }), [quarantine])
+  // Search only the already sorted code list, never the original rows. Code
+  // identity stays exact; only the search term has surrounding whitespace removed.
+  const visibleGroups = useMemo(() => {
+    const query = view.query.trim()
+    return groups.map(group => ({ ...group, visibleCodes: group.kind === 'teach' && query
+      ? group.codes.filter(code => String(code).includes(query)) : group.codes }))
+  }, [groups, view.query])
+  const current = () => lifetime.current === view && getAccessSession() === session && session.status === 'active'
+  const update = (code, change) => {
+    if (!current()) return
+    view.states.set(code, { ...(view.states.get(code) ?? EMPTY_STATE), ...change })
+    redraw()
+  }
+  async function send(code, event) {
+    event.preventDefault()
+    if (!current()) return
+    const state = view.states.get(code) ?? EMPTY_STATE
+    if (state.saving || state.done) return
+    const active = capture()
+    const entry = byCode.get(code)
+    const payload = { ...state.form, externalCode: code, channel: entry?.sample?.source?.channel ?? null, affected: entry?.affected ?? 0 }
+    // Set the Map synchronously, before React renders or hashing/fetch starts.
+    update(code, { saving: true, fieldErrors: {} })
+    try {
+      const response = await api.post(`/tools/${encodeURIComponent(slug)}/teach`, payload)
+      if (!active() || !current()) return
+      const done = readTeachingResult(response, payload.canonicalCode)
+      update(code, { done, open: false, saving: false })
+    } catch (error) {
+      if (!active() || !current()) return
+      update(code, { saving: false, fieldErrors: error.fields ?? {} })
+      toast.error(error.message)
+      return
+    }
+    // A failed refresh is not a failed write. Keep the completed state visible.
+    try { await onTaught?.() } catch {
+      if (!active() || !current()) return
+      const message = '알려주신 내용은 저장됐지만 최신 상태를 다시 불러오지 못했습니다.'
+      update(code, { refreshError: message })
+      toast.error(message)
+    }
+  }
+  if (session.status !== 'active') return null
   if (!quarantine || quarantine.length === 0) return null
-  const groups = groupQuarantine(quarantine, QUARANTINE_REASONS)
 
   return (
     <section className="card teach">
@@ -26,7 +100,7 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
       </div>
 
       <div className="teach-groups">
-        {groups.map((g) => (
+        {visibleGroups.map((g) => (
           <article key={g.reason} className={`teach-group kind-${g.kind}`}>
             <div className="teach-group-head">
               <span className="badge badge-neutral">{g.label}</span>
@@ -45,18 +119,34 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
             <p className="teach-group-body">{g.body}</p>
 
             {g.kind === 'teach' && (
+              <>
+              {g.codes.length > PAGE_SIZE && <Field label="코드 찾기" hint="대소문자 구분 · 검색어 앞뒤 공백 제외">
+                <input type="search" value={view.query} placeholder="코드 일부 입력" autoComplete="off"
+                  onChange={event => { if (current()) { view.query = event.target.value; view.page = 0; redraw() } }} />
+              </Field>}
+              {g.codes.length > PAGE_SIZE && <p className="card-note">전체 코드 {num(g.codes.length)}종 · 일치 {num(g.visibleCodes.length)}종</p>}
+              {g.visibleCodes.length === 0 && <p className="card-note" role="status">검색 조건에 맞는 코드가 없습니다.</p>}
               <ul className="teach-codes">
-                {g.codes.map((code) => (
+                {g.visibleCodes.slice(view.page * PAGE_SIZE, (view.page + 1) * PAGE_SIZE).map((code) => (
                   <TeachOne
                     key={code}
-                    slug={slug}
                     code={code}
-                    rows={affectedRows(quarantine, code)}
-                    sample={quarantine.find((q) => q.externalCode === code)}
-                    onTaught={onTaught}
+                    rows={byCode.get(code)?.affected ?? 0}
+                    sample={byCode.get(code)?.sample}
+                    state={view.states.get(code) ?? EMPTY_STATE}
+                    update={change => update(code, change)}
+                    send={event => send(code, event)}
                   />
                 ))}
               </ul>
+              {g.codes.length > PAGE_SIZE && g.visibleCodes.length > 0 && <nav className="row" aria-label="격리 코드 페이지">
+                <button type="button" className="btn-ghost btn-sm" disabled={view.page === 0}
+                  onClick={() => { if (current()) { view.page = Math.max(0, view.page - 1); redraw() } }}>이전 코드 20개</button>
+                <span className="card-note" role="status" aria-live="polite">코드 {num(view.page * PAGE_SIZE + 1)}–{num(Math.min((view.page + 1) * PAGE_SIZE, g.visibleCodes.length))} / {num(g.visibleCodes.length)}</span>
+                <button type="button" className="btn-ghost btn-sm" disabled={(view.page + 1) * PAGE_SIZE >= g.visibleCodes.length}
+                  onClick={() => { if (current()) { view.page = Math.min(Math.ceil(g.visibleCodes.length / PAGE_SIZE) - 1, view.page + 1); redraw() } }}>다음 코드 20개</button>
+              </nav>}
+              </>
             )}
 
             {g.kind !== 'teach' && g.rows.length > 0 && (
@@ -85,37 +175,8 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
   )
 }
 
-function TeachOne({ slug, code, rows, sample, onTaught }) {
-  const toast = useToast()
-  const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ canonicalCode: '', teacher: '', note: '' })
-  const [fieldErrors, setFieldErrors] = useState({})
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(null)
-
-  const list = catalog()
-
-  async function send(e) {
-    e.preventDefault()
-    setSaving(true)
-    setFieldErrors({})
-    try {
-      const r = await api.post(`/tools/${slug}/teach`, {
-        ...form,
-        externalCode: code,
-        channel: sample?.source?.channel ?? null,
-        affected: rows,
-      })
-      setDone(r)
-      setOpen(false)
-      await onTaught?.()
-    } catch (err) {
-      if (err.fields) setFieldErrors(err.fields)
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
-    }
-  }
+function TeachOne({ code, rows, sample, state, update, send }) {
+  const { open, form, fieldErrors, saving, done, refreshError } = state
 
   if (done) {
     return (
@@ -128,6 +189,7 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
         <p className="card-note" style={{ marginTop: 5 }}>
           {done.already ? '이미 알고 있던 코드였습니다.' : done.next}
         </p>
+        {refreshError && <p className="card-note" role="status">{refreshError}</p>}
       </li>
     )
   }
@@ -142,7 +204,7 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
         </span>
         <span className="spacer" />
         {!open && (
-          <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(true)}>
+          <button type="button" className="btn-ghost btn-sm" onClick={() => update({ open: true })}>
             어느 상품인지 알려주기
           </button>
         )}
@@ -155,10 +217,11 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
                 또 밀려나거나, 더 나쁘게는 엉뚱한 상품 매출로 잡힌다. */}
             <select
               value={form.canonicalCode}
-              onChange={(e) => setForm((f) => ({ ...f, canonicalCode: e.target.value }))}
+              disabled={saving}
+              onChange={(e) => update({ form: { ...form, canonicalCode: e.target.value } })}
             >
               <option value="">골라주세요</option>
-              {list.map((s) => (
+              {CATALOG.map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.name} ({s.code})
                 </option>
@@ -169,7 +232,8 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
           <Field label="누가 알려주십니까" required error={fieldErrors.teacher}>
             <input
               value={form.teacher}
-              onChange={(e) => setForm((f) => ({ ...f, teacher: e.target.value }))}
+              disabled={saving}
+              onChange={(e) => update({ form: { ...form, teacher: e.target.value } })}
               placeholder="정산 담당자"
               maxLength={60}
             />
@@ -179,7 +243,7 @@ function TeachOne({ slug, code, rows, sample, onTaught }) {
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
               {saving ? '보내는 중…' : `알려주기 (${num(rows)}줄이 풀립니다)`}
             </button>
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+            <button type="button" className="btn-ghost btn-sm" onClick={() => update({ open: false })}>
               그만두기
             </button>
           </div>
