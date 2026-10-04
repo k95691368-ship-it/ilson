@@ -23,6 +23,8 @@ const port = fixture ? 5188 : 5187
 let queue = Promise.resolve()
 const applicationRetryFixture = process.argv.includes('--application-retry-fixture')
 let applicationReplyLost = false
+const teachRetryFixture = process.argv.includes('--teach-retry-fixture')
+let teachReplyLost = false
 globalThis.fetch = (url, options) => {
   const certificates = fixture?.certificates(url)
   if (certificates) return Promise.resolve(certificates)
@@ -39,6 +41,14 @@ globalThis.fetch = (url, options) => {
       if (applicationRetryFixture && !applicationReplyLost && name === 'ilson_record_application'
         && result.rows[0].data?.response?.status === 201) {
         applicationReplyLost = true
+        return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
+      }
+      // Exercise a teaching retry after the alias, audit and receipt really
+      // commit. This opt-in local fixture never runs in deployed Functions.
+      if (teachRetryFixture && !teachReplyLost && name === 'ilson_actor_commit'
+        && result.rows[0].data?.response?.body?.ok === true
+        && Array.isArray(args[4]) && args[4].some(sql => /^\s*INSERT\s+INTO\s+sku_alias\b/i.test(sql))) {
+        teachReplyLost = true
         return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
       }
       if (fixture?.loseReply(name, args, result.rows[0].data)) return Response.json({code:'LOCAL_LOST_REPLY'},{status:503})

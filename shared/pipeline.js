@@ -318,7 +318,7 @@ function processRow({ channel, columns, row, source, aliases }) {
         raw: rawCells,
         externalCode: rawSku,
         productName: rawName,
-        note: '이 코드가 어느 상품인지 알려주시면 다음부터는 자동으로 처리됩니다.',
+        note: '상품 연결을 알려주시면 다음 계산부터 반영됩니다. 다른 오류가 있는 줄은 계속 격리됩니다.',
       },
     }
   }

@@ -50,7 +50,7 @@ it('same-scope renewed generation discards old form and late completion', async 
   expect(refresh).not.toHaveBeenCalled(); expect(toasts.error).not.toHaveBeenCalled()
 })
 
-it.each([{}, [], { ok: true, already: false, canonicalCode: 'wrong' }])('malformed success %j is not rendered as completed', async body => {
+it.each([{}, [], { ok: true, already: false, canonicalCode: 'wrong' }, { ok: true, already: false, canonicalCode: CANON, teacher: {} }])('malformed success %j is not rendered as completed', async body => {
   const refresh = vi.fn()
   vi.stubGlobal('fetch', vi.fn(async () => Response.json(body)))
   render(<TeachQuarantine slug="malformed" quarantine={rows()} onTaught={refresh} />)
@@ -85,4 +85,44 @@ it('non-teaching source references retain file disambiguation, sheet, first twel
   expect(group.querySelectorAll('li')).toHaveLength(12)
   expect(group.textContent).toContain('synthetic-sheet · 2번째 줄')
   expect(group.textContent).toContain('앞 12줄만 보여드립니다.')
+})
+
+it('real mode does not offer an editable author and shows only server-confirmed attribution', async () => {
+  act(() => completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'access', scope: SCOPE_A }))
+  const fetcher = vi.fn(async () => Response.json({ ok: true, already: false, canonicalCode: CANON, teacher: '인증된 합성 직원' }))
+  vi.stubGlobal('fetch', fetcher)
+  render(<TeachQuarantine slug="real-author" quarantine={rows()} />)
+  fireEvent.click(screen.getByRole('button', { name: '어느 상품인지 알려주기' }))
+  expect(screen.getByText('작성자는 로그인 계정으로 기록됩니다.')).toBeTruthy()
+  expect(screen.queryByRole('textbox', { name: /^누가 알려/ })).toBeNull()
+  expect(screen.queryByText('기록된 작성자: 인증된 합성 직원')).toBeNull()
+  fireEvent.change(screen.getByRole('combobox'), { target: { value: CANON } })
+  submit()
+  await waitFor(() => expect(screen.getByText('기록된 작성자: 인증된 합성 직원')).toBeTruthy())
+  expect(JSON.parse(fetcher.mock.calls[0][1].body)).toMatchObject({ teacher: '', externalCode: 'EXTERNAL', canonicalCode: CANON })
+})
+
+it('real and demo lifetime changes cannot reuse author input or confirmed attribution', async () => {
+  const source = rows()
+  render(<TeachQuarantine slug="author-mode" quarantine={source} />)
+  fill('PRIVATE_DEMO_AUTHOR')
+  act(() => completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'access', scope: SCOPE_A }))
+  fireEvent.click(screen.getByRole('button', { name: '어느 상품인지 알려주기' }))
+  expect(screen.queryByDisplayValue('PRIVATE_DEMO_AUTHOR')).toBeNull()
+  expect(screen.queryByRole('textbox', { name: /^누가 알려/ })).toBeNull()
+  act(() => activate(SCOPE_A))
+  fireEvent.click(screen.getByRole('button', { name: '어느 상품인지 알려주기' }))
+  expect(screen.getByRole('textbox', { name: /^누가 알려/ }).value).toBe('')
+  expect(screen.queryByText('작성자는 로그인 계정으로 기록됩니다.')).toBeNull()
+})
+
+it('displays an uneditable source code validation error without shortening it or claiming success', async () => {
+  const longCode = 'X'.repeat(81), message = '상품코드는80자까지 알려주실 수 있습니다. 원본 코드를 확인해주세요.'
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ error: '내용을 확인해주세요.', fields: { externalCode: message } }, { status: 400 })))
+  render(<TeachQuarantine slug="long-code" quarantine={[{ reason: 'unknown_sku', externalCode: longCode }]} />)
+  fill(); submit()
+  await waitFor(() => expect(screen.getByRole('alert').textContent).toBe(message))
+  expect(screen.getByText(longCode)).toBeTruthy()
+  expect(screen.queryByText('알려주셨습니다')).toBeNull()
+  expect(screen.getByRole('button', { name: /알려주기 \(/ }).disabled).toBe(false)
 })

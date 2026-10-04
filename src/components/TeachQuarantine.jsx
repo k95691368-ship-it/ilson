@@ -18,10 +18,11 @@ function readTeachingResult(value, canonicalCode) {
   if (!value || typeof value !== 'object' || Array.isArray(value) || value.ok !== true
     || value.canonicalCode !== canonicalCode || typeof value.already !== 'boolean'
     || (value.productName !== undefined && typeof value.productName !== 'string')
+    || (value.teacher !== undefined && typeof value.teacher !== 'string')
     || (value.next !== undefined && typeof value.next !== 'string')) {
     throw new Error('저장 응답을 확인하지 못했습니다. 같은 내용으로 다시 시도해주세요.')
   }
-  return { canonicalCode: value.canonicalCode, already: value.already, productName: value.productName, next: value.next }
+  return { canonicalCode: value.canonicalCode, already: value.already, productName: value.productName, teacher: value.teacher, next: value.next }
 }
 
 // 밀려난 줄을 부서가 되돌려 알려준다.
@@ -133,6 +134,7 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
                     code={code}
                     rows={byCode.get(code)?.affected ?? 0}
                     sample={byCode.get(code)?.sample}
+                    verifiedAttribution={session.mode === 'access'}
                     state={view.states.get(code) ?? EMPTY_STATE}
                     update={change => update(code, change)}
                     send={event => send(code, event)}
@@ -175,7 +177,7 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
   )
 }
 
-function TeachOne({ code, rows, sample, state, update, send }) {
+function TeachOne({ code, rows, sample, state, verifiedAttribution, update, send }) {
   const { open, form, fieldErrors, saving, done, refreshError } = state
 
   if (done) {
@@ -189,6 +191,7 @@ function TeachOne({ code, rows, sample, state, update, send }) {
         <p className="card-note" style={{ marginTop: 5 }}>
           {done.already ? '이미 알고 있던 코드였습니다.' : done.next}
         </p>
+        {done.teacher && <p className="card-note">기록된 작성자: {done.teacher}</p>}
         {refreshError && <p className="card-note" role="status">{refreshError}</p>}
       </li>
     )
@@ -212,6 +215,7 @@ function TeachOne({ code, rows, sample, state, update, send }) {
 
       {open && (
         <form className="teach-form" onSubmit={send}>
+          {fieldErrors.externalCode && <p className="card-note" role="alert">{fieldErrors.externalCode}</p>}
           <Field label="어느 상품입니까" required error={fieldErrors.canonicalCode}>
             {/* 직접 적게 하지 않고 고르게 한다. 없는 코드로 이어 두면 그 줄이
                 또 밀려나거나, 더 나쁘게는 엉뚱한 상품 매출로 잡힌다. */}
@@ -229,7 +233,7 @@ function TeachOne({ code, rows, sample, state, update, send }) {
             </select>
           </Field>
 
-          <Field label="누가 알려주십니까" required error={fieldErrors.teacher}>
+          {verifiedAttribution ? <p className="card-note">작성자는 로그인 계정으로 기록됩니다.</p> : <Field label="누가 알려주십니까" required error={fieldErrors.teacher}>
             <input
               value={form.teacher}
               disabled={saving}
@@ -237,11 +241,11 @@ function TeachOne({ code, rows, sample, state, update, send }) {
               placeholder="정산 담당자"
               maxLength={60}
             />
-          </Field>
+          </Field>}
 
           <div className="row">
             <button type="submit" className="btn-primary btn-sm" disabled={saving}>
-              {saving ? '보내는 중…' : `알려주기 (${num(rows)}줄이 풀립니다)`}
+              {saving ? '보내는 중…' : `알려주기 (미등록 ${num(rows)}줄)`}
             </button>
             <button type="button" className="btn-ghost btn-sm" onClick={() => update({ open: false })}>
               그만두기
