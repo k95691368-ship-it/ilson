@@ -1,5 +1,9 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 23:40 KST — 기능 동결·마감 인계
+
+새 기능·대규모 개발을 중단하고 검증 결과·현재 배포·남은 한계를 `release-handoff-2026-10-04.md`에 정리했다. C28 제품 변경은 CLI커밋·푸시 `9d4f7b5cf0259cf1289e7bc76cdedc1eb7614b45`·[CI37209947780](https://github.com/k95691368-ship-it/ilson/actions/runs/37209947780) success/exit0·Git 연결 Production `c0003eb9-1bfe-4178-885b-328b68a30eac` source9d4f7b5로 확인했다. 공개47개SHA256·GitOG·actualJSON health200/ready:true/workspace200/active:false/session·override428/no-store를 검증했다. 초기 Agreement-y3Y57wtH asset 불일치를 성공으로 보지 않았고 공개/배포 실제JS/hash의 변경근거 후 전체를 통과했다. 현재 npm audit는 전체 알려진취약점0(운영침투검증아님)이다. 후속 인계문서 커밋은 제품 source·DB/RPC/ACL/Auth/구매AX 변경 없이 같은 산출물을 유지하며, 그 CI·최종 배포 확인은 아직 남았다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 14 필요성·검증
 
 23:36 KST C28은 소개와 실제 성과 계산의 불일치만 최소 정정했다. `shared/about.js`는 부서가 90분 아닌55분이라고 답하면 절감액이 자동 감소한다고 썼지만, 현재 `outcomeEvidence`는 체감치를 반박 context에 넣고 `labelForOutcome`은 숫자를 유지한다. 독립 반박에서 협의 화면의 실측 추가·기준선 명시 재확정이라는 기존 대안과 미해결 반박 해소 경로를 확인했다. 새 계산식/성과 서비스는 불필요하다. 소개를 양방향20% 이상 차이의 반박·미해결 금액의 보수적 추정/확정 사용 금지·체감 답변만으로 기준선/금액 자동 변경0으로 정정했다. 같은 화면의 안전0건은 운영 실적이 아닌 목표임을 한 문장 명료화했다(P3 선택적).
