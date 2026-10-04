@@ -1,5 +1,20 @@
 // Download is assembled in the browser. Original file bytes and cell previews
 // are not required to identify the normalized result's source.
+// This CSV is for spreadsheet review, not a lossless machine interchange.
+// OWASP recommends a tab inside the quoted field for formula-shaped Excel text:
+// https://community.owasp.org/attacks/CSV_Injection
+// The tab is part of the exported value; other spreadsheet/import modes differ.
+// eslint-disable-next-line no-control-regex -- Leading controls must not hide a spreadsheet formula prefix.
+const FORMULA_TEXT = /^[\s\u0000-\u001f\u007f]*[=+\-@＝＋－＠]/u
+
+function csvCell(value) {
+  let text = String(value ?? '')
+  // Pipeline amounts/counts are numbers. Never turn a real negative amount into
+  // text, and never change the original row/source when protecting its export.
+  if (typeof value !== 'number' && (FORMULA_TEXT.test(text) || /^[\t\r\n]/.test(text))) text = '\t' + text
+  return `"${text.replace(/"/g, '""')}"`
+}
+
 export function settlementCsv(rows) {
   const header = [
     '날짜', '주차', '채널', '상품코드', '상품명', '수량', '반품수량',
@@ -15,6 +30,6 @@ export function settlementCsv(rows) {
     r.duplicate_of?.file, r.duplicate_of?.sheet, r.duplicate_of?.rowNo, r.duplicate_of?.sha256,
   ])
   return '\uFEFF' + [header, ...data]
-    .map(row => row.map(cell => `"${String(cell ?? '').replace(/"/g, '""')}"`).join(','))
+    .map(row => row.map(csvCell).join(','))
     .join('\r\n')
 }

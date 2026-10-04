@@ -54,8 +54,8 @@ describe('도구 계산과 실행 기록의 실패 구분', () => {
   it('실제 내려받기 버튼은 전체 원본 지문을 내보내고 원본 셀·지문을 실행 요약 API로 보내지 않는다', async () => {
     const hash = 'a'.repeat(64)
     state.pipeline.mockResolvedValueOnce({
-      files: [{ name: '01_정산.csv', sha256: hash, ambiguousName: true, rowsOut: 1 }],
-      rows: [{ date: '2026-06-01', net_revenue_krw: 10000, source: { file: '01_정산.csv', sheet: '', rowNo: 2, sha256: hash }, raw: ['PRIVATE_LOCAL_CELL'] }],
+      files: [{ name: '=1+2.csv', sha256: hash, ambiguousName: true, rowsOut: 1 }],
+      rows: [{ date: '2026-06-01', net_revenue_krw: 10000, source: { file: '=1+2.csv', sheet: '', rowNo: 2, sha256: hash }, raw: ['PRIVATE_LOCAL_CELL'] }],
       quarantine: [], stats: { durationMs: 1 }, totals: { byChannel: [] },
     })
     let downloaded
@@ -64,10 +64,11 @@ describe('도구 계산과 실행 기록의 실패 구분', () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     try {
       startRun()
-      fireEvent.click(await screen.findByRole('button', { name: '엑셀로 내려받기' }))
+      fireEvent.click(await screen.findByRole('button', { name: 'CSV 내려받기' }))
       expect(await downloaded.text()).toContain(`"원본SHA256"`)
       expect(await downloaded.text()).toContain(hash)
-      expect(await downloaded.text()).toContain('01_정산.csv')
+      expect(await downloaded.text()).toContain('"\t=1+2.csv"')
+      expect(JSON.stringify(state.post.mock.calls[0][1])).toContain('=1+2.csv')
       expect(await downloaded.text()).not.toContain('PRIVATE_LOCAL_CELL')
       expect(click).toHaveBeenCalledTimes(1)
       expect(revoke).toHaveBeenCalledWith('blob:local-source-test')
@@ -103,7 +104,7 @@ describe('도구 계산과 실행 기록의 실패 구분', () => {
     await waitFor(() => expect(state.error).toHaveBeenCalled())
     expect(state.post).toHaveBeenCalledTimes(1)
     expect(state.post.mock.calls[0][1]).not.toHaveProperty('ok', false)
-    expect(screen.getByRole('button', { name: '엑셀로 내려받기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'CSV 내려받기' })).toBeTruthy()
   })
   it('같은 실행을 재계산 없이 같은 식별자와 내용으로 다시 저장한다', async () => {
     state.post.mockRejectedValueOnce(new Error('응답이 끊겼습니다'))
@@ -126,14 +127,14 @@ describe('도구 계산과 실행 기록의 실패 구분', () => {
     await waitFor(() => expect(state.post).toHaveBeenCalledTimes(1))
     expect(state.post.mock.calls[0][1]).toMatchObject({ ok: false, fail_reason: '지원하지 않는 표입니다' })
     expect(state.post.mock.calls[0][1].duration_ms).toBeGreaterThanOrEqual(0)
-    expect(screen.queryByRole('button', { name: '엑셀로 내려받기' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'CSV 내려받기' })).toBeNull()
   })
   it('저장 뒤 조회 실패를 두 번째 실행 실패로 기록하지 않는다', async () => {
     state.reload.mockRejectedValueOnce(new Error('조회 연결 오류'))
     startRun()
     await waitFor(() => expect(state.reload).toHaveBeenCalled())
     expect(state.post).toHaveBeenCalledTimes(1)
-    expect(screen.getByRole('button', { name: '엑셀로 내려받기' })).toBeTruthy()
+    expect(screen.getByRole('button', { name: 'CSV 내려받기' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: '같은 실행 기록 다시 저장' })).toBeNull()
   })
   it('마우스로 다시 떨어뜨려도 실행 중인 계산을 중복 시작하지 않는다', async () => {
@@ -203,7 +204,7 @@ describe('도구 계산과 실행 기록의 실패 구분', () => {
     fireEvent.click(screen.getByRole('link', { name: '도구로 돌아가기' }))
     const retry = await screen.findByRole('button', { name: '같은 실행 기록 다시 저장' })
     expect(screen.queryByRole('button', { name: '정산서 파일 넣기' })).toBeNull()
-    expect(screen.queryByRole('button', { name: '엑셀로 내려받기' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'CSV 내려받기' })).toBeNull()
     fireEvent.click(retry)
     await waitFor(() => expect(state.post).toHaveBeenCalledTimes(2))
     expect(state.post.mock.calls[1]).toEqual(original)
@@ -270,7 +271,7 @@ function leaveSession(view, transition) {
   }
 }
 function expectNoOriginal() {
-  expect(screen.queryByRole('button', { name: '엑셀로 내려받기' })).toBeNull()
+  expect(screen.queryByRole('button', { name: 'CSV 내려받기' })).toBeNull()
   expect(screen.queryByText('A-private.csv')).toBeNull()
   expect(screen.queryByText('A-private-original')).toBeNull()
 }

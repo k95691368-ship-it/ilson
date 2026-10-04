@@ -101,10 +101,10 @@ describe.sequential('department attestations through signed middleware and Postg
     expect((await invoke('admin@local.invalid', cases[0][1], signoff, cases[0][3])).status).toBe(200)
   })
   it.each([
-    ['department revoked', "UPDATE override_actor SET departments_json='[]' WHERE email='owner@local.invalid'", 'operations', '["재무"]'],
-    ['administrator downgraded', "UPDATE override_actor SET role='operations' WHERE email='owner@local.invalid'", 'audit', '[]'],
-    ['account disabled', "UPDATE override_actor SET active=0 WHERE email='owner@local.invalid'", 'operations', '["재무"]'],
-  ])('outcome rejects %s before commit despite retained application ownership', async (_label, change, role, departments) => {
+    ['department revoked', "UPDATE override_actor SET departments_json='[]' WHERE email='owner@local.invalid'", 'operations', '["재무"]', 409],
+    ['administrator downgraded', "UPDATE override_actor SET role='operations' WHERE email='owner@local.invalid'", 'audit', '[]', 409],
+    ['account disabled', "UPDATE override_actor SET active=0 WHERE email='owner@local.invalid'", 'operations', '["재무"]', 401],
+  ])('outcome rejects %s before commit despite retained application ownership', async (_label, change, role, departments, expectedStatus) => {
     await DB.prepare('UPDATE override_actor SET role=?,departments_json=?,active=1 WHERE email=?')
       .bind(role, departments, 'owner@local.invalid').run()
     const prior = await DB.prepare("SELECT * FROM outcome WHERE application_id='app-dept'").first()
@@ -112,7 +112,8 @@ describe.sequential('department attestations through signed middleware and Postg
     beforeCommit = () => pg.exec(change)
     try {
       const result = await invoke('owner@local.invalid', cases[2][1], outcome, cases[2][3])
-      expect(result.status, JSON.stringify(result.body)).toBe(409)
+      expect(result.status, JSON.stringify(result.body)).toBe(expectedStatus)
+      if (expectedStatus === 401) expect(result.body.code).toBe('ACCESS_REVOKED')
       expect(beforeCommit).toBeNull()
       expect(await DB.prepare("SELECT * FROM outcome WHERE application_id='app-dept'").first()).toEqual(prior)
       expect(Number((await DB.prepare("SELECT count(*) n FROM decision_log WHERE application_id='app-dept'").first()).n)).toBe(before)

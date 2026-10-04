@@ -429,9 +429,13 @@ function ToolSession({ slug, data, error, loading, reload }) {
             <div className="card-head">
               <h2 className="card-title">채널별 결과</h2>
               <button type="button" className="btn-primary btn-sm" onClick={download}>
-                엑셀로 내려받기
+                CSV 내려받기
               </button>
             </div>
+            <details className="card-note">
+              <summary>CSV 안내</summary>
+              <p>스프레드시트 검토용 파일입니다. 수식 기호로 시작하는 문자 값에는 탭을 붙이며, 금액·수량의 음수와 화면의 원본 이름은 바꾸지 않습니다. 다른 시스템에 재가져오거나 다시 저장한 파일을 열 때는 원본과 대조해 주세요.</p>
+            </details>
             <div className="table-wrap">
               <table className="data-table">
                 <caption className="sr-only">채널별 처리 결과</caption>

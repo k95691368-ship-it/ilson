@@ -5,16 +5,19 @@
 //   2) 폼 검증 실패는 다른 오류와 구분해서 넘긴다 (칸마다 다른 문구를 붙여야 하므로)
 
 import { accessBlocked, getAccessSession, revokeAccess, subscribeAccessSession } from '../lib/accessSession.js'
+import { prepareApplicationIntent, beginApplicationIntent, IntentError, isApplicationReceipt, recoverApplicationReceipt, settleApplicationIntent } from './applicationIntent.ts'
 
 const BASE = '/api'
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue | undefined }
 export type FieldErrors = Record<string, string>
 export type ReadOptions = { signal?: AbortSignal }
+export type FormOptions = { confirmedNewIntent?: boolean }
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type RequestOptions = Omit<RequestInit, 'method'> & {
   method?: HttpMethod
   sessionProbe?: boolean
   sessionGeneration?: number
+  confirmedNewIntent?: boolean
 }
 type WorkspaceState = { enabled: boolean; active?: boolean; expired?: boolean; expiresAt?: string; reset?: boolean }
 type AccessSnapshot = { generation: number; status: string; scope: string | null; error: string }
@@ -127,7 +130,27 @@ function takeBooted(path: string, options: RequestOptions): Promise<Response | n
 }
 
 const pendingMutations = new Map<string, { key: string; until: number }>()
+// Opaque current-tab references let a retry notice another tab's later receipt.
+const uncertainApplications = new Map<string, { key: string; digest: string }>()
+let mutationSalt: string | null = null
 const changedSession = () => new ApiError('접근 상태가 바뀌었습니다. 권한을 다시 확인한 뒤 저장 기록을 확인해주세요.', { status: 409, code: 'ACCESS_CHANGED' })
+const identityUnavailable = () => new ApiError('재시도 정보를 안전하게 만들지 못했습니다. 브라우저 설정을 확인한 뒤 다시 시도해주세요.', { status: 0, code: 'MUTATION_IDENTITY_UNAVAILABLE', notSaved: true })
+
+async function digestIdentity(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value))
+  return Array.from(new Uint8Array(digest), byte => byte.toString(16).padStart(2, '0')).join('')
+}
+
+function textFormSnapshot(body: FormData): { body: FormData; identity: string } {
+  const entries = [...body.entries()]
+  if (entries.some(([, value]) => typeof value !== 'string')) {
+    throw new ApiError('신청서에는 텍스트만 보낼 수 있습니다. 첨부 파일을 제외해주세요.', { status: 400, code: 'FORM_FILES_UNSUPPORTED', notSaved: true })
+  }
+  const snapshot = new FormData()
+  for (const [name, value] of entries) snapshot.append(name, value)
+  return { body: snapshot, identity: JSON.stringify(entries) }
+}
+
 async function send(path: string, options: RequestOptions = {}): Promise<unknown> {
   const access: AccessSnapshot = getAccessSession()
   const generation = options.sessionGeneration ?? access.generation
@@ -137,10 +160,57 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
     throw new ApiError(access.error || '접근 권한을 다시 확인해 주세요.', { status: 401, code: 'ACCESS_REVOKED' })
   }
   const current = () => generation === getAccessSession().generation && !options.signal?.aborted
+  const assertCurrent = () => { if (!current()) throw changedSession() }
   let res: Response
-  const identity = options.method && options.method !== 'GET' && typeof options.body === 'string' ? `${access.scope ?? 'unverified'}:${options.method}:${path}:${options.body}` : null
+  const application = path === '/applications' && options.method === 'POST' && options.body instanceof FormData
+  let identity: string | null = null
   let key: string | undefined
-  if (identity) {
+  const recoverReceipt = async () => {
+    if (!application || !key || !identity) return null
+    try {
+      const receipt = await recoverApplicationReceipt(String(access.scope), key, identity, assertCurrent)
+      assertCurrent()
+      if (receipt && uncertainApplications.get(String(access.scope))?.key === key) uncertainApplications.delete(String(access.scope))
+      return receipt
+    } catch (error) {
+      if (error instanceof IntentError) throw new ApiError(error.message, { status: 409, code: error.code })
+      throw error
+    }
+  }
+  if (application || (options.method && options.method !== 'GET' && typeof options.body === 'string')) {
+    // Capture FormData synchronously: callers can edit their form during hashing.
+    let input = typeof options.body === 'string' ? options.body : ''
+    if (application) {
+      const snapshot = textFormSnapshot(options.body as FormData)
+      options = { ...options, body: snapshot.body }
+      input = snapshot.identity
+    }
+    try {
+      const snapshot = application ? await prepareApplicationIntent(String(access.scope), assertCurrent) : null
+      const salt = snapshot?.salt ?? (mutationSalt ??= crypto.randomUUID())
+      identity = await digestIdentity(JSON.stringify([salt, access.scope, options.method, path, input]))
+      if (!current()) throw changedSession()
+      let replayConfirmedKey = false
+      const uncertain = application && uncertainApplications.get(String(access.scope))
+      if (uncertain && !options.confirmedNewIntent) {
+        if (uncertain.digest !== identity) throw new ApiError('이전 신청의 접수 여부가 확인되지 않았습니다. 접수 내역을 먼저 확인해주세요.', { status: 409, code: 'APPLICATION_INTENT_UNRESOLVED' })
+        key = uncertain.key
+        const receipt = await recoverReceipt()
+        // A cached past receipt is not proof of current permission. Re-send the
+        // original key through the server gate before treating a new retry as done.
+        replayConfirmedKey = receipt !== null
+      }
+      if (snapshot && !replayConfirmedKey) ({ key } = await beginApplicationIntent(String(access.scope), snapshot, identity, options.confirmedNewIntent === true, assertCurrent))
+      assertCurrent()
+      if (application && key) uncertainApplications.set(String(access.scope), { key, digest: identity })
+    } catch (error) {
+      if (!current()) throw changedSession()
+      if (error instanceof ApiError) throw error
+      if (error instanceof IntentError) throw new ApiError(error.message, { status: 409, code: error.code })
+      throw identityUnavailable()
+    }
+  }
+  if (identity && !application) {
     const prior = pendingMutations.get(identity)
     key = prior && prior.until > Date.now() ? prior.key : crypto.randomUUID()
     const oldest = pendingMutations.keys().next().value
@@ -153,7 +223,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
     if (!sessionProbe) headers.set('X-Ilson-Scope', String(access.scope))
     else headers.delete('X-Ilson-Scope')
     if (key) headers.set('X-Idempotency-Key', key)
-    const { sessionProbe: _probe, sessionGeneration: _generation, ...requestOptions } = options
+    const { sessionProbe: _probe, sessionGeneration: _generation, confirmedNewIntent: _confirmed, ...requestOptions } = options
     options = { ...requestOptions, headers, credentials: 'same-origin', cache: 'no-store' }
     // 미리 띄워 둔 것이 있으면 그것을 쓴다. 그것이 실패했으면 null 이 오고,
     // 그때는 아무 일 없었던 것처럼 지금 부른다.
@@ -162,6 +232,8 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
   } catch (error) {
     if (options.signal?.aborted) throw error
     if (!current()) throw changedSession()
+    const receipt = await recoverReceipt()
+    if (receipt) return receipt
     // 인터넷이 끊겼거나 서버가 아예 안 뜬 경우. 상태 코드조차 없다.
     throw new ApiError('서버에 닿지 못했습니다. 인터넷 연결을 확인해주세요.', { status: 0 })
   }
@@ -171,29 +243,54 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
   // JSON parsing itself is asynchronous. Never return an earlier session's
   // body or let its late denial invalidate a subsequently verified session.
   if (!current()) throw changedSession()
-  if (res.ok && (!body || typeof body !== 'object')) {
+  if (res.ok && (!body || typeof body !== 'object' || (application && (
+    res.status !== 201 || !isApplicationReceipt(body)
+  )))) {
     // The server may have committed even when its response was lost or truncated.
     // Preserve the mutation key so a manual retry cannot duplicate that write.
+    const receipt = await recoverReceipt()
+    if (receipt) return receipt
     throw new ApiError('서버 응답을 확인하지 못했습니다. 같은 내용으로 다시 시도해주세요.', { status:502 })
   }
 
   if (!res.ok) {
-    if (identity && res.status < 500 && pendingMutations.get(identity)?.key === key) pendingMutations.delete(identity)
+    if (!application && identity && res.status < 500 && pendingMutations.get(identity)?.key === key) pendingMutations.delete(identity)
     const failure = isRecord(body) ? body : {}
+    let confirmedNotSaved = !application && failure.notSaved === true
+    if (application && key && (failure.code === 'APPLICATION_INTENT_CONFLICT' || (failure.notSaved === true && res.status !== 429))) {
+      // A failed cleanup is conservative: the existing retry key remains intact.
+      try {
+        const cleared = await settleApplicationIntent(String(access.scope), key, failure.code === 'APPLICATION_INTENT_CONFLICT' ? 'conflict' : 'not-saved', assertCurrent)
+        confirmedNotSaved = failure.code !== 'APPLICATION_INTENT_CONFLICT' && cleared
+        if (confirmedNotSaved && uncertainApplications.get(String(access.scope))?.key === key) uncertainApplications.delete(String(access.scope))
+      } catch { /* retain the server's error */ }
+    }
+    assertCurrent()
     const errorMessage = typeof failure.error === 'string' ? failure.error : null
     const scopeChanged = (res.status === 409 && failure.code === 'SESSION_SCOPE_CHANGED')
       || (res.status === 400 && failure.code === 'SESSION_SCOPE_INVALID')
     if (!sessionProbe && ([401, 428].includes(res.status) || scopeChanged)) {
       revokeAccess(generation, errorMessage || '접근 권한을 다시 확인해 주세요.')
+    } else if (application && !confirmedNotSaved && (res.status >= 500 || res.status === 400)) {
+      // Never replace explicit permission/resource denials (notably 403) with
+      // a receipt from an earlier permission state in this seven-day window.
+      const receipt = await recoverReceipt()
+      if (receipt) return receipt
     }
     throw new ApiError(errorMessage ?? '요청에 실패했습니다.', {
       status: res.status,
       fields: failure.fields,
       code: failure.code,
-      notSaved: failure.notSaved,
+      notSaved: confirmedNotSaved,
     })
   }
-  if (identity && pendingMutations.get(identity)?.key === key) pendingMutations.delete(identity)
+  if (application && key) {
+    // The receipt is authoritative even when browser storage becomes unavailable.
+    // Leaving the old key only replays this receipt; it cannot create a duplicate.
+    try { await settleApplicationIntent(String(access.scope), key, 'confirmed', assertCurrent, isApplicationReceipt(body) ? body : undefined) } catch { /* preserve confirmed receipt */ }
+    if (uncertainApplications.get(String(access.scope))?.key === key) uncertainApplications.delete(String(access.scope))
+  } else if (identity && pendingMutations.get(identity)?.key === key) pendingMutations.delete(identity)
+  assertCurrent()
   return body
 }
 
@@ -218,7 +315,6 @@ export const api = {
   put: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('PUT', body)),
   patch: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('PATCH', body)),
   remove: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('DELETE', body)),
-  // 파일이 섞인 폼은 Content-Type을 우리가 정하면 안 된다.
-  // 브라우저가 경계 문자열을 붙여 직접 정해야 서버가 나눠 읽을 수 있다.
-  form: (path: string, formData: FormData): Promise<unknown> => send(path, { method: 'POST', body: formData }),
+  // The browser supplies the multipart boundary. Applications accept text only.
+  form: (path: string, formData: FormData, options: FormOptions = {}): Promise<unknown> => send(path, { method: 'POST', body: formData, ...options }),
 }

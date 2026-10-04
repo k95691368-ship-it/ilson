@@ -70,7 +70,7 @@ afterAll(async () => { vi.unstubAllGlobals(); await pg.close() })
 describe.sequential('review revisions and lifecycle writes', () => {
   it('installs on existing and newly opened demo spaces and includes readiness', async () => {
     for (const DB of [rootDB, demoDB, otherDemo]) {
-      expect(await DB.readiness()).toMatchObject({ migration: '0013', schemaReady: true })
+      expect(await DB.readiness()).toMatchObject({ migration: '0014', schemaReady: true })
       await insert(DB, 'installation')
       expect((await app(DB, 'installation')).review_revision).toBe(0)
       await DB.prepare("UPDATE application SET status='검토중' WHERE id='installation'").run()

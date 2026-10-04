@@ -1,12 +1,11 @@
 // 1단계 — 신청서 접수와 목록.
 //
-// 로그인을 요구하지 않는다. 부서 담당자에게 계정을 만들게 하는 순간 아무도
-// 신청하지 않고, 그러면 이 시스템에 들어오는 것이 없다. 대신 접수번호를 주고
-// 남용은 IP 단위 호출 한도로 막는다.
+// 운영 계정/개인 체험 범위는 middleware가 고른다. 같은 제출 의도의 재시도는
+// 접수번호를 다시 돌려주며, 신청·성공 한도·재시도 영수증은 DB에서 함께 커밋한다.
 
-import { jsonResponse, jsonError, failUnexpected } from '../../_lib/http.ts'
-import { checkRateLimit, releaseRateLimit } from '../../_lib/rateLimit.js'
+import { jsonResponse, failUnexpected } from '../../_lib/http.ts'
 import { newId, newTicketNo, hashIp } from '../../_lib/ids.js'
+import { mutationFingerprint } from '../../_lib/atomicMutation.ts'
 import {
   validateApplication,
   annualHours,
@@ -135,25 +134,16 @@ export async function onRequestPost({ env, data: requestData, request }) {
   env = requestData?.requestEnv ?? env
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown'
 
-  // 한 사람이 같은 내용을 반복 제출하는 것만 막는다. 진짜 신청을 막지 않도록
-  // 넉넉하게 둔다 — 부서에서 여러 명이 같은 사무실 IP로 낼 수 있다.
-  const ticket = await checkRateLimit(env, `apply:${ip}`, 12, 3600)
-  if (!ticket) {
-    return jsonError('신청은 시간당 12건까지 받습니다. 잠시 후 다시 시도해주세요.', 429)
-  }
-
   let form
   try {
     form = await request.formData()
   } catch {
-    await releaseRateLimit(env, `apply:${ip}`, ticket)
-    return jsonError('신청서 형식이 올바르지 않습니다.', 400)
+    return jsonResponse({ error: '신청서 형식이 올바르지 않습니다.', notSaved: true }, 400)
   }
 
   for (const value of form.values()) {
     if (typeof value !== 'string') {
-      await releaseRateLimit(env, `apply:${ip}`, ticket)
-      return jsonError('신청서는 텍스트만 받습니다. 정산 파일은 제작 화면에서 처리해주세요.', 400)
+      return jsonResponse({ error: '신청서는 텍스트만 받습니다. 정산 파일은 제작 화면에서 처리해주세요.', notSaved: true }, 400)
     }
   }
   const fields = Object.fromEntries(form)
@@ -161,51 +151,40 @@ export async function onRequestPost({ env, data: requestData, request }) {
 
   const check = validateApplication(fields)
   if (!check.ok) {
-    await releaseRateLimit(env, `apply:${ip}`, ticket)
-    return jsonResponse({ error: '적어 주신 내용을 확인해주세요.', fields: check.errors }, 400)
+    return jsonResponse({ error: '적어 주신 내용을 확인해주세요.', fields: check.errors, notSaved: true }, 400)
   }
 
-  const v = check.value
-  const id = newId('app')
-  const ticketNo = newTicketNo()
+  const requestId = request.headers.get('X-Idempotency-Key')
+  if (!requestId || !/^[a-zA-Z0-9_-]{16,100}$/.test(requestId)) {
+    return jsonResponse({ error: '제출 확인 정보가 없습니다. 접수 내역을 확인한 뒤 신청 화면을 다시 열어주세요.', code: 'APPLICATION_INTENT_REQUIRED', notSaved: true }, 400)
+  }
+  if (typeof env.DB?.recordApplication !== 'function') {
+    return jsonResponse({ error: '안전한 신청 접수 기능을 준비 중입니다. 잠시 후 같은 내용으로 다시 시도해주세요.', notSaved: true }, 503)
+  }
 
   try {
-    await env.DB.prepare(
-      `INSERT INTO application
-         (id, ticket_no, dept, applicant_label, contact, title, bottleneck, problem, wish,
-          current_minutes, current_people, current_frequency, impact_if_wrong,
-          status, source_ip_hash, owner_email)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '접수', ?, ?)`
-    )
-      .bind(
-        id,
-        ticketNo,
-        v.dept,
-        v.applicant_label,
-        v.contact,
-        v.title,
-        v.bottleneck,
-        v.problem,
-        v.wish,
-        v.current_minutes,
-        v.current_people,
-        v.current_frequency,
-        v.impact_if_wrong,
-        await hashIp(ip),
-        env.AUTH_ACTOR?.email ?? null
-      )
-      .run()
+    const value = check.value
+    // Network changes and newly generated record IDs must not change the intent.
+    // The DB independently scopes receipts to the verified actor/workspace.
+    const fingerprint = await mutationFingerprint({ operation: 'application.create', value })
+    const committed = await env.DB.recordApplication(`apply:${ip}`, requestId, fingerprint, {
+      ...value, id: newId('app'), ticket_no: newTicketNo(), source_ip_hash: await hashIp(ip),
+    })
+    const { status, body } = committed.response
+    if (![201, 429].includes(status) || !body || typeof body !== 'object' || Array.isArray(body)
+      || (status === 201 && (typeof body.id !== 'string' || !/^app_[a-zA-Z0-9_-]{16,90}$/.test(body.id)
+        || typeof body.ticket_no !== 'string' || !/^AX-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{3}-[23456789ABCDEFGHJKMNPQRSTUVWXYZ]{3}$/.test(body.ticket_no)
+        || typeof body.message !== 'string' || !body.message.trim()))
+      || (status === 429 && (typeof body.error !== 'string' || !body.error.trim() || body.notSaved !== true))) {
+      throw new Error('Invalid application receipt response')
+    }
+    return jsonResponse(body, status, { 'X-Idempotency-Replayed': committed.replayed ? '1' : '0' })
   } catch (error) {
-    await releaseRateLimit(env, `apply:${ip}`, ticket)
-    return failUnexpected(error, '신청서를 저장하지 못했습니다.', 500)
+    if (/\/(40001)\)/.test(error?.message ?? '')) {
+      return jsonResponse({ error: '이 제출 번호에 이미 다른 내용이나 이전 접근 상태의 접수 기록이 있습니다. 접수 내역을 먼저 확인해주세요.', code: 'APPLICATION_INTENT_CONFLICT' }, 409)
+    }
+    // A failed/lost response may follow a committed insert. Never refund its
+    // quota or generate another intent; retrying the same key recovers it.
+    return failUnexpected(error, '신청서의 저장 여부를 확인하지 못했습니다. 같은 내용으로 다시 시도해주세요.')
   }
-
-  return jsonResponse(
-    {
-      id,
-      ticket_no: ticketNo,
-      message: '접수됐습니다.',
-    },
-    201
-  )
 }

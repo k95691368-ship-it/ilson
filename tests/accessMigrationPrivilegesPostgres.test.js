@@ -59,7 +59,7 @@ describe('access migration under a non-superuser migration owner', () => {
       const changed = (await pg.query('SELECT public.ilson_actor_query($1,$2) AS data',
         ['owner-a@test.invalid', "UPDATE public.application SET title='forbidden' WHERE id='app-b'"])).rows[0].data
       expect(changed.rowCount).toBe(0)
-      expect((await pg.query('SELECT public.ilson_readiness(NULL) AS data')).rows[0].data).toMatchObject({ migration: '0013', schemaReady: true })
+      expect((await pg.query('SELECT public.ilson_readiness(NULL) AS data')).rows[0].data).toMatchObject({ migration: '0014', schemaReady: true })
       await pg.exec('RESET ROLE; SET ROLE anon')
       await expect(pg.query('SELECT public.ilson_actor_query($1,$2)',
         ['owner-a@test.invalid', 'SELECT id FROM public.application'])).rejects.toMatchObject({ code: '42501' })

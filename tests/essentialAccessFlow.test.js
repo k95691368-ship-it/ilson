@@ -22,7 +22,7 @@ const actors=[['admin@local.invalid','audit',[],[]],['staff@local.invalid','prod
   ['owner@local.invalid','reviewer',[],[]],['other@local.invalid','reviewer',[],[]]]
 beforeAll(async()=>{
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-  for(const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop.sql','0003_journey_workspaces.sql','0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql'])
+  for(const file of ['0000_schema.sql','0001_execute_sql.sql','0002_override_loop.sql','0003_journey_workspaces.sql','0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql','0014_application_receipts.sql'])
     await pg.exec(readFileSync(new URL('../supabase/migrations/'+file,import.meta.url),'utf8'))
   vi.stubGlobal('fetch',(url,options)=>{
     if(String(url)===issuer+'/cdn-cgi/access/certs')return Promise.resolve(Response.json({keys:[jwk]}))

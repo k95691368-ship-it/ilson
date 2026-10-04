@@ -104,6 +104,40 @@ describe('오래된 것은 되살리지 않는다', () => {
 })
 
 describe('저장하고 되살리기', () => {
+  it('제출용 표시가 있는 짧은 유효 신청만 일반 10자 기준과 별도로 복구한다', () => {
+    const s = fakeStorage()
+    const short = { dept: '재무', applicant_label: '담당', title: '정산', current_people: '1' }
+    expect(saveDraft(s, SCOPE, short, NOW)).toBe(false)
+    expect(saveDraft(s, SCOPE, short, NOW, { submission: true })).toBe(true)
+    expect(loadDraft(s, SCOPE, NOW).form).toEqual(short)
+    expect(loadDraft(s, OTHER_SCOPE, NOW)).toBeNull()
+    expect(loadDraft(s, SCOPE, NOW + DRAFT_MAX_DAYS * DAY + 1)).toBeNull()
+  })
+
+  it.each([true, 'submission', 'ilson.application-submission.v2'])('미확인 제출 표시 %s는 짧은 초안 기준을 우회하지 않는다', format => {
+    const s = fakeStorage({ [KEY]: JSON.stringify({ scope: SCOPE, savedAt: new Date(NOW).toISOString(), format, form: { dept: '재무', applicant_label: '담당', title: '정산' } }) })
+    expect(loadDraft(s, SCOPE, NOW)).toBeNull()
+  })
+
+  it('제출 snapshot은 허용한 텍스트 필드만 보존하며 필수값·길이 상한을 검사한다', () => {
+    const s = fakeStorage()
+    const short = { dept: '재무', applicant_label: '담당', title: '정산', private_extra: 'do not retain' }
+    expect(saveDraft(s, SCOPE, short, NOW, { submission: true })).toBe(true)
+    expect(loadDraft(s, SCOPE, NOW).form).toEqual({ dept: '재무', applicant_label: '담당', title: '정산' })
+    expect(s.getItem(KEY)).not.toContain('private_extra')
+    expect(saveDraft(s, SCOPE, { ...short, title: '가'.repeat(81) }, NOW, { submission: true })).toBe(false)
+    clearDraft(s, SCOPE)
+    expect(saveDraft(s, SCOPE, { ...short, applicant_label: '' }, NOW, { submission: true })).toBe(false)
+    expect(loadDraft(s, SCOPE, NOW)).toBeNull()
+  })
+
+  it('새 필드 상한을 넘는 과거 초안은 복구하지 않되 사용자 원문을 삭제하지 않는다', () => {
+    const raw = JSON.stringify({ scope: SCOPE, savedAt: new Date(NOW).toISOString(), form: { ...FULL, problem: '과거 원문'.repeat(400) } })
+    const s = fakeStorage({ [KEY]: raw })
+    expect(loadDraft(s, SCOPE, NOW)).toBeNull()
+    expect(s.getItem(KEY)).toBe(raw)
+  })
+
   it('저장한 것을 그대로 되살린다', () => {
     const s = fakeStorage()
     expect(saveDraft(s, SCOPE, FULL, NOW)).toBe(true)

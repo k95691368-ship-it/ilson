@@ -1,5 +1,6 @@
 import { atomicMutation, mutationFingerprint } from './atomicMutation.ts'
 import { jsonResponse, jsonError, failUnexpected } from './http.ts'
+import { isTransactionConflict } from './transactionConflict.ts'
 
 export function agreementConflict() {
   return jsonResponse({error:'협의 근거가 변경되었습니다. 작성한 내용은 유지하고 최신 근거를 확인한 뒤 다시 저장해주세요.',code:'AGREEMENT_EDIT_CONFLICT'},409)
@@ -42,7 +43,7 @@ export async function agreementMutation(env, request, identity, body, action) {
       return forbidden||action(DB)
     })
   } catch(error) {
-    if(/\/(40001|40P01|28000)/.test(error.message)) return agreementConflict()
+    if(isTransactionConflict(error)) return agreementConflict()
     return failUnexpected(error,'협의 근거를 저장하지 못했습니다.')
   }
 }

@@ -10,7 +10,7 @@ import { localAccessFixture } from '../tests/fixtures/localAccess.mjs'
 import { compileDemoRoutes } from './lib/demo-routes.mjs'
 const pg = new PGlite()
 await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql']) {
+for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql','0014_application_receipts.sql']) {
   await pg.exec(await readFile(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'))
 }
 const fixture = process.argv.includes('--access-fixture') ? await localAccessFixture(pg, {
@@ -21,6 +21,8 @@ const fixture = process.argv.includes('--access-fixture') ? await localAccessFix
 }) : null
 const port = fixture ? 5188 : 5187
 let queue = Promise.resolve()
+const applicationRetryFixture = process.argv.includes('--application-retry-fixture')
+let applicationReplyLost = false
 globalThis.fetch = (url, options) => {
   const certificates = fixture?.certificates(url)
   if (certificates) return Promise.resolve(certificates)
@@ -28,10 +30,17 @@ globalThis.fetch = (url, options) => {
   const run = queue.then(async () => {
     try {
       const name = new URL(url).pathname.split('/').at(-1)
-      if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|record_tool_run|record_beta_round|assign_application_owner|actor_(query|batch|receipt|commit|claim_rate_limit|rate_state|release_rate_limit)|readiness)$/.test(name)) throw new Error('Unsupported RPC')
+      if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|record_tool_run|record_beta_round|record_application|assign_application_owner|actor_(query|batch|receipt|commit|claim_rate_limit|rate_state|release_rate_limit)|readiness)$/.test(name)) throw new Error('Unsupported RPC')
       const args = Object.values(JSON.parse(options.body))
       await pg.exec('SET ROLE service_role')
       const result = await pg.query(`SELECT public.${name}(${args.map((_, i) => '$' + (i + 1)).join(',')}) AS data`, args)
+      // Local in-memory verification only: commit the first successful form
+      // intent, then lose its response once. Its retry must recover the receipt.
+      if (applicationRetryFixture && !applicationReplyLost && name === 'ilson_record_application'
+        && result.rows[0].data?.response?.status === 201) {
+        applicationReplyLost = true
+        return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
+      }
       if (fixture?.loseReply(name, args, result.rows[0].data)) return Response.json({code:'LOCAL_LOST_REPLY'},{status:503})
       return Response.json(result.rows[0].data)
     } catch (error) { return Response.json({ code: error.code || 'LOCAL' }, { status: 400 }) }

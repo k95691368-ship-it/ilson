@@ -46,7 +46,7 @@ beforeAll(async()=>{
   })
   const form=new FormData()
   for(const [key,value] of Object.entries({dept:'재무',applicant_label:'감사 담당',title:'신규 신청 진행 감사',bottleneck:'수작업',problem:'지연',current_minutes:'10',current_people:'1',current_frequency:'매일'})) form.set(key,value)
-  const response=await apply({env,request:new Request('https://local.invalid/api/applications',{method:'POST',body:form})})
+  const response=await apply({env,request:new Request('https://local.invalid/api/applications',{method:'POST',headers:{'X-Idempotency-Key':crypto.randomUUID()},body:form})})
   expect(response.status).toBe(201)
   app=await response.json()
   // Review is not under audit; begin from the supported accepted state.

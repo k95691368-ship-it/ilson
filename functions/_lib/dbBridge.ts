@@ -1,6 +1,6 @@
 // Server-only Supabase bridge. Route handlers keep the D1 statement interface.
 import type {
-  CommittedMutation, Database, DatabaseResult, MutationRead, MutationReceipt,
+  ApplicationSubmission, CommittedMutation, Database, DatabaseResult, MutationRead, MutationReceipt,
   MutationWrite, PreparedStatement, SqlRow, SqlValue,
 } from './runtimeTypes.ts'
 
@@ -33,6 +33,7 @@ export interface SupabaseDatabase extends Database {
   toolRunScope(): Promise<string>
   recordToolRun(slug: string, bucket: string, requestId: string, fingerprint: string, run: unknown): Promise<unknown>
   recordBetaRound(applicationId: string, requestId: string, fingerprint: string, round: unknown): Promise<unknown>
+  recordApplication(bucket: string, requestId: string, fingerprint: string, application: ApplicationSubmission): Promise<CommittedMutation>
   workspaceOpen(token: string, applications: unknown): Promise<unknown>
   workspaceReset(token: string, applications: unknown, newToken: string): Promise<unknown>
   claimRateLimit(bucket: string, maxHits: number, windowSeconds: number): Promise<unknown>
@@ -267,6 +268,10 @@ export function createSupabaseDb(url: string, key: string, workspaceToken: strin
       p_token: workspaceToken, p_actor: actorEmail, p_application: applicationId,
       p_request_id: requestId, p_fingerprint: fingerprint, p_round: round,
     }),
+    recordApplication: async (bucket, requestId, fingerprint, application) => committedOf(await rpc('ilson_record_application', {
+      p_token: workspaceToken, p_actor: actorEmail, p_bucket: bucket,
+      p_request_id: requestId, p_fingerprint: fingerprint, p_application: application,
+    })),
     workspaceOpen: (token, applications) => rpc('ilson_workspace_open', { p_token: token, p_applications: applications }),
     workspaceReset: (token, applications, newToken) => rpc('ilson_workspace_reset', { p_token: token, p_applications: applications, p_new_token: newToken }),
     claimRateLimit: (bucket, maxHits, windowSeconds) => rpc(actorEmail ? 'ilson_actor_claim_rate_limit' : 'ilson_claim_rate_limit', {

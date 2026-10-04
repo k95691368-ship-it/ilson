@@ -9,6 +9,7 @@
 //
 // 초안은 브라우저에만 두되, 서버가 확인한 계정·체험 공간별로 분리한다.
 // 소유 범위가 없는 이전 공용 초안은 새 계정에 이관하거나 읽거나 지우지 않는다.
+import { DEPTS } from '../../shared/depts.js'
 
 export const DRAFT_KEY = 'ilson.apply.draft.v1'
 
@@ -30,6 +31,27 @@ export const DRAFT_MAX_DAYS = 7
 // 사람이 실제로 글을 쓴 흔적이 있어야 한다.
 const MEANINGFUL = ['title', 'bottleneck', 'problem', 'wish', 'impact_if_wrong']
 const MIN_CHARS = 10
+const SUBMISSION_FORMAT = 'ilson.application-submission.v1'
+const FORM_LIMITS = {
+  dept: 80, applicant_label: 40, contact: 80, title: 80,
+  bottleneck: 1000, problem: 1500, wish: 1000, impact_if_wrong: 600,
+  current_minutes: 16, current_people: 16, current_frequency: 40,
+}
+
+function projectForm(form) {
+  if (!form || typeof form !== 'object' || Array.isArray(form)) return null
+  const output = {}
+  for (const [key, limit] of Object.entries(FORM_LIMITS)) {
+    if (form[key] === undefined) continue
+    if (typeof form[key] !== 'string' || form[key].length > limit) return null
+    output[key] = form[key]
+  }
+  return output
+}
+
+function isSubmission(form) {
+  return form && DEPTS.includes(form.dept) && Boolean(form.applicant_label?.trim()) && Boolean(form.title?.trim())
+}
 
 export function isWorthSaving(form) {
   if (!form) return false
@@ -48,17 +70,20 @@ export function isExpired(savedAt, now = Date.now(), days = DRAFT_MAX_DAYS) {
 
 // 저장한다. 저장할 값이 없으면 전에 저장해 둔 것을 지운다 —
 // 사람이 다 지웠는데 옛것이 남아 있으면 다음에 그게 되살아난다.
-export function saveDraft(storage, scope, form, now = Date.now()) {
+export function saveDraft(storage, scope, form, now = Date.now(), { submission = false } = {}) {
   const key = draftKey(scope)
   if (!storage || !key) return false
-  if (!isWorthSaving(form)) {
+  const projected = projectForm(form)
+  if (!projected) return false
+  const submitted = submission === true && isSubmission(projected)
+  if (!isWorthSaving(projected) && !submitted) {
     clearDraft(storage, scope)
     return false
   }
   try {
     storage.setItem(
       key,
-      JSON.stringify({ scope, savedAt: new Date(now).toISOString(), form })
+      JSON.stringify({ scope, savedAt: new Date(now).toISOString(), form: projected, ...(submitted ? { format: SUBMISSION_FORMAT } : {}) })
     )
     return true
   } catch {
@@ -88,7 +113,13 @@ export function loadDraft(storage, scope, now = Date.now()) {
     return null
   }
 
-  if (parsed?.scope !== scope || !parsed?.form || !isWorthSaving(parsed.form)) {
+  const form = projectForm(parsed?.form)
+  // A newly enforced field limit must not erase an older user-authored draft.
+  // Do not restore unsupported fields, but preserve its original local record.
+  if (parsed?.scope === scope && parsed.form && !form
+    && Object.entries(FORM_LIMITS).some(([field, limit]) => typeof parsed.form[field] === 'string' && parsed.form[field].length > limit)) return null
+  const submitted = parsed?.format === SUBMISSION_FORMAT && isSubmission(form)
+  if (parsed?.scope !== scope || !form || (!isWorthSaving(form) && !submitted)) {
     clearDraft(storage, scope)
     return null
   }
@@ -96,7 +127,7 @@ export function loadDraft(storage, scope, now = Date.now()) {
     clearDraft(storage, scope)
     return null
   }
-  return { form: parsed.form, savedAt: parsed.savedAt }
+  return { form, savedAt: parsed.savedAt, submission: Boolean(submitted) }
 }
 
 export function clearDraft(storage, scope) {

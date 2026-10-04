@@ -24,6 +24,23 @@ export interface CommittedMutation {
   replayed: boolean
 }
 
+export interface ApplicationSubmission {
+  id: string
+  ticket_no: string
+  dept: string
+  applicant_label: string
+  contact: string | null
+  title: string
+  bottleneck: string
+  problem: string
+  wish: string | null
+  current_minutes: number | null
+  current_people: number | null
+  current_frequency: string | null
+  impact_if_wrong: string | null
+  source_ip_hash: string | null
+}
+
 export interface MutationRead {
   sql: string
   binds?: readonly SqlValue[]
@@ -50,6 +67,7 @@ export interface Database {
   batch(statements: readonly PreparedStatement[]): Promise<DatabaseResult[]>
   // A distinct capability: staged batch() queues writes and cannot serve reads.
   readBatch?(statements: readonly PreparedStatement[]): Promise<DatabaseResult[]>
+  recordApplication?(bucket: string, requestId: string, fingerprint: string, application: ApplicationSubmission): Promise<CommittedMutation>
   mutationReceipt?(requestId: string, fingerprint: string): Promise<MutationReceipt | null>
   commitMutation?(requestId: string, fingerprint: string, reads: readonly MutationRead[], writes: readonly MutationWrite[], response: MutationReceipt): Promise<CommittedMutation>
 }

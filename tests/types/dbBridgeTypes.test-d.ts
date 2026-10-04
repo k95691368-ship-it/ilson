@@ -18,6 +18,9 @@ export type LegacyAtomicSupportRemainsOptional = Assert<Equal<undefined extends 
 export type SupabaseAtomicSupportIsRequired = Assert<Equal<undefined extends SupabaseDatabase['commitMutation'] ? true : false, false>>
 export type LegacyReadBatchSupportRemainsOptional = Assert<Equal<undefined extends Database['readBatch'] ? true : false, true>>
 export type SupabaseReadBatchIsRequired = Assert<Equal<undefined extends SupabaseDatabase['readBatch'] ? true : false, false>>
+export type LegacyApplicationCapabilityRemainsOptional = Assert<Equal<undefined extends Database['recordApplication'] ? true : false, true>>
+export type SupabaseApplicationCapabilityIsRequired = Assert<Equal<undefined extends SupabaseDatabase['recordApplication'] ? true : false, false>>
+export type ApplicationReceiptIsRuntimeChecked = Assert<Equal<Awaited<ReturnType<SupabaseDatabase['recordApplication']>>, CommittedMutation>>
 export type UnmigratedRpcStaysUnknown = Assert<Equal<Awaited<ReturnType<SupabaseDatabase['recordToolRun']>>, unknown>>
 export type BindingValuesMatchSql = Assert<Equal<Parameters<PreparedStatement['bind']>[number], SqlValue>>
 

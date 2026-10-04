@@ -54,13 +54,13 @@ describe('deployable Pages Worker', () => {
     let queue = Promise.resolve()
     try {
       await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
-      for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql']) {
+      for (const file of ['0000_schema.sql', '0001_execute_sql.sql', '0002_override_loop.sql', '0003_journey_workspaces.sql', '0004_audit_hardening.sql','0005_field_feedback.sql','0006_access_scope.sql','0007_issue_workflow.sql','0008_feedback_rechecks.sql','0009_participation_quota.sql','0010_application_ownership.sql','0011_tool_run_receipts.sql','0012_beta_round_receipts.sql','0013_review_revision.sql','0014_application_receipts.sql']) {
         await pg.exec(readFileSync(new URL('../supabase/migrations/' + file, import.meta.url), 'utf8'))
       }
       vi.stubGlobal('fetch', (url, options) => {
         if (!String(url).startsWith(env.SUPABASE_URL + '/rest/v1/rpc/')) throw Error('External network forbidden')
         const name = new URL(url).pathname.split('/').at(-1)
-        if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|actor_(claim_rate_limit|rate_state|release_rate_limit)|readiness)$/.test(name)) throw Error('Unknown RPC')
+        if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|record_application|actor_(claim_rate_limit|rate_state|release_rate_limit)|readiness)$/.test(name)) throw Error('Unknown RPC')
         const result = queue.then(async () => {
           try {
             await pg.exec('SET ROLE service_role')
@@ -75,7 +75,7 @@ describe('deployable Pages Worker', () => {
       const scopeFor = async cookie => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode('workspace:' + cookie.split('=')[1]))), byte => byte.toString(16).padStart(2, '0')).join('')
       const request = async (path, cookie = '', body, method = body ? 'POST' : 'GET', key = crypto.randomUUID()) => worker.fetch(new Request('https://ilson.test' + path, {
         method, headers: { Origin: 'https://ilson.test', 'X-Ilson-Request': '1', Cookie: cookie, 'X-Idempotency-Key': key, ...(cookie ? { 'X-Ilson-Scope': await scopeFor(cookie) } : {}) },
-        ...(body ? { body: JSON.stringify(body) } : {}),
+        ...(body ? { body: body instanceof FormData ? body : JSON.stringify(body) } : {}),
       }), env, context)
       const openedA = await request('/api/demo/workspace', '', {})
       const openedB = await request('/api/demo/workspace', '', {})
@@ -83,6 +83,17 @@ describe('deployable Pages Worker', () => {
       expect(openedB.status).toBe(201)
       const a = openedA.headers.get('Set-Cookie').split(';')[0]
       const b = openedB.headers.get('Set-Cookie').split(';')[0]
+      const applicationForm = new FormData()
+      for (const [name, value] of Object.entries({ dept: '재무', applicant_label: '합성 신청자', title: '배포 묶음 신청 재시도' })) applicationForm.set(name, value)
+      const applicationKey = crypto.randomUUID()
+      const submitted = await request('/api/applications', a, applicationForm, 'POST', applicationKey)
+      expect(submitted.status).toBe(201)
+      const applicationReceipt = await submitted.json()
+      const submittedAgain = await request('/api/applications', a, applicationForm, 'POST', applicationKey)
+      expect(submittedAgain.status).toBe(201)
+      expect(submittedAgain.headers.get('X-Idempotency-Replayed')).toBe('1')
+      expect(await submittedAgain.json()).toEqual(applicationReceipt)
+      expect((await request('/api/applications/' + applicationReceipt.id, b)).status).toBe(404)
       const missingScope = await worker.fetch(new Request('https://ilson.test/api/override', { headers: { Cookie: a } }), env, context)
       expect(missingScope.status).toBe(428)
       expect(await missingScope.json()).toMatchObject({ code: 'SESSION_SCOPE_REQUIRED' })

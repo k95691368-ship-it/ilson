@@ -2,6 +2,7 @@ import { mutationFingerprint, atomicMutation } from './atomicMutation.ts'
 import { computeOutcome, annualize, buildChallenges, daysSince, labelForOutcome } from '../../shared/outcome.js'
 import { OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../shared/accept.js'
 import { jsonError, failUnexpected } from './http.ts'
+import { isTransactionConflict } from './transactionConflict.ts'
 import { allScopedReads } from './allScopedReads.ts'
 
 export const OUTCOME_RESOLUTION_KIND = '성과검증해소'
@@ -24,8 +25,7 @@ export async function outcomeMutation(DB, request, identity, body, action) {
   try {
     return await atomicMutation(DB, requestId, await mutationFingerprint({ identity, body }), action)
   } catch (error) {
-    if (/\/28000/.test(error.message)) return jsonError('계정 권한이 변경되었습니다. 작성한 내용은 유지됩니다. 다시 접속하여 권한을 확인해주세요.', 409)
-    if (/\/(40001|40P01)/.test(error.message)) return outcomeConflict()
+    if (isTransactionConflict(error)) return outcomeConflict()
     return failUnexpected(error, '성과 기록을 저장하지 못했습니다.')
   }
 }

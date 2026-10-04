@@ -1,5 +1,6 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { atomicMutation, mutationFingerprint } from '../../../_lib/atomicMutation.ts'
+import { isTransactionConflict } from '../../../_lib/transactionConflict.ts'
 import { loadHandoverEvidence, publicHandoverEvidence } from '../../../_lib/handoverEvidence.ts'
 import { logDecision } from '../../../_lib/decisions.js'
 import { HANDOVER_KIND, STOP_KIND, TOOL_SCOPE, validateHandover } from '../../../../shared/handover.ts'
@@ -119,8 +120,7 @@ export async function onRequestPost({env,data,params,request}: HandoverWriteCont
       return jsonResponse({ok:true,action:body.action,slug,href:`/t/${slug}`} satisfies HandoverMutationResponse,body.action==='create'?201:200)
     })
   } catch(error) {
-    const message=error!==null&&typeof error==='object'&&'message' in error&&typeof error.message==='string'?error.message:''
-    if(/\/(40001|40P01|28000)/.test(message)) return conflict()
+    if(isTransactionConflict(error)) return conflict()
     return failUnexpected(error,'인계 저장 여부를 확인하지 못했습니다. 같은 내용으로 다시 저장해주세요.')
   }
 }

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
@@ -80,6 +80,9 @@ function ApplySession({ scope, generation, status, mode }) {
   const [similarHidden, setSimilarHidden] = useState(false)
   const [fieldErrors, setFieldErrors] = useState({})
   const [submitting, setSubmitting] = useState(false)
+  const submittingRef = useRef(false)
+  const submittedDraftRef = useRef(null)
+  const [submissionIssue, setSubmissionIssue] = useState(null)
   const [receipt, setReceipt] = useState(null)
 
   useEffect(() => {
@@ -96,6 +99,9 @@ function ApplySession({ scope, generation, status, mode }) {
     if (!scope || restorable || !currentSession()) return
     const current = captureView()
     const timer = setTimeout(() => {
+      // Preserve a short submitted snapshot; the normal 10-character typing
+      // threshold must not erase it after the submit debounce catches up.
+      if (submittedDraftRef.current === form) return
       if (current() && currentSession()) saveDraft(browserStore(), scope, form)
     }, 800)
     return () => clearTimeout(timer)
@@ -130,32 +136,45 @@ function ApplySession({ scope, generation, status, mode }) {
     if (fieldErrors[key]) setFieldErrors((e) => ({ ...e, [key]: undefined }))
   }
 
-  async function submit(e) {
+  async function submit(e, confirmedNewIntent = false) {
     e.preventDefault()
-    if (submitting || !currentSession()) return
+    // React state is not a same-tick lock (e.g. two submit events before render).
+    if (submittingRef.current || !currentSession() || (submissionIssue?.needsConfirmation && !confirmedNewIntent)) return
+    submittingRef.current = true
     setSubmitting(true)
     setFieldErrors({})
     const current = captureView()
+    // Do not rely on the 800ms typing debounce when a tab closes after submit.
+    if (scope && saveDraft(browserStore(), scope, form, Date.now(), { submission: true })) submittedDraftRef.current = form
 
     const body = new FormData()
     Object.entries(form).forEach(([k, v]) => body.append(k, v))
 
     try {
-      const json = await api.form('/applications', body)
+      const json = await api.form('/applications', body, { confirmedNewIntent })
       if (!current() || !currentSession()) return
       // 냈으면 초안은 쓸모가 없다. 남겨 두면 다음에 열었을 때 이미 낸 것을
       // 또 내라고 권하게 된다.
       clearDraft(browserStore(), scope)
       setReceipt(json)
+      setSubmissionIssue(null)
       setForm(EMPTY)
       toast.success(`접수됐습니다. 접수번호 ${json.ticket_no}`)
-      await reload()
+      // A failed list refresh does not make a confirmed receipt uncertain.
+      try { await reload() } catch {
+        if (current() && currentSession()) toast.error('접수는 완료됐지만 목록을 새로 불러오지 못했습니다. 접수번호로 확인해주세요.')
+      }
     } catch (err) {
       if (!current() || !currentSession()) return
       // 칸별 오류가 있으면 그 칸 아래에 붙이고, 아니면 알림으로 알린다.
       if (err.fields) setFieldErrors(err.fields)
+      setSubmissionIssue(err.notSaved && err.status !== 429 ? null : {
+        message: err.message,
+        needsConfirmation: ['APPLICATION_INTENT_CONFLICT', 'APPLICATION_INTENT_EXPIRED', 'APPLICATION_INTENT_UNRESOLVED', 'APPLICATION_INTENT_CHANGED'].includes(err.code),
+      })
       toast.error(err.message)
     } finally {
+      submittingRef.current = false
       if (current() && currentSession()) setSubmitting(false)
     }
   }
@@ -196,8 +215,8 @@ function ApplySession({ scope, generation, status, mode }) {
                 <span className="card-note">{draftAge(restorable.savedAt)}</span>
               </div>
               <p className="draft-restore-body">
-                {describeDraft(restorable.form)} — 이어서 쓰시겠습니까? 이 브라우저에만 두었고
-                서버로 보낸 적은 없습니다.
+                {describeDraft(restorable.form)} — 이 브라우저에 저장한 초안입니다.
+                접수 여부는 아래 내역에서 확인할 수 있습니다.
               </p>
               <div className="row">
                 <button
@@ -205,7 +224,9 @@ function ApplySession({ scope, generation, status, mode }) {
                   className="btn-primary btn-sm"
                   onClick={() => {
                     if (!currentSession()) return
-                    setForm({ ...EMPTY, ...restorable.form })
+                    const restored = { ...EMPTY, ...restorable.form }
+                    if (restorable.submission) submittedDraftRef.current = restored
+                    setForm(restored)
                     setRestorable(null)
                   }}
                 >
@@ -223,7 +244,7 @@ function ApplySession({ scope, generation, status, mode }) {
                   버리고 새로 쓰기
                 </button>
                 <span className="spacer" />
-                <span className="card-note">{DRAFT_MAX_DAYS}일이 지나면 저절로 지워집니다</span>
+                <span className="card-note">{DRAFT_MAX_DAYS}일이 지난 초안은 복원하지 않습니다</span>
               </div>
             </section>
           )}
@@ -382,15 +403,23 @@ function ApplySession({ scope, generation, status, mode }) {
               </Field>
             </div>
           </section>
+          {submissionIssue && <section className="notice notice-warn" role="status">
+            <p>{submissionIssue.message}</p>
+            <p className="card-note">접수 결과가 불확실하면 같은 내용으로 재시도해주세요. 같은 브라우저에서는 탭을 다시 열어도 같은 신청으로 확인합니다.</p>
+            <a href="#submitted-applications">접수 내역 확인</a>
+            {submissionIssue.needsConfirmation && <div className="stack" style={{ marginTop: 8 }}>
+              <p className="card-note">기존 접수를 확인하셨다면, 입력한 내용을 유지한 채 별도 신청으로 접수할 수 있습니다.</p>
+              <button type="button" className="btn-ghost btn-sm" disabled={submitting} onClick={event => submit(event, true)}>내역 확인 후 새 신청</button>
+            </div>}
+          </section>}
 
-
-          <button type="submit" className="btn-primary btn-block" disabled={submitting}>
+          <button type="submit" className="btn-primary btn-block" disabled={submitting || submissionIssue?.needsConfirmation}>
             {submitting ? '접수하는 중…' : '신청서 내기'}
           </button>
         </form>
 
         <aside className="stack">
-          <section className="card">
+          <section className="card" id="submitted-applications">
             <div className="card-head">
               <h2 className="card-title">접수된 신청서</h2>
               {data && <span className="card-note">{num(data.summary.total)}건</span>}
