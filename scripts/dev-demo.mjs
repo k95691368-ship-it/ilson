@@ -25,6 +25,15 @@ const applicationRetryFixture = process.argv.includes('--application-retry-fixtu
 let applicationReplyLost = false
 const teachRetryFixture = process.argv.includes('--teach-retry-fixture')
 let teachReplyLost = false
+const codeReviewRetryFixture = process.argv.includes('--code-review-retry-fixture')
+let codeReviewReplyLost = false
+if (codeReviewRetryFixture && fixture) {
+  // Explicit synthetic legacy mappings for local UI boundaries, never business data.
+  await pg.query('INSERT INTO sku_alias(external_code,canonical_code,product_name,taught_by,owner_email) VALUES($1,$2,$3,$4,$5)',
+    ['C15-LEGACY-NO-ORIGIN', 'NR-CM-100', '로컬 출처 미연결 예제', 'AX 담당자', 'verification@local.invalid'])
+  await pg.query('INSERT INTO sku_alias(external_code,canonical_code,product_name,taught_by,owner_email) VALUES($1,$2,$3,$4,$5)',
+    ['C15-INVALID-MAPPING', 'NOT-IN-CATALOG', '로컬 잘못된 연결 예제', 'AX 담당자', 'verification@local.invalid'])
+}
 globalThis.fetch = (url, options) => {
   const certificates = fixture?.certificates(url)
   if (certificates) return Promise.resolve(certificates)
@@ -49,6 +58,13 @@ globalThis.fetch = (url, options) => {
         && result.rows[0].data?.response?.body?.ok === true
         && Array.isArray(args[4]) && args[4].some(sql => /^\s*INSERT\s+INTO\s+sku_alias\b/i.test(sql))) {
         teachReplyLost = true
+        return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
+      }
+      if (codeReviewRetryFixture && !codeReviewReplyLost && name === 'ilson_actor_commit'
+        && result.rows[0].data?.response?.body?.ok === true
+        && ['confirm', 'correct'].includes(result.rows[0].data?.response?.body?.action)
+        && Array.isArray(args[4]) && args[4].some(sql => sql.includes('ilson-code-review:'))) {
+        codeReviewReplyLost = true
         return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
       }
       if (fixture?.loseReply(name, args, result.rows[0].data)) return Response.json({code:'LOCAL_LOST_REPLY'},{status:503})

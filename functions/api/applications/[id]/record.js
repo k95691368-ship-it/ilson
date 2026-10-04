@@ -15,6 +15,7 @@ import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
 import { decodeBetaRound } from '../../../../shared/betaEvidence.ts'
 import { readTogether, one } from '../../../_lib/readTogether.js'
+import { projectCodeReviewDecision } from '../../../../shared/codeReviewEvidence.ts'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)
@@ -150,7 +151,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       challenges: challengeRows,
       money,
       moneyLabel,
-      decisions: decisions.results,
+      decisions: decisions.results.map(projectCodeReviewDecision),
       done,
       // 이 문서를 언제 뽑았는지. 인쇄물에는 이게 있어야 나중에 어느 시점의
       // 기록인지 알 수 있다.

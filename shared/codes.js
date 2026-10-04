@@ -1,25 +1,16 @@
 // 알려 준 상품코드를 담당자가 확인하고 정정한다.
 //
-// 부서가 "이 코드는 이 상품입니다"를 알려주면 다음 실행부터 그대로 쓰인다.
-// 편하지만 위험하다 — 코드 하나를 잘못 이어 두면 그 코드로 팔린 것이 전부
-// 엉뚱한 상품 매출로 잡힌다. 금액이 틀리는데 아무도 안 틀렸다고 생각한다.
-// 격리된 줄은 눈에 띄지만 잘못 이어진 줄은 조용히 섞인다.
-//
-// 그렇다고 담당자 승인을 받아야 쓰이게 하면, 부서가 알려주고 나서 며칠씩
-// 기다리게 된다. 그러면 알려주지 않는다.
-//
-// 그래서 이렇게 한다. 부서가 알려준 것은 바로 쓴다. 대신 담당자 화면에
-// "아직 확인 안 한 것"으로 쌓아 두고, 담당자가 나중에 훑어보게 한다.
-// 빠르되 눈감지는 않는다.
+// 저장된 연결은 이후 계산에 적용된다. 기존 계산 결과를 소급 수정하지는
+// 않는다. 현재 연결과 검토 근거의 버전이 일치해야 확인 완료로 표시한다.
+
+import { decodeCodeReviewEvidence, isCodeReviewMetadata } from './codeReviewEvidence.ts'
+import { SKU_BY_CODE } from './master.js'
 
 export const CONFIRM_KIND = '코드확인'
 export const CORRECT_KIND = '코드정정'
 
-// 누가 알려 줬는가.
-//
-// 담당자가 제작 단계에서 넣은 것과 부서가 도구를 쓰다가 알려준 것은
-// 무게가 다르다. 담당자 것은 표를 보고 넣은 것이고, 부서 것은 화면에서
-// 골라 넣은 것이다. 부서 것을 더 봐야 한다.
+// 기존 표시명을 이용한 이력 분류이다. 이름만으로 실제 권한이나 확인
+// 근거를 보증하지 않으며, 확인 완료 여부는 별도 버전 근거로 판정한다.
 export function taughtBySide(alias, staffLabels = ['AX 담당자']) {
   const who = String(alias?.taught_by ?? '').trim()
   if (!who) return '알 수 없음'
@@ -33,39 +24,43 @@ export function annotate(aliases, decisions, { staffLabels } = {}) {
 
   for (const d of decisions ?? []) {
     if (d.link_kind === CONFIRM_KIND) {
-      // 같은 코드를 여러 번 확인했으면 마지막 것만 본다.
-      const prev = confirmed.get(d.link_id)
-      if (!prev || String(prev.at) < String(d.created_at)) {
-        confirmed.set(d.link_id, { by: d.title, at: d.created_at })
-      }
+      const list = confirmed.get(d.link_id) ?? []
+      list.push({ id: d.id, by: d.title, at: d.created_at, evidence: decodeCodeReviewEvidence(d.alternatives, d),
+        legacy: !isCodeReviewMetadata(d) })
+      confirmed.set(d.link_id, list)
     }
     if (d.link_kind === CORRECT_KIND) {
       const list = corrected.get(d.link_id) ?? []
-      list.push({ by: d.title, at: d.created_at, what: d.what, why: d.why })
+      list.push({ id: d.id, by: d.title, at: d.created_at, what: d.what, why: d.why })
       corrected.set(d.link_id, list)
     }
   }
 
   return (aliases ?? []).map((a) => {
     const side = taughtBySide(a, staffLabels)
-    const check = confirmed.get(a.external_code) ?? null
+    const checks = [...(confirmed.get(a.external_code) ?? [])].sort((x, y) => String(y.at).localeCompare(String(x.at)) || String(y.id ?? '').localeCompare(String(x.id ?? '')))
+    const current = a.review_reason !== 'invalid_mapping' && Object.hasOwn(SKU_BY_CODE, a.canonical_code)
+      ? checks.find(check => check.evidence?.reviewedMappingRevision === a.mapping_revision
+      && check.evidence.afterCanonicalCode === a.canonical_code)
+      : undefined
+    const historical = current ?? checks[0] ?? null
+    const check = historical ? { by: historical.by, at: historical.at, verified: Boolean(current), legacy: historical.legacy } : null
     const fixes = (corrected.get(a.external_code) ?? []).sort((x, y) =>
-      String(y.at).localeCompare(String(x.at))
+      String(y.at).localeCompare(String(x.at)) || String(y.id ?? '').localeCompare(String(x.id ?? ''))
     )
 
     // 확인한 뒤에 누가 또 고쳤으면 그 확인은 낡은 것이다.
-    const staleCheck = Boolean(
-      check && String(a.created_at) > String(check.at)
-    )
+    // An old timestamp/name is historical information, not proof that this
+    // exact current mapping was reviewed. Opaque revision evidence is required.
+    const staleCheck = Boolean(check && !check.verified)
 
     return {
       ...a,
       side,
       confirmed: check,
       corrections: fixes,
-      // 담당자가 봐야 하는 것 — 부서가 알려줬는데 아직 확인 안 한 것.
-      // 담당자가 직접 넣은 것은 넣을 때 이미 본 것이라 다시 안 묻는다.
-      needsCheck: side !== '담당자' && (!check || staleCheck),
+      // A display name must not exempt a row from actual review evidence.
+      needsCheck: !check?.verified,
       staleCheck,
     }
   })
@@ -75,8 +70,7 @@ export function annotate(aliases, decisions, { staffLabels } = {}) {
 export function sortForReview(annotated) {
   return [...(annotated ?? [])].sort((a, b) => {
     if (a.needsCheck !== b.needsCheck) return a.needsCheck ? -1 : 1
-    // 그중에서는 최근 것부터. 방금 들어온 것이 아직 안 쓰였을 가능성이 크고,
-    // 그때 잡아야 잘못 섞인 정산을 되돌리는 일이 안 생긴다.
+    // 미확인 항목 안에서는 저장된 연결의 변경 시각 순서로 표시한다.
     return String(b.created_at).localeCompare(String(a.created_at))
   })
 }
@@ -100,10 +94,9 @@ export function validateCorrection({ canonicalCode, why, author, knownCodes }) {
   } else if (knownCodes && !knownCodes.includes(canon)) {
     fields.canonicalCode = '저희 목록에 없는 상품코드입니다.'
   }
-  // 왜 바꾸는지가 없으면, 몇 달 뒤 정산 숫자가 달라진 이유를 못 찾는다.
-  // 코드를 바꾸는 것은 지난 숫자까지 같이 움직이는 일이다.
+  // 이후 계산에 적용되는 연결을 왜 바꿨는지 기록한다.
   if (String(why ?? '').trim().length < 5) {
-    fields.why = '왜 바꾸시는지 적어주세요. 지난 정산 숫자가 함께 움직입니다.'
+    fields.why = '왜 바꾸시는지 적어주세요.'
   }
   if (!String(author ?? '').trim()) fields.author = '누가 정정하시는지 적어주세요.'
   return fields

@@ -11,6 +11,7 @@ const BASE = '/api'
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue | undefined }
 export type FieldErrors = Record<string, string>
 export type ReadOptions = { signal?: AbortSignal }
+export type MutationOptions = { validateResponse?: (value: unknown) => boolean }
 export type FormOptions = { confirmedNewIntent?: boolean }
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
 type RequestOptions = Omit<RequestInit, 'method'> & {
@@ -18,6 +19,7 @@ type RequestOptions = Omit<RequestInit, 'method'> & {
   sessionProbe?: boolean
   sessionGeneration?: number
   confirmedNewIntent?: boolean
+  validateResponse?: (value: unknown) => boolean
 }
 type WorkspaceState = { enabled: boolean; active?: boolean; expired?: boolean; expiresAt?: string; reset?: boolean }
 type AccessSnapshot = { generation: number; status: string; scope: string | null; error: string }
@@ -152,6 +154,7 @@ function textFormSnapshot(body: FormData): { body: FormData; identity: string } 
 }
 
 async function send(path: string, options: RequestOptions = {}): Promise<unknown> {
+  const validateResponse = options.validateResponse
   const access: AccessSnapshot = getAccessSession()
   const generation = options.sessionGeneration ?? access.generation
   const sessionProbe = options.sessionProbe === true && path === '/session' && !options.method
@@ -223,7 +226,7 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
     if (!sessionProbe) headers.set('X-Ilson-Scope', String(access.scope))
     else headers.delete('X-Ilson-Scope')
     if (key) headers.set('X-Idempotency-Key', key)
-    const { sessionProbe: _probe, sessionGeneration: _generation, confirmedNewIntent: _confirmed, ...requestOptions } = options
+    const { sessionProbe: _probe, sessionGeneration: _generation, confirmedNewIntent: _confirmed, validateResponse: _validate, ...requestOptions } = options
     options = { ...requestOptions, headers, credentials: 'same-origin', cache: 'no-store' }
     // 미리 띄워 둔 것이 있으면 그것을 쓴다. 그것이 실패했으면 null 이 오고,
     // 그때는 아무 일 없었던 것처럼 지금 부른다.
@@ -284,6 +287,13 @@ async function send(path: string, options: RequestOptions = {}): Promise<unknown
       notSaved: confirmedNotSaved,
     })
   }
+  // A consumer's success contract must pass before the retry key is retired.
+  // Valid JSON alone does not establish that this exact write was confirmed.
+  if (validateResponse) {
+    let valid = false
+    try { valid = validateResponse(body) === true } catch { /* uncertain success, preserve key */ }
+    if (!valid) throw new ApiError('저장 응답을 확인하지 못했습니다. 같은 내용으로 다시 시도해주세요.', { status: 502 })
+  }
   if (application && key) {
     // The receipt is authoritative even when browser storage becomes unavailable.
     // Leaving the old key only replays this receipt; it cannot create a duplicate.
@@ -311,7 +321,7 @@ function withJson(method: HttpMethod, body?: JsonValue): RequestOptions {
 export const api = {
   // Success JSON deliberately remains unknown until a consuming boundary validates it.
   get: (path: string, { signal }: ReadOptions = {}): Promise<unknown> => send(path, { signal }),
-  post: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('POST', body)),
+  post: (path: string, body?: JsonValue, { validateResponse }: MutationOptions = {}): Promise<unknown> => send(path, { ...withJson('POST', body), validateResponse }),
   put: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('PUT', body)),
   patch: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('PATCH', body)),
   remove: (path: string, body?: JsonValue): Promise<unknown> => send(path, withJson('DELETE', body)),

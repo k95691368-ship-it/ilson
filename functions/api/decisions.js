@@ -9,8 +9,18 @@
 
 import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { DEPT_KINDS, PROXY_KINDS, sideOf, sideLine } from '../../shared/side.js'
+import { CODE_REVIEW_PREFIX, projectCodeReviewDecision } from '../../shared/codeReviewEvidence.ts'
 
 const STAGES = ['신청서', '검토', '협의안', '제작', '베타테스트', '사용법서', '배포', '성과']
+
+// Keep counting/searching human alternatives in SQL, without loading the entire
+// history. Reserved code evidence is not an alternative, even when unreadable.
+// SQLite LIKE is case-insensitive by default; the exact prefix comparison keeps
+// its classification equal to PostgreSQL and the shared startsWith predicate.
+const VISIBLE_ALTERNATIVES = `CASE WHEN d.link_kind IN ('코드확인', '코드정정')
+  AND d.alternatives LIKE '${CODE_REVIEW_PREFIX}%'
+  AND substr(d.alternatives, 1, ${CODE_REVIEW_PREFIX.length}) = '${CODE_REVIEW_PREFIX}'
+  THEN NULL ELSE d.alternatives END`
 
 export async function onRequestGet({ env, data: requestData, request }) {
   env = requestData?.requestEnv ?? env
@@ -60,7 +70,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
     if (q) {
       // 제목·내용·근거·대안 어디에 있든 찾는다. 나중에 "그거 어디 적었더라"를
       // 찾을 때 어느 칸에 적었는지까지 기억하고 있을 리 없다.
-      where.push('(d.title LIKE ? OR d.what LIKE ? OR d.why LIKE ? OR d.alternatives LIKE ?)')
+      where.push(`(d.title LIKE ? OR d.what LIKE ? OR d.why LIKE ? OR (${VISIBLE_ALTERNATIVES}) LIKE ?)`)
       const like = `%${q}%`
       binds.push(like, like, like, like)
     }
@@ -70,7 +80,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
     const [rows, stageCount, deptCount, totals, allKinds] = await Promise.all([
       env.DB.prepare(
         `SELECT d.id, d.application_id, d.stage, d.actor, d.title, d.what, d.why,
-                d.alternatives, d.created_at, d.link_kind,
+                d.alternatives, d.created_at, d.link_kind, d.link_id,
                 -- 요청받지 않았는데 먼저 꺼낸 것.
                 --
                 -- 저장된 칸만 보면 예전에 남긴 기록은 영영 0이다. 그 칸을
@@ -109,7 +119,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
                 SUM(CASE WHEN d.actor = 'human' THEN 1 ELSE 0 END) AS human,
                 SUM(CASE WHEN (d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
                   AND TRIM(COALESCE(r.refuse_alternative, '')) <> '')) THEN 1 ELSE 0 END) AS unrequested,
-                SUM(CASE WHEN d.alternatives IS NOT NULL AND d.alternatives <> '' THEN 1 ELSE 0 END) AS with_alternatives
+                SUM(CASE WHEN (${VISIBLE_ALTERNATIVES}) <> '' THEN 1 ELSE 0 END) AS with_alternatives
          FROM decision_log d
          LEFT JOIN review r ON r.application_id = d.application_id`
       ).first(),
@@ -127,7 +137,7 @@ export async function onRequestGet({ env, data: requestData, request }) {
     }
 
     return jsonResponse({
-      items: rows.results,
+      items: rows.results.map(projectCodeReviewDecision),
       stages: STAGES,
       byStage: Object.fromEntries(stageCount.results.map((s) => [s.stage, s.n])),
       byDept: deptCount.results,

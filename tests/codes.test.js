@@ -8,6 +8,7 @@ import {
   CONFIRM_KIND,
   CORRECT_KIND,
 } from '../shared/codes.js'
+import { encodeCodeReviewEvidence } from '../shared/codeReviewEvidence.ts'
 
 // 코드 하나를 잘못 이어 두면 그 코드로 팔린 것이 전부 엉뚱한 상품 매출로
 // 잡힌다. 금액이 틀리는데 아무도 안 틀렸다고 생각한다. 격리된 줄은 눈에
@@ -22,15 +23,19 @@ const alias = (code, taughtBy, at) => ({
   product_name: '콜라겐 래핑 마스크',
   taught_by: taughtBy,
   created_at: at,
+  mapping_revision: 'a'.repeat(64),
 })
 
 const confirm = (code, at, by = 'AX 담당자') => ({
   link_kind: CONFIRM_KIND,
   link_id: code,
+  application_id: null,
   title: by,
   what: '맞습니다',
   why: '원본 파일과 맞춰 봤습니다',
   created_at: at,
+  alternatives: encodeCodeReviewEvidence({ version: 1, action: 'confirm', externalCode: code, reviewedMappingRevision: 'a'.repeat(64),
+    beforeCanonicalCode: 'NR-CM-100', afterCanonicalCode: 'NR-CM-100', provenance: { state: 'unknown', applicationId: null } }),
 })
 
 const correct = (code, at, what) => ({
@@ -44,7 +49,7 @@ const correct = (code, at, what) => ({
 
 describe('누가 알려 줬는가', () => {
   it('담당자가 넣은 것과 부서가 알려준 것을 가른다', () => {
-    // 담당자 것은 표를 보고 넣은 것이고, 부서 것은 화면에서 골라 넣은 것이다.
+    // 기존 표시 이름으로 분류할 뿐, 어떤 원본을 검증했는지는 증명하지 않는다.
     expect(taughtBySide({ taught_by: 'AX 담당자' })).toBe('담당자')
     expect(taughtBySide({ taught_by: '정산 담당자' })).toBe('부서')
   })
@@ -62,10 +67,9 @@ describe('확인해야 할 것 가려내기', () => {
     expect(a.confirmed).toBeNull()
   })
 
-  it('담당자가 직접 넣은 것은 다시 안 묻는다', () => {
-    // 넣을 때 이미 본 것이다.
+  it('담당자 표시 이름만으로 확인을 면제하지 않는다', () => {
     const [a] = annotate([alias('CJ-77', 'AX 담당자', '2026-08-01 09:00:00')], [])
-    expect(a.needsCheck).toBe(false)
+    expect(a.needsCheck).toBe(true)
   })
 
   it('확인한 것은 목록에서 빠진다', () => {
@@ -81,7 +85,7 @@ describe('확인해야 할 것 가려내기', () => {
     // 확인해 놓고 누가 또 고쳤는데 확인 표시가 그대로 남아 있으면,
     // 담당자는 이미 본 것으로 알고 넘어간다.
     const [a] = annotate(
-      [alias('CJ-77', '정산 담당자', '2026-08-02 09:00:00')],
+      [{ ...alias('CJ-77', '정산 담당자', '2026-08-02 09:00:00'), mapping_revision: 'b'.repeat(64) }],
       [confirm('CJ-77', '2026-08-01 10:00:00')]
     )
     expect(a.staleCheck).toBe(true)
@@ -139,7 +143,7 @@ describe('훑어볼 순서', () => {
       alias('B', '정산 담당자', '2026-08-01 09:00:00'),
       alias('C', '회계 담당자', '2026-08-04 09:00:00'),
     ],
-    []
+    [confirm('A', '2026-08-05 10:00:00')]
   )
 
   it('확인해야 할 것이 위로 온다', () => {
@@ -149,8 +153,7 @@ describe('훑어볼 순서', () => {
   })
 
   it('확인할 것끼리는 최근 것부터', () => {
-    // 방금 들어온 것이 아직 안 쓰였을 가능성이 크고, 그때 잡아야 잘못
-    // 섞인 정산을 되돌리는 일이 안 생긴다.
+    // 미확인 연결 사이에서는 기록된 변경 시각 순서로 표시한다.
     const s = sortForReview(rows)
     expect(s[0].external_code).toBe('C')
     expect(s[1].external_code).toBe('B')
@@ -178,7 +181,7 @@ describe('요약', () => {
     expect(s.total).toBe(3)
     expect(s.byDept).toBe(2)
     expect(s.byStaff).toBe(1)
-    expect(s.needsCheck).toBe(1) // C만 남았다
+    expect(s.needsCheck).toBe(2) // A와 C: 표시 이름은 확인 근거가 아니다.
   })
 
   it('빈 목록에서도 터지지 않는다', () => {
@@ -200,8 +203,7 @@ describe('정정할 때 받는 것', () => {
   })
 
   it('왜 바꾸는지를 안 적으면 막는다', () => {
-    // 코드를 바꾸는 것은 지난 숫자까지 같이 움직이는 일이다. 이유가 없으면
-    // 몇 달 뒤 정산 숫자가 달라진 까닭을 못 찾는다.
+    // 이후 계산에 적용되는 연결을 바꾼 이유를 남긴다.
     expect(validateCorrection({ ...good, why: '수정' }).why).toBeTruthy()
   })
 
@@ -211,5 +213,46 @@ describe('정정할 때 받는 것', () => {
 
   it('소문자로 적어도 받아 준다', () => {
     expect(validateCorrection({ ...good, canonicalCode: 'nr-pa-030' })).toEqual({})
+  })
+})
+
+describe('현재 연결을 확인했다는 근거', () => {
+  it('과거 원문 확인은 보존하지만 현재 연결의 검증으로 쓰지 않는다', () => {
+    const historical = { ...confirm('CJ-77', '2026-08-01 10:00:00'), alternatives: '원문 대안' }
+    const [row] = annotate([alias('CJ-77', 'AX 담당자', '2026-08-01 09:00:00')], [historical])
+    expect(row.confirmed).toMatchObject({ by: 'AX 담당자', verified: false, legacy: true })
+    expect(row.needsCheck).toBe(true); expect(row.staleCheck).toBe(true)
+    expect(historical.alternatives).toBe('원문 대안')
+  })
+
+  it('동초에 다른 상품으로 바뀐 확인을 현재 확인으로 만들지 않는다', () => {
+    const original = alias('CJ-77', '담당자', '2026-08-01 09:00:00')
+    const current = { ...original, canonical_code: 'NR-PA-030' }
+    const [row] = annotate([current], [confirm('CJ-77', original.created_at)])
+    expect(row.needsCheck).toBe(true); expect(row.confirmed.verified).toBe(false)
+  })
+
+  it('A→B→A로 값과 표시시각이 같아도 서버 revision이 다르면 옛 확인은 낡은 것이다', () => {
+    const current = { ...alias('CJ-77', '담당자', '2026-08-01 09:00:00'), mapping_revision: 'b'.repeat(64) }
+    const [row] = annotate([current], [confirm('CJ-77', current.created_at)])
+    expect(row.needsCheck).toBe(true); expect(row.staleCheck).toBe(true)
+  })
+
+  it('변형된 메타데이터가 확인 근거로 승격되지 않는다', () => {
+    const record = confirm('CJ-77', '2026-08-01 10:00:00')
+    for (const changes of [{ link_id: 'another' }, { application_id: 'fake-app' }, { alternatives: 'ilson-code-review:{"version":9}' }]) {
+      const [row] = annotate([alias('CJ-77', '담당자', '2026-08-01 09:00:00')], [{ ...record, ...changes }])
+      expect(row.needsCheck).toBe(true)
+    }
+  })
+
+  it.each(['__proto__', 'NR-XX-999'])('메타데이터 revision이 맞아도 목록에 없는 상품 %s 은 확인 완료가 아니다', canonicalCode => {
+    const current = { ...alias('CJ-77', '담당자', '2026-08-01 09:00:00'), canonical_code: canonicalCode }
+    const record = { ...confirm('CJ-77', current.created_at), alternatives: encodeCodeReviewEvidence({
+      version: 1, action: 'confirm', externalCode: 'CJ-77', reviewedMappingRevision: current.mapping_revision,
+      beforeCanonicalCode: canonicalCode, afterCanonicalCode: canonicalCode, provenance: { state: 'unknown', applicationId: null },
+    }) }
+    const [row] = annotate([current], [record])
+    expect(row.needsCheck).toBe(true); expect(row.confirmed.verified).toBe(false)
   })
 })

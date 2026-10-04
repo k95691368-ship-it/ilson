@@ -1,5 +1,5 @@
 import { api, ApiError } from '../../src/api/client.ts'
-import type { FieldErrors, JsonValue } from '../../src/api/client.ts'
+import type { FieldErrors, JsonValue, MutationOptions } from '../../src/api/client.ts'
 import type { HandoverDraft, HandoverRequest, HandoverMutationResponse } from '../../shared/contracts/handover.ts'
 import { readHandoverEvidence } from '../../shared/contracts/handover.ts'
 
@@ -10,6 +10,8 @@ type Equal<Left, Right> =
 
 export type SuccessJsonRemainsUnknown = Assert<Equal<Awaited<ReturnType<typeof api.get>>, unknown>>
 export type MutationJsonRemainsUnknown = Assert<Equal<Awaited<ReturnType<typeof api.post>>, unknown>>
+export type MutationDecoderReceivesUnknown = Assert<Equal<Parameters<NonNullable<MutationOptions['validateResponse']>>[0], unknown>>
+export type MutationDecoderIsSynchronous = Assert<Equal<ReturnType<NonNullable<MutationOptions['validateResponse']>>, boolean>>
 export type DecoderAcceptsUnknown = Assert<Equal<Parameters<typeof readHandoverEvidence>[0], unknown>>
 export type DecoderChecksNumericLimits = Assert<Equal<NonNullable<ReturnType<typeof readHandoverEvidence>['handover']>['daily_limit'], number>>
 export type JsonBodyExcludesFunctions = Assert<Equal<(() => void) extends JsonValue ? true : false, false>>

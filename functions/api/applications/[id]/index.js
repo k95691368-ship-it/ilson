@@ -6,6 +6,7 @@
 
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { annualHours } from '../../../_lib/applications.js'
+import { projectCodeReviewDecision } from '../../../../shared/codeReviewEvidence.ts'
 
 export async function onRequestGet({ env, data: requestData, params }) {
   env = requestData?.requestEnv ?? env
@@ -41,7 +42,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
       //
       // 예외도 안 나고 화면도 안 깨진다. 그냥 늘 빈 목록이다.
       env.DB.prepare(
-        `SELECT id, stage, actor, title, what, why, alternatives, unrequested,
+        `SELECT id, application_id, stage, actor, title, what, why, alternatives, unrequested,
                 link_kind, link_id, created_at
          FROM decision_log WHERE application_id = ? ORDER BY created_at`
       )
@@ -56,7 +57,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
         annual_hours: annualHours(application),
       },
       review: review ?? null,
-      decisions: decisions.results,
+      decisions: decisions.results.map(projectCodeReviewDecision),
     })
   } catch (error) {
     return failUnexpected(error, '신청서를 불러오지 못했습니다.')

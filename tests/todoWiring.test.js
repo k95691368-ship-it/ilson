@@ -33,7 +33,7 @@ const SOURCES = {
   signoffs: 'functions/api/signoffs.js',
 }
 
-// 줄이 있는 것처럼 구는 D1. 빈 표만 주면 라우트가 일찍 되돌아가서 요약
+// 줄이 있는 것처럼 구는 가상 DB. 빈 표만 주면 라우트가 일찍 되돌아가서 요약
 // 자체를 안 만든다.
 const ANY_ROW = new Proxy(
   {},
@@ -53,7 +53,7 @@ const ANY_ROW = new Proxy(
   }
 )
 
-function fakeEnv() {
+function fakeEnv(source) {
   const stmt = {
     bind: () => stmt,
     first: async () => ANY_ROW,
@@ -61,7 +61,11 @@ function fakeEnv() {
     run: async () => ({ meta: {} }),
   }
   return {
+    // This response-field wiring test is not an authentication test. Codes
+    // requires an explicitly scoped context; use its isolated demo contract.
+    DEMO_WORKSPACE: source === 'codes',
     DB: {
+      workspace: source === 'codes',
       prepare: () => stmt,
       batch: async (l) => (l ?? []).map(() => ({ meta: {} })),
       exec: async () => ({}),
@@ -115,10 +119,11 @@ describe('첫 화면 할 일이 읽는 값을 서버가 진짜 주는가', () =>
     for (const [name, file] of Object.entries(SOURCES)) {
       const mod = await import(pathToFileURL(join(ROOT, file)).href)
       const res = await mod.onRequestGet({
-        env: fakeEnv(),
+        env: fakeEnv(name),
         params: {},
         request: new Request('https://example.test/api/x'),
       })
+      expect(res.status, `${name} response-field fixture must reach its GET handler`).toBe(200)
       responses[name] = await res.json()
     }
 

@@ -11,6 +11,8 @@
 // 이 파일은 브라우저와 서버 양쪽에서 쓴다. 그래서 DOM도 D1도 건드리지 않는
 // 순수 함수만 둔다.
 
+import { projectCodeReviewDecision } from './codeReviewEvidence.ts'
+
 const STAGE_ORDER = [
   '신청서',
   '검토',
@@ -309,7 +311,7 @@ export function dossierText(record) {
   out.push(
     decisions.length > 0
       ? block(`[기록] 이 신청서에서 내린 결정 ${decisions.length}건`, [
-          ...decisions.map((d) =>
+          ...decisions.map(projectCodeReviewDecision).map((d) =>
             [
               `· ${when(d.created_at)} [${d.stage}] ${d.title}${d.unrequested ? ' *요청받지 않았으나 먼저 제안*' : ''}`,
               `    무엇을: ${d.what}`,

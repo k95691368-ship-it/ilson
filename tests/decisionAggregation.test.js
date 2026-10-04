@@ -25,11 +25,11 @@ beforeAll(async () => {
     CREATE TABLE application (id text, ticket_no text, dept text, title text);
     CREATE TABLE review (application_id text, verdict text, refuse_alternative text);
     CREATE TABLE decision_log (id text, application_id text, stage text, actor text,
-      title text, what text, why text, alternatives text, created_at text, link_kind text, unrequested integer);
+      title text, what text, why text, alternatives text, created_at text, link_kind text, link_id text, unrequested integer);
     INSERT INTO application VALUES ('app', 'AX-TEST', '재무', '정산');
     INSERT INTO decision_log
       SELECT 'decision-' || n, 'app', '검토', 'human', '검토 기록', '내용', '근거', '', '2026-09-22',
-        CASE n % 4 WHEN 0 THEN NULL WHEN 1 THEN '수령확인' WHEN 2 THEN '성과대리확인' ELSE ' 코드알림 ' END, 0
+        CASE n % 4 WHEN 0 THEN NULL WHEN 1 THEN '수령확인' WHEN 2 THEN '성과대리확인' ELSE ' 코드알림 ' END, NULL, 0
       FROM generate_series(1, 10000) n;
   `)
 })

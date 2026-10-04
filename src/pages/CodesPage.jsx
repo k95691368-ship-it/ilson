@@ -1,9 +1,29 @@
-import { useState } from 'react'
+import { useReducer, useRef, useSyncExternalStore } from 'react'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.ts'
 import { ago, dateTimeLabel, num } from '../lib/format.js'
 import Field from '../components/Field.jsx'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
+
+const VERSION = /^[a-f0-9]{64}$/
+const REVIEW_REASON = {
+  origin_unavailable: '현재 접근 가능한 기록에서 관련 업무 근거를 확인하지 못했습니다.',
+  origin_ambiguous: '여러 업무의 근거가 연결되어 있어 이 화면에서 변경할 수 없습니다.',
+  origin_unknown_admin: '업무 출처가 연결되지 않은 기록입니다. 관리자 확인으로 남깁니다.',
+  not_authorized: '현재 계정에는 코드 검토 권한이 없습니다.',
+  invalid_mapping: '상품 연결 정보를 확인하지 못했습니다.',
+}
+
+export function isCodeReviewResult(value, payload) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && value.ok === true
+    && typeof value.id === 'string' && value.id.length > 0
+    && value.action === payload.action && value.externalCode === payload.externalCode
+    && value.canonicalCode === payload.expectedCanonical
+    && (value.productName === undefined || typeof value.productName === 'string')
+    && (value.author === undefined || typeof value.author === 'string'))
+}
 
 // 알려 준 상품코드.
 //
@@ -15,9 +35,10 @@ import Field from '../components/Field.jsx'
 // 그렇다고 승인을 받아야 쓰이게 하면 부서가 며칠씩 기다리게 되고, 그러면
 // 알려주지 않습니다. 바로 쓰되 여기 쌓아 두고 나중에 훑어봅니다.
 export default function CodesPage() {
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
   const { data, error, loading, reload } = useApi('/codes')
 
-  if (error) return <div className="notice notice-danger">{error}</div>
+  if (error && !data) return <div className="notice notice-danger">{error}</div>
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
   if (!data) return null
 
@@ -25,19 +46,20 @@ export default function CodesPage() {
 
   return (
     <div className="stack">
+      {error && <div className="notice notice-danger" role="status">최신 목록을 불러오지 못했습니다. {error}</div>}
       <header className="page-head">
         <h1>상품코드 관리</h1>
         <p className="page-sub">
-          등록 즉시 계산에 적용됩니다. 잘못 연결하면 매출이 다른 상품에 합산되므로 원본과 확인해 주세요.
+          다음 계산에 적용됩니다. 원본과 상품 연결을 확인해 주세요.
         </p>
       </header>
 
       <section className="stat-row">
-        <Tile label="이어 둔 코드" value={num(s.total)} note={`부서가 ${s.byDept} · 담당자가 ${s.byStaff}`} />
+        <Tile label="조회된 코드" value={num(s.total)} note="현재 목록 · 최대 500개" />
         <Tile
-          label="아직 확인 안 한 것"
+          label="현재 연결 미확인"
           value={num(s.needsCheck)}
-          note={s.needsCheck > 0 ? '부서가 알려준 뒤 아직 안 봤습니다' : '전부 확인했습니다'}
+          note={s.needsCheck > 0 ? '현재 연결의 확인 근거가 필요합니다' : '현재 목록에서 미확인 항목 없음'}
           warn={s.needsCheck > 0}
         />
         <Tile label="정정한 것" value={num(s.corrected)} note="잘못 이어져 있던 것" />
@@ -54,7 +76,7 @@ export default function CodesPage() {
       ) : (
         <ul className="code-list">
           {data.codes.map((c) => (
-            <CodeRow key={c.external_code} code={c} catalog={data.catalog} onChanged={reload} />
+            <CodeRow key={`${session.generation}:${c.external_code}`} code={c} catalog={data.catalog} onChanged={reload} session={session} refreshing={loading} />
           ))}
         </ul>
       )}
@@ -62,35 +84,63 @@ export default function CodesPage() {
   )
 }
 
-function CodeRow({ code, catalog, onChanged }) {
+function CodeRow({ code, catalog, onChanged, session, refreshing }) {
   const toast = useToast()
-  const [mode, setMode] = useState(null)
-  const [form, setForm] = useState({ canonicalCode: '', why: '', author: 'AX 담당자' })
-  const [fieldErrors, setFieldErrors] = useState({})
-  const [saving, setSaving] = useState(false)
+  const [, redraw] = useReducer(value => value + 1, 0)
+  const lifetime = useRef(null)
+  if (!lifetime.current || lifetime.current.session !== session || lifetime.current.version !== code.edit_version) {
+    const previous = lifetime.current?.session === session ? lifetime.current : null
+    lifetime.current = { session, version: code.edit_version, mode: previous?.mode ?? null,
+      form: previous?.form ?? { canonicalCode: '', why: '', author: 'AX 담당자' },
+      fieldErrors: {}, saving: false, done: null, error: '', conflict: false, refreshError: '' }
+  }
+  const view = lifetime.current
+  const { mode, form, fieldErrors, saving, done } = view
+  const capture = useActionLifetime(view)
+  const current = () => lifetime.current === view && getAccessSession() === session && session.status === 'active'
+  const update = change => { if (current()) { Object.assign(view, change); redraw() } }
+  const edit = (name, value) => update({ form: { ...view.form, [name]: value } })
+  const available = code.review_available === true && VERSION.test(code.edit_version ?? '')
+  const disabled = saving || Boolean(done) || !available || refreshing
 
-  async function act(action, payload = {}) {
-    setSaving(true)
-    setFieldErrors({})
+  async function act(action) {
+    if (!current() || view.saving || view.done || !available || refreshing) return
+    const active = capture()
+    const payload = { externalCode: code.external_code, action, expectedVersion: code.edit_version,
+      ...(action === 'correct' ? { canonicalCode: view.form.canonicalCode, why: view.form.why } : {}),
+      ...(session.mode === 'demo' ? { author: view.form.author } : {}) }
+    const expected = { ...payload, expectedCanonical: action === 'correct' ? payload.canonicalCode : code.canonical_code }
+    // Lock before rendering, hashing or fetch; two same-tick submits share no work.
+    update({ saving: true, fieldErrors: {}, error: '', conflict: false, refreshError: '' })
     try {
-      await api.post('/codes', { externalCode: code.external_code, action, ...payload })
+      const result = await api.post('/codes', payload, { validateResponse: value => isCodeReviewResult(value, expected) })
+      if (!active() || !current()) return
+      update({ saving: false, done: result, mode: null })
       toast.success(action === 'confirm' ? '확인했다고 남겼습니다.' : '바꾸고 기록에 남겼습니다.')
-      setMode(null)
-      await onChanged()
     } catch (err) {
-      if (err.fields) setFieldErrors(err.fields)
+      if (!active() || !current()) return
+      update({ saving: false, fieldErrors: err.fields ?? {}, error: err.message, conflict: err.status === 409 })
       toast.error(err.message)
-    } finally {
-      setSaving(false)
+      return
+    }
+    // A failed refresh never changes a confirmed write back into a failed write.
+    try { await onChanged() } catch {
+      if (!active() || !current()) return
+      update({ refreshError: '이 요청은 저장됐지만 최신 목록을 불러오지 못했습니다.' })
+    }
+  }
+
+  async function refresh() {
+    if (!current() || view.saving || refreshing) return
+    const active = capture()
+    try { await onChanged() } catch {
+      if (active() && current()) update({ refreshError: '최신 연결을 불러오지 못했습니다. 작성 내용은 유지됩니다.' })
     }
   }
 
   return (
     <li className={`code-row${code.needsCheck ? ' needs' : ''}`}>
       <div className="row" style={{ marginBottom: 6 }}>
-        <span className={`badge ${code.side === '부서' ? 'badge-warning' : 'badge-neutral'}`}>
-          {code.side}가 알려줌
-        </span>
         {code.needsCheck && <span className="badge badge-danger">확인 안 함</span>}
         {code.staleCheck && <span className="badge badge-warning">확인 뒤에 또 바뀜</span>}
         {code.corrections.length > 0 && (
@@ -113,11 +163,23 @@ function CodeRow({ code, catalog, onChanged }) {
         </span>
       </div>
 
-      {code.confirmed && !code.staleCheck && (
+      {code.confirmed?.verified === true && !code.staleCheck && (
         <p className="card-note code-confirmed">
           {code.confirmed.by}가 {ago(code.confirmed.at)} 확인했습니다
         </p>
       )}
+      {code.confirmed && code.confirmed.verified !== true && <p className="card-note">과거 확인 기록 · 현재 연결의 확인 근거는 아닙니다.</p>}
+      {code.review_reason && <p className="card-note">{REVIEW_REASON[code.review_reason] ?? '코드 검토 상태를 확인하지 못했습니다.'}</p>}
+      {!available && !code.review_reason && <p className="card-note">최신 연결 정보를 확인한 뒤 검토해주세요.</p>}
+      {view.error && <p className="card-note" role="alert">{view.error}</p>}
+      {(view.conflict || view.refreshError) && <div className="row">
+        {view.refreshError && <p className="card-note" role="status">{view.refreshError}</p>}
+        <button type="button" className="btn-ghost btn-sm" disabled={saving || refreshing} onClick={refresh}>최신 연결 확인</button>
+      </div>}
+      {done && <p className="card-note code-confirmed" role="status">
+        이 요청을 기록했습니다: {done.externalCode} → {done.productName ?? done.canonicalCode}
+        {done.author && ` · 기록된 작성자: ${done.author}`}
+      </p>}
 
       {code.corrections.length > 0 && (
         <details className="code-history">
@@ -126,8 +188,7 @@ function CodeRow({ code, catalog, onChanged }) {
             {code.corrections.map((f, i) => (
               <li key={i}>
                 <div>{f.what}</div>
-                {/* 코드를 바꾸는 것은 지난 숫자까지 같이 움직이는 일이다.
-                    왜 바꿨는지가 남아야 정산이 달라진 까닭을 찾는다. */}
+                {/* 과거 결과는 바꾸지 않는다. 새 재계산의 변경 근거를 남긴다. */}
                 <div className="card-note">
                   {f.why} — {f.by}, {ago(f.at)}
                 </div>
@@ -137,36 +198,37 @@ function CodeRow({ code, catalog, onChanged }) {
         </details>
       )}
 
-      {mode === null && (
+      {mode === null && !done && available && (
         <div className="row code-actions">
           {code.needsCheck && (
             <button
               type="button"
               className="btn-primary btn-sm"
-              disabled={saving}
+              disabled={disabled}
               onClick={() => act('confirm')}
             >
               맞습니다
             </button>
           )}
-          <button type="button" className="btn-ghost btn-sm" onClick={() => setMode('correct')}>
+          <button type="button" className="btn-ghost btn-sm" disabled={disabled} onClick={() => update({ mode: 'correct' })}>
             다른 상품이었습니다
           </button>
         </div>
       )}
 
-      {mode === 'correct' && (
+      {mode === 'correct' && !done && (
         <form
           className="thread-form"
           onSubmit={(e) => {
             e.preventDefault()
-            act('correct', form)
+            act('correct')
           }}
         >
           <Field label="어느 상품이었습니까" required error={fieldErrors.canonicalCode}>
             <select
               value={form.canonicalCode}
-              onChange={(e) => setForm((f) => ({ ...f, canonicalCode: e.target.value }))}
+              disabled={disabled}
+              onChange={(e) => edit('canonicalCode', e.target.value)}
             >
               <option value="">골라주세요</option>
               {catalog.map((s) => (
@@ -180,19 +242,21 @@ function CodeRow({ code, catalog, onChanged }) {
             <textarea
               rows={2}
               value={form.why}
-              onChange={(e) => setForm((f) => ({ ...f, why: e.target.value }))}
+              disabled={disabled}
+              maxLength={2000}
+              onChange={(e) => edit('why', e.target.value)}
               placeholder="이름이 비슷한 다른 상품이었습니다. 원본 주문서와 맞춰 봤습니다."
             />
           </Field>
           <div className="row">
-            <button type="submit" className="btn-primary btn-sm" disabled={saving}>
+            <button type="submit" className="btn-primary btn-sm" disabled={disabled}>
               {saving ? '바꾸는 중…' : '바꾸고 기록에 남기기'}
             </button>
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setMode(null)}>
+            <button type="button" className="btn-ghost btn-sm" disabled={saving} onClick={() => update({ mode: null })}>
               그만두기
             </button>
             <span className="spacer" />
-            <span className="card-note">지난 정산 숫자가 함께 움직입니다</span>
+            <span className="card-note">이후 재계산 결과에 영향을 줍니다</span>
           </div>
         </form>
       )}
