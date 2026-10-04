@@ -25,7 +25,7 @@ const cases = [
   ['reject', accept, async () => ({ by: 'Author', kind: 'reject', reason: '실제 업무에서 사용할 수 없습니다.' }), 200],
   ['hold', hold, async () => ({ by: 'Author', kind: 'met', body: '보류 조건이 실제로 해소되었습니다.' }), 200],
   ['cancel', hold, async () => ({ by: 'Author', kind: 'cancel' }), 200],
-  ['beta', beta, async () => ({ by: 'Author', kind: '의견', body: '실제 업무에 적용해 확인했습니다.' }), 200],
+  ['beta', beta, async app => ({ by: 'Author', kind: '의견', body: '실제 업무에 적용해 확인했습니다.', expectedRoundId: app.round }), 200],
   ['outcome', outcome, async app => ({ kind: 'dept_confirm', by: 'Author', comment: '현재 수치 확인', expectedEvidence: (await read(getOutcome, app)).expectedEvidence }), 200],
   ['outcome-direct', outcomeDirect, async app => ({ by: 'Author', agree: true, expectedEvidence: (await read(getOutcome, app)).expectedEvidence }), 200],
   ['handover', handover, async app => ({ action: 'stop', reason: '현장 검증을 위해 실행을 중단합니다.', expectedEvidence: (await read(getHandover, app)).expectedEvidence }), 200],
@@ -69,7 +69,7 @@ afterEach(async () => {
 afterAll(async () => { vi.unstubAllGlobals(); await pg.close() })
 
 async function fixture() {
-  const id = 'ACCESS-' + (++seq), app = { id, ticket: id, slug: 'tool-' + seq, criterion: 'criterion-' + seq }
+  const id = 'ACCESS-' + (++seq), app = { id, ticket: id, slug: 'tool-' + seq, criterion: 'criterion-' + seq, round: 'round-' + seq }
   await pg.query("INSERT INTO application(id,ticket_no,dept,applicant_label,title,bottleneck,problem,status,current_frequency,owner_email) VALUES($1,$1,'Finance','Author','Before','Task','Task','보류','매일',$2)", [id, email])
   await pg.query("INSERT INTO acceptance_criterion(id,application_id,ord,body,confirmed_at) VALUES($1,$2,1,'서류 확인',now())", [app.criterion, id])
   await pg.query("INSERT INTO handover(application_id,slug,title,handed_to_dept,handed_to_person) VALUES($1,$2,'Tool','Finance','Author')", [id, app.slug])

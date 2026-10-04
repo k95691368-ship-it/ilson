@@ -19,7 +19,7 @@ const cases = [
   ['reject', accept, {by:'Owner',kind:'reject',reason:'실제 업무에서 사용할 수 없습니다.'}],
   ['hold', hold, {by:'Owner', kind:'met', body:'보류 조건이 실제로 해소되었습니다.'}],
   ['cancel', hold, {by:'Owner',kind:'cancel'}],
-  ['beta', beta, {by:'Owner', kind:'의견', body:'실제 업무에 적용해 확인했습니다.'}],
+  ['beta', beta, {by:'Owner', kind:'의견', body:'실제 업무에 적용해 확인했습니다.', expectedRoundId:'round'}],
 ]
 beforeAll(async () => {
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { api } from '../api/client.ts'
 import { useApi } from '../hooks/useApi.js'
@@ -9,7 +9,7 @@ import { noticesFrom, actionsFrom, newSince, seenKey } from '../../shared/notice
 import { validateResubmit, MAX_RESUBMIT } from '../../shared/resubmit.js'
 import { validateSignoff, VERDICTS } from '../../shared/signoff.js'
 import { validateOutcomeConfirm } from '../../shared/accept.js'
-import { validateBetaSay, BETA_SAY_KINDS, kindOf, betaSayHeadline, betaSayWhy } from '../../shared/betasay.js'
+import { validateBetaSay, validSavedBetaRound, BETA_SAY_KINDS, kindOf, betaSayHeadline, betaSayWhy } from '../../shared/betasay.js'
 import { validateHoldLift, LIFT_KINDS, liftKindOf, holdHeadline, holdWhy } from '../../shared/holdlift.js'
 import { rollbackState, rollbackHeadline, rollbackWhatNow } from '../../shared/rollback.js'
 import { JOIN_KIND, UNJOIN_KIND } from '../../shared/join.js'
@@ -1318,8 +1318,8 @@ function HoldLift({ ticket, onDone }) {
 // 조회 화면은 "시험판을 써 보고 막힌 곳을 알려주세요"라고 적어 두고, 정작
 // 그 말을 적을 칸을 아무 데도 안 뒀다. 시키기만 하고 갈 곳이 없는 문장은
 // 한 번 겪으면 그다음부터 그 목록을 통째로 안 읽게 만든다.
-function BetaSay({ ticket, onDone }) {
-  const { data, setData } = useApi(`/track/${encodeURIComponent(ticket)}/beta`)
+export function BetaSay({ ticket, onDone }) {
+  const { data, setData, reload, error, loading } = useApi(`/track/${encodeURIComponent(ticket)}/beta`)
   const state = data?.state
   const captureView = useActionLifetime(ticket)
   const [open, setOpen] = useState(false)
@@ -1329,30 +1329,67 @@ function BetaSay({ ticket, onDone }) {
   const [errors, setErrors] = useState({})
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState(null)
+  const [draftRound, setDraftRound] = useState(null)
+  const [roundConflict, setRoundConflict] = useState(false)
+  const [uncertain, setUncertain] = useState(false)
+  const busyRef = useRef(false)
 
   // 시험판을 아직 안 돌렸으면 물어볼 것이 없다.
   if (!state?.canSay) return null
 
   async function submit(e) {
     e.preventDefault()
+    if (busyRef.current || !validSavedBetaRound(draftRound)) return
     const bad = validateBetaSay({ by, kind, body })
     setErrors(bad)
     if (Object.keys(bad).length > 0) return
+    busyRef.current = true
     setBusy(true)
     const current = captureView()
+    const target = draftRound
+    const confirmed = (r) => r?.ok === true && validSavedBetaRound(r.savedRound)
+      && r.savedRound.id === target.id && r.savedRound.seq === target.seq
+      && typeof r.message === 'string' && r.state?.canSay === true && validSavedBetaRound(r.state.round)
+      && Array.isArray(r.state.says) && ['total', 'open', 'answered'].every((key) => Number.isSafeInteger(r.state[key]) && r.state[key] >= 0)
     try {
-      const r = await api.post(`/track/${encodeURIComponent(ticket)}/beta`, { by, kind, body })
+      const r = await api.post(`/track/${encodeURIComponent(ticket)}/beta`, {
+        by, kind, body, expectedRoundId: target.id,
+      }, { validateResponse: confirmed })
       if (!current()) return
+      if (!confirmed(r)) throw new Error('저장 응답을 확인하지 못했습니다. 같은 내용으로 다시 시도하고 기록을 확인해주세요.')
       setMsg(r.message)
       setData(r)
       setBody('')
+      setDraftRound(null)
+      setRoundConflict(false)
+      setUncertain(false)
       setOpen(false)
       onChangedSafely(onDone)
     } catch (err) {
-      if (current()) setErrors({ body: err.message })
+      if (current()) {
+        setErrors({ body: err.message })
+        if (err.code === 'BETA_ROUND_CHANGED') setRoundConflict(true)
+        // A fresh action explicitly rejected this round binding before writing.
+        // This permits draft recovery, not a claim that an older write was undone.
+        if (err.notSaved && ['BETA_ROUND_CHANGED', 'BETA_ROUND_REQUIRED'].includes(err.code)) setUncertain(false)
+        if (!err.notSaved && (!err.status || err.status >= 500)) setUncertain(true)
+      }
     } finally {
-      if (current()) setBusy(false)
+      if (current()) { busyRef.current = false; setBusy(false) }
     }
+  }
+
+  function beginDraft() {
+    if (busyRef.current || loading || !validSavedBetaRound(state.round)) return
+    if (!draftRound) setDraftRound({ id: state.round.id, seq: state.round.seq })
+    setOpen(true)
+  }
+
+  async function discardAndRead() {
+    if (busyRef.current || uncertain) return
+    // Only this explicit discard or a confirmed save releases the original round.
+    setBody(''); setDraftRound(null); setRoundConflict(false); setErrors({}); setMsg(null); setOpen(false)
+    await reload()
   }
 
   return (
@@ -1370,6 +1407,16 @@ function BetaSay({ ticket, onDone }) {
       <p className="dconf-why">{betaSayWhy(state)}</p>
 
       {msg && <p className="dconf-msg">{msg}</p>}
+      {error && <p className="field-error" role="alert">{error}</p>}
+      {(roundConflict || (draftRound && draftRound.id !== state.round.id)) && (
+        <p className="card-note">
+          기존 초안은 시험판 {draftRound?.seq}차에 연결되어 있습니다. 최신 회차에 자동으로 옮기지 않습니다.
+          <button type="button" className="btn-ghost" disabled={busy || loading || uncertain} onClick={discardAndRead}>
+            초안 버리고 최신 회차 불러오기
+          </button>
+        </p>
+      )}
+      {uncertain && <p className="card-note">저장 여부가 아직 확인되지 않았습니다. 입력은 유지되며 같은 내용으로 재시도하거나 기록을 확인해주세요.</p>}
 
       {/* 이미 적어 주신 것과 그에 대한 답. 안 보여주면 부서는 자기가 낸
           말이 읽히기는 했는지 모르고, 같은 말을 다시 적는다. */}
@@ -1397,11 +1444,13 @@ function BetaSay({ ticket, onDone }) {
       )}
 
       {!open ? (
-        <button type="button" className="btn-primary btn-sm" onClick={() => setOpen(true)}>
+        <button type="button" className="btn-primary btn-sm" disabled={busy || loading || !validSavedBetaRound(state.round)} onClick={beginDraft}>
           {state.total === 0 ? '써 보고 느낀 것 적기' : '하나 더 적기'}
         </button>
       ) : (
         <form className="dconf-form" onSubmit={submit}>
+          <p className="card-note">이 의견은 시험판 {draftRound?.seq}차에 연결됩니다.</p>
+          <fieldset disabled={busy || uncertain} style={{ border: 0, padding: 0, margin: 0, minWidth: 0, display: 'grid', gap: 'var(--space-4)' }}>
           <div
             className="dconf-pick"
             role="radiogroup"
@@ -1464,11 +1513,12 @@ function BetaSay({ ticket, onDone }) {
             )}
           </label>
 
+          </fieldset>
           <div className="row">
             <button type="submit" className="btn-primary" disabled={busy}>
               {busy ? '남기는 중…' : '보내기'}
             </button>
-            <button type="button" className="btn-ghost" onClick={() => setOpen(false)}>
+            <button type="button" className="btn-ghost" disabled={busy} onClick={() => setOpen(false)}>
               그만두기
             </button>
           </div>

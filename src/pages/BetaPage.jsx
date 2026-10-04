@@ -19,6 +19,10 @@ import SourceReferences from '../components/SourceReference.jsx'
 // 나오고, 판정불가가 하나라도 남으면 이 회차는 통과가 아니다 —
 // 안 본 것을 통과로 세면 이 게이트는 안 보고 열어 주는 문이 된다.
 
+function validRoundReceipt(result) {
+  return result?.ok === true && typeof result.round_id === 'string' && /^bta_[a-f0-9]{32}$/.test(result.round_id)
+    && Number.isSafeInteger(result.seq) && result.seq > 0 && ['통과', '조건부', '차단'].includes(result.overall)
+}
 
 export default function BetaPage() {
   const { data: list } = useApi('/applications')
@@ -132,7 +136,11 @@ function BetaSession({ id, data, error, loading, reload }) {
     const current = () => mounted.current && currentScope.current === scope
     let saved = null
     try {
-      saved = await api.post(`/applications/${id}/beta`, payload)
+      const result = await api.post(`/applications/${id}/beta`, payload, { validateResponse: validRoundReceipt })
+      // Validate before acknowledging the tab queue. A 2xx without a receipt
+      // does not establish either storage or the server's authoritative verdict.
+      if (!validRoundReceipt(result)) throw new Error('채점 저장 응답을 확인하지 못했습니다. 같은 채점 기록으로 다시 확인해주세요.')
+      saved = result
       if (current() && pendingBetaRound(scope, id)?.payload.run_id === payload.run_id) ownedClear.current = payload.run_id
       forgetBetaRound(scope, id, payload.run_id)
       if (current()) {

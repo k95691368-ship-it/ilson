@@ -40,6 +40,15 @@ export const BETA_SAY_KINDS = [
 
 export const MIN_BODY = 5
 export const MIN_NAME = 2
+// Existing opaque round IDs are identities, not a new generated-ID format.
+export function validBetaRoundId(value) {
+  return typeof value === 'string' && value.trim().length > 0
+    && !value.includes('\0') && !/[\uD800-\uDFFF]/u.test(value)
+}
+export function validSavedBetaRound(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    && validBetaRoundId(value.id) && Number.isSafeInteger(value.seq) && value.seq >= 1
+}
 
 export function kindOf(code) {
   return BETA_SAY_KINDS.find((k) => k.code === code) ?? null
@@ -80,7 +89,7 @@ export function betaSayState({ round, says } = {}) {
   return {
     // 시험판을 아직 안 돌렸으면 물어볼 것이 없다.
     canSay: Boolean(round),
-    round: round ? { seq: round.seq, overall: round.overall, at: round.created_at } : null,
+    round: round ? { id: round.id, seq: round.seq, overall: round.overall, at: round.created_at } : null,
     total: list.length,
     open: open.length,
     answered: answered.length,

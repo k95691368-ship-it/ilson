@@ -1,5 +1,27 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 시간 제한 자율 개선 — 회차 13 구현·검증
+
+23:27 KST C26/C27 최종 source의 lint/typecheck/137모듈·Worker build/script syntax·linter·diff check와 전체 npm test exit0을 확인했다. **214파일4,150개(일반213파일4,144+규모6)**다. C26 신규 actual client/큐21개+기존 관련4파일50개, C27 신규 actual client/UI13개·signed middleware/현행15migration PG25개 및 관련7파일166개를 포함한다. 독립 최종 읽기 검토에서 새 P1/P2 차단 근거나 기존 단언 약화는 없었다. CLI·운영 반영은 아직 남았다.
+
+C26은 저장 확인 전 pendingBetaRound/원payload/run_id를 버리지 않게 기존 POST opt-in validator를 사용한다. 실제 IAB/외부 연결 없는 메모리 PG의 합성CSV2행은 malformed200{}→기존 채점 기록/재시도/새시험 차단 유지, 다음 실제 커밋의 응답503→같은기록 재확인→1차통과·회차1행·기준2개·원본SHA/줄참조로 이어졌다. 그 채점은 부서 확인 없는 자동 기준 통과이지 실제 업무효과나 인계 승인이 아니다. GET의 기존ID·서버 판정 수정·503/기준변경/계정/ABA 보호는 유지한다.
+
+C27은 최초 폼 작성 회차에 의견을 고정하고 최신 회차와 다르면409/부분쓰기0이다. 과거 확정receipt의 savedRound와 응답의 현재state.round를 분리한다. 오래된 receipt에 회차가 없으면null/당시 미확인으로 두고 현재 회차를 날조하지 않는다. 명시초안폐기만 새회차로 이동하며 닫기/재열기·자동조회는 기존앵커를 유지한다. root 반박에서503 뒤 명시미저장 회차변경에도 uncertain이 남을 수 있는 복구 잠금을 지적했고, BETA_ROUND_CHANGED/REQUIRED+notSaved:true만 해제하는 회귀를 추가했다. 무관한409·명시미저장 없는 충돌은 함부로 해제하지 않는다.
+
+native1440×1000/360×800에서 1차 초안 작성→handler 전2차생성→409/원문유지, 닫기/재열기1차유지, 명시폐기/GET→2차 새의견 저장1개/담당검토 대기와 당시2차 저장문구를 확인했다. 문서폭1425/345px·가로넘침0, fieldset 기존토큰gap12px다. 넓은/좁은 조작 캡처는 .tmpcheck/cycle13-beta-*.png 및 cycle13-round-conflict-wide.png/cycle13-round-retained-narrow.png다. viewport 전환 뒤 최종 wide 캡처의 해당영역이 화면 밖이어서 시각 증거로 사용하지 않고, 실제 DOM/조작과 충돌 캡처를 근거로 삼았다. 내가 만든 탭5/6·viewport·5188 서버만 정리했다.
+
+ID100 임의상한은 실제TEXT/레거시 계약 근거가 없어 root 반박 후 제거했고, 공백·Unicode·301자 opaqueID를 정확히 보존했다. 최초 합산의 UI14개는 verbose의 실제13개로 교정했다(관련166·최종UI53은 정확). 새 DB/RPC/ACL/Auth·외부AI·원본추가전송/복제서비스0이다. 편익은 합성 근거 손실·잘못된 회차귀속 방지이며 운영빈도·직원시간·다중PG부하는 미측정이다. 화면이탈/탭종료·기존30분자동키/7일receipt를 넘는 영구보존이나 exactly-once는 보장하지 않는다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 13 시작
+
+23:19 KST C25의 CLI커밋·푸시7a51633b18460797930ac26634a684a70d4c26f8, [CI37208534683](https://github.com/k95691368-ship-it/ilson/actions/runs/37208534683) success/exit0·Git연결Production39b91908-5b1f-48c2-a40f-647736f9b9a4 source7a51633을 확인했다. 주주소47개SHA256·Git원본OG·health200/ready:true·workspace200/active:false·session/override428 actualJSON/no-store가 일치했다. 초기 Agreement asset 불일치를 성공으로 보지 않았고, 주주소/배포주소의 실제 JS/hash 일치라는 변경 근거 후 전체 검증을 통과했다. 직접중복배포/운영DB/ACL/공유Auth/구매AX 변경0이다.
+
+C26은 필수P2의 기존 베타 대기 근거 보존으로 채택한다. actual client/useApi/pendingQueue 메모리 시험에서 미확정 round의 POST200{}가 큐/실행ID를 지우고 같은기록 재시도 버튼을 없애며 새시험을 허용했다. 정상 서버가{}를 생산하거나 운영에서 발생했다는 증거는 없다. 기존503복구와 새로고침/재채점은 그 근거를 보존하는 대안이 아니다. saveRound의 POST확정응답에만 기존 opt-in validator를 사용하고 현행0012의 ok:true/bta32hex/양의 안전정수seq/overall3종을 확인한 뒤에만 forget/판정을 실행한다. GET레거시ID는 거절하지 않고 서버판정과 로컬claimed 동일성은 요구하지 않는다. DB/RPC/큐/전역client/원본 처리 변경 없이 구현·집중검증 중이다.
+
+C27은 필수P2의 기존 부서 베타 의견 귀속 보완으로 채택한다. actual signed middleware·현행15migrations·메모리 PG에서 1차조회→2차생성→1차의견이200/2차feedback.round_id·감사link_id로 저장됐다. 현재2차 의견200과 서버읽기뒤3차생성CAS409는 기존 보호다. 독립 반박에서 화면의 특정N차 표시·서버round연결 정책상 신청전체 의견으로 재정의하는 대안은 더 큰 변경임을 확인했다. GET의 실제round.id를 폼의 최초작성 수명에 고정하고 POSTexpectedRoundId를 현재latest와 원자 action 안 비교한다. 닫기/재열기·재조회 뒤 초안을 새회차로 자동붙이지 않으며 명시초안정리만 새회차로 전환한다. 과거 확정receipt는 당시 savedRound를 구분하고 추가쓰기 없이 재생한다. 신규DB/RPC/ACL/Auth·알림·승인서비스는 제외한다.
+
+두 후보의 편익은 합성 자료의 미확정 판정 보존과 회차 근거의 정확한 귀속이다. 운영 발생률·직원시간·멀티세션부하는 미측정이며 테스트 통과만으로 실제효과를 주장하지 않는다. 원본은 계속 브라우저에서 처리하고 외부AI 호출을 추가하지 않는다. C26 23:25/C27 23:27 source동결 목표로 전체gate·1440/360·CLI검증이 가능한 작은 범위만 진행하며, 크거나 불명확하면 미배포 다음과제로 남긴다.23:40 이후 새대규모 개발/검증불가능 배포는 시작하지 않는다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 12 구현·판단 교정
 
 23:14 KST 독립 최종 검토에서 제품의 새 P1/P2 차단 근거는 없었고, nonuse 작성자 fixture 변경 뒤 개인정보 비노출 단언이 옛 owner를 검사하는 감도 저하1곳을 찾았다. 실제 nonuse 식별자를 검사하도록 한 줄을 교정했다. 집중8·lint·최종 전체211파일4,090개/exit0(23:12:57 일반/23:14:01 규모)을 다시 확인했고 독립 검토자는 교정 해소를 읽기 확인했다. C25 검증된13파일만 ilson/main에 CLI 커밋·푸시하며 기존 public/og.png는 제외한다. 운영 반영 전 성공으로 적지 않는다.

@@ -17,7 +17,7 @@ function deferred() { let resolve, reject; const promise = new Promise((yes, no)
 function latest(path) { return pending.get(path)?.at(-1) }
 function result(ticket) { return { ticket, application: { id: ticket, title: `신청 ${ticket}`, dept: '재무', status: '접수', applicant: '작성자', created_at: '2026-01-01' }, timeline: [], decisions: [], currentStage: '신청' } }
 function signoff(ticket) { return { expectedVersion:'v-'+ticket, criteria: [{ id: `${ticket}-criterion`, body: `${ticket} 확정 기준`, check_kind: 'human' }], requiredDepts: ['재무', '영업'], state: { canSign: true, status: '확인 전', headline: '기준 확인', requiredDepts: ['재무', '영업'] } } }
-function beta() { return { state: { canSay: true, round: { seq: 1, overall: '통과' }, total: 0, open: 0, answered: 0, says: [] } } }
+function beta() { return { state: { canSay: true, round: { id: 'legacy-beta-round', seq: 1, overall: '통과' }, total: 0, open: 0, answered: 0, says: [] } } }
 function Controls() { navigate = useNavigate(); const location = useLocation(); return <output data-testid="location">{location.search}</output> }
 function show(query = `?no=${A}`) { return render(<MemoryRouter initialEntries={[`/track${query}`]}><Controls /><TrackPage /></MemoryRouter>) }
 async function move(query) { await act(async () => { navigate(`/track${query}`) }) }
@@ -202,7 +202,7 @@ describe('접수번호 조회는 현재 URL과 화면 생명주기에 귀속된�
     await move(`?no=${B}`); await load(B)
     await move(`?no=${A}`); await load(A); await answer(`/track/${A}/beta`, beta())
     const count = client.get.mock.calls.length
-    if (kind === 'success') await act(async () => { posts[0].resolve({ ...beta(), message: '이전 A 의견 저장 완료' }) })
+    if (kind === 'success') await act(async () => { posts[0].resolve({ ...beta(), ok: true, savedRound: { id: 'legacy-beta-round', seq: 1 }, message: '이전 A 의견 저장 완료' }) })
     else await fail(posts[0], '이전 A 의견 저장 실패')
     expect(screen.queryByText(/이전 A 의견 저장/)).toBeNull()
     expect(client.get.mock.calls).toHaveLength(count)
@@ -211,7 +211,7 @@ describe('접수번호 조회는 현재 URL과 화면 생명주기에 귀속된�
 
   it('현재 ticket 의견 저장은 기존처럼 결과를 보이고 같은 ticket을 재조회한다', async () => {
     show(); await load(A); await answer(`/track/${A}/beta`, beta()); betaForm()
-    await act(async () => { posts[0].resolve({ ...beta(), message: '의견을 저장했습니다.' }) })
+    await act(async () => { posts[0].resolve({ ...beta(), ok: true, savedRound: { id: 'legacy-beta-round', seq: 1 }, message: '의견을 저장했습니다.' }) })
     expect(screen.getByText('의견을 저장했습니다.')).toBeTruthy()
     expect(pending.get(`/track/${A}`)).toHaveLength(2)
     expect(screen.getByTestId('location').textContent).toBe(`?no=${A}`)

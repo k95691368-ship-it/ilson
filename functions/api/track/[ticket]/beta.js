@@ -11,7 +11,7 @@
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_lib/http.ts'
 import { newId } from '../../../_lib/ids.js'
 import { checkRateLimit, releaseRateLimit } from '../../../_lib/rateLimit.js'
-import { validateBetaSay, betaSayState, BETA_SAY_KIND } from '../../../../shared/betasay.js'
+import { validateBetaSay, betaSayState, BETA_SAY_KIND, validBetaRoundId, validSavedBetaRound } from '../../../../shared/betasay.js'
 import { logDecision } from '../../../_lib/decisions.js'
 import { currentDepartmentAuthority } from '../../../_lib/departmentAuthority.js'
 import { departmentMutation } from '../../../_lib/departmentMutation.js'
@@ -64,11 +64,17 @@ export async function onRequestPost({ env, data: requestData, request, params })
   }
   const ticket = String(params.ticket ?? '').trim().toUpperCase()
   const response = await departmentMutation(env,request,`betasay:${ticket}`,body,async DB => {
+    // Validate inside the action: a prior receipt is historical success, not a
+    // new write against the latest round or a retroactive cancellation.
+    if (!validBetaRoundId(body.expectedRoundId)) return jsonResponse({error:'작성할 때 본 시험판 회차를 다시 확인해주세요.',code:'BETA_ROUND_REQUIRED',notSaved:true},400)
     const loaded = await load({...env,DB},ticket)
     if (!loaded) return jsonError('그 접수번호를 찾지 못했습니다.',404)
     const forbidden = await currentDepartmentAuthority(env,DB,loaded.app.dept)
     if (forbidden) return forbidden
     if (!loaded.round) return jsonError('아직 시험판이 나오지 않았습니다. 나오면 이 화면에 뜹니다.',409)
+    if (body.expectedRoundId !== loaded.round.id) return jsonResponse({error:'시험판 회차가 변경되었습니다. 작성 중인 의견은 유지하고 최신 회차를 확인해주세요.',code:'BETA_ROUND_CHANGED',notSaved:true},409)
+    const savedRound={id:loaded.round.id,seq:Number(loaded.round.seq)}
+    if (!validSavedBetaRound(savedRound)) throw new Error('Current beta round reference unavailable')
     const errors = validateBetaSay(body)
     if (Object.keys(errors).length) return failFields(errors,'적어 주신 내용을 확인해주세요.')
     const by = String(body.by).trim().slice(0,60), said = String(body.body).trim().slice(0,1000)
@@ -77,15 +83,16 @@ export async function onRequestPost({ env, data: requestData, request, params })
     await logDecision({DB},{applicationId:loaded.app.id,stage:'베타테스트',actor:'human',title:by,what:said,
       why:`${loaded.app.dept}에서 시험판을 써 보고 적어 주셨습니다. 기계 채점은 "쓰기 불편하다"를 채점하지 못합니다.`,
       linkKind:BETA_SAY_KIND,linkId:loaded.round.id})
-    return jsonResponse({ok:true,blocked:body.kind === '막힌곳'})
+    return jsonResponse({ok:true,blocked:body.kind === '막힌곳',savedRound})
   })
   if (!response.ok || response.headers.get('X-Idempotency-Replayed') === '1') await releaseRateLimit(env,bucket,rateTicket)
   if (!response.ok) return response
   try {
     const receipt = await response.json(), state = betaSayState(await load(env,ticket))
-    return jsonResponse({ok:true,state,message:receipt.blocked
-      ? '알려주셔서 고맙습니다. 막힌 곳은 고치고 나서 여기에 답을 적어 두겠습니다.'
-      : '알려주셔서 고맙습니다. 여기에 답을 적어 두겠습니다.'},200,
+    const savedRound=validSavedBetaRound(receipt.savedRound)?receipt.savedRound:null
+    return jsonResponse({ok:true,state,savedRound,message:savedRound
+      ? `시험판 ${savedRound.seq}차에 의견을 기록했습니다.${receipt.blocked?' 막힌 곳은 담당자 검토가 필요합니다.':''}`
+      : '이전에 의견을 기록했습니다. 당시 회차는 이 응답으로 확인할 수 없으므로 기록을 확인해주세요.'},200,
       {'X-Idempotency-Replayed':response.headers.get('X-Idempotency-Replayed') || '0'})
   } catch(error) { return failUnexpected(error,'시험판 의견 상태를 불러오지 못했습니다.') }
 }

@@ -35,6 +35,10 @@ const feedbackRetryFixture = Boolean(fixture) && process.argv.includes('--feedba
 const reportFeedFixture = Boolean(fixture) && process.argv.includes('--report-feed-fixture')
 const reportFixFixture = Boolean(fixture) && process.argv.includes('--report-fix-fixture')
 const fieldFeedbackSaveFixture = Boolean(fixture) && process.argv.includes('--field-feedback-save-fixture')
+const betaReceiptFixture = Boolean(fixture) && process.argv.includes('--beta-receipt-fixture')
+const trackBetaRoundFixture = Boolean(fixture) && process.argv.includes('--track-beta-round-fixture')
+let betaReceiptMalformed = false
+let trackBetaRoundChanged = false
 let fieldFeedbackReplyMalformed = false
 let fieldFeedbackReadPending = false
 let reportFixReplyLost = false
@@ -46,6 +50,10 @@ let agreementReadRejected = false
 let agreementReadPending = false
 const feedbackRepliesLost = new Set()
 let unclearReadPending = false
+if (trackBetaRoundFixture) {
+  await pg.exec(`INSERT INTO beta_round(id,application_id,seq,overall,total,human_needed)
+    VALUES('c27-local-round-1','app-local-verify',1,'조건부',1,1);`)
+}
 if (fieldFeedbackSaveFixture) {
   // Add one compact first-page case; keep all previous synthetic rows intact.
   await pg.exec(`INSERT INTO override_event(id,product_id,reviewer_label,reviewer_role,decision_action,is_override,ai_decision,human_decision,reason_code,reason_detail,model_version,prompt_version,validity,reporter_email)
@@ -171,6 +179,27 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
         const bindings = context.env
         // Reproduce Pages: next() gets original bindings and shared request data.
         context.next = async (forwarded = context.request) => {
+          if (betaReceiptFixture && url.pathname === '/api/applications/app-local-beta/beta' && req.method === 'POST' && !betaReceiptMalformed) {
+            const input = await forwarded.clone().json().catch(() => null)
+            if (input?.kind === 'round') {
+              betaReceiptMalformed = true
+              // An invalid success before the real round handler writes anything.
+              await new Promise(resolve => setTimeout(resolve, 3000))
+              return Response.json({}, { status: 200 })
+            }
+          }
+          if (trackBetaRoundFixture && url.pathname === '/api/track/AX-ABC-234/beta' && req.method === 'POST' && !trackBetaRoundChanged) {
+            const input = await forwarded.clone().json().catch(() => null)
+            if (input?.expectedRoundId === 'c27-local-round-1') {
+              trackBetaRoundChanged = true
+              // Another synthetic actor publishes a newer round before this
+              // handler reads it. Serialize with the local RPC connection.
+              const changed = queue.then(() => pg.exec(`INSERT INTO beta_round(id,application_id,seq,overall,total,human_needed)
+                VALUES('c27-local-round-2','app-local-verify',2,'조건부',1,1);`))
+              queue = changed.catch(() => {})
+              await changed
+            }
+          }
           if (fieldFeedbackSaveFixture && url.pathname === '/api/feedback') {
             if (req.method === 'POST' && !fieldFeedbackReplyMalformed) {
               const input = await forwarded.clone().json().catch(() => null)

@@ -24,7 +24,7 @@ const cases = [
   ['accept', '/api/tools/department-test/accept', accept, { by: '이름 위조' }],
   ['outcome', '/api/track/AX-TEST/outcome', outcome, { by: '이름 위조', agree: true }],
   ['hold', '/api/track/AX-TEST/hold', hold, { by: '이름 위조', kind: 'met', body: '필요한 조건이 해소되었습니다.' }],
-  ['beta', '/api/track/AX-TEST/beta', beta, { by: '이름 위조', kind: '의견', body: '업무에 적용해 확인했습니다.' }],
+  ['beta', '/api/track/AX-TEST/beta', beta, { by: '이름 위조', kind: '의견', body: '업무에 적용해 확인했습니다.', expectedRoundId: 'round' }],
 ]
 beforeAll(async () => {
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')

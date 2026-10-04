@@ -16,10 +16,11 @@ vi.mock('../src/hooks/useApi.js', () => ({ useApi: path => ({ data: path === '/a
 }, error: path === '/applications' ? null : state.loadError, loading: false, reload: state.reload }) }))
 
 function clearQueue() { for (const scope of ['beta-scope-a', 'beta-scope-b']) forgetBetaRound(scope, 'beta-app') }
+const receipt = () => ({ ok: true, overall: '통과', round_id: `bta_${'a'.repeat(32)}`, seq: 1 })
 beforeEach(() => {
   vi.clearAllMocks(); clearQueue()
   state.scope = 'beta-scope-a'; state.revision = 2; state.loadError = null
-  state.post.mockResolvedValue({ ok: true, overall: '통과', round_id: 'local-beta-1' })
+  state.post.mockResolvedValue(receipt())
   state.get.mockResolvedValue({ aliases: [] }); state.reload.mockResolvedValue(undefined)
   state.read.mockResolvedValue([])
   state.grade.mockResolvedValue({ graded: [{ id: 'criterion-a', body: '현재 기준', kind: 'rule', verdict: '통과', is_required_safety: 1 }], summary: { overall: '통과', durationMs: 123 } })
@@ -39,6 +40,19 @@ async function start() {
 }
 
 describe('베타 판정 저장의 연속성', () => {
+  it('클라이언트 검사 우회 응답도 큐를 제거하거나 후속 GET을 실행하지 않는다', async () => {
+    state.post.mockResolvedValueOnce({})
+    await start()
+    await waitFor(() => expect(state.error).toHaveBeenCalledTimes(1))
+    const pending = pendingBetaRound('beta-scope-a', 'beta-app')
+    expect(pending?.payload).toEqual(state.post.mock.calls[0][1])
+    expect(state.success).not.toHaveBeenCalled(); expect(state.info).not.toHaveBeenCalled()
+    expect(state.reload).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '같은 채점 기록 다시 저장' }))
+    await waitFor(() => expect(state.success).toHaveBeenCalledTimes(1))
+    expect(state.post.mock.calls[1][1]).toBe(pending.payload)
+    expect(state.grade).toHaveBeenCalledTimes(1); expect(state.read).toHaveBeenCalledTimes(1)
+  })
   it('저장 응답 유실은 동일 판정·revision·scope·실행 ID로 재확인한다', async () => {
     state.post.mockRejectedValueOnce(new Error('응답 유실'))
     await start()
@@ -155,7 +169,7 @@ describe('베타 판정 저장의 연속성', () => {
     fireEvent.click(screen.getByRole('link', { name: '다른 화면' }))
     fireEvent.click(screen.getByRole('link', { name: '베타로 돌아가기' }))
     await screen.findByRole('button', { name: '같은 채점 기록 다시 저장' })
-    await act(async () => finishOld({ overall: '통과' }))
+    await act(async () => finishOld(receipt()))
     expect(screen.queryByRole('region', { name: '채점 기록 저장 상태' })).toBeNull()
     expect(screen.getByRole('button', { name: '파일 넣고 시험 시작' }).disabled).toBe(false)
     expect(state.reload).toHaveBeenCalledTimes(1)
@@ -192,8 +206,8 @@ describe('베타 판정 저장의 연속성', () => {
     fireEvent.click(screen.getByRole('link', { name: '베타로 돌아가기' }))
     fireEvent.click(await screen.findByRole('button', { name: '같은 채점 기록 다시 저장' }))
     await waitFor(() => expect(state.post).toHaveBeenCalledTimes(2))
-    await act(async () => finishOld({ overall: '통과' }))
-    await act(async () => retryFails ? failRetry(new Error('재시도 응답 유실')) : finishRetry({ overall: '통과' }))
+    await act(async () => finishOld(receipt()))
+    await act(async () => retryFails ? failRetry(new Error('재시도 응답 유실')) : finishRetry(receipt()))
     expect(pendingBetaRound('beta-scope-a', 'beta-app')).toBeNull()
     expect(state.reload).toHaveBeenCalledTimes(1)
     expect(state.error).not.toHaveBeenCalled()
