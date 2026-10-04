@@ -5,6 +5,10 @@ import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.ts'
 import { ago, dateTimeLabel, duration, ms, num } from '../lib/format.js'
 import Field from '../components/Field.jsx'
+import { useReportFeed } from '../hooks/useReportFeed.js'
+import ReportPagination from '../components/ReportPagination.jsx'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
+import { accessBlocked, getAccessSession } from '../lib/accessSession.js'
 
 // 넘긴 뒤에 무슨 일이 일어나고 있나.
 //
@@ -27,7 +31,8 @@ export default function ToolsPage() {
   const [params] = useSearchParams()
   const wanted = params.get('id')
   // 넘긴 뒤 부서가 겪은 것. 이게 없으면 "돌고 있음"만 보고 잘 되는 줄 안다.
-  const { data: reports, reload: reloadReports } = useApi('/reports')
+  const feed = useReportFeed()
+  const reports = feed.data
   // 부서가 알려준 상품코드 중 아직 담당자가 안 본 것. 잘못 이어져 있으면
   // 그 코드로 팔린 것이 전부 엉뚱한 상품 매출로 잡힌다.
   const { data: codes } = useApi('/codes')
@@ -59,12 +64,7 @@ export default function ToolsPage() {
             <Tile
               label="넘긴 도구"
               value={num(s.total)}
-              note={
-                (reports?.summary.toolsUntrusted ?? 0) > 0
-                  ? `그중 ${reports.summary.toolsUntrusted}개는 지금 결과를 믿을 수 없습니다`
-                  : `돌고 있는 것 ${s.running}개`
-              }
-              tone={(reports?.summary.toolsUntrusted ?? 0) > 0 ? 'warn' : undefined}
+              note={`돌고 있는 것 ${s.running}개`}
             />
             <Tile
               label="넘긴 뒤 실행"
@@ -84,9 +84,9 @@ export default function ToolsPage() {
             />
             <Tile
               label="부서가 이상하다고 한 것"
-              value={num(reports?.summary.open ?? 0)}
+              value={!reports || feed.error ? '미확인' : num(reports.summary.open)}
               note={
-                (reports?.summary.urgent ?? 0) > 0
+                !reports || feed.error ? '신고 목록을 확인해주세요' : reports.summary.urgent > 0
                   ? `그중 결과를 믿을 수 없는 것 ${reports.summary.urgent}건`
                   : '아직 못 고친 신고'
               }
@@ -271,19 +271,6 @@ export default function ToolsPage() {
             ))}
           </div>
 
-          {reports?.tools?.length > 0 && (
-            <section className="stack">
-              <div className="card-head">
-                <h2 className="card-title">
-                  부서가 겪은 것 {reports.summary.open}건이 아직 안 고쳐졌습니다
-                </h2>
-              </div>
-              {reports.tools.map((t) => (
-                <ReportTool key={t.applicationId} tool={t} onFixed={reloadReports} />
-              ))}
-            </section>
-          )}
-
           {data.failures.length > 0 && (
             <section className="card">
               <div className="card-head">
@@ -311,12 +298,19 @@ export default function ToolsPage() {
           )}
         </>
       )}
+      <section className="stack" aria-label="부서 신고 목록">
+        <div className="card-head"><h2 className="card-title">부서가 겪은 것</h2></div>
+        {reports && !feed.error && <p>전체 미처리 {reports.summary.open}건 · 긴급 {reports.summary.urgent}건 · 처리 {reports.summary.fixed}건</p>}
+        {reports && !feed.error && reports.summary.toolsUntrusted > 0 && <p className="card-note">긴급 미처리 신고가 있는 기능 {reports.summary.toolsUntrusted}개</p>}
+        <ReportPagination feed={feed} />
+        {reports?.tools.map(t => <ReportTool key={`${feed.identity}:${reports.page.basis}:${reports.page.number}:${t.applicationId}`} tool={t} onFixed={feed.afterWrite} locked={feed.locked} />)}
+      </section>
     </div>
   )
 }
 
 // 도구 하나에 들어온 신고와, 담당자가 고쳤다고 남기는 자리.
-function ReportTool({ tool, onFixed }) {
+function ReportTool({ tool, onFixed, locked }) {
   return (
     <article className={`report-tool${tool.urgent > 0 ? ' untrusted' : ''}`}>
       <div className="row" style={{ marginBottom: 8 }}>
@@ -341,38 +335,52 @@ function ReportTool({ tool, onFixed }) {
       <div className="tool-card-title" style={{ marginBottom: 10 }}>
         {tool.toolTitle}
       </div>
+      <p className="card-note">이 기능 전체 미처리 {tool.open}건 · 처리 {tool.fixed}건 · 현재 페이지 원문 {tool.reports.length}건</p>
 
       <ul className="honest-list">
         {tool.reports.map((r) => (
-          <ReportItem key={r.id} report={r} onFixed={onFixed} />
+          <ReportItem key={r.id} report={r} onFixed={onFixed} locked={locked} />
         ))}
       </ul>
     </article>
   )
 }
 
-function ReportItem({ report, onFixed }) {
+function ReportItem({ report, onFixed, locked }) {
   const toast = useToast()
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ how: '', why: '', author: 'AX 담당자' })
   const [fieldErrors, setFieldErrors] = useState({})
   const [saving, setSaving] = useState(false)
+  const pending = useRef(false)
+  const capture = useActionLifetime(report.id)
 
   async function send(e) {
     e.preventDefault()
+    if (pending.current || locked) return
+    const viewCurrent = capture(), generation = getAccessSession().generation
+    const current = () => viewCurrent() && getAccessSession().generation === generation && !accessBlocked(getAccessSession())
+    if (!current()) return
+    pending.current = true
     setSaving(true)
     setFieldErrors({})
     try {
-      await api.post('/reports', { ...form, reportId: report.id })
+      await api.post('/reports', { ...form, reportId: report.id }, {
+        validateResponse: value => value?.ok === true && typeof value.id === 'string' && /^dec_[a-f0-9]{20}$/.test(value.id),
+      })
+      if (!current()) return
       toast.success('처리한 것을 남겼습니다.')
       setOpen(false)
-      await onFixed()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
-      toast.error(err.message)
+      toast.error(!err.status || err.status >= 500 ? '처리 결과를 확인하지 못했습니다. 입력은 유지했습니다. 목록을 다시 확인해주세요.' : err.message)
+      return
     } finally {
-      setSaving(false)
+      pending.current = false
+      if (current()) setSaving(false)
     }
+    if (current()) await onFixed()
   }
 
   return (
@@ -401,6 +409,7 @@ function ReportItem({ report, onFixed }) {
         </div>
       ) : open ? (
         <form className="thread-form" onSubmit={send}>
+          <fieldset disabled={saving || locked} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <Field label="무엇을 하셨습니까" required error={fieldErrors.how}>
             <textarea
               rows={2}
@@ -425,12 +434,14 @@ function ReportItem({ report, onFixed }) {
               그만두기
             </button>
           </div>
+          </fieldset>
         </form>
       ) : (
         <button
           type="button"
           className="btn-ghost btn-sm"
           style={{ marginTop: 8 }}
+          disabled={locked}
           onClick={() => setOpen(true)}
         >
           처리했다고 남기기

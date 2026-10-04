@@ -48,11 +48,33 @@ function text(value: unknown, field: string, fallback: string | null, required =
 }
 function number(value: unknown, field: string, fallback: number | null): number | null {
   if (value == null) return fallback
-  // Preserve valid legacy numeric strings and fractional quantities; PostgreSQL
-  // retains its existing BIGINT conversion. Never coerce booleans/arrays to zero.
+  // Preserve valid legacy numeric strings and fractional money/FX values.
+  // Never coerce booleans/arrays to zero. Stored quantities are checked below.
   const parsed = typeof value === 'number' ? value
     : typeof value === 'string' && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim()) ? Number(value) : NaN
   if (!Number.isFinite(parsed) || Math.abs(parsed) > Number.MAX_SAFE_INTEGER) invalid(field)
+  return parsed
+}
+function quantity(value: unknown, field: string, rowIndex: number): number {
+  const parsed = number(value, field, 0) ?? 0
+  let integralText = true
+  if (typeof value === 'string') {
+    // Syntax is checked by number(). Inspect the decimal before binary parsing:
+    // underflow or long fractions can otherwise become apparent safe integers.
+    // Never allocate an exponent-sized string or BigInt.
+    const [mantissa, exponent = '0'] = value.trim().toLowerCase().replace(/^[+-]/, '').split('e')
+    const fractionLength = mantissa.includes('.') ? mantissa.length - mantissa.indexOf('.') - 1 : 0
+    const digits = mantissa.replace('.', '')
+    let nonZeroEnd = digits.length
+    while (nonZeroEnd > 0 && digits.charCodeAt(nonZeroEnd - 1) === 48) nonZeroEnd -= 1
+    integralText = nonZeroEnd === 0 || Number(exponent) >= fractionLength - (digits.length - nonZeroEnd)
+  }
+  // BIGINT silently rounds fractions. Reject this whole command before staging
+  // any writes; do not change the browser's calculation or guess a unit policy.
+  if (!Number.isSafeInteger(parsed) || !integralText) {
+    const label = FIELD_LABELS[field.split('.').at(-1) ?? '']
+    throw new BuildRunCommandError(`제작 결과 ${rowIndex + 1}번째 행의 ${label}이 소수입니다. 현재 저장 형식에서는 정확히 보존할 수 없습니다. 원본 수량과 단위를 확인해주세요.`, 400, field)
+  }
   return parsed
 }
 
@@ -182,7 +204,7 @@ export function normalizeBuildRunCommand(body: unknown): BuildRunCommand {
     const values: SqlValue[] = [
       text(raw.date, prefix + 'date', null, true), text(raw.iso_week, prefix + 'iso_week', null, true),
       text(raw.sku, prefix + 'sku', null, true), text(raw.sku_name, prefix + 'sku_name', null),
-      text(raw.channel, prefix + 'channel', null, true), number(raw.qty, prefix + 'qty', 0), number(raw.return_qty, prefix + 'return_qty', 0),
+      text(raw.channel, prefix + 'channel', null, true), quantity(raw.qty, prefix + 'qty', i), quantity(raw.return_qty, prefix + 'return_qty', i),
       text(raw.src_currency, prefix + 'src_currency', 'KRW'), number(raw.fx_rate, prefix + 'fx_rate', 1), ...money,
       text(source.file, prefix + 'source.file', ''), text(source.sheet, prefix + 'source.sheet', null), source.rowNo ?? 0,
       trace, duplicate ? 1 : 0, projected.duplicate_of ? projected.duplicate_of.file + ':' + projected.duplicate_of.rowNo : null,

@@ -90,6 +90,31 @@ it.each(['network', '503'])('retries an uncertain %s with identical body/intent/
   expect(state.read).toHaveBeenCalledTimes(1); expect(state.pipeline).toHaveBeenCalledTimes(1)
 })
 
+it('shows a fractional quantity rejection while preserving the exact calculation, source and retry intent', async () => {
+  calculated.rows[0].qty = 1.5
+  calculated.rows[0].return_qty = 0.5
+  calculated.totals.all.qty = 1.5
+  const message = '제작 결과 1번째 행의 수량이 소수입니다. 현재 저장 형식에서는 정확히 보존할 수 없습니다. 원본 수량과 단위를 확인해주세요.'
+  postReply = () => failure(400, { error: message, fields: { 'rows.0.qty': message } })
+  const view = await show(); choose(view)
+  expect((await pendingError()).textContent).toContain(message)
+  const original = posts()[0][1].body, payload = JSON.parse(original)
+  expect(payload.rows[0]).toMatchObject({ qty: 1.5, return_qty: 0.5, source })
+  expect(payload.totals.all.qty).toBe(1.5)
+  const preview = within(statusPanel()).getByRole('table', { name: '저장할 정산 계산 결과', hidden: true })
+  expect(within(preview).getByRole('columnheader', { name: '수량', hidden: true })).toBeTruthy()
+  expect(within(preview).getByRole('columnheader', { name: '반품수량', hidden: true })).toBeTruthy()
+  expect(within(preview).getByText('1.5')).toBeTruthy()
+  expect(within(preview).getByText('0.5')).toBeTruthy()
+  expect(within(statusPanel()).getAllByText(/selected.csv/).length).toBeGreaterThan(0)
+  expect(screen.getByRole('button', { name: '파일 넣기' }).disabled).toBe(true)
+  expect(state.success).not.toHaveBeenCalled()
+  retry(); await waitFor(() => expect(posts()).toHaveLength(2)); await pendingError()
+  expect(posts()[1][1].body).toBe(original)
+  expect(state.read).toHaveBeenCalledTimes(1); expect(state.pipeline).toHaveBeenCalledTimes(1)
+  expect(calculated.rows[0].qty).toBe(1.5)
+})
+
 it.each([{}, { ok: true }, { ok: false, run_id: STORED, seq: 1 }, { ok: true, run_id: null, seq: 1 },
   { ok: true, run_id: 'bad id', seq: 1 }, { ok: true, run_id: STORED, seq: 0 }, { ok: true, run_id: STORED, seq: '1' }, { ok: true, run_id: STORED, seq: 1.5 },
 ])('preserves the retry key until an exact success receipt is validated: %j', async body => {

@@ -96,6 +96,10 @@ describe('신고만 골라내기', () => {
     const [r] = toReports([report('r1', '없는유형', '2026-07-21 09:00:00')])
     expect(r.label).toBeTruthy()
   })
+  it.each(['__proto__','constructor','toString'])('prototype %s를 알려진 신고 유형으로 보지 않는다',code=>{
+    const [r]=toReports([report('r',code,'2026-07-20')])
+    expect(r.code).toBe('other');expect(r.urgent).toBe(false);expect(r.label).toBeTruthy()
+  })
 
   it('빈 값에도 터지지 않는다', () => {
     expect(toReports([])).toEqual([])
@@ -104,6 +108,20 @@ describe('신고만 골라내기', () => {
 })
 
 describe('고친 것과 안 고친 것', () => {
+  it('입력 순서와 무관하게 시각/id 기준의 최신 처리를 선택한다',()=>{
+    const r=report('r','wrong_number','2026-07-20'),old={...fix('f1','r','2026-07-21'),what:'예전 처리'},latest={...fix('f2','r','2026-07-22'),what:'최신 처리'}
+    expect(toReports([r,old,latest])[0].fix.how).toBe('최신 처리')
+    expect(toReports([latest,old,r])[0].fix.how).toBe('최신 처리')
+    const tied={...old,id:'f3',created_at:latest.created_at,what:'동률 결정적 선택'}
+    expect(toReports([tied,latest,r])[0].fix.how).toBe('동률 결정적 선택')
+    expect(toReports([latest,tied,r])[0].fix.how).toBe('동률 결정적 선택')
+  })
+  it('다른 신청서 처리와 명시적 앱/누락 앱 혼합은 연결하지 않는다',()=>{
+    const r=report('r','wrong_number','2026-07-20',{application_id:'a'}),foreign={...fix('f','r','2026-07-22'),application_id:'b'}
+    expect(toReports([r,foreign])[0].open).toBe(true)
+    expect(toReports([r,fix('f','r','2026-07-22')])[0].open).toBe(true)
+    expect(toReports([r,{...foreign,application_id:'a'}])[0].open).toBe(false)
+  })
   it('처리 기록이 붙으면 닫힌다', () => {
     const [r] = toReports([
       report('r1', 'wrong_number', '2026-07-21 09:00:00'),
@@ -124,6 +142,14 @@ describe('고친 것과 안 고친 것', () => {
 })
 
 describe('무엇을 맨 위에 놓는가', () => {
+  it('동시각 신고는 id 순서로 결정적으로 놓는다',()=>{
+    expect(toReports([report('b','wrong_number','2026-07-20'),report('a','wrong_number','2026-07-20')]).map(r=>r.id)).toEqual(['a','b'])
+  })
+  it('legacy Unicode ID도 PG UTF-8 동률 순서와 맞춘다',()=>{
+    expect(toReports([report('😀','wrong_number','2026-07-20'),report('\ue000','wrong_number','2026-07-20')]).map(r=>r.id)).toEqual(['\ue000','😀'])
+    const r=report('r','wrong_number','2026-07-20'),a={...fix('\ue000','r','2026-07-21'),what:'BMP'},b={...fix('😀','r','2026-07-21'),what:'astral'}
+    expect(toReports([r,b,a])[0].fix.how).toBe('astral')
+  })
   it('안 고친 것이 고친 것보다 위다', () => {
     const rs = toReports([
       report('r1', 'wrong_number', '2026-07-20 09:00:00'),

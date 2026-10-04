@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import BuildPage from '../src/pages/BuildPage.jsx'
 import { beginAccessCheck, completeAccessCheck } from '../src/lib/accessSession.js'
@@ -33,6 +33,25 @@ it('renders stored same-name references and makes each full original hash availa
   fireEvent.keyDown(rows[1], { key: 'Enter' })
   expect(screen.getAllByText(shaB)).toHaveLength(2)
   expect(screen.getByText('원본 파일에서 확인')).toBeTruthy()
+})
+
+it.each([[1.5, '1.5'], [1e-7, '1e-7'], [1234, '1,234']])('displays stored quantity %s precisely in both summary and detail without changing money display', async (qty, expected) => {
+  state.data.runs[0].totals = { byChannel: [{ channel: '자사몰', rows: 1, qty, net_revenue_krw: 10000.25 }] }
+  state.data.rows = [{ ...entry('quantity-row', shaA), qty }]
+  render(<MemoryRouter><BuildPage /></MemoryRouter>)
+  const summary = await screen.findByRole('table', { name: '제작 결과의 채널별 집계' })
+  expect(within(summary).getByRole('cell', { name: expected })).toBeTruthy()
+  expect(within(summary).getByRole('cell', { name: '10,000원' })).toBeTruthy()
+  const detail = screen.getByRole('row', { name: /합성 상품.*어디서 왔는지/ })
+  expect(within(detail).getByRole('cell', { name: expected })).toBeTruthy()
+})
+
+it('does not invent a recovered historical quantity when stored detail and supplied totals already differ', async () => {
+  state.data.runs[0].totals = { byChannel: [{ channel: '자사몰', rows: 1, qty: 1.5 }] }
+  state.data.rows = [{ ...entry('legacy-rounded', shaA), qty: 2 }]
+  render(<MemoryRouter><BuildPage /></MemoryRouter>)
+  expect(within(await screen.findByRole('table', { name: '제작 결과의 채널별 집계' })).getByRole('cell', { name: '1.5' })).toBeTruthy()
+  expect(within(screen.getByRole('row', { name: /합성 상품.*어디서 왔는지/ })).getByRole('cell', { name: '2' })).toBeTruthy()
 })
 
 it('does not retrofit a fingerprint onto legacy rows with only filename and line references', async () => {

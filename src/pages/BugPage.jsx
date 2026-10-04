@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -7,6 +7,10 @@ import { ago } from '../lib/format.js'
 import Fold from '../components/Fold.jsx'
 import Field from '../components/Field.jsx'
 import { REPORT_KINDS, REPORT_BY_CODE } from '../../shared/report.js'
+import { useReportFeed } from '../hooks/useReportFeed.js'
+import ReportPagination from '../components/ReportPagination.jsx'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
+import { accessBlocked, getAccessSession } from '../lib/accessSession.js'
 
 // 우리가 만든 기능이 이상할 때 말할 데.
 //
@@ -23,11 +27,14 @@ const EMPTY = { applicationId: '', code: '', body: '', reporter: '' }
 
 export default function BugPage() {
   const { data: targetData, error: targetErr } = useApi('/bugs')
-  const { data: reportData, error: reportErr, loading, reload } = useApi('/reports')
+  const feed = useReportFeed()
+  const reportData = feed.data
   const toast = useToast()
   const [form, setForm] = useState(EMPTY)
   const [fieldErrors, setFieldErrors] = useState({})
   const [sending, setSending] = useState(false)
+  const pending = useRef(false)
+  const capture = useActionLifetime(feed.identity)
 
   const set = (patch) => setForm((f) => ({ ...f, ...patch }))
   const asked = REPORT_BY_CODE[form.code]?.ask
@@ -35,19 +42,31 @@ export default function BugPage() {
 
   async function send(e) {
     e.preventDefault()
+    if (pending.current) return
+    const viewCurrent = capture(), generation = getAccessSession().generation
+    const current = () => viewCurrent() && getAccessSession().generation === generation && !accessBlocked(getAccessSession())
+    if (!current()) return
+    pending.current = true
     setSending(true)
     setFieldErrors({})
     try {
-      const r = await api.post('/bugs', form)
+      const r = await api.post('/bugs', form, {
+        validateResponse: value => value?.ok === true && typeof value.id === 'string' && /^dec_[a-f0-9]{20}$/.test(value.id)
+          && typeof value.ticket_no === 'string' && value.ticket_no.trim().length > 0,
+      })
+      if (!current()) return
       toast.success(`${r.ticket_no} 에 대한 신고로 접수했습니다.`)
       setForm(EMPTY)
-      await reload()
     } catch (err) {
+      if (!current()) return
       if (err.fields) setFieldErrors(err.fields)
-      toast.error(err.message)
+      toast.error(!err.status || err.status >= 500 ? '신고 결과를 확인하지 못했습니다. 입력은 유지했습니다. 목록을 다시 확인해주세요.' : err.message)
+      return
     } finally {
-      setSending(false)
+      pending.current = false
+      if (current()) setSending(false)
     }
+    if (current()) await feed.afterWrite()
   }
 
   const tools = reportData?.tools ?? []
@@ -73,6 +92,7 @@ export default function BugPage() {
         </div>
       ) : (
         <form className="card card-boxed" onSubmit={send} noValidate>
+          <fieldset disabled={sending} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
           <div className="card-head">
             <h2 className="card-title">무엇이 이상한가요</h2>
           </div>
@@ -129,28 +149,20 @@ export default function BugPage() {
           <button type="submit" className="btn-primary" disabled={sending}>
             {sending ? '보내는 중…' : '신고하기'}
           </button>
+          </fieldset>
         </form>
       )}
 
-      {(targetErr || reportErr) && (
-        <div className="notice notice-danger">{targetErr || reportErr}</div>
+      {targetErr && (
+        <div className="notice notice-danger">{targetErr}</div>
       )}
-      {loading && !reportData && <div className="page-loading">불러오는 중…</div>}
-
-      {reportData && tools.length === 0 && (
-        <div className="empty">
-          <div className="empty-title">아직 들어온 신고가 없습니다</div>
-          <div className="empty-sub">없어서 안 보이는 것이지, 숨겨서 안 보이는 것이 아닙니다.</div>
-        </div>
-      )}
+      {reportData && !feed.error && <p>전체 미처리 {summary.open}건 · 긴급 {summary.urgent}건 · 처리 {summary.fixed}건</p>}
+      <ReportPagination feed={feed} />
 
       {openTools.length > 0 && (
         <section className="card">
           <div className="card-head">
-            <h2 className="card-title">아직 안 고친 것 {summary.open}건</h2>
-            {summary.urgent > 0 && (
-              <span className="badge badge-danger">결과를 믿을 수 없는 것 {summary.urgent}건</span>
-            )}
+            <h2 className="card-title">미처리 신고가 남은 기능 · 현재 페이지</h2>
             <span className="spacer" />
             {/* 고치는 자리는 「넘긴 뒤」 화면에 이미 있다. 같은 일을 두 화면에
                 만들면 한쪽만 고쳐진다. */}
@@ -167,7 +179,7 @@ export default function BugPage() {
       )}
 
       {doneTools.length > 0 && (
-        <Fold label="다 처리한 것" count={doneTools.length} note="고친 내용까지 그대로 남습니다">
+        <Fold label="현재 페이지의 전체 처리 완료 기능" count={doneTools.length} note="전체 기능 수가 아니라 이 페이지에 원문이 있는 기능 수입니다">
           <div className="stack-sm">
             {doneTools.map((t) => (
               <ToolReports key={t.applicationId} t={t} />
@@ -196,6 +208,7 @@ function ToolReports({ t }) {
           <span className="badge badge-success">전부 처리됨</span>
         )}
       </div>
+      <p className="card-note">이 기능 전체 신고 {t.total}건 · 처리 {t.fixed}건 · 현재 페이지 원문 {t.reports.length}건</p>
 
       <div className="stack-sm">
         {t.reports.map((r) => (

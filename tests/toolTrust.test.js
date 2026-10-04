@@ -121,20 +121,27 @@ describe('그 판단이 부서 화면까지 간다', () => {
 // 있는 쪽이 훨씬 급하다.
 describe('망가진 도구가 몇 개인지', () => {
   const route = readFileSync(join(ROOT, 'functions', 'api', 'reports.js'), 'utf8')
+  const feed = readFileSync(join(ROOT, 'functions', '_lib', 'reportFeed.ts'), 'utf8')
   const page = readFileSync(join(ROOT, 'src', 'pages', 'ToolsPage.jsx'), 'utf8')
+  const reportSection = page.match(/<section className="stack" aria-label="부서 신고 목록">([\s\S]*?)<\/section>/)?.[1] ?? ''
 
-  it('서버가 도구 단위로도 센다', () => {
-    expect(route).toContain('toolsUntrusted:')
+  it('서버가 페이지 카드가 아닌 전체 열람 범위의 기능 단위로 센다', () => {
+    expect(route).toContain('await loadReportFeed(env.DB, query.value)')
+    expect(route).toContain('summary: feed.summary')
+    expect(feed).toContain('const summary = counts.reduce(')
+    expect(feed).toMatch(/toolsUntrusted:\s*out\.toolsUntrusted\+\(c\.urgent>0\?1:0\)/)
+    expect(feed).toContain('FROM report_state GROUP BY application_id')
   })
 
-  it('화면이 그 값을 읽는다', () => {
-    expect(page).toContain('reports?.summary.toolsUntrusted')
-    expect(page).toContain('결과를 믿을 수 없습니다')
+  it('신고 영역에서 그 전체 범위를 말하며 넘긴 도구의 개수로 오인하지 않는다', () => {
+    expect(reportSection).toContain('reports.summary.toolsUntrusted')
+    expect(reportSection).toContain('긴급 미처리 신고가 있는 기능 {reports.summary.toolsUntrusted}개')
+    expect(page.slice(0, page.indexOf('<section className="stack" aria-label="부서 신고 목록">'))).not.toContain('toolsUntrusted')
   })
 
-  it('없을 때 0으로 굳지 않는다', () => {
-    // 아직 안 받아 온 사이에 null 이 오면 Number(null) 이 0이 되어
-    // "이상 없음"으로 보인다. ?? 로 걸러야 한다.
-    expect(page).toContain('reports?.summary.toolsUntrusted ?? 0')
+  it('미조회·조회 오류에서는 0이나 이상 없음으로 굳지 않는다', () => {
+    expect(reportSection).toContain('reports && !feed.error && reports.summary.toolsUntrusted > 0')
+    expect(reportSection).not.toMatch(/toolsUntrusted\s*\?\?\s*0/)
+    expect(reportSection).toContain('<ReportPagination feed={feed} />')
   })
 })

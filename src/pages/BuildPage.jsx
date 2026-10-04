@@ -4,7 +4,7 @@ import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.ts'
-import { krw, num, ms, ago } from '../lib/format.js'
+import { krw, num, quantity, ms, ago } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { SKUS } from '../../shared/master.js'
 import { readLocalFiles } from '../lib/readFiles.js'
@@ -238,8 +238,8 @@ function Build({ id, session, pendingRuns, redrawParent }) {
         <SourceReferences files={record.payload.files} localOnly={!record.receipt} />
         <details className="disclose"><summary>계산 결과 미리보기</summary>
           <div className="table-wrap"><table className="data-table"><caption className="sr-only">저장할 정산 계산 결과</caption>
-            <thead><tr><th scope="col">상품</th><th scope="col">순매출</th><th scope="col">원본</th></tr></thead>
-            <tbody>{record.payload.rows.slice(0, 20).map((row, index) => <tr key={index}><td>{row.sku_name || row.sku}</td><td>{krw(row.net_revenue_krw)}</td><td><SourceFile source={row.source} /> · {row.source.sheet || '시트 없음'} · {row.source.rowNo}번째 줄</td></tr>)}</tbody>
+            <thead><tr><th scope="col">상품</th><th scope="col">수량</th><th scope="col">반품수량</th><th scope="col">순매출</th><th scope="col">원본</th></tr></thead>
+            <tbody>{record.payload.rows.slice(0, 20).map((row, index) => <tr key={index}><td>{row.sku_name || row.sku}</td><td className="num">{quantity(row.qty)}</td><td className="num">{quantity(row.return_qty)}</td><td>{krw(row.net_revenue_krw)}</td><td><SourceFile source={row.source} /> · {row.source.sheet || '시트 없음'} · {row.source.rowNo}번째 줄</td></tr>)}</tbody>
           </table></div><p className="card-note">처음 20줄만 표시합니다. 전체 계산 결과와 원본 참조는 동일한 저장 요청에 보관되어 있습니다.</p>
         </details>
         {record.error && <div className="notice notice-warn" role="alert"><p>{record.error}</p>
@@ -315,7 +315,7 @@ function Build({ id, session, pendingRuns, redrawParent }) {
                         <tr key={t.channel}>
                           <td>{t.channel}</td>
                           <td className="num">{num(t.rows)}</td>
-                          <td className="num">{num(t.qty)}</td>
+                          <td className="num">{quantity(t.qty)}</td>
                           <td className="num">{krw(t.net_revenue_krw)}</td>
                           <td className="num">{krw(t.commission_krw)}</td>
                           <td className="num">
@@ -396,7 +396,7 @@ function Build({ id, session, pendingRuns, redrawParent }) {
                             </span>
                           )}
                         </td>
-                        <td className="num">{num(r.qty)}</td>
+                        <td className="num">{quantity(r.qty)}</td>
                         <td className="num">{krw(r.net_revenue_krw)}</td>
                         <td className="num">{krw(r.contribution_krw)}</td>
                       </tr>

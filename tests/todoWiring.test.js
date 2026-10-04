@@ -57,7 +57,10 @@ function fakeEnv(source) {
   const stmt = {
     bind: () => stmt,
     first: async () => ANY_ROW,
-    all: async () => ({ results: [ANY_ROW] }),
+    // Reports requires exactly one PG wrapper and matching read metadata.
+    all: async () => source === 'reports'
+      ? { success: true, results: [{ payload: { counts: [], rows: [] } }], meta: { changes: 1, row_count: 1 } }
+      : { results: [ANY_ROW] },
     run: async () => ({ meta: {} }),
   }
   return {
@@ -65,6 +68,7 @@ function fakeEnv(source) {
     // requires an explicitly scoped context; use its isolated demo contract.
     DEMO_WORKSPACE: source === 'codes',
     DB: {
+      ...(source === 'reports' ? { provider: 'supabase', toolRunScope: async () => 'a'.repeat(64) } : {}),
       workspace: source === 'codes',
       prepare: () => stmt,
       batch: async (l) => (l ?? []).map(() => ({ meta: {} })),

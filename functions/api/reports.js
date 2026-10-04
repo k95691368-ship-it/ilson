@@ -5,36 +5,35 @@
 
 import { jsonResponse, jsonError, failFields, failUnexpected } from '../_lib/http.ts'
 import { logDecision } from '../_lib/decisions.js'
-import { toReports, openReports, REPORT_KIND, REPORT_FIX } from '../../shared/report.js'
+import { toReports, REPORT_KIND, REPORT_FIX } from '../../shared/report.js'
+import { loadReportFeed, parseReportFeedQuery } from '../_lib/reportFeed.ts'
 
-export async function onRequestGet({ env, data: requestData }) {
+export async function onRequestGet({ env, data: requestData, request }) {
+  const query = parseReportFeedQuery(request)
+  if (!query.ok) return jsonError('신고 페이지 요청을 확인해주세요.', 400)
   env = requestData?.requestEnv ?? env
   try {
-    const { results } = await env.DB.prepare(
-      `SELECT d.id, d.application_id, d.title, d.what, d.why, d.link_kind, d.link_id, d.created_at,
-              a.ticket_no, a.dept, h.slug, h.title AS tool_title, h.handed_to_dept
-       FROM decision_log d
-       JOIN application a ON a.id = d.application_id
-       LEFT JOIN handover h ON h.application_id = d.application_id
-       WHERE d.link_kind IN (?, ?)
-       ORDER BY d.created_at DESC
-       LIMIT 200`
-    )
-      .bind(REPORT_KIND, REPORT_FIX)
-      .all()
-
-    // 도구별로 묶어서 각각 몇 건이 살아 있는지 센다.
+    const feed = await loadReportFeed(env.DB, query.value)
+    if (query.value.basis !== null && query.value.basis !== feed.basis) {
+      return jsonResponse({ error: '신고 기록이 바뀌었습니다. 첫 페이지에서 다시 확인해주세요.', code: 'REPORTS_CHANGED' }, 409)
+    }
+    // Only this page's original reports are grouped. Tool badges and summary
+    // remain complete for the current scoped data, not counts of visible cards.
     const byApp = new Map()
-    for (const r of results) {
+    for (const r of feed.rows) {
       if (!byApp.has(r.application_id)) byApp.set(r.application_id, [])
       byApp.get(r.application_id).push(r)
+      if (r.fix_id !== null) byApp.get(r.application_id).push({
+        id:r.fix_id,application_id:r.fix_application_id,link_kind:REPORT_FIX,link_id:r.id,
+        what:r.fix_how,why:r.fix_why,created_at:r.fix_at,
+      })
     }
-
+    const counts = new Map(feed.counts.map(c => [c.application_id,c]))
     const tools = []
     for (const [applicationId, rows] of byApp) {
       const first = rows[0]
       const reports = toReports(rows)
-      if (reports.length === 0) continue
+      const count = counts.get(applicationId)
       tools.push({
         applicationId,
         ticket_no: first.ticket_no,
@@ -42,25 +41,16 @@ export async function onRequestGet({ env, data: requestData }) {
         toolTitle: first.tool_title ?? first.dept,
         dept: first.handed_to_dept ?? first.dept,
         reports,
-        open: openReports(reports).length,
-        urgent: openReports(reports).filter((r) => r.urgent).length,
+        open: count.open,
+        urgent: count.urgent,
+        total: count.total,
+        fixed: count.fixed,
       })
     }
 
     // 못 미더운 도구를 맨 위로. 급한 신고가 살아 있는 것이 먼저다.
-    tools.sort((a, b) => b.urgent - a.urgent || b.open - a.open)
-
-    const all = tools.flatMap((t) => t.reports)
-    return jsonResponse({
-      tools,
-      summary: {
-        total: all.length,
-        open: all.filter((r) => r.open).length,
-        urgent: all.filter((r) => r.open && r.urgent).length,
-        fixed: all.filter((r) => !r.open).length,
-        toolsUntrusted: tools.filter((t) => t.urgent > 0).length,
-      },
-    })
+    tools.sort((a, b) => b.urgent - a.urgent || b.open - a.open || (a.applicationId < b.applicationId ? -1 : a.applicationId > b.applicationId ? 1 : 0))
+    return jsonResponse({ tools, summary: feed.summary, page: feed.page })
   } catch (err) {
     return failUnexpected(err, '신고를 불러오지 못했습니다.')
   }

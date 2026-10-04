@@ -101,12 +101,28 @@ export function validateFiledReport({ applicationId, code, body, reporter } = {}
   return fields
 }
 
+// PG COLLATE "C" sorts valid UTF-8 text by Unicode code points. Comparing
+// UTF-16 strings directly differs for legacy IDs containing astral characters.
+function reportTextOrder(a,b) {
+  const left=String(a),right=String(b)
+  if(left===right)return 0
+  let li=0,ri=0
+  while(li<left.length && ri<right.length){
+    const lc=left.codePointAt(li),rc=right.codePointAt(ri)
+    if(lc!==rc)return lc<rc?-1:1
+    li+=lc>0xffff?2:1;ri+=rc>0xffff?2:1
+  }
+  return li===left.length?-1:1
+}
+
 // 결정 기록 줄을 신고로 바꾼다.
 export function toReports(rows) {
+  const origins = new Map()
   const items = (rows ?? [])
     .filter((r) => r.link_kind === REPORT_KIND)
     .map((r) => {
-      const kind = REPORT_BY_CODE[r.link_id] ?? REPORT_BY_CODE.other
+      origins.set(r.id,r.application_id ?? null)
+      const kind = Object.hasOwn(REPORT_BY_CODE,r.link_id) ? REPORT_BY_CODE[r.link_id] : REPORT_BY_CODE.other
       return {
         id: r.id,
         code: kind.code,
@@ -120,20 +136,29 @@ export function toReports(rows) {
     })
 
   // 처리한 것을 표시한다. 처리 기록은 신고 id를 가리킨다.
-  const fixed = new Map(
-    (rows ?? [])
-      .filter((r) => r.link_kind === REPORT_FIX)
-      .map((r) => [r.link_id, { how: r.what, why: r.why, at: r.created_at }])
-  )
+  const fixed = new Map()
+  for (const r of rows ?? []) {
+    if (r.link_kind !== REPORT_FIX) continue
+    const app = r.application_id ?? null
+    if (!fixed.has(app)) fixed.set(app, new Map())
+    const appFixes = fixed.get(app), previous = appFixes.get(r.link_id)
+    // Timestamp/id order is deterministic, not evidence of commit order. Never
+    // let the caller's ASC/DESC read order select different handling text.
+    if (!previous || reportTextOrder(r.created_at,previous.created_at)>0
+      || (reportTextOrder(r.created_at,previous.created_at)===0 && reportTextOrder(r.id,previous.id)>0)) appFixes.set(r.link_id,r)
+  }
 
   return items
-    .map((r) => ({ ...r, fix: fixed.get(r.id) ?? null, open: !fixed.has(r.id) }))
+    .map((r) => {
+      const f = fixed.get(origins.get(r.id))?.get(r.id)
+      return { ...r, fix:f ? {how:f.what,why:f.why,at:f.created_at} : null,open:!f }
+    })
     .sort((a, b) => {
       // 안 고친 것 먼저, 그중 급한 것 먼저, 그중 오래된 것 먼저.
       // 오래 방치된 신고가 맨 위에 와야 그게 눈에 걸린다.
       if (a.open !== b.open) return a.open ? -1 : 1
       if (a.urgent !== b.urgent) return a.urgent ? -1 : 1
-      return String(a.at).localeCompare(String(b.at))
+      return reportTextOrder(a.at,b.at) || reportTextOrder(a.id,b.id)
     })
 }
 

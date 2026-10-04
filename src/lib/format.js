@@ -19,6 +19,24 @@ export function num(value, digits = 0) {
   })
 }
 
+// Quantity is evidence, not a rounded count. Keep the computed JS number's
+// shortest round-trip representation; numeric strings keep their actual text.
+// Tiny values retain exponent notation instead of becoming zero. This does not
+// recover source precision already lost before receiving a JS number.
+export function quantity(value) {
+  if ((typeof value !== 'number' && typeof value !== 'string') || (typeof value === 'string' && !value.trim())) return '—'
+  if (typeof value === 'string' && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(value.trim())) return '—'
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) return '—'
+  const text = typeof value === 'string' ? value.trim() : String(parsed)
+  if (/e/i.test(text)) return text
+  const [integer, fraction] = text.split('.')
+  const sign = /^[+-]/.test(integer) ? integer[0] : ''
+  const digits = integer.slice(sign.length), groups = []
+  for (let end = digits.length; end > 0; end -= 3) groups.push(digits.slice(Math.max(0, end - 3), end))
+  return sign + groups.reverse().join(',') + (fraction === undefined ? '' : '.' + fraction)
+}
+
 // 초를 사람이 읽는 단위로. 1분 미만은 초, 1시간 미만은 분, 그 위는 시간+분.
 // 반올림해서 "2시간"으로 뭉개지 않는 이유는, 이 값이 절감 근거로 쓰이기 때문이다.
 export function duration(seconds) {

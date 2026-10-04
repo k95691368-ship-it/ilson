@@ -14,7 +14,7 @@ import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../
 import { annotateRuns, summarizeRuns, usersOf } from '../../shared/history.js'
 import { useToast } from '../context/ToastContext.jsx'
 import { api } from '../api/client.ts'
-import { krw, num, ms, ago, dateTimeLabel } from '../lib/format.js'
+import { krw, num, quantity, ms, ago, dateTimeLabel } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { pendingToolRun, keepToolRun, forgetToolRun, subscribeToolRuns } from '../lib/pendingToolRuns.js'
 import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
@@ -460,7 +460,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
                     <tr key={t.channel}>
                       <td>{t.channel}</td>
                       <td className="num">{num(t.rows)}</td>
-                      <td className="num">{num(t.qty)}</td>
+                      <td className="num">{quantity(t.qty)}</td>
                       <td className="num">{krw(t.net_revenue_krw)}</td>
                       <td className="num">{krw(t.commission_krw)}</td>
                       <td className="num">{krw(t.contribution_krw)}</td>

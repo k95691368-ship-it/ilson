@@ -125,6 +125,25 @@ function fakeEnv(withRows = false) {
   return { DB: withRows ? fakeDBWithRows() : fakeDB(), SOURCES: fakeR2() }
 }
 
+// The bounded report feed uses a typed Supabase SELECT, not an arbitrary D1 row.
+// Only reports GET gets this fixture; every other handler keeps the smoke shell.
+function fakeReportFeedDB(withRows) {
+  const payload = withRows ? {
+    counts: [{ application_id: 'app_x', total: 1, open: 1, urgent: 1, fixed: 0, digest: 'a'.repeat(32) }],
+    rows: [{
+      id: 'dec_report', application_id: 'app_x', title: '재무 담당', what: '합계가 다릅니다.', why: '원장과 대조했습니다.',
+      link_kind: '신고', link_id: 'wrong_number', created_at: '2026-08-01 00:00:00', ticket_no: 'AX-XXX-000', dept: '재무',
+      slug: null, tool_title: null, handed_to_dept: null,
+      fix_id: null, fix_application_id: null, fix_how: null, fix_why: null, fix_at: null, open_rank: 1, urgent_rank: 1,
+    }],
+  } : { counts: [], rows: [] }
+  const stmt = {
+    bind: () => stmt,
+    all: async () => ({ success: true, results: [{ payload }], meta: { changes: 1, row_count: 1 } }),
+  }
+  return { provider: 'supabase', toolRunScope: async () => 'a'.repeat(64), prepare: () => stmt }
+}
+
 function apiFiles(dir, out = []) {
   for (const name of readdirSync(dir)) {
     const p = join(dir, name)
@@ -167,6 +186,7 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
           params: { ticket: 'AX-XXX-000', id: 'app_x', slug: 'demo', dept: '재무' },
           request: new Request('https://example.test/api/x'),
         }
+        if (rel.endsWith('/api/reports.js')) ctx.env.DB = fakeReportFeedDB(withRows)
 
         let res
         try {
@@ -197,6 +217,24 @@ describe('서버 라우트를 한 번씩 돌려 본다', () => {
     // 같이 돌면 5초 기본값을 넘긴다 — 느린 것이 아니라 붐비는 것이라
     // 제한만 늘린다.
   }, 60000)
+
+  it('신고 조회의 실패·깨진 wrapper를 정상적인 0건 응답으로 허용하지 않는다', async () => {
+    const { onRequestGet } = await import('../functions/api/reports.js')
+    const broken = [
+      async () => { throw Error('synthetic read failure') },
+      async () => ({ success: true, results: [], meta: { changes: 0, row_count: 0 } }),
+      async () => ({ success: true, results: [{ payload: { counts: [], rows: [] } }], meta: { changes: 1, row_count: 0 } }),
+    ]
+    for (const all of broken) {
+      const stmt = { bind: () => stmt, all }
+      const DB = { ...fakeReportFeedDB(false), prepare: () => stmt }
+      const res = await onRequestGet({ env: { DB }, request: new Request('https://example.test/api/reports') })
+      expect(res.status).toBe(503)
+      const body = await res.json()
+      expect(body).not.toHaveProperty('summary')
+      expect(body.error).toBeTruthy()
+    }
+  })
 
   // POST는 GET보다 잡기 어렵다. 대개 입력 검증에서 먼저 되돌아가기 때문에
   // 그 뒤 코드는 안 밟힌다. 그래서 두 번 부른다 — 빈 몸으로 한 번(검증

@@ -1,5 +1,31 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 시간 제한 자율 개선 — 회차 10 화면·검증 교정
+
+22:28 KST 최종 동결 소스의 전체 검사 **206파일3,834개(일반205파일3,828+규모6)** 통과를 확인했다. build를 먼저 완료한 뒤 test를 실행해 deployArtifact suite도 정상 통과했다. lint/typecheck/137모듈/Worker build·격리 시험 script syntax/lint·diff check가 완료됐고 CLI 커밋·푸시/운영검증이 남았다.
+
+22:27 KST C22/C23 구현과 독립 반박 검토를 마쳤다. 신고 단일 조회는 원문100개와 전체/기능별 집계를 분리하며 adapter wrapper1개·row_count/changes1을 함께 확인한다. 불완전한 페이지·중복ID·불가능한 건수는0건 성공이 아니라503/미확인이다. basis 변경409는 이전 원문을 숨기고 첫 페이지 확인으로 복구한다. 미인계 기능 신고도 열람하며 넘긴 도구 타일과 전체 신고 기능 경고를 분리했다. C23은 qty/return_qty만 현재BIGINT에 손실 없이 저장되는지 검증한다. 숫자 문자열의 긴 소수·지수 언더플로를 decimal 구조로 검사하며 과대한 지수 확장을 하지 않는다. 표시 함수는 긴 소수 문자열/작은 지수 숫자를0이나 정수로 반올림하지 않는다. 금액·환율·일반 num/krw 규칙은 그대로다. 독립 exact BigInt 기준1,384개/6,545개 bounded 합성 조합의 불일치0은 원본 파싱 전 손실·과거 DB 복원의 증거가 아니다.
+
+실제 IAB/외부 연결 없는 격리 PG의 원신고208개에서 최근200 뒤 오래된 긴급을 첫 페이지로, 최신 처리 원문·미인계 신고를 세 번째8개로 접근했다. 페이지2 직전 원문 변경은 실제409/원문 숨김/첫페이지 재확인으로 복구했다. 처리 POST 확정 뒤 GET503에는 성공과 미확인을 분리하고 GET만 복구하여 미처리207→206/처리1→2를 확인했다. 제작 합성2행 수량1.5/반품0.5는 명시400/계산·원본2·3행 참조 보존, 새 정수2/반품1 계산은 첫 실행1차 저장확인으로 이어졌다. 부서 도구 채널 수량1.5 표시와 기존 실행응답 유실 뒤 같은 기록 재확인도 조작했다.1440×1000/360×800 문서폭1425/345px에서 넘침0, 캡처 .tmpcheck/cycle10-*.png다. 내가 만든 탭4/viewport/5188시험서버만 정리했고 사용자 탭·기존OG는 유지했다.
+
+첫 전체 검사는5개 테스트와1개 suite에 실패했다. typed report GET을 예전 fake DB로 호출한 smoke1개·이동한 집계 정적3개는 실제 계약으로 갱신하며5xx/조회실패 차단을 유지했다. 소개 kind regex는 이미 존재하던 REPORT_FIX/직접 linkKind를 누락했으므로37→38 대신 총종류 숫자만 제거했다. deployArtifact 누락은 root가 build/test를 동시에 실행하여 dist 삭제/읽기가 경합한 검증 절차 오류였다. suite를 제외하지 않고 build 완료 뒤 test 순서로 교정했다. 추가 집중 UI43개·기존 실패 경계117개·전체 lint/typecheck/137모듈/Worker build 통과를 확인했고 전체 회귀·CLI 반영은 진행 중이다. 파일선택 timeout/성공 후 사라진 pending region 조회 timeout·추정한 table DOM 속성은 제품 실패 증거로 사용하지 않는다.
+
+편익은 합성 신고 접근·집계 정합성·저장/조회 상태 구분·반올림 저장 차단이다. 실제 직원 시간/빈도/운영 부하·소수 단위의 업무 유효성은 미측정이다. 지속DB snapshot/영구 초안/기존 신고 POST 원자성까지 해결한 것으로 주장하지 않는다. 운영DB/RPC/ACL/공유Auth/구매AX·원본 셀 추가전송/외부AI호출0이다. 다음 C24는 독립 signed middleware/PG에서 확인한 신고 처리 중복·입력 조용한 절단·원신고 판본/현재역할 검증 후보로, 이번 반영 완료 전 구현하지 않는다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 10 추가 선택
+
+21:54 KST에 C23 독립 조사 결과를 채택했다. 현재 real PG의 소수 수량 검사는 qty1.5→2/return_qty0.5→1을 허용하고 계산 합계1.5와 저장 결과가 달라진다. 화면의 num(qty) 역시 기본 정수 반올림을 사용한다. 소수 수량 자체의 업무 유효성은 확인되지 않았으므로 계산/단위/DB형을 임의 변경하지 않고, 저장 형식으로 보존할 수 없는 두 수량만 사전 정수 검증하여 부분 쓰기를 막는다. 현재 브라우저 값은 전용 formatter로 정밀하게 표시하되 원본 문자열이나 과거 손실을 복원한다고 쓰지 않는다. 기존 금액·환율·정수 문자열·기본값은 회귀 검증한다. 공유 DB 변경 없이 수행하며 C22와 파일 소유를 분리했다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 10 시작
+
+21:47 KST에 C20/C21의 CLI 커밋·푸시 `0a60366fec136cd0c412ce24bb2f1bfe266d5de9`와 [CI37202960057](https://github.com/k95691368-ship-it/ilson/actions/runs/37202960057) success를 확인했다. Git 연결 Production `900c090f-4392-47c3-bf50-ac184da24a7c` / [배포 주소](https://900c090f.ilson.pages.dev)의 source는0a60366이다. 초기 전파 중 한 asset hash는 불일치하여 배포 검증 성공으로 보고하지 않았다. 이후 같은 asset의 content/hash가 일치하는 변경 근거를 확인하고 전46개·Git원본OG·health200/ready:true·workspace200/active:false·session/override428 actualJSON/no-store를 재검증해 통과했다. 직접 중복 업로드·운영DB/ACL/공유Auth/구매AX 변경0, 기존OG는 보존했다. 배포1회 성공을 전체Goal완료로 처리하지 않는다.
+
+C22 필수 P2의 최소 선택은 고정100건 origin 페이지와 전체 scoped 집계·도구별 건수, 최신same-app fix 연결이다. 정적408개에서 OFFSET도keyset와같은coverage였으므로 작은1-based page(1..10000)만 사용한다. page원문98건을 전체open405건으로 계산하는 새오류를 막고 handover없는신고/rolledback/처리이력을 보존한다. 신고원문·선택fix·app/handover 표시/정렬 근거를knownfields로DBdigest하고 currentScope와서버SHA256을묶어 페이지 변경 기준을 만들며 count/max만으로 revision을추정하지않는다. MD5는변경감지일뿐권한/보안증명이아니다. 단일SELECT/CTE의counts와bounded rows를JSONBwrapper로읽으면 해당응답은같은statement스냅샷이나 페이지간지속스냅샷은아니다. 실제PG/격리체험·타입/배치/본문검증으로안전하지않으면 더작은대안으로축소한다.
+
+새알림/검색서비스·신고처리POST 원자쓰기 확장·DB/RPC/ACL·무제한원문조회·전체디자인변경은 제외한다. 현재신고처리POST 성공후 첫페이지재조회와 GET실패/수명보호만 기존화면에서 보완한다. basis불일치409에는 원문을반환하지않고 firstpage확인을안내한다. 전건0/현재page0/일부페이지fixed와전체toolopen을구분하고조회실패를0안심으로표시하지않는다. 원문고정100·201+오래된긴급·oldfix·408+동률·RLS/숨긴fix·metadata/본문/처리변경·좁은/넓은조작과전체검증이남았다. 기대편익은누락된허용범위신고접근과집계정합성이며운영빈도/직원시간은미측정이다.
+
+C23 quantity 소수1.5→기존BIGINT2의저장근거차이는 읽기후보로만 조사한다. fractionalquantity의지원의도·계산/normalization/저장envelope/재조회계약을 확인하기전에 단위반올림·DB형변경·원본추가전송·대규모백필을하지않는다. 기존 데이터형 경계를 유지하는거절/정확복원대안을비교해필수성을판단하며구현0이다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 9 검증
 
 21:40 KST C20/C21의 최종 동결 소스에서 lint·typecheck·135모듈/Worker build·local script syntax/별도 lint·diff check 및 전체 **202파일 3,633개(일반3,627+규모6) 검사 통과**를 확인했다. C20 actual client/협의/게이트58개, useApi 반환 수명13개, C21 명령17개·실제 signed middleware/현재 migrations 메모리 PostgreSQL38개·actual client/게이트 UI60개와 writer 호출 경로1개가 추가됐다. 첫 전체 검사는 공통 writer로 이동한 두 피드백 종류를 담당자 전용으로 잘못 읽는 정적 검사1개에 실패했다. 제품 분류에 예외를 추가하지 않고 실제 공통 writer의 모든 호출 경로가 기존 두 tool endpoint인지 추적·단언하도록 고친 후 전체를 다시 실행했다.

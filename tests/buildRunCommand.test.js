@@ -23,10 +23,36 @@ describe('typed build run command and compiled transaction budgets', () => {
     expect(JSON.stringify(normalized)).not.toContain('SECRET')
     expect(JSON.stringify(normalized)).not.toContain('not persisted')
   })
-  it('does not impose new date/week/catalog rules or recalculate fractional monetary/quantity values', () => {
-    const result = normalize(body({ rows: [row({ date: 'legacy date', iso_week: 'legacy week', qty: '1.5', return_qty: '.5', gross_krw: '-12.25', fx_rate: '1e3' })] }))
+  it('keeps legacy text, signed integer quantities and fractional monetary/FX values', () => {
+    const result = normalize(body({ rows: [row({ date: 'legacy date', iso_week: 'legacy week', qty: '1.0', return_qty: '-2e0', gross_krw: '-12.25', fx_rate: '1.25' })] }))
     expect(result.rows[0].slice(0,3)).toEqual(['legacy date','legacy week','unregistered-legacy'])
-    expect(result.rows[0][5]).toBe(1.5); expect(result.rows[0][6]).toBe(0.5); expect(result.rows[0][8]).toBe(1000); expect(result.rows[0][9]).toBe(-12.25)
+    expect(result.rows[0][5]).toBe(1); expect(result.rows[0][6]).toBe(-2); expect(result.rows[0][8]).toBe(1.25); expect(result.rows[0][9]).toBe(-12.25)
+  })
+  it.each(['qty', 'return_qty'])('rejects representable fractional %s with the result row and field before storage', field => {
+    for (const value of [1.5, 0.5, -0.5, '1.5', '.5', '-5e-1', Number.MIN_VALUE, '5e-324', 1 + Number.EPSILON, 4503599627370495.5,
+      '1e-324', '1e-1000', '1.00000000000000001', '9007199254740990.5', '100.01e-2']) {
+      expect(() => normalize(body({ rows: [row(), row({ [field]: value })] }))).toThrow(expect.objectContaining({
+        status: 400, field: 'rows.1.' + field, message: expect.stringContaining('2번째 행'),
+      }))
+    }
+  })
+  it.each(['qty', 'return_qty'])('preserves exact supported integer/default %s values without rounding', field => {
+    for (const [value, expected] of [[undefined,0], [null,0], [0,0], [-1,-1], ['+1.0',1], ['1e3',1000], ['10e-1',1],
+      ['100000000000000000e-17',1], ['100.0e-2',1], ['-2.000',-2], ['0e-999999',0], ['0e999999',0],
+      [Number.MAX_SAFE_INTEGER,Number.MAX_SAFE_INTEGER], [-Number.MAX_SAFE_INTEGER,-Number.MAX_SAFE_INTEGER]]) {
+      const command = normalize(body({ rows: [row({ [field]: value })] }))
+      expect(command.rows[0][field === 'qty' ? 5 : 6]).toBe(expected)
+    }
+  })
+  it('validates the final row beyond a write chunk before returning any command', () => {
+    const rows = Array.from({ length: BUILD_RUN_LIMITS.rowsPerStatement + 1 }, () => row())
+    rows.at(-1).return_qty = 0.25
+    expect(() => normalize(body({ rows }))).toThrow(expect.objectContaining({ status: 400, field: 'rows.500.return_qty' }))
+  })
+  it('checks long numeric strings without exponent-sized or quadratic trailing-zero work', () => {
+    const exact = '0'.repeat(20000) + '1' + '0'.repeat(20000) + 'e-20000'
+    expect(normalize(body({ rows: [row({ qty: exact })] })).rows[0][5]).toBe(1)
+    rejects(body({ rows: [row({ qty: exact + '0' })] }))
   })
   it.each([true, [], {}, '', ' ', 'NaN', 'Infinity', NaN, Infinity, 9007199254740992])('rejects unsafe numeric scalar %j', value => rejects(body({ rows: [row({ qty: value })] })))
   it.each(['date','iso_week','sku','channel'])('requires a nonempty textual %s without trimming legitimate text', field => {

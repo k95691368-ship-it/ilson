@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { StrictMode } from 'react'
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { Link, MemoryRouter, Route, Routes } from 'react-router-dom'
 import ToolPage from '../src/pages/ToolPage.jsx'
 import { forgetToolRun, keepToolRun, pendingToolRun } from '../src/lib/pendingToolRuns.js'
@@ -52,6 +52,15 @@ function startRun() {
 }
 
 describe('도구 계산과 실행 기록의 실패 구분', () => {
+  it.each([[1.5,'1.5'], [1e-7,'1e-7'], [1234,'1,234']])('로컬 채널 수량 %s를 반올림하지 않고 표시한다', async (qty, expected) => {
+    state.pipeline.mockResolvedValueOnce({ files: [], rows: [], quarantine: [], stats: { durationMs: 1 },
+      totals: { byChannel: [{ channel: '자사몰', rows: 1, qty, net_revenue_krw: 10000.25 }] } })
+    startRun()
+    const table = await screen.findByRole('table', { name: '채널별 처리 결과' })
+    expect(within(table).getByRole('cell', { name: expected })).toBeTruthy()
+    expect(within(table).getByRole('cell', { name: '10,000원' })).toBeTruthy()
+    expect(state.pipeline).toHaveBeenCalledTimes(1)
+  })
   it.each(['picker', 'drop'])('6개 파일 %s 선택은 읽기·계산·실패 실행 저장 전에 거절한다', async mode => {
     const view = renderTool()
     const files = Array.from({ length: 6 }, (_, i) => new File(['x'], `synthetic-${i}.csv`))

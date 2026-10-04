@@ -32,11 +32,28 @@ let buildReplyLost = false
 const healthFailureFixture = process.argv.includes('--health-failure-fixture')
 const agreementSaveFixture = Boolean(fixture) && process.argv.includes('--agreement-save-fixture')
 const feedbackRetryFixture = Boolean(fixture) && process.argv.includes('--feedback-retry-fixture')
+const reportFeedFixture = Boolean(fixture) && process.argv.includes('--report-feed-fixture')
+let reportPageChanged = false
+let reportRefreshPending = false
 let agreementWriteRejected = false
 let agreementReadRejected = false
 let agreementReadPending = false
 const feedbackRepliesLost = new Set()
 let unclearReadPending = false
+if (reportFeedFixture) {
+  // Disposable, explicitly synthetic reports: originals must not share a page
+  // budget with fixes, and reports without a handover must remain reachable.
+  await pg.exec(`INSERT INTO decision_log(id,application_id,stage,actor,title,what,why,link_kind,link_id,created_at)
+    SELECT 'c22-local-recent-'||lpad(n::text,3,'0'),'app-local-verify','배포','human','가상 제보자',
+      '로컬 일반 신고 원문 '||n,'합성 페이지 검증','신고','other','2026-09-01 00:00:00'
+    FROM generate_series(1,205) n;
+    INSERT INTO decision_log(id,application_id,stage,actor,title,what,why,link_kind,link_id,created_at) VALUES
+      ('c22-local-old-urgent','app-local-verify','배포','human','가상 제보자','200개 뒤에도 보여야 하는 오래된 긴급 신고입니다.','합성 누락 검증','신고','wrong_number','2026-01-01 00:00:00'),
+      ('c22-local-old-fixed','app-local-verify','배포','human','가상 제보자','과거에 처리된 원신고입니다.','합성 처리 연결 검증','신고','other','2026-01-02 00:00:00'),
+      ('c22-local-old-fix','app-local-verify','배포','human','가상 담당자','이전 처리 내용입니다.','이전 가상 원인','신고처리','c22-local-old-fixed','2026-02-01 00:00:00'),
+      ('c22-local-latest-fix','app-local-verify','배포','human','가상 담당자','최신 처리 내용이 연결됩니다.','최신 가상 원인','신고처리','c22-local-old-fixed','2026-03-01 00:00:00'),
+      ('c22-local-no-handover','app-local-beta','제작','human','가상 제보자','도구를 넘기기 전 접수된 신고입니다.','합성 접근 검증','신고','other','2026-09-02 00:00:00');`)
+}
 if (agreementSaveFixture) {
   await pg.query(`INSERT INTO meeting(id,application_id,seq,title,minutes_text) VALUES($1,$2,1,$3,$4)`,
     ['meeting-local-save', 'app-local-verify', '로컬 협의 저장 검증', '수정 전 가상 회의록입니다.'])
@@ -127,6 +144,21 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
         const bindings = context.env
         // Reproduce Pages: next() gets original bindings and shared request data.
         context.next = async (forwarded = context.request) => {
+          if (reportFeedFixture && url.pathname === '/api/reports') {
+            if (req.method === 'GET' && url.searchParams.get('page') === '2' && !reportPageChanged) {
+              // A concurrent synthetic edit invalidates the previously read
+              // basis. This is not a production write or persistent snapshot.
+              reportPageChanged = true
+              const change = queue.then(() => pg.query('UPDATE decision_log SET what=$1 WHERE id=$2',
+                ['다른 조회 사이 변경된 가상 신고 원문입니다.', 'c22-local-recent-001']))
+              queue = change.catch(() => {})
+              await change
+            }
+            if (req.method === 'GET' && reportRefreshPending) {
+              reportRefreshPending = false
+              return Response.json({ error: '로컬 검증: 처리 저장 뒤 목록 조회가 실패했습니다.' }, { status: 503 })
+            }
+          }
           // Opt-in browser failures after real signed middleware, using only
           // this disposable database. Reject one legacy save BEFORE any write;
           // a successful later save loses only its subsequent read response.
@@ -146,6 +178,7 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
             return Response.json({ error: '로컬 검증: 안내 상태 조회가 실패했습니다.' }, { status: 503 })
           }
           const result = handler ? await handler({ ...context, request: forwarded, env: bindings }) : Response.json({ error: 'Method not allowed' }, { status: 405 })
+          if (reportFeedFixture && url.pathname === '/api/reports' && req.method === 'POST' && result.ok) reportRefreshPending = true
           if (agreementSaveFixture && agreementPath && req.method === 'PATCH' && result.ok) agreementReadPending = true
           if (feedbackRetryFixture && req.method === 'POST' && /^\/api\/tools\/local-retry-tool\/(report|unclear)$/.test(url.pathname) && result.ok) {
             const saved = await result.clone().json()

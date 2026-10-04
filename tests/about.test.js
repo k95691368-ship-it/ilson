@@ -27,6 +27,18 @@ function walk(dir, out = []) {
   return out
 }
 
+// Explicit discriminator declarations/writes, not a proof of the total of all
+// dynamic SQL kinds. A new reader must not inflate this set by repeating an
+// already-existing constant as SQL text.
+function explicitDecisionKinds(source) {
+  const kinds = new Set()
+  for (const pattern of [
+    /(?:link_kind|linkKind)\s*[=:]\s*'([^']+)'/g,
+    /\b[A-Z][A-Z0-9_]*_(?:KIND|FIX)\s*=\s*'([^']+)'/g,
+  ]) for (const match of source.matchAll(pattern)) kinds.add(match[1])
+  return kinds
+}
+
 describe('두 칸이 서로 다른 질문에 답하는가', () => {
   it('쉬운 쪽에는 기술 용어가 없다', () => {
     // 코딩을 모르는 사람이 그 자리에서 닫게 만드는 말들.
@@ -153,15 +165,22 @@ describe('적어 둔 것이 실제로 그런가', () => {
     expect(PLAIN.stages[0].body).not.toContain('로그인은 없습니다')
   })
 
-  it('설명한 link_kind 종류 수가 실제 소스 개수와 맞는다', () => {
-    // 이런 숫자는 기능을 더할 때마다 조용히 틀려진다. 글에 적힌 수와
-    // 소스에 있는 수를 매번 맞춰 본다.
-    const kinds = new Set()
-    for (const m of src.matchAll(/link_kind\s*[=:]\s*'([^']+)'/g)) kinds.add(m[1])
-    for (const m of src.matchAll(/_KIND\s*=\s*'([^']+)'/g)) kinds.add(m[1])
+  it('실제 기록 구분은 검사하되 정적 검색으로 총종류 수를 발명하지 않는다', () => {
+    const kinds = explicitDecisionKinds(src)
     expect(kinds.size).toBeGreaterThan(20) // 이 검사가 헛돌지 않는다
+    for (const kind of ['신고', '신고처리', '코드알림', 'criterion', 'baseline', 'build_run']) expect(kinds.has(kind), kind).toBe(true)
+    expect(src).toContain('linkKind: REPORT_FIX')
     const log = TECH.sections.find((s) => s.title.includes('decision_log'))
-    expect(Number(log.body.match(/(\d+)종/)?.[1])).toBe(kinds.size)
+    expect(log.body).toContain('업무별 이벤트')
+    expect(log.body).toContain('`link_kind`를 discriminator')
+    expect(log.body).not.toMatch(/\d+종/)
+  })
+
+  it('FIX 상수·직접 저장 kind를 놓치지 않고 같은 reader literal은 중복하지 않는다', () => {
+    const writer = "export const REPORT_KIND = '신고'; export const REPORT_FIX = '신고처리'; logDecision({ linkKind: '코드알림' });"
+    const kinds = explicitDecisionKinds(writer)
+    expect([...kinds].sort()).toEqual(['신고', '신고처리', '코드알림'].sort())
+    expect(explicitDecisionKinds(writer + " SELECT * FROM decision_log WHERE link_kind='신고처리'")).toEqual(kinds)
   })
 
   it('"테스트 4층"의 세 번째 층이 실제로 있다', () => {

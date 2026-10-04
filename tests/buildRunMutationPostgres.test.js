@@ -347,15 +347,58 @@ describe.sequential('atomic build run persistence through signed middleware and 
     expect((await state(second, keys[loser])).runs).toHaveLength(2)
   })
 
-  it('preserves existing fractional quantity-to-BIGINT conversion without altering stored totals', async () => {
+  it.each(['qty','return_qty'])('rejects fractional %s instead of allowing PostgreSQL BIGINT rounding', async field => {
+    const app = await fixture(), key = crypto.randomUUID()
+    directWrites.length = 0
+    const response = await invoke(app, payload(app, { rows: [row({ [field]: field === 'qty' ? 1.5 : 0.5 })] }), { key })
+    expect(response).toMatchObject({ status: 400, body: { error: expect.stringContaining('1번째 행'), fields: { ['rows.0.' + field]: expect.stringContaining('소수') } } })
+    expect(commitCalls).toEqual([]); expect(directWrites).toEqual([])
+    expect(await state(app, key)).toEqual(empty)
+  })
+
+  it('rejects a fractional final row after 500 valid rows with zero staged or committed business writes', async () => {
+    const app = await fixture(), key = crypto.randomUUID()
+    directWrites.length = 0
+    const rows = Array.from({ length: 501 }, () => row())
+    rows.at(-1).return_qty = '5e-324'
+    const response = await invoke(app, payload(app, { rows }), { key })
+    expect(response).toMatchObject({ status: 400, body: { fields: { 'rows.500.return_qty': expect.stringContaining('501번째 행') } } })
+    expect(commitCalls).toEqual([]); expect(directWrites).toEqual([])
+    expect(await state(app, key)).toEqual(empty)
+  })
+  it.each(['1e-324','1.00000000000000001','9007199254740990.5'])('rejects fractional numeric text %s before binary rounding and any DB mutation', async qty => {
+    const app = await fixture(), key = crypto.randomUUID()
+    directWrites.length = 0
+    const response = await invoke(app, payload(app, { rows: [row({ qty })] }), { key })
+    expect(response).toMatchObject({ status: 400, body: { fields: { 'rows.0.qty': expect.stringContaining('소수') } } })
+    expect(commitCalls).toEqual([]); expect(directWrites).toEqual([])
+    expect(await state(app, key)).toEqual(empty)
+  })
+
+  it('preserves a real fractional pipeline result locally while rejecting its storage before mutation', async () => {
+    const app = await fixture(), key = crypto.randomUUID()
+    const result = await runPipeline({ files: [{ name: 'fractional.csv', buffer: new TextEncoder().encode('주문일자,상품코드,상품명,수량,판매가,할인액\n2026-06-01,NR-CM-100,가상 상품,1.5,15000,0\n2026-06-02,NR-CM-100,가상 상품,-0.5,-5000,0') }] })
+    expect(result.quarantine).toEqual([])
+    expect(result.rows.map(value => [value.qty,value.return_qty])).toEqual([[1.5,0],[0,0.5]])
+    expect(result.totals.all).toMatchObject({ qty: 1.5, return_qty: 0.5 })
+    const before = JSON.stringify(result), body = buildRunPayload(result)
+    expect((await invoke(app, body, { key })).status).toBe(400)
+    expect(commitCalls).toEqual([])
+    expect(await state(app, key)).toEqual(empty)
+    expect(JSON.stringify(result)).toBe(before)
+    expect(body.rows[0].source.sha256).toBe(result.files[0].sha256)
+  })
+
+  it('stores integer numeric strings/defaults and fractional money/FX without recertifying supplied totals', async () => {
     const app = await fixture()
-    const body = payload(app, { rows: [row({ qty: 1.5, return_qty: 0.5, gross_krw: '12.25' })], totals: { all: { rows: '1', qty: '1.5', gross_krw: '-12.25' } } })
+    const body = payload(app, { rows: [row({ qty: '1.0', return_qty: '-2e0', gross_krw: '12.25', fx_rate: '1.25' }), row({ qty: null, return_qty: null })], totals: { all: { rows: '2', qty: '1.5', gross_krw: '-12.25' } } })
     expect((await invoke(app, body)).status).toBe(201)
     const result = await state(app, 'none')
-    expect(result.rows[0]).toMatchObject({ qty: 2, return_qty: 1, gross_krw: 12.25 })
+    expect(result.rows[0]).toMatchObject({ qty: 1, return_qty: -2, gross_krw: 12.25, fx_rate: 1.25 })
+    expect(result.rows[1]).toMatchObject({ qty: 0, return_qty: 0 })
     // Totals are a validated browser claim, not recalculated or certified from
     // original files. Preserve valid legacy numeric strings exactly.
-    expect(JSON.parse(result.runs[0].totals_json).all).toEqual({ rows: '1', qty: '1.5', gross_krw: '-12.25' })
+    expect(JSON.parse(result.runs[0].totals_json).all).toEqual({ rows: '2', qty: '1.5', gross_krw: '-12.25' })
   })
 
   it('persists only projected calculation/provenance metadata from a real pipeline and supports zero output lines', async () => {
