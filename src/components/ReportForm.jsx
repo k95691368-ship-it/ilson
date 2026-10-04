@@ -1,9 +1,9 @@
-import { useState } from 'react'
-import { api } from '../api/client.ts'
-import { useToast } from '../context/ToastContext.jsx'
-import { REPORT_KINDS, REPORT_BY_CODE } from '../../shared/report.js'
+import { useState, useSyncExternalStore } from 'react'
+import { REPORT_KINDS, REPORT_BY_CODE, validateReport } from '../../shared/report.js'
 import Field from './Field.jsx'
 import { handleRadioGroupKeyDown } from '../lib/radioGroup.js'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
+import { useFeedbackSubmission } from '../hooks/useFeedbackSubmission.js'
 
 // 부서가 도구에 이상을 신고한다.
 //
@@ -14,32 +14,41 @@ import { handleRadioGroupKeyDown } from '../lib/radioGroup.js'
 // 로그인을 요구하지 않는다. 요구하는 순간 아무도 신고하지 않고, 신고가
 // 없으면 도구가 멀쩡한 줄 알게 된다.
 export default function ReportForm({ slug }) {
-  const toast = useToast()
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  if (session.status !== 'active' || !['access', 'demo'].includes(session.mode)) return null
+  return <ReportSession key={`${session.generation}:${slug}`} slug={slug} session={session} />
+}
+
+function ReportSession({ slug, session }) {
   const [open, setOpen] = useState(false)
   const [form, setForm] = useState({ code: '', body: '', reporter: '' })
-  const [fieldErrors, setFieldErrors] = useState({})
-  const [saving, setSaving] = useState(false)
-  const [done, setDone] = useState(null)
+  const [localErrors, setLocalErrors] = useState({})
+  const submission = useFeedbackSubmission({ session, slug, kind: 'report' })
+  const { busy: saving, receipt: done, pending } = submission
+  const fieldErrors = { ...submission.fields, ...localErrors }
+  const locked = saving || Boolean(pending)
 
   const kind = REPORT_BY_CODE[form.code]
 
   async function send(e) {
     e.preventDefault()
-    setSaving(true)
-    setFieldErrors({})
-    try {
-      const r = await api.post(`/tools/${slug}/report`, form)
-      setDone(r)
+    const current = submission.capture()
+    if (saving) return
+    if (!pending) {
+      const fields = validateReport({ ...form, reporter: session.mode === 'access' ? '서버 계정' : form.reporter })
+      if (form.body.trim().length > 3000) fields.body = '내용은 3,000자 이내로 적어주세요.'
+      if (form.reporter.trim().length > 60) fields.reporter = '누가 겪은 일인지는 60자 이내로 적어주세요.'
+      setLocalErrors(fields)
+      if (Object.keys(fields).length) return
+    }
+    const receipt = await submission.submit(form)
+    if (receipt && current()) {
       setForm({ code: '', body: '', reporter: form.reporter })
       setOpen(false)
-    } catch (err) {
-      if (err.fields) setFieldErrors(err.fields)
-      toast.error(err.message)
-    } finally {
-      setSaving(false)
     }
   }
 
+  if (submission.denied) return <p className="notice notice-danger" role="alert">{submission.denied} 제보 내용을 숨겼습니다.</p>
   if (done) {
     return (
       <section className="report-done">
@@ -47,7 +56,7 @@ export default function ReportForm({ slug }) {
         {/* 신고하고 나서 아무 말도 없으면 "말해도 소용없구나"가 된다.
             다음에 무슨 일이 있을지 그 자리에서 알려 준다. */}
         <p className="card-note">{done.next}</p>
-        <button type="button" className="btn-ghost btn-sm" onClick={() => setDone(null)}>
+        <button type="button" className="btn-ghost btn-sm" onClick={submission.discard}>
           하나 더 알리기
         </button>
       </section>
@@ -65,11 +74,11 @@ export default function ReportForm({ slug }) {
   }
 
   return (
-    <form className="card report-form" onSubmit={send}>
+    <form className="card report-form" aria-label="이상한 점 제보" onSubmit={send}>
       <div className="card-head">
         <h2 className="card-title">무엇이 이상하셨습니까</h2>
         <span className="spacer" />
-        <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+        <button type="button" className="btn-ghost btn-sm" disabled={locked} onClick={() => setOpen(false)}>
           그만두기
         </button>
       </div>
@@ -88,7 +97,8 @@ export default function ReportForm({ slug }) {
             key={k.code}
             type="button"
             className={`report-kind${form.code === k.code ? ' on' : ''}`}
-            onClick={() => setForm((f) => ({ ...f, code: k.code }))}
+            disabled={locked}
+            onClick={() => { if (!locked) setForm((f) => ({ ...f, code: k.code })) }}
             role="radio"
             aria-checked={form.code === k.code}
             tabIndex={form.code ? (form.code === k.code ? 0 : -1) : (index === 0 ? 0 : -1)}
@@ -110,24 +120,33 @@ export default function ReportForm({ slug }) {
           <textarea
             rows={3}
             value={form.body}
-            onChange={(e) => setForm((f) => ({ ...f, body: e.target.value }))}
+            maxLength={3000}
+            disabled={locked}
+            onChange={(e) => { if (!locked) setForm((f) => ({ ...f, body: e.target.value })) }}
             placeholder={placeholderFor(kind.code)}
           />
         </Field>
       )}
 
-      <Field label="누가 겪으신 일입니까" required error={fieldErrors.reporter}>
+      {session.mode === 'demo' ? <Field label="누가 겪으신 일입니까" required error={fieldErrors.reporter}>
         <input
           value={form.reporter}
-          onChange={(e) => setForm((f) => ({ ...f, reporter: e.target.value }))}
+          disabled={locked}
+          onChange={(e) => { if (!locked) setForm((f) => ({ ...f, reporter: e.target.value })) }}
           placeholder="정산 담당자"
           maxLength={60}
         />
-      </Field>
+      </Field> : <p className="card-note">제보자는 서버에서 확인한 현재 계정으로 기록됩니다.</p>}
 
-      <button type="submit" className="btn-primary btn-sm" disabled={saving || !form.code}>
-        {saving ? '보내는 중…' : '알리기'}
+      {submission.error && <p className="notice notice-warn" role="alert">{submission.error}</p>}
+      {pending && <p className="card-note">입력한 내용 그대로 저장 여부를 다시 확인합니다. 이 화면을 벗어나면 재시도 정보가 사라집니다.</p>}
+      <button type="submit" className="btn-primary btn-sm" disabled={saving || !form.code || pending?.blocked}>
+        {saving ? '보내는 중…' : pending ? '같은 제보 다시 확인' : '알리기'}
       </button>
+      {pending && <details className="disclose"><summary>다른 내용으로 제보하기</summary>
+        <p>기존 제보가 이미 저장됐을 수 있습니다. 보관을 끝내도 서버 저장은 취소되지 않으며 새 제보가 중복될 수 있습니다.</p>
+        <button type="button" className="btn-ghost btn-sm" disabled={saving} onClick={() => { submission.discard(); setLocalErrors({}) }}>보관을 끝내고 현재 내용 수정</button>
+      </details>}
     </form>
   )
 }

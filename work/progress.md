@@ -1,5 +1,29 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 시간 제한 자율 개선 — 회차 9 검증
+
+21:40 KST C20/C21의 최종 동결 소스에서 lint·typecheck·135모듈/Worker build·local script syntax/별도 lint·diff check 및 전체 **202파일 3,633개(일반3,627+규모6) 검사 통과**를 확인했다. C20 actual client/협의/게이트58개, useApi 반환 수명13개, C21 명령17개·실제 signed middleware/현재 migrations 메모리 PostgreSQL38개·actual client/게이트 UI60개와 writer 호출 경로1개가 추가됐다. 첫 전체 검사는 공통 writer로 이동한 두 피드백 종류를 담당자 전용으로 잘못 읽는 정적 검사1개에 실패했다. 제품 분류에 예외를 추가하지 않고 실제 공통 writer의 모든 호출 경로가 기존 두 tool endpoint인지 추적·단언하도록 고친 후 전체를 다시 실행했다.
+
+C20은 실패 후 입력/편집/성공 표시7곳을 보호하고 동기 ref·native fieldset으로 같은 화면의 제출 동안 새 입력을 막는다. 확정 POST/PATCH 뒤 transient GET 실패는 저장 성공을 취소하지 않고 기존 data/다른 초안을 유지하며 GET만 재시도한다. 독립 검토에서 확정 저장 뒤 GET403/404/410가 폼을 숨겨도 늦은 성공 toast를 남기는 경계를 재현해, useApi가 현재 수용한 GET 결과만 반환하고 폐기/권한거절에서는 자식 후속효과를 실행하지 않도록 보완했다. 기존 nonthrowing reload와 반환값에 의존하지 않는 소비처는 유지한다. 서버의 legacy 협의 경로에 원자 receipt나 안전한 재전송 보장을 추가한 것은 아니다. 응답이 불명확하면 먼저 현행 내용·이력을 확인하도록 안내하며 화면 이탈/새로고침을 넘는 초안 저장 서비스는 없다.
+
+C21은 report/unclear의 동일 body intent에 결정 기록·감사·기존 receipt를 한 번에 확정하고 현재 actor/handover/application 읽기를 CAS로 다시 확인한다. 다른 의도의 같은 내용은 별도 제보로 허용한다. 실계정 작성자는 기존 서버 귀속을 유지하고 demo만 가상 label을 받는다. 알려진 입력의 잘못된 타입/초과/비정상 Unicode는 쓰기 전에 명시적으로 거절한다. 독립 PG 검토는 prior receipt와 동시 commit replay 직전 owner/dept 회수 또는 slug 재지정에서 옛 접수 ID/긴급 여부가 반환되는 경계를 추가로 재현했다. replay만 반환 전 scoped JOIN을 다시 읽어404/409로 비공개 처리한다. 이는 최신 read 보호이지 receipt와 단일 DB snapshot 보장은 아니며 다중 세션 부하 시험도 아니다. 요청 한도는 재생도 차감하는 빈도 제한이고 성공 quota의 exactly-once로 설명하지 않는다.
+
+실제 IAB와 외부 연결 없는 메모리 PG에서 협의 PATCH 첫503(쓰기 전 거절)의 회의록 초안 유지, pending textarea/button의 실제 :disabled 상속, 다음 확정 PATCH 뒤 GET503의 다른 요구 초안 유지와 GET만 복구를 조작했다.1440×1000/360×800 문서폭1425/345px다. 최종 C21 소스로 서버를 재시작하고 report/unclear 첫 실제 커밋 응답만 유실시켰다. 같은 제보 재확인 뒤 신고1개/동일 dec_a38c044b5b94426ea1a0, 사용법 제보1개를 확인했다. unclear POST 확인 뒤 GET503에도 저장 안내가 유지되고 GET만 다시 읽어1건/검토 필요로 회복했다. 두 폭에서 조작·넘침0을 확인했다. 캡처는 .tmpcheck/cycle9-*.jpg이며 내가 만든 탭22/23·viewport·5188 서버만 정리했다. 조회 경로를 잘못 추정한 로컬404/필수scope누락428 및 DOM 검사 작성 오류는 제품 결함 증거로 사용하지 않는다.
+
+같은 의도의 재시도2기록→1기록, 실패 뒤 초안 손실→보존, 저장/조회 오해 방지가 합성 검증 편익이다. 실제 직원 시간·운영 발생률·처리량은 미측정이다. 브라우저 pending은 현재 화면/계정 수명 안에만 있고 기존7일 receipt 정리와 브라우저 시간 경계가 있어 영구 단일 저장을 보장하지 않는다. 명시적 보관 종료는 서버 취소/삭제가 아니며 새 의도는 중복될 수 있다. 운영DB/RPC/ACL·공유Auth/구매AX·원본 셀 전송·외부 호출은0, 기존 OG는 제외한다. CLI 반영 확인이 남았다. 기존 receipt/CAS/서버귀속 경계를 유지하는 호환 수정으로 복구하며 무감사 중복 경로를 되살리지 않는다.
+
+C22는 현재 실제 scoped PG에서 최근 일반200+오래된 긴급1이 /reports 긴급0이지만 /tools 긴급1, 처리 로그가 원 신고의 슬롯을 차지해 과거 이력이 누락됨을 확인했다. 동일 신고 중복 fix 선택도 입력 순서에 따라 달라졌다.2SELECT의 전건 집계+bounded origin/latest same-app fix 페이지를 readBatch1RPC로 읽는 대안을408개/동률205개에서 검증했다. 정적 자료에서 OFFSET도 누락/중복0이라 keyset 복잡성이 필수라는 초기 생각은 축소했다. 페이지 원문98건을 도구 전체405건으로 오인하지 않도록 전역/도구 집계를 분리해야 한다. 동시 변경의 단일 snapshot과 영구 revision은 아직 보장하지 않는다. 새 알림 서비스·무제한 원문·새 DB/RPC/ACL은 제외하고 다음 회차에서 최소 페이지 경계와 검증 비용을 결정한다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 9 시작
+
+21:18 KST에 C18/C19 `e354d750efa8e399827d82dcdb8b5887e863a42b`의 [CI37201182578](https://github.com/k95691368-ship-it/ilson/actions/runs/37201182578) success를 확인했다. Git 연결 Production `7fca4b78-f038-452e-a7e3-a40c90449b01` / [배포 주소](https://7fca4b78.ilson.pages.dev)의 source는e354d75다. 주주소 index/bootstrap/JS/CSS46개 SHA-256·Git원본OG 일치, health200/ready:true·workspace200/active:false·session/override428 실제JSON/no-store를 확인했다. 기존OG로컬변경은 보존하며 이번회차 운영DB/ACL/공유Auth/구매AX 변경은 없다.
+
+C20은 실제 AgreementPage/client/useApi/Toast/WorkspaceGate의20개 격리 재현을 근거로 필수 P2 보완을 채택했다. 공통 send10개 중7개에서 실패 뒤 입력/편집을 초기화하거나 성공 안내를 냈고, 같은 화면 전송 이후의 새 초안도 성공 응답으로 지웠다. 기각 사유는 다시 열면 남으므로 완전삭제로 과장하지 않는다. POST성공/GET실패는 저장실패가 아니지만 오류 조기반환이 자식폼을 폐기하고 조회재시도가 없었다. A/B 늦은응답이 새업무자료를 덮는 후보와 계정간토스트 누출은 기존 key/useApi/게이트가 막아 폐기했다. 같은계정의 다른화면 늦은토스트만 보호한다. 최소안은 legacy3섹션의 동기저장잠금·확정성공만 초기화·현재수명 후속·기존data/초안유지와GET만재시도다. 기준/기준선/이의 별도흐름과 서버API는 제외한다. 장기초안서비스·원자서버receipt확대·안전재전송 보장은 근거/범위가 달라 추가하지 않는다.
+
+C21도 필수 P2 제보정합성으로 채택했다. 실제signed/current-PG에서 같은key 유실503→200은 report/unclear1→2행이며, unclear 후속조회503도 이미저장1행을 실패로표시·환급해 재제보2행이 된다. 같은의도의2행만으로 '두 사람'·자동작성중을 표시했다. 도구stop을 read/write사이에 주입하면 저장되지만 owner/dept회수는RLS403/0행이어서 권한우회로 일반화하지 않는다. 최소안은 기존atomic receipt와현재actor/handover/appCAS, 확정POST와GET분리, 건수/검토필요 문구, 불변body intent 재시도/화면수명이다. 새DB/RPC/ACL·신원추적·새피드백서비스는 제외하고 별도한도를requestfrequency로 보존한다. 불명확commit을 미저장으로단정·환급하지 않으며 성공건수 exactly-once한도는 주장하지 않는다. 각기 다른의도의 같은내용은 정당한제보로 허용한다.
+
+root 판단 교정: 신고자 자유label UI만 보고 실계정 대리제보 의미를 추론했지만 verifiedAttribution은 이미서버계정 label로덮었다. 독립 실제middleware증거와 전체함수를 확인해 첫지시를 정정하고 기존서버귀속 방어를 유지한다. authorization예외를 만들지 않으며 demo만입력label을보존한다. C22의 최신200로그밖 미처리누락은 독립 signed PG/조회비용·bounded순회대안 조사중이며 아직구현하지 않았다. 현재 C20/C21 집중검증 뒤 root 독립검토·전체검사·1440/360 실제조작·CLI반영이 남았다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 8 검증
 
 21:05 KST에 C18/C19의 동결 소스 검증을 완료했다. lint·typecheck·134모듈/Worker build·script syntax/별도 lint·diff check, 전체 **198파일 3,446개(일반3,440+규모6) 검사 통과**다. C18의 typed command63개·실제 signed middleware/현재 migrations 메모리 PostgreSQL39개·actual client/useApi 화면29개, C19 사실 경계9개와 useApi HTTP 상태6개가 포함된다. 운영 데이터나 다중 PostgreSQL 세션의 부하 검증은 아니다.

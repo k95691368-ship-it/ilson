@@ -78,9 +78,14 @@ function writesByKind() {
   return out
 }
 
-// 부서가 로그인 없이 여는 자리. 접수번호나 도구 주소 하나로 들어온다.
-const isDeptRoute = (path) =>
-  path.includes('functions/api/track/') || path.includes('functions/api/tools/')
+// 실제 업무의 인증 범위는 유지된다. 여기서는 신원이나 사람 수가 아니라
+// 기존 직원 피드백 경로를 분류한다. 공통 writer로 이동한 기록은 그 writer의
+// 실제 호출 경로까지 따라가며, 담당자용 호출이 생기면 다시 실패해야 한다.
+const directDeptRoute = path => path.includes('functions/api/track/') || path.includes('functions/api/tools/')
+const feedbackCallers = files.filter(file => /\bsaveToolFeedback\s*\(/.test(readFileSync(file, 'utf8'))
+  && rel(file) !== 'functions/_lib/toolFeedback.ts').map(rel)
+const isDeptRoute = path => directDeptRoute(path)
+  || (path === 'functions/_lib/toolFeedback.ts' && feedbackCallers.length > 0 && feedbackCallers.every(directDeptRoute))
 
 // 주소만으로는 못 가르는 둘. 이유를 적어 두고 예외로 둔다 — 예외를 아예
 // 안 두면 규칙을 느슨하게 만들게 되고, 그러면 정작 뒤바뀐 것을 못 잡는다.
@@ -103,6 +108,15 @@ describe('부서인지 담당자인지를 이름이 아니라 코드에서 유�
     // 이 검사가 헛돌지 않는지 먼저 본다. 못 찾으면 아래가 전부 공회전이다.
     expect(writes.size).toBeGreaterThan(10)
     expect([...writes.keys()]).toContain('신고')
+  })
+
+  it('공통 제보 writer의 실제 호출자는 기존 두 도구 피드백 경로다', () => {
+    expect(feedbackCallers.sort()).toEqual([
+      'functions/api/tools/[slug]/report.js',
+      'functions/api/tools/[slug]/unclear.js',
+    ])
+    expect(writes.get('신고')).toContain('functions/_lib/toolFeedback.ts')
+    expect(writes.get('사용법모름')).toContain('functions/_lib/toolFeedback.ts')
   })
 
   it('부서만 여는 라우트가 쓰는 종류는 부서로 세어진다', () => {

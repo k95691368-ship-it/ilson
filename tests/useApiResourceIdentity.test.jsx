@@ -9,6 +9,7 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 let container
 let requests
+let currentResource
 
 function response(body, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -22,6 +23,7 @@ beforeEach(() => {
   container = document.createElement('div')
   document.body.appendChild(container)
   requests = new Map()
+  currentResource = null
   globalThis.fetch = vi.fn(
     (url) =>
       new Promise((resolve) => {
@@ -44,7 +46,9 @@ function resolveRequest(path, body, index = 0, status = 200) {
 }
 
 function Probe({ path }) {
-  const { data, error, errorStatus, loading, reload } = useApi(path)
+  const resource = useApi(path)
+  currentResource = resource
+  const { data, error, errorStatus, loading, reload } = resource
   const value = data?.who ?? error ?? (loading ? '불러오는 중' : '비어 있음')
   return createElement(
     'div',
@@ -55,6 +59,69 @@ function Probe({ path }) {
 }
 
 describe('useApi 응답은 요청 URL에 귀속된다', () => {
+  it.each([200, 403, 404, 410, 503])('최신 재조회 %s는 수용한 결과만 반환한다', async status => {
+    const root = createRoot(container)
+    try {
+      await act(async () => { root.render(createElement(Probe, { path: '/applications/A' })) })
+      await act(async () => { resolveRequest('/applications/A', { who: '기존 A' }) })
+      let pending, outcome
+      await act(async () => { pending = currentResource.reload() })
+      const body = status === 200 ? { who: '최신 A' } : { error: '최신 조회 실패' }
+      await act(async () => { resolveRequest('/applications/A', body, 1, status); outcome = await pending })
+      expect(outcome).toEqual(status === 200 ? { ok: true, data: body } : { ok: false, status, error: body.error })
+      if (status === 503) expect(currentResource.data).toEqual({ who: '기존 A' })
+      if ([403, 404, 410].includes(status)) expect(currentResource.data).toBeNull()
+    } finally { await act(async () => { root.unmount() }) }
+  })
+
+  it.each([200, 403, 503])('뒤처진 재조회 %s는 새 조회 결과를 반환하거나 덮어쓰지 않는다', async status => {
+    const root = createRoot(container)
+    try {
+      await act(async () => { root.render(createElement(Probe, { path: '/applications/A' })) })
+      await act(async () => { resolveRequest('/applications/A', { who: '기존 A' }) })
+      let older, latest, olderOutcome, latestOutcome
+      await act(async () => { older = currentResource.reload(); latest = currentResource.reload() })
+      await act(async () => { resolveRequest('/applications/A', { who: '최신 A' }, 2); latestOutcome = await latest })
+      await act(async () => { resolveRequest('/applications/A', status === 200 ? { who: '과거 A' } : { error: '과거 실패' }, 1, status); olderOutcome = await older })
+      expect(latestOutcome).toEqual({ ok: true, data: { who: '최신 A' } })
+      expect(olderOutcome).toBeUndefined()
+      expect(currentResource.data).toEqual({ who: '최신 A' })
+    } finally { await act(async () => { root.unmount() }) }
+  })
+
+  it.each(['path', 'account', 'unmount', 'denial'])('%s로 폐기한 재조회는 결과를 반환하지 않는다', async change => {
+    const root = createRoot(container)
+    let unmounted = false
+    try {
+      await act(async () => { root.render(createElement(Probe, { path: '/applications/A' })) })
+      await act(async () => { resolveRequest('/applications/A', { who: '기존 A' }) })
+      let pending, outcome
+      await act(async () => { pending = currentResource.reload() })
+      if (change === 'path') await act(async () => { root.render(createElement(Probe, { path: '/applications/B' })) })
+      if (change === 'account') await act(async () => { completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'access', scope: 'b'.repeat(64) }) })
+      if (change === 'unmount') { await act(async () => { root.unmount() }); unmounted = true }
+      await act(async () => {
+        resolveRequest('/applications/A', change === 'denial' ? { error: '계정 접근 거절' } : { who: '폐기된 원문' }, 1, change === 'denial' ? 401 : 200)
+        outcome = await pending
+      })
+      expect(outcome).toBeUndefined()
+      expect(container.textContent).not.toContain('폐기된 원문')
+    } finally { if (!unmounted) await act(async () => { root.unmount() }) }
+  })
+
+  it('조회할 주소가 없거나 계정 확인 중이면 결과를 반환하지 않는다', async () => {
+    const root = createRoot(container)
+    try {
+      await act(async () => { root.render(createElement(Probe, { path: null })) })
+      let outcome
+      await act(async () => { outcome = await currentResource.reload() })
+      expect(outcome).toBeUndefined(); expect(fetch).not.toHaveBeenCalled()
+      await act(async () => { beginAccessCheck(); root.render(createElement(Probe, { path: '/applications/A' })) })
+      await act(async () => { outcome = await currentResource.reload() })
+      expect(outcome).toBeUndefined(); expect(fetch).not.toHaveBeenCalled()
+    } finally { await act(async () => { root.unmount() }) }
+  })
+
   it.each([403, 404, 410, 429, 500, 503])('현재 리소스의 HTTP %s만 노출하고 성공·URL 교체 때 지운다', async status => {
     const root = createRoot(container)
     try {

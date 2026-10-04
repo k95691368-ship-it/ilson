@@ -30,6 +30,17 @@ let codeReviewReplyLost = false
 const buildRetryFixture = process.argv.includes('--build-retry-fixture')
 let buildReplyLost = false
 const healthFailureFixture = process.argv.includes('--health-failure-fixture')
+const agreementSaveFixture = Boolean(fixture) && process.argv.includes('--agreement-save-fixture')
+const feedbackRetryFixture = Boolean(fixture) && process.argv.includes('--feedback-retry-fixture')
+let agreementWriteRejected = false
+let agreementReadRejected = false
+let agreementReadPending = false
+const feedbackRepliesLost = new Set()
+let unclearReadPending = false
+if (agreementSaveFixture) {
+  await pg.query(`INSERT INTO meeting(id,application_id,seq,title,minutes_text) VALUES($1,$2,1,$3,$4)`,
+    ['meeting-local-save', 'app-local-verify', '로컬 협의 저장 검증', '수정 전 가상 회의록입니다.'])
+}
 if (codeReviewRetryFixture && fixture) {
   // Explicit synthetic legacy mappings for local UI boundaries, never business data.
   await pg.query('INSERT INTO sku_alias(external_code,canonical_code,product_name,taught_by,owner_email) VALUES($1,$2,$3,$4,$5)',
@@ -115,7 +126,40 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
           params: Object.fromEntries(route.names.map((name, i) => [name, decodeURIComponent(match[i+1])])), data: {}, waitUntil: promise => promise.catch(() => {}) }
         const bindings = context.env
         // Reproduce Pages: next() gets original bindings and shared request data.
-        context.next = (forwarded = context.request) => handler ? handler({ ...context, request: forwarded, env: bindings }) : Response.json({ error: 'Method not allowed' }, { status: 405 })
+        context.next = async (forwarded = context.request) => {
+          // Opt-in browser failures after real signed middleware, using only
+          // this disposable database. Reject one legacy save BEFORE any write;
+          // a successful later save loses only its subsequent read response.
+          const agreementPath = url.pathname === '/api/applications/app-local-verify/agreement'
+          if (agreementSaveFixture && agreementPath && req.method === 'PATCH' && !agreementWriteRejected) {
+            agreementWriteRejected = true
+            await new Promise(resolve => setTimeout(resolve, 4000))
+            return Response.json({ error: '로컬 검증: 저장 결과를 확인하지 못했습니다.' }, { status: 503 })
+          }
+          if (agreementSaveFixture && agreementPath && req.method === 'GET' && agreementReadPending && !agreementReadRejected) {
+            agreementReadRejected = true
+            agreementReadPending = false
+            return Response.json({ error: '로컬 검증: 저장 뒤 재조회가 실패했습니다.' }, { status: 503 })
+          }
+          if (feedbackRetryFixture && req.method === 'GET' && url.pathname === '/api/tools/local-retry-tool/unclear' && unclearReadPending) {
+            unclearReadPending = false
+            return Response.json({ error: '로컬 검증: 안내 상태 조회가 실패했습니다.' }, { status: 503 })
+          }
+          const result = handler ? await handler({ ...context, request: forwarded, env: bindings }) : Response.json({ error: 'Method not allowed' }, { status: 405 })
+          if (agreementSaveFixture && agreementPath && req.method === 'PATCH' && result.ok) agreementReadPending = true
+          if (feedbackRetryFixture && req.method === 'POST' && /^\/api\/tools\/local-retry-tool\/(report|unclear)$/.test(url.pathname) && result.ok) {
+            const saved = await result.clone().json()
+            if (saved.ok === true && /^dec_[a-f0-9]{20}$/.test(saved.id)) {
+              if (!feedbackRepliesLost.has(url.pathname)) {
+                feedbackRepliesLost.add(url.pathname)
+                // The real handler already committed a decision and receipt.
+                return Response.json({ error: '로컬 검증: 저장 응답이 끊겼습니다.' }, { status: 503 })
+              }
+              if (url.pathname.endsWith('/unclear')) unclearReadPending = true
+            }
+          }
+          return result
+        }
         const response = await onRequest(context)
         if (fixture?.afterResponse && !res.destroyed) {
           const after = queue.then(() => fixture.afterResponse({ method: req.method, path: url.pathname, status: response.status }))

@@ -73,9 +73,11 @@ describe('같은 자리에 쌓이는가', () => {
       join(ROOT, 'functions', 'api', 'tools', '[slug]', 'report.js'),
       'utf8'
     )
+    const writer = readFileSync(join(ROOT, 'functions', '_lib', 'toolFeedback.ts'), 'utf8')
+    expect(fromTool).toContain("saveToolFeedback(env, params.slug, 'report'")
     for (const piece of ['linkKind: REPORT_KIND', 'linkId: code', 'actor:']) {
       expect(route, piece).toContain(piece)
-      expect(fromTool, piece).toContain(piece)
+      expect(writer, piece).toContain(piece)
     }
   })
 

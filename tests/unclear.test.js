@@ -96,8 +96,7 @@ describe('지금 어느 자리가 안 읽히나', () => {
     expect(unclearBoard({ flags, fixes }).sections[0].key).toBe('when_to_run')
   })
 
-  it('두 사람이 같은 자리에서 막히면 문서 문제로 본다', () => {
-    // 한 사람이 모르는 것은 처음이라 그럴 수 있다.
+  it('같은 대목에 두 건이 남으면 반복 검토 대상으로 본다', () => {
     const b = unclearBoard({ flags, fixes })
     expect(b.sections.find((s) => s.key === 'when_to_run').mustFix).toBe(true)
     expect(b.sections.find((s) => s.key === 'upload').mustFix).toBe(false)
@@ -132,13 +131,14 @@ describe('담당자 화면 한 줄', () => {
   })
 
   it('다 고쳤으면 몇 곳을 고쳤는지 말한다', () => {
-    expect(boardLine({ openTotal: 0, fixedTotal: 3 })).toContain('3곳')
+    expect(boardLine({ openTotal: 0, fixedTotal: 3 })).toContain('3건')
   })
 
-  it('두 사람 이상 막힌 곳은 따로 말한다', () => {
+  it('미해결 건수와 반복 제보가 남은 대목 수를 구분한다', () => {
     const t = boardLine({ openTotal: 4, mustFix: 1 })
-    expect(t).toContain('4곳')
-    expect(t).toContain('잘못 쓰인')
+    expect(t).toContain('4건')
+    expect(t).toContain('1곳')
+    expect(t).not.toMatch(/두 사람|잘못 쓰인/)
   })
 
   it('빈 값에도 터지지 않는다', () => {
@@ -147,11 +147,13 @@ describe('담당자 화면 한 줄', () => {
 })
 
 describe('부서가 보는 자리에 붙는 말', () => {
-  it('짚혀 있으면 고치는 중이라고 알린다', () => {
+  it('짚혀 있으면 사람 수나 착수를 추정하지 않고 검토 필요를 알린다', () => {
     // 짚고 나서 아무 표시가 없으면 "말해 봐야 소용없다"가 된다.
     const n = sectionNote({ key: 'upload', open: 2, flags: [] })
     expect(n.tone).toBe('open')
-    expect(n.text).toContain('2분')
+    expect(n.text).toContain('2건')
+    expect(n.text).toContain('검토가 필요')
+    expect(n.text).not.toMatch(/분이|쓰는 중/)
   })
 
   it('고쳤으면 무엇을 고쳤는지 보여준다', () => {

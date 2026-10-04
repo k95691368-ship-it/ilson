@@ -17,6 +17,8 @@ import { api } from '../api/client.ts'
 import { krw, num, ms, ago, dateTimeLabel } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { pendingToolRun, keepToolRun, forgetToolRun, subscribeToolRuns } from '../lib/pendingToolRuns.js'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
+import { useFeedbackSubmission } from '../hooks/useFeedbackSubmission.js'
 
 // 부서에 넘긴 도구.
 //
@@ -50,16 +52,11 @@ function ToolSession({ slug, data, error, loading, reload }) {
   // 계정을 만들라고 하지는 않는다. 이 브라우저에 기억해 두고 다음부터는
   // 안 묻는다.
   const [whoRan, setWhoRan] = useState('')
-  const [notes, setNotes] = useState({})
-  const loadNotes = useCallback(() => {
-    api
-      .get(`/tools/${encodeURIComponent(slug)}/unclear`)
-      .then((r) => setNotes(r.notes ?? {}))
-      .catch(() => {})
-  }, [slug])
-  useEffect(() => {
-    loadNotes()
-  }, [loadNotes])
+  // The ordinary GET lifecycle suppresses late responses from a different tool
+  // or account and retains existing notes only for transient read failures.
+  const { data: notesData, error: notesError, errorStatus: notesStatus, loading: notesLoading, reload: loadNotes } = useApi(`/tools/${encodeURIComponent(slug)}/unclear`, { skip: !data || data.rolledBack === true })
+  const notes = notesData?.notes ?? {}
+  const notesDenied = [401, 403, 404, 410].includes(notesStatus)
 
   // Remember a name only within the current account/workspace and tool.
   // The old unscoped key cannot safely be attributed to any current account.
@@ -235,7 +232,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
       <header className="page-head">
         <h1>{data.title}</h1>
         {data.manual?.intro && <p className="page-sub">{data.manual.intro}</p>}
-        <Unclear slug={slug} section="intro" notes={notes} reload={loadNotes} />
+        <Unclear slug={slug} section="intro" notes={notes} reload={loadNotes} unavailable={notesDenied} />
 
         {/* 여기서 나가는 길이 하나도 없었다.
             697줄짜리 화면에 링크가 한 개도 없다. 부서는 넘겨받을 때 이 주소
@@ -255,6 +252,11 @@ function ToolSession({ slug, data, error, loading, reload }) {
           </div>
         )}
       </header>
+
+      {notesError && <div className="notice notice-warn" role="status">
+        <p>안내 상태를 불러오지 못했습니다. 확인된 제보 저장은 유지됩니다. {notesError}</p>
+        <button type="button" className="btn-ghost btn-sm" disabled={notesLoading} onClick={loadNotes}>안내 상태 다시 읽기</button>
+      </div>}
 
       {/* 지금 이 도구를 믿을 수 있나.
           신고를 받으면 서버가 "결과를 믿을 수 없는 종류라 이 도구에 표시가
@@ -337,7 +339,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
         <div className="notice notice-info">
           <div className="notice-title">언제 돌리나요</div>
           <p>{data.manual.when_to_run}</p>
-          <Unclear slug={slug} section="when_to_run" notes={notes} reload={loadNotes} />
+          <Unclear slug={slug} section="when_to_run" notes={notes} reload={loadNotes} unavailable={notesDenied} />
         </div>
       )}
 
@@ -501,7 +503,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
                 무엇을 해야 하는지는 사용법서를 보세요. 모르겠으면{' '}
                 {data.manual?.contact ?? '담당자'}에게 문의하세요.
               </p>
-              <Unclear slug={slug} section="quarantine" notes={notes} reload={loadNotes} />
+              <Unclear slug={slug} section="quarantine" notes={notes} reload={loadNotes} unavailable={notesDenied} />
             </section>
           )}
         </>
@@ -511,7 +513,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
         <section className="card">
           <h2 className="card-title">결과를 어떻게 쓰나요</h2>
           <p className="card-note">{data.manual.what_to_do_after}</p>
-          <Unclear slug={slug} section="what_to_do_after" notes={notes} reload={loadNotes} />
+          <Unclear slug={slug} section="what_to_do_after" notes={notes} reload={loadNotes} unavailable={notesDenied} />
         </section>
       )}
 
@@ -519,8 +521,8 @@ function ToolSession({ slug, data, error, loading, reload }) {
           있어야 한다. 여기가 실제로 막히는 자리다. */}
       <section className="card unclear-rest">
         <h2 className="card-title">사용법서에서 모르겠는 데가 있으신가요</h2>
-        <Unclear slug={slug} section="upload" notes={notes} reload={loadNotes} />
-        <Unclear slug={slug} section="contact" notes={notes} reload={loadNotes} />
+        <Unclear slug={slug} section="upload" notes={notes} reload={loadNotes} unavailable={notesDenied} />
+        <Unclear slug={slug} section="contact" notes={notes} reload={loadNotes} unavailable={notesDenied} />
       </section>
 
       <footer className="tool-foot">
@@ -791,72 +793,87 @@ function Tile({ label, value, tone }) {
 //
 // 이름은 안 받는다. 모르겠다고 말하는 일에 이름을 붙이라고 하면, 모르는
 // 것을 밝히는 것 자체가 부담이 되어 아무도 안 짚는다.
-function Unclear({ slug, section, notes, reload }) {
+function Unclear({ slug, section, notes, reload, unavailable }) {
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  if (session.status !== 'active' || unavailable) return null
+  return <UnclearForm key={`${session.generation}:${slug}:${section}`} session={session} slug={slug} section={section} notes={notes} reload={reload} />
+}
+
+function UnclearForm({ session, slug, section, notes, reload }) {
   const [open, setOpen] = useState(false)
   const [body, setBody] = useState('')
   const [error, setError] = useState(null)
-  const [busy, setBusy] = useState(false)
-  const [done, setDone] = useState(null)
+  const submission = useFeedbackSubmission({ session, slug, kind: 'unclear', section })
+  const { busy, receipt, pending } = submission
+  const locked = busy || Boolean(pending)
 
   const spec = SECTION_BY_KEY[section]
   const note = notes?.[section] ?? null
 
   async function send(e) {
     e.preventDefault()
-    const bad = validateUnclear({ section, body })
-    if (bad.body) {
-      setError(bad.body)
-      return
+    if (busy) return
+    const current = submission.capture()
+    if (!pending) {
+      const bad = validateUnclear({ section, body })
+      if (body.trim().length > 1000) bad.body = '내용은 1,000자 이내로 적어주세요.'
+      if (bad.body || bad.section) { setError(bad.body || bad.section); return }
     }
-    setBusy(true)
-    try {
-      const r = await api.post(`/tools/${encodeURIComponent(slug)}/unclear`, { section, body })
-      setDone(r.message)
+    setError(null)
+    const response = await submission.submit({ body })
+    if (response && current()) {
       setOpen(false)
       setBody('')
-      reload()
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setBusy(false)
+      // GET failure is displayed separately; a confirmed POST is never resent.
+      await reload()
     }
   }
 
+  if (submission.denied) return <p className="notice notice-danger" role="alert">{submission.denied} 제보 내용을 숨겼습니다.</p>
   return (
     <div className="unclear">
       {/* 담당자가 이미 다시 쓴 대목이면 그 말이 여기 붙는다. */}
       {note && <p className={`unclear-note unclear-${note.tone}`}>{note.text}</p>}
-      {done && <p className="unclear-note unclear-thanks">{done}</p>}
+      {receipt && <p className="unclear-note unclear-thanks">{receipt.message}</p>}
 
       {open ? (
-        <form className="unclear-form" onSubmit={send}>
+        <form className="unclear-form" aria-label={`${spec?.label} 제보`} onSubmit={send}>
           <Field
             label={`${spec?.label} — 무엇이 모르겠으신가요`}
             required
-            error={error}
+            error={error || submission.fields.body}
             hint="성함은 안 여쭙습니다. 적어주신 내용만 담당자에게 갑니다."
           >
             <textarea
               rows={2}
               value={body}
+              maxLength={1000}
+              disabled={locked}
               onChange={(e) => {
+                if (locked) return
                 setBody(e.target.value)
                 setError(null)
               }}
               placeholder={spec?.hint}
             />
           </Field>
+          {submission.error && <p className="notice notice-warn" role="alert">{submission.error}</p>}
+          {pending && <p className="card-note">입력한 내용 그대로 저장 여부를 다시 확인합니다. 이 화면을 벗어나면 재시도 정보가 사라집니다.</p>}
           <div className="row">
-            <button type="submit" className="btn-primary btn-sm" disabled={busy}>
-              {busy ? '보내는 중…' : '보내기'}
+            <button type="submit" className="btn-primary btn-sm" disabled={busy || pending?.blocked}>
+              {busy ? '보내는 중…' : pending ? '같은 제보 다시 확인' : '보내기'}
             </button>
-            <button type="button" className="btn-ghost btn-sm" onClick={() => setOpen(false)}>
+            <button type="button" className="btn-ghost btn-sm" disabled={locked} onClick={() => setOpen(false)}>
               그만두기
             </button>
           </div>
+          {pending && <details className="disclose"><summary>다른 내용으로 제보하기</summary>
+            <p>기존 제보가 이미 저장됐을 수 있습니다. 보관을 끝내도 서버 저장은 취소되지 않으며 새 제보가 중복될 수 있습니다.</p>
+            <button type="button" className="btn-ghost btn-sm" disabled={busy} onClick={() => { submission.discard(); setError(null) }}>보관을 끝내고 현재 내용 수정</button>
+          </details>}
         </form>
       ) : (
-        !done && (
+        !receipt && (
           <button type="button" className="unclear-ask" onClick={() => setOpen(true)}>
             {spec?.label} — 여기 모르겠습니다
           </button>

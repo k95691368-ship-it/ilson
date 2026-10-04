@@ -61,10 +61,8 @@ export const MANUAL_SECTIONS = [
 export const SECTION_KEYS = MANUAL_SECTIONS.map((s) => s.key)
 export const SECTION_BY_KEY = Object.fromEntries(MANUAL_SECTIONS.map((s) => [s.key, s]))
 
-// 이만큼 짚히면 그건 읽는 사람 문제가 아니다.
-//
-// 한 사람이 모르는 것은 그 사람이 처음이라 그럴 수 있다. 두 사람이 같은
-// 자리에서 막히면 문서가 잘못 쓰인 것이다. 그 선을 여기 둔다.
+// 미해결 제보 두 건부터 반복 검토 대상으로 표시한다.
+// 제보 건수는 서로 다른 사람 수나 문서 결함이 입증된 수가 아니다.
 export const MANY = 2
 
 // 무엇을 모르겠는지 이만큼은 적어야 한다.
@@ -118,7 +116,7 @@ export function unclearBoard({ flags, fixes } = {}) {
       total: mine.length,
       open: open.length,
       flags: mine,
-      // 두 사람이 같은 자리에서 막히면 문서가 잘못 쓰인 것이다.
+      // 같은 대목의 반복 제보를 우선 검토한다. 사람 수는 추정하지 않는다.
       mustFix: open.length >= MANY,
     }
   }).filter((s) => s.total > 0)
@@ -143,12 +141,12 @@ export function boardLine(summary) {
   const s = summary ?? {}
   if (!s.openTotal) {
     return s.fixedTotal > 0
-      ? `짚힌 곳을 모두 다시 썼습니다. (지금까지 ${s.fixedTotal}곳)`
+      ? `접수된 제보에 모두 보완 기록이 남았습니다. (지금까지 ${s.fixedTotal}건)`
       : '아직 모르겠다고 짚힌 곳이 없습니다.'
   }
-  const parts = [`부서가 ${s.openTotal}곳을 모르겠다고 짚었습니다.`]
+  const parts = [`아직 해결되지 않은 사용법 제보가 ${s.openTotal}건입니다.`]
   if (s.mustFix > 0) {
-    parts.push(`그중 ${s.mustFix}곳은 두 사람 이상이 같은 자리에서 막혔습니다 — 문서가 잘못 쓰인 것입니다.`)
+    parts.push(`그중 ${s.mustFix}곳은 반복 제보가 남아 있어 검토가 필요합니다.`)
   }
   return parts.join(' ')
 }
@@ -162,7 +160,7 @@ export function sectionNote(section) {
   if (section.open > 0) {
     return {
       tone: 'open',
-      text: `${section.open}분이 이 대목을 모르겠다고 짚어 주셨습니다. 담당자가 다시 쓰는 중입니다.`,
+      text: `이 대목에 해결되지 않은 제보가 ${section.open}건 있습니다. 담당자 검토가 필요합니다.`,
     }
   }
   const last = [...(section.flags ?? [])].reverse().find((f) => f.fix)

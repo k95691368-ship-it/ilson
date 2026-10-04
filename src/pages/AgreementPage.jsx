@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { DEPTS } from '../../shared/depts.js'
 import StageHeader from '../components/StageHeader.jsx'
@@ -12,6 +12,7 @@ import { withJosa } from '../../shared/korean.js'
 import Field from '../components/Field.jsx'
 import AgreementEvidence from '../components/AgreementEvidence.jsx'
 import { useActionLifetime } from '../hooks/useActionLifetime.js'
+import { accessBlocked, getAccessSession } from '../lib/accessSession.js'
 import {
   REQUIREMENT_KINDS,
   PRIORITIES,
@@ -96,9 +97,11 @@ export default function AgreementPage() {
 }
 
 function Agreement({ id }) {
-  const { data, error, loading, reload, setData } = useApi(`/applications/${id}/agreement`)
+  const { data, error, errorStatus, loading, reload, setData } = useApi(`/applications/${id}/agreement`)
   const captureView = useActionLifetime(id)
   const toast = useToast()
+  const pending = useRef(false)
+  const [busy, setBusy] = useState(false)
 
   async function refreshEvidence() {
     const current = captureView()
@@ -108,21 +111,57 @@ function Agreement({ id }) {
   }
 
   async function send(method, body) {
+    // The ref locks before React can render disabled controls. It belongs to
+    // this keyed application view, not another application's new form.
+    if (pending.current || loading || error) return null
+    const viewCurrent = captureView()
+    const generation = getAccessSession().generation
+    const current = () => viewCurrent() && getAccessSession().generation === generation
+      && !accessBlocked(getAccessSession())
+    if (!current()) return null
+    pending.current = true
+    setBusy(true)
     try {
       const r = await api[method](`/applications/${id}/agreement`, body)
-      await reload()
-      return r
+      if (!current()) return null
+      if (!confirmedAgreementSave(method, body, r)) {
+        toast.error('저장 응답을 확인하지 못했습니다. 입력은 유지했습니다. 현재 협의 내용과 이력을 먼저 확인해주세요.')
+        return null
+      }
+      // A transient read failure does not undo this confirmed write. But a
+      // discarded read or lost resource access cannot authorize child effects
+      // (clearing drafts or showing toasts) from the now-hidden editing view.
+      const refreshed = await reload()
+      if (!refreshed || (!refreshed.ok && [401, 403, 404, 410].includes(refreshed.status))) return null
+      return current() ? r : null
     } catch (err) {
-      // 여기서 다시 던지면 버튼 onClick이 받아 주는 곳이 없어 브라우저 콘솔에
-      // 처리되지 않은 오류로 남는다. 사용자에게는 이미 알림으로 알렸으므로
-      // null을 돌려주고, 이어서 할 일이 있는 곳만 그 값을 확인하면 된다.
-      toast.error(err.message)
+      if (current()) {
+        const uncertain = !Number.isInteger(err.status) || err.status < 100 || err.status >= 500
+        toast.error(uncertain
+          ? '저장 결과를 확인하지 못했습니다. 입력은 유지했습니다. 현재 협의 내용과 이력을 먼저 확인해주세요.'
+          : err.message)
+      }
       return null
+    } finally {
+      pending.current = false
+      if (current()) setBusy(false)
     }
   }
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
-  if (error) return <div className="notice notice-danger">{error}</div>
+  const unavailable = [401, 403, 404, 410].includes(errorStatus)
+  const refreshNotice = error && (
+    <div className="notice notice-danger" role="alert">
+      <p>{error}</p>
+      {!unavailable && <>
+        <p className="card-note">조회만 다시 시도합니다. 저장 결과가 불명확했다면 현재 협의 내용과 이력을 먼저 확인해주세요.</p>
+        <button type="button" className="btn-ghost btn-sm" disabled={loading} onClick={() => reload()}>
+          {loading ? '조회 중…' : '최신 내용 다시 확인'}
+        </button>
+      </>}
+    </div>
+  )
+  if (unavailable || (error && !data)) return refreshNotice
   if (!data) return null
 
   // 들어오자마자 아무 칸도 펼치지 않는다.
@@ -134,13 +173,30 @@ function Agreement({ id }) {
 
   return (
     <div className="stack">
-      <Stakeholders data={data} send={send} toast={toast} openBy={openBy} />
-      <Meetings data={data} send={send} toast={toast} openBy={openBy} />
-      <Requirements data={data} send={send} toast={toast} openBy={openBy} />
+      {refreshNotice}
+      <fieldset className="stack" aria-label="협의 내용 편집" aria-busy={busy} disabled={busy || loading || Boolean(error)} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <Stakeholders data={data} send={send} toast={toast} openBy={openBy} />
+        <Meetings data={data} send={send} toast={toast} openBy={openBy} />
+        <Requirements data={data} send={send} toast={toast} openBy={openBy} />
+      </fieldset>
       <AgreementEvidence id={id} data={data} refresh={refreshEvidence} />
       <Objections id={id} toast={toast} openBy={openBy} />
     </div>
   )
+}
+
+const AGREEMENT_POST_IDS = {
+  stakeholder: /^stk_[a-f0-9]{20}$/,
+  meeting: /^mtg_[a-f0-9]{20}$/,
+  requirement: /^req_[a-f0-9]{20}$/,
+}
+
+function confirmedAgreementSave(method, body, result) {
+  if (!result || typeof result !== 'object' || Array.isArray(result) || result.ok !== true) return false
+  if (method !== 'post') return true
+  if (!Object.hasOwn(AGREEMENT_POST_IDS, body.kind) || typeof result.id !== 'string'
+    || !AGREEMENT_POST_IDS[body.kind].test(result.id)) return false
+  return body.kind !== 'meeting' || (Number.isSafeInteger(result.seq) && result.seq > 0)
 }
 
 // 기준·실측은 접힌 입력만 제공한다. 이전의 안내 띠나 대시보드는 복원하지 않는다.
@@ -226,7 +282,7 @@ function Stakeholders({ data, send, toast, openBy }) {
             toast.error('부서와 원하는 것은 적어주세요.')
             return
           }
-          await send('post', { kind: 'stakeholder', ...form })
+          if (!await send('post', { kind: 'stakeholder', ...form })) return
           setForm({ dept: '', role_label: '', person_label: '', wants: '' })
         }}
       >
@@ -276,12 +332,13 @@ function Meetings({ data, send, toast, openBy }) {
                 style={{ marginTop: 8 }}
                 onClick={async () => {
                   const el = document.getElementById(`minutes-${m.id}`)
-                  await send('patch', {
+                  const saved = await send('patch', {
                     kind: 'meeting',
                     id: m.id,
                     title: m.title,
                     minutes_text: el.value,
                   })
+                  if (!saved) return
                   setEditing(null)
                   toast.success('회의록을 저장했습니다.')
                 }}
@@ -310,7 +367,7 @@ function Meetings({ data, send, toast, openBy }) {
           type="button"
           className="btn-ghost"
           onClick={async () => {
-            await send('post', { kind: 'meeting', title: draft.title })
+            if (!await send('post', { kind: 'meeting', title: draft.title })) return
             setDraft({ title: '', minutes_text: '' })
           }}
         >
@@ -447,7 +504,7 @@ function Requirements({ data, send, toast, openBy }) {
                 toast.error('내용을 적어주세요.')
                 return
               }
-              await send('post', { kind: 'requirement', ...form })
+              if (!await send('post', { kind: 'requirement', ...form })) return
               setForm({ ...form, body: '', quote: '', measurable: '' })
             }}
           >
@@ -565,12 +622,13 @@ function RequirementCard({ r, send, toast, editable }) {
                   toast.error('고친 문장을 적어주세요.')
                   return
                 }
-                await send('patch', {
+                const saved = await send('patch', {
                   kind: 'requirement',
                   id: r.id,
                   status: '수정채택',
                   decided_body: amend.trim(),
                 })
+                if (!saved) return
                 setAmend(null)
               }}
             >
@@ -598,13 +656,14 @@ function RequirementCard({ r, send, toast, editable }) {
             className="btn-danger btn-sm"
             style={{ marginTop: 6 }}
             onClick={async () => {
-              await send('patch', {
+              const saved = await send('patch', {
                 kind: 'requirement',
                 id: r.id,
                 status: '기각',
                 reject_reason: reason,
                 summary: r.body,
               })
+              if (!saved) return
               setOpen(false)
               toast.success('기각했습니다. 기록에 남았습니다.')
             }}
@@ -782,7 +841,7 @@ function PendingJoins({ pending, send, toast }) {
     }
     setBusy(p.join_id)
     try {
-      await send('post', { ...joinAsRequirement(p), body })
+      if (!await send('post', { ...joinAsRequirement(p), body })) return
       toast.success(`${p.dept}의 요구로 올렸습니다. 회의 뒤에 채택/기각을 정하세요.`)
     } finally {
       setBusy(null)

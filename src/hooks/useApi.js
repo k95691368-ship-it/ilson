@@ -45,6 +45,9 @@ export function useApi(path, { skip = false } = {}) {
     }
   }, [])
 
+  // A caller may distinguish a current read failure from a discarded request.
+  // Only the result accepted into this resource's state is returned; existing
+  // fire-and-forget callers retain the same non-throwing reload behavior.
   const load = useCallback(async () => {
     if (!alive.current) return
     const mine = ++seq.current
@@ -69,17 +72,21 @@ export function useApi(path, { skip = false } = {}) {
       const result = await api.get(resourcePath, { signal: pending.signal })
       if (latest()) {
         setSnapshot({ key: resourceKey, data: result, error: null, errorStatus: null, loading: true })
+        return { ok: true, data: result }
       }
     } catch (err) {
       if (latest()) {
         const unavailable = [401, 403, 404, 410].includes(err.status)
+        const error = err.message || '불러오지 못했습니다.'
+        const status = Number.isInteger(err.status) && err.status >= 100 && err.status <= 599 ? err.status : null
         setSnapshot((previous) => ({
           key: resourceKey,
           data: !unavailable && previous.key === resourceKey ? previous.data : null,
-          error: err.message || '불러오지 못했습니다.',
-          errorStatus: Number.isInteger(err.status) && err.status >= 100 && err.status <= 599 ? err.status : null,
+          error,
+          errorStatus: status,
           loading: true,
         }))
+        return { ok: false, status, error }
       }
     } finally {
       // 뒤처진 응답은 loading 도 안 건드린다. 건드리면 아직 오는 중인
