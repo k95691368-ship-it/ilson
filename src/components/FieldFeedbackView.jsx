@@ -1,12 +1,40 @@
-import { useState } from 'react'
+import { useRef, useState, useSyncExternalStore } from 'react'
 import { api } from '../api/client.ts'
 import { useApi } from '../hooks/useApi.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
+import { accessBlocked, getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
 import { safeJson } from '../../shared/override.js'
 import { FEEDBACK_KINDS, FEEDBACK_VERDICTS, QUALITY_VERDICTS, NONUSE_STATES, NONUSE_REASONS, qualitySummary } from '../../shared/fieldFeedback.js'
 
 const today = () => new Date().toISOString().slice(0, 10)
 const options = (labels) => Object.entries(labels).map(([value, label]) => <option key={value} value={value}>{label}</option>)
 const fields = (form) => Object.fromEntries(new FormData(form).entries())
+const allocatedIds = { publish_update: /^ffu_[a-f0-9]{20}$/, create_sample: /^qsb_[a-f0-9]{20}$/, record_nonuse: /^nur_[a-f0-9]{20}$/ }
+function validReceipt(result, payload) {
+  if (result?.ok !== true || typeof result.id !== 'string') return false
+  if (Object.hasOwn(allocatedIds, payload.action)) return allocatedIds[payload.action].test(result.id)
+  const id = payload.action === 'read_update' || payload.action === 'confirm_update' ? payload.updateId
+    : payload.action === 'review_sample' ? payload.itemId : payload.action === 'resolve_followup' ? payload.followupId : null
+  return Boolean(id) && result.id === id
+}
+// Only the submitted target participates in the lifetime. An unrelated case,
+// product or summary refresh must not discard this form's confirmed result.
+function targetSnapshot(payload, data, products) {
+  if (!data) return null
+  let target
+  if (payload.action === 'publish_update') target = data.cases.find(item => item.id === payload.caseId)
+  else if (payload.action === 'read_update' || payload.action === 'confirm_update') {
+    const item = data.cases.find(item => item.updates.some(update => update.id === payload.updateId))
+    if (item) target = { caseId: item.id, eventId: item.event_id, isMine: item.is_mine, update: item.updates.find(update => update.id === payload.updateId) }
+  } else if (payload.action === 'review_sample') target = data.samples.find(item => item.id === payload.itemId)
+  else if (payload.action === 'resolve_followup') target = data.followups?.find(item => item.id === payload.followupId)
+    ?? data.cases.flatMap(item => item.followups ?? []).find(item => item.id === payload.followupId)
+    ?? data.samples.find(item => item.followup?.id === payload.followupId)?.followup
+  else if (payload.action === 'create_sample' || payload.action === 'record_nonuse') target = products.find(item => item.id === payload.productId)
+  const capability = payload.action === 'publish_update' || payload.action === 'resolve_followup' ? data.manager
+    : payload.action === 'create_sample' || payload.action === 'review_sample' ? data.reviewer : null
+  return target ? JSON.stringify({ target, capability }) : null
+}
 function ProductSelect({ products }) {
   return <label>AI 제품<select name="productId" required><option value="">선택해주세요</option>{products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</select></label>
 }
@@ -34,42 +62,68 @@ export default function FieldFeedbackView({ mode, role, products, onCapture, onO
   const batchCursors = batchPages.role === role ? batchPages.cursors : ['']
   const cursor = mode === 'feedback' ? pageCursors.at(-1) : ''
   const batchCursor = mode === 'quality' ? batchCursors.at(-1) : ''
-  const { data, error, loading, reload } = useApi(`/feedback?role=${encodeURIComponent(role)}${cursor ? `&caseCursor=${encodeURIComponent(cursor)}` : ''}${batchCursor ? `&batchCursor=${encodeURIComponent(batchCursor)}` : ''}`)
-  const [busy, setBusy] = useState(false)
+  const { data, error, errorStatus, loading, reload } = useApi(`/feedback?role=${encodeURIComponent(role)}${cursor ? `&caseCursor=${encodeURIComponent(cursor)}` : ''}${batchCursor ? `&batchCursor=${encodeURIComponent(batchCursor)}` : ''}`)
+  const access = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  const identity = JSON.stringify([access.generation, mode, role, cursor, batchCursor])
+  const capture = useActionLifetime(identity)
+  const pending = useRef(null)
+  const [pendingState, setPendingState] = useState(null)
+  const busy = pendingState?.identity === identity
   const [status, setStatus] = useState(null)
   const [selected, setSelected] = useState('')
+  const batch = data?.batches.find(b => b.id === selected) ?? data?.batches[0]
+  const live = useRef(null)
+  live.current = { data, products, batchId: mode === 'quality' ? batch?.id : null }
+  if (pending.current?.identity === identity && !pending.current.committed
+    && (targetSnapshot(pending.current.payload, data, products) !== pending.current.source || live.current.batchId !== pending.current.batchId)) pending.current.stale = true
   async function save(payload, form) {
-    if (busy) return
-    setBusy(true); setStatus(null)
+    if (pending.current?.identity === identity || loading || error || accessBlocked(getAccessSession())) return
+    const isViewCurrent = capture()
+    const source = targetSnapshot(payload, data, products)
+    if (source === null) return
+    const operation = { identity, payload, source, batchId: live.current.batchId, stale: false, committed: false }
+    pending.current = operation
+    setPendingState(operation); setStatus(null)
+    const current = () => isViewCurrent() && !operation.stale && getAccessSession().generation === access.generation
+      && !accessBlocked(getAccessSession()) && targetSnapshot(payload, live.current.data, live.current.products) === source && live.current.batchId === operation.batchId
     try {
-      const result = await api.post('/feedback', { ...payload, role })
+      const result = await api.post('/feedback', { ...payload, role }, { validateResponse: result => validReceipt(result, payload) })
+      if (!validReceipt(result, payload)) throw new Error('저장 응답을 확인하지 못했습니다. 입력을 유지한 채 다시 확인해주세요.')
+      if (!current()) return
+      operation.committed = true
       form?.reset()
       if (payload.action === 'create_sample') {
         setSelected(result.id)
         setBatchPages({ role, cursors: [''] })
       }
-      setStatus({ text: '기록을 저장했습니다.', error: false })
-      await reload()
-    } catch (err) { setStatus({ text: err.message, error: true }) }
-    finally { setBusy(false) }
+      const destination = payload.action === 'create_sample' ? JSON.stringify([access.generation, mode, role, cursor, '']) : identity
+      setStatus({ identity: destination, text: '기록을 저장했습니다.', error: false })
+      // A confirmed sample can return to page one. Its new useApi resource
+      // performs that read; do not reload the previous cursor's closure.
+      if (payload.action !== 'create_sample' || !batchCursor) await reload()
+    } catch (err) {
+      if (current() && !operation.committed) setStatus({ identity, text: err.message, error: true })
+    } finally {
+      if (pending.current === operation) { pending.current = null; setPendingState(null) }
+    }
   }
   function submit(event, action, extra = {}) {
     event.preventDefault()
     const form = event.currentTarget
     return save({ ...fields(form), action, ...extra }, form)
   }
-  const batch = data?.batches.find(b => b.id === selected) ?? data?.batches[0]
   const samples = data?.samples.filter(s => s.batch_id === batch?.id) ?? []
   const summary = qualitySummary(samples)
   const pendingFollowups = (data?.followups ?? []).filter(item => item.status === 'open' && (mode === 'feedback' ? item.source_kind === 'feedback' : item.source_kind === 'quality_sample') && !(mode === 'feedback' ? data.cases.some(entry => entry.followups?.some(followup => followup.id === item.id)) : samples.some(sample => sample.followup?.id === item.id)))
   return <section className="ol-page field-workspace" data-clarity-mask="true">
     <header className="ol-page-intro"><div>
       <h1>{mode === 'feedback' ? '내 피드백' : '현장 점검'}</h1></div>
-      <button className="ol-secondary" onClick={reload} disabled={loading}>새로고침</button>
+      <button className="ol-secondary" onClick={reload} disabled={busy || loading}>새로고침</button>
     </header>
     {error && <p role="alert" className="field-error">{error}</p>}
-    {status && <p role={status.error ? 'alert' : 'status'} className={status.error ? 'field-error' : 'field-status'}>{status.text}</p>}
+    {status?.identity === identity && ![401, 403, 404, 410].includes(errorStatus) && <p role={status.error ? 'alert' : 'status'} className={status.error ? 'field-error' : 'field-status'}>{status.text}</p>}
     {loading && !data && <p role="status">기록을 불러오는 중입니다.</p>}
+    <fieldset disabled={busy || loading || Boolean(error)} aria-label="현장 피드백 작업" style={{ border: 0, padding: 0, minWidth: 0, display: 'grid', gap: 24 }}>
     {data && mode === 'feedback' && <>
       <div className="field-caption"><span>읽지 않은 안내 <strong>{data.unread}건</strong></span><span>{data.manager ? '담당자 권한 · 피드백' : '내가 남긴 피드백'} · {pageCursors.length}페이지 · 최신 기록부터 표시</span></div>
       {!data.cases.length && (pageCursors.length > 1 ? <p className="field-muted">이 페이지에 피드백이 없습니다.</p> : <div className="ol-panel field-empty"><h2>피드백이 없습니다.</h2><p>수정·거절·이관 사건의 처리 안내가 표시됩니다. 작성자 미확인 시연 기록은 제외됩니다.</p><button className="ol-primary" onClick={onCapture}>판단 기록하기</button></div>)}
@@ -100,16 +154,6 @@ export default function FieldFeedbackView({ mode, role, products, onCapture, onO
         </form></details>}
       </article>)}
     </>}
-    {mode === 'feedback' && (pageCursors.length > 1 || data?.casePage?.hasMore) && <nav className="field-caption" aria-label="피드백 페이지">
-      <button className="ol-secondary" disabled={busy || loading || pageCursors.length === 1} onClick={() => setPages({ role, cursors: pageCursors.slice(0, -1) })}>이전 페이지</button>
-      <span className="field-muted">{pageCursors.length}페이지{!data?.casePage?.hasMore && ' · 마지막'}</span>
-      <button className="ol-secondary" disabled={busy || loading || !data?.casePage?.hasMore} onClick={() => setPages({ role, cursors: [...pageCursors, data.casePage.nextCursor] })}>다음 페이지</button>
-    </nav>}
-    {mode === 'quality' && (batchCursors.length > 1 || data?.batchPage?.hasMore) && <nav className="field-caption" aria-label="점검 묶음 페이지">
-      <button className="ol-secondary" disabled={busy || loading || batchCursors.length === 1} onClick={() => setBatchPages({ role, cursors: batchCursors.slice(0, -1) })}>이전 묶음 페이지</button>
-      <span className="field-muted">점검 묶음 {batchCursors.length}페이지{!data?.batchPage?.hasMore && ' · 마지막'}</span>
-      <button className="ol-secondary" disabled={busy || loading || !data?.batchPage?.hasMore} onClick={() => setBatchPages({ role, cursors: [...batchCursors, data.batchPage.nextCursor] })}>다음 묶음 페이지</button>
-    </nav>}
     {data && mode === 'quality' && <>
       {data.reviewer ? <>
         <section className="ol-panel"><h2>승인 사건 표본 점검</h2><p className="field-muted">사이트에 저장된 승인 사건 중 아직 추출하지 않은 사건을 무작위로 선택합니다. 전체 AI 호출을 수집한 것이 아니므로 서비스 전체의 오류율로 해석할 수 없습니다.</p>
@@ -148,5 +192,16 @@ export default function FieldFeedbackView({ mode, role, products, onCapture, onO
       {(data.manager || data.reviewer) && <section className="ol-panel"><h2>자발적 응답 현황</h2><p className="field-muted">전체 기간의 응답 건수입니다. 동일인의 여러 의견이 포함될 수 있으며, 사용자 수나 실제 사용 중단율이 아닙니다.</p>{data.nonuseSummary.length ? <ul className="field-report-list">{data.nonuseSummary.map((r,i) => <li key={i}>{r.product_name} · {NONUSE_STATES[r.usage_state]} · {NONUSE_REASONS[r.reason]} <strong>{r.reports}건</strong></li>)}</ul> : <p>아직 응답이 없습니다.</p>}</section>}
     </>}
     {data?.manager && pendingFollowups.length > 0 && <section className="ol-panel"><h2>남아 있는 후속 검토</h2><p className="field-muted">최근 표시 범위 밖의 원 기록도 후속 검토가 열려 있으면 여기에서 확인합니다.</p>{pendingFollowups.map(item => <Followup key={item.id} item={item} manager busy={busy} onSubmit={submit} onOpenCluster={onOpenCluster} />)}</section>}
+    </fieldset>
+    {mode === 'feedback' && (pageCursors.length > 1 || data?.casePage?.hasMore) && <nav className="field-caption" aria-label="피드백 페이지">
+      <button className="ol-secondary" disabled={busy || loading || pageCursors.length === 1} onClick={() => setPages({ role, cursors: pageCursors.slice(0, -1) })}>이전 페이지</button>
+      <span className="field-muted">{pageCursors.length}페이지{!data?.casePage?.hasMore && ' · 마지막'}</span>
+      <button className="ol-secondary" disabled={busy || loading || !data?.casePage?.hasMore} onClick={() => setPages({ role, cursors: [...pageCursors, data.casePage.nextCursor] })}>다음 페이지</button>
+    </nav>}
+    {mode === 'quality' && (batchCursors.length > 1 || data?.batchPage?.hasMore) && <nav className="field-caption" aria-label="점검 묶음 페이지">
+      <button className="ol-secondary" disabled={busy || loading || batchCursors.length === 1} onClick={() => setBatchPages({ role, cursors: batchCursors.slice(0, -1) })}>이전 묶음 페이지</button>
+      <span className="field-muted">점검 묶음 {batchCursors.length}페이지{!data?.batchPage?.hasMore && ' · 마지막'}</span>
+      <button className="ol-secondary" disabled={busy || loading || !data?.batchPage?.hasMore} onClick={() => setBatchPages({ role, cursors: [...batchCursors, data.batchPage.nextCursor] })}>다음 묶음 페이지</button>
+    </nav>}
   </section>
 }

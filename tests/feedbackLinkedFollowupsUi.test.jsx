@@ -10,17 +10,17 @@ const empty = () => ({ cases: [], casePage: { hasMore: false }, unread: 0, manag
 const followup = (id, overrides = {}) => ({ id, cluster_id: 'cluster-old', source_kind: 'feedback', source_id: 'notice-' + id,
   event_id: 'event-old', product_id: 'p', reason: '이전 검토 ' + id, status: 'open', ...overrides })
 const show = mode => render(<FieldFeedbackView mode={mode} role="product" products={[{ id: 'p', name: '테스트 AI' }]} onCapture={vi.fn()} onOpenCluster={vi.fn()} />)
-beforeEach(() => { client.get.mockReset(); client.post.mockReset(); client.post.mockResolvedValue({ ok: true }) })
+beforeEach(() => { client.get.mockReset(); client.post.mockReset(); client.post.mockImplementation(async (_, body) => ({ ok: true, id: body.followupId })) })
 afterEach(cleanup)
 
 it('renders every old case link outside the summary, keeps resolved evidence and completes only the selected followup', async () => {
   const links = [followup('open-one'), followup('open-two'), followup('closed', { status: 'resolved', resolution: '이전 처리 근거', resolved_by: '이전 담당자' })]
   const old = { ...empty(), cases: [{ id: 'case-old', event_id: 'event-old', product_name: '테스트 AI', reason_detail: '오래된 제보', updates: [], followups: links }] }
-  client.get.mockImplementation(async path => path.includes('caseCursor=') ? old : { ...empty(), casePage: { hasMore: true, nextCursor: 'older' } })
+  client.get.mockImplementation(async path => path.includes('caseCursor=') ? structuredClone(old) : { ...empty(), casePage: { hasMore: true, nextCursor: 'older' } })
   client.post.mockImplementation(async (_, body) => {
     const target = links.find(item => item.id === body.followupId)
     Object.assign(target, { status: 'resolved', resolution: body.resolution, resolved_by: '담당자' })
-    return { ok: true }
+    return { ok: true, id: body.followupId }
   })
   show('feedback')
   fireEvent.click(await screen.findByRole('button', { name: '다음 페이지' }))
@@ -31,7 +31,7 @@ it('renders every old case link outside the summary, keeps resolved evidence and
   fireEvent.click(within(target).getByText('후속 검토 처리'))
   fireEvent.change(within(target).getByRole('textbox', { name: '처리 결과와 확인 근거' }), { target: { value: '수정 배포 후 같은 입력을 확인했습니다.' } })
   fireEvent.submit(within(target).getByRole('button', { name: '후속 검토 완료' }).closest('form'))
-  await waitFor(() => expect(client.post).toHaveBeenCalledWith('/feedback', { action: 'resolve_followup', followupId: 'open-two', resolution: '수정 배포 후 같은 입력을 확인했습니다.', role: 'product' }))
+  await waitFor(() => expect(client.post).toHaveBeenCalledWith('/feedback', { action: 'resolve_followup', followupId: 'open-two', resolution: '수정 배포 후 같은 입력을 확인했습니다.', role: 'product' }, expect.objectContaining({ validateResponse: expect.any(Function) })))
   await screen.findByText(/처리 근거: 수정 배포 후 같은 입력/)
   expect(screen.getAllByText('후속 검토 대기')).toHaveLength(1)
   expect(screen.getByText('이전 검토 open-one')).toBeTruthy()

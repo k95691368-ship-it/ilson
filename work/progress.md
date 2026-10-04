@@ -1,5 +1,37 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 시간 제한 자율 개선 — 회차 12 구현·판단 교정
+
+23:14 KST 독립 최종 검토에서 제품의 새 P1/P2 차단 근거는 없었고, nonuse 작성자 fixture 변경 뒤 개인정보 비노출 단언이 옛 owner를 검사하는 감도 저하1곳을 찾았다. 실제 nonuse 식별자를 검사하도록 한 줄을 교정했다. 집중8·lint·최종 전체211파일4,090개/exit0(23:12:57 일반/23:14:01 규모)을 다시 확인했고 독립 검토자는 교정 해소를 읽기 확인했다. C25 검증된13파일만 ilson/main에 CLI 커밋·푸시하며 기존 public/og.png는 제외한다. 운영 반영 전 성공으로 적지 않는다.
+
+23:11 KST C25 최종 전체 npm test가 exit0으로 종료됐다. **211파일4,090개(일반210파일4,084+규모6)**, lint/typecheck/137모듈·Worker build·시험 script syntax/lint·diff check를 통과했다. CLI·운영 반영과 독립 최종 diff 검토는 아직 남았다.
+
+기존 현장 피드백7개 액션은 실제 `{ok:true,id}` 계약으로 저장 확인을 검증하고, 같은 화면의 제출 동안 입력·중복 동작을 잠근다. 현재 대상·역할·계정·페이지·선택 묶음 수명이 바뀐 응답은 다른 폼을 초기화하거나 성공으로 표시하지 않는다. 액션별 기존 ID와 신규 ID 계약은 구분하고, 확정된 새 표본은 첫 페이지의 조회만 실행한다. 현재 화면/기존 client 자동키30분을 넘는 영구 초안·멱등성은 추가하지 않았다.
+
+서버는 atomic action 안에서 현재 actor7필드를 읽어 기존 관리/표본 정책·현재 작성자 이름과 CAS를 확인한다. 신규 signed middleware·현행15개 migrations의 격리 PG51개 및 기존4파일을 합한87개가 통과했다. 초기 actor를 읽은 뒤 본인 사건에서 product→reviewer로 바뀐 관리 답변은 기존에 저장됐지만 이제403/신규 업무·감사·receipt0이다. 읽기 뒤 권한/이름/배정/revision 변경은409, 비활성은401, 응답 유실/같은 키 경쟁은 각1개 저장, 감사 SQL 오류는 전체 롤백이다. 과거 receipt 조회 뒤 권한 회수는 이미 확정된 역사 응답의 재생일 수 있으나 새 저장은0이다. 이를 현재 역할 재승인이나 응답 시점까지의 잠금으로 주장하지 않는다.
+
+실제 schema를 반박 확인해0000의 CHECK 없는 선행 CREATE 때문에0002 CREATE IF NOT EXISTS의 역할 CHECK가 적용되지 않는 것을 발견했다. 공통 resolver/schema/ACL을 바꾸지 않고 이번 action의 current actor에 기존 OVERRIDE_ROLES만 허용했다. 알려진8역할 자기 확인·기존 관리 허용과 unknown4액션403을 검증했다. 운영 DB·신규 RPC/ACL·공유 Auth·구매 AX·원본 추가 전송 변경0이다.
+
+실제 IAB/외부 연결 없는 메모리 PG에서 confirm_update 첫 malformed200{} 전송 동안 note/message/refresh의 실제 :disabled 상속을 확인했다. 잘못된 성공 후 두 초안이 유지됐으며, 같은 내용 재시도 확정200 뒤 GET503에는 저장 성공과 목록 미확인을 분리했다. GET만 복구해 직원의 미해결 근거·연결 문제/후속 검토1개와 미전송 담당자 초안 보존을 확인했다.1440×1000/360×800의 문서폭1425/345px·가로 넘침0·fieldset gap24px이다. 캡처 .tmpcheck/cycle12-*.png, 내가 만든 탭4/viewport/5188 서버만 정리했다. selector exact-label 실패는 조작 작성 오류이지 제품 결함으로 채택하지 않았다.
+
+첫 전체 검사는210파일4,084개 중 기존 시험2개 실패였다. demo env의 DEMO_WORKSPACE 누락과 UI의 인수2개/{ok:true} 모형 응답이었다. 실제 미들웨어/receipt 계약으로 설정만 갱신하고 기존17/19개 단언을 유지했으며 제출 성공/조회1회/해당 폼 초기화 단언을 추가했다. 제품 코드를 느슨하게 바꾸거나 suite를 제외하지 않았다.
+
+편익은 합성 입력 손실/무검증 성공 방지와 신규 관리 쓰기의 권한 회수 보호다. 직원 시간·운영 발생률·다중 세션 부하는 미측정이다. 독립 최종 제품 검토에서는 새 필수 기능의 근거를 찾지 못했다. 외부 제어 서비스는 기존 수동 근거/미연결 안내로 충분해 폐기했고, 승인 basis 재열람은 정확한 승인 주기 연결과 운영 필요를 다음 조사로 남겼다. 안전 게이트0건 소개는 실적이 아닌 목표 여부를 확인할 선택적 문구 후보이며 아직 변경0이다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 12 시작
+
+23:02 KST C25의 독립 signed middleware/현행15migration/메모리 PG 8경계에서 좁은 현재 역할 회수 문제를 재현해 필수 P2 서버 보완을 추가 채택했다. 초기 product actor를 resolve한 뒤 receipt 전 또는 commit 전에 reviewer로 바꾸면 본인 사건의 publish_update가201/안내1/감사1/receipt1로 저장된다. 타인 사건은CAS409/0·0·0이고 비활성화는401/0·0·0이어서 전체 RLS/Auth 우회라고 주장하지 않는다. 현재 actor7필드를 원자 action 안에서 읽고 기존 역할 정책·현재 label을 사용하며 commit CAS로 보호한다. 초기 role fingerprint와 달라진 신규 저장은 허용 역할 사이 변경도409로 확인을 요구한다. after-receipt의 과거 성공 재생은 신규쓰기0이며 신규 권한 우회와 구분한다. DB/RPC/ACL/전역 resolver·공유 Auth 변경은 없다.
+
+UI는 29개 새 actual client/gate 검사와 관련7파일91개·typecheck/소유lint/diffcheck 및 독립 읽기 검토를 마쳤다. 전체 작업부 native fieldset은 grid/gap24·border/padding/minWidth reset으로 기존 간격을 보존하며 조회오류 복구 페이지 nav는 밖에 남긴다. 외부 연결 없는 로컬 시험 flag는 새로운 compact first-page 합성 사건에 malformed200/쓰기 전 거절과 정상 처리 뒤 GET503을 주입하며 기존 가상 행은 유지한다. 최종 backend·전체 gate·실제1440/360·CLI 반영 확인은 아직 남았다.
+
+22:55 KST C24의 [CI37207150770](https://github.com/k95691368-ship-it/ilson/actions/runs/37207150770)가 success/exit0으로 완료됐다. 이미 확인한 Production6186dbef·주주소47개·GitOG·actualJSON API 경계와 함께 해당 릴리스의 검증을 마쳤다. CI의 Node20 action 실행환경 전환/ubuntu-latest 예고는 경고이며 이번 실패나 운영 영향 증거가 아니다. 전체 Goal을 완료로 처리하지 않고 C25 필수 UI 경계를 이어간다.
+
+22:54 KST C24는 CLI 커밋·푸시 f7524d5b21c807d4783341795934d1098a496a17로 Git 연결 Production6186dbef-6f08-494b-9567-66cfba97c8f2 / https://6186dbef.ilson.pages.dev source f7524d5에 반영됐다. 주주소47개 SHA-256·Git 원본OG·health200/ready:true/workspace200/active:false/session·override428 actualJSON/no-store를 확인했다. CI37207150770은 시험 진행 중이며 아직 success로 보고하지 않는다. 직접 중복 업로드·운영DB/ACL/공유Auth/구매AX 변경0이다.
+
+C25는 FieldFeedbackView 공용 save의 확인되지 않은 성공과 같은 화면의 입력 손실을 필수 P2로 채택한다. 직원이 개선 적용 안내에 미해결 근거를 재확인하는 실제 UI/client/useApi 메모리 검증에서 POST200{}가 초기화/성공/GET2로 이어졌고, 지연 중 추가 근거가 활성 입력에서 작성된 뒤 첫 전송의 성공으로 삭제됐다. 독립 검토자도 두 경우를 재현했다. 서버7액션은 이미 atomic receipt/CAS와 {ok:true,id}를 사용하므로 새 서버/티켓/알림/승인·DB/권한 변경은 불필요하다. existing 액션 id는 요청 update/item/followup과 정확히 비교하고 신규 ffu/qsb/nur만 현행 생성 계약을 검사한다.
+
+반박 검토에서 확정 POST 뒤 GET503은 현재도 저장 성공+별도 조회오류+olddata 유지로 동작하고, 다른 계정은 기존 client/gate가 막는다. 이 두 보호를 이번에 새로 고쳤다고 주장하지 않는다. 최소안은 동기 pending·native 입력 잠금·액션별 확정응답·현재 대상/화면 수명과 기존 GET 복구의 회귀다. 운영 빈도·직원 시간은 미측정이며 synthetic malformed200는 운영DB 미저장의 실증이 아니다. 자동키30분/화면이탈을 넘는 영구 intent/초안 서비스는 제외한다. source 변경이 다른 초안을 지우거나 필요 보호가 이미 해당 폼에 있으면 축소/폐기한다. 23:15 동결 목표와 전체·실제1440/360·CLI 검증 가능성을 보고하며 23:40 이후 미완료 큰 변경은 시작하지 않는다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 11 구현·실제 화면 검증
 
 22:49 KST 최종 npm test가 exit0으로 종료되어 **209파일4,006개(일반208파일4,000+규모6)**를 확인했다. 마지막 동결 backend를 포함한 build·typecheck와 재실행 lint도 통과했다. 결과 회수 누락을 성공으로 추정하지 않고 전체 명령의 종료까지 다시 확인했다. 독립 최종 검토와 CLI·운영 반영이 남았다.

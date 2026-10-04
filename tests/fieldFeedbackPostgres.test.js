@@ -32,11 +32,14 @@ beforeAll(async () => {
     return result
   })
   await seedOverrideWorkspace({ DB, OVERRIDE_DEMO_MODE: 'true' })
-  for (const [email, role] of [['owner@test.invalid','reviewer'],['other@test.invalid','reviewer'],['manager@test.invalid','product'],['audit@test.invalid','audit']])
-    await DB.prepare('INSERT INTO override_actor(email,display_name,role) VALUES(?,?,?)').bind(email,email.split('@')[0],role).run()
+  for (const [email, role, productIds] of [['owner@test.invalid','reviewer','[]'],['other@test.invalid','reviewer','[]'],['manager@test.invalid','product','["olp_loan","olp_commerce","olp_insurance"]'],['audit@test.invalid','audit','[]'],['nonuse@test.invalid','engineer','["olp_loan"]']])
+    await DB.prepare('INSERT INTO override_actor(email,display_name,role,product_ids_json) VALUES(?,?,?,?)').bind(email,email.split('@')[0],role,productIds).run()
 },60000)
 afterAll(async () => { vi.unstubAllGlobals(); await pg.close() })
-const post = (body, email='manager@test.invalid', key=crypto.randomUUID(), bindings) => mutate({ env: bindings ?? env(email), request: new Request('https://test.invalid/api/feedback', { method:'POST', headers:{'X-Idempotency-Key':key}, body:JSON.stringify(body) }) })
+// Legacy GET/capture fixtures remain unchanged; access feedback writes must use
+// the same actor-scoped DB contract as the real middleware. Signed middleware
+// and current migration coverage lives in fieldFeedbackAuthorityPostgres.
+const post = (body, email='manager@test.invalid', key=crypto.randomUUID(), bindings) => mutate({ env: bindings ?? {...env(email),DB:DB.forActor(email)}, request: new Request('https://test.invalid/api/feedback', { method:'POST', headers:{'X-Idempotency-Key':key}, body:JSON.stringify(body) }) })
 const get = (email='owner@test.invalid', bindings) => list({ env:bindings ?? env(email), request:new Request('https://test.invalid/api/feedback?role=product') })
 const record = (decisionAction='modify', bindings=env('owner@test.invalid')) => capture({ env:bindings, request:new Request('https://test.invalid/api/override', {method:'POST',headers:{'X-Idempotency-Key':crypto.randomUUID()},body:JSON.stringify({action:'capture_event',productId:'olp_loan',decisionAction,aiDecision:'기존 내규에 따른 답변',humanDecision:'원본 문서를 확인한 판단',reasonDetail:'새 내규를 반영해야 합니다.',policyRefs:['policy-local-1']})}) })
 async function ok(response, status=201) { expect(response.status,JSON.stringify(await response.clone().json())).toBe(status); return response.json() }
@@ -103,14 +106,14 @@ describe.sequential('field feedback: real PostgreSQL and authenticated handlers'
   })
   it('stores voluntary non-use reasons privately and returns aggregate response counts', async () => {
     const body={action:'record_nonuse',productId:'olp_loan',usageState:'paused',reason:'other',occurredOn:new Date().toISOString().slice(0,10),note:''}
-    expect((await post(body,'owner@test.invalid')).status).toBe(400)
+    expect((await post(body,'nonuse@test.invalid')).status).toBe(400)
     const key=crypto.randomUUID()
-    await ok(await post({...body,note:'내 업무 양식에 맞지 않습니다.'},'owner@test.invalid',key))
-    await ok(await post({...body,note:'내 업무 양식에 맞지 않습니다.'},'owner@test.invalid',key))
-    const mine=await ok(await get(),200), other=await ok(await get('other@test.invalid'),200), manager=await ok(await get('manager@test.invalid'),200)
+    await ok(await post({...body,note:'내 업무 양식에 맞지 않습니다.'},'nonuse@test.invalid',key))
+    await ok(await post({...body,note:'내 업무 양식에 맞지 않습니다.'},'nonuse@test.invalid',key))
+    const mine=await ok(await get('nonuse@test.invalid'),200), other=await ok(await get('other@test.invalid'),200), manager=await ok(await get('manager@test.invalid'),200)
     expect(mine.nonuse).toHaveLength(1); expect(other.nonuse).toHaveLength(0); expect(manager.nonuse).toHaveLength(0)
     expect(manager.nonuseSummary).toHaveLength(1); expect(Number(manager.nonuseSummary[0].reports)).toBe(1)
-    expect(JSON.stringify(manager.nonuseSummary)).not.toContain('owner')
+    expect(JSON.stringify(manager.nonuseSummary)).not.toContain('nonuse')
     const audit=(await DB.prepare("SELECT detail_json FROM override_audit WHERE entity_kind='field_feedback'").all()).results
     expect(audit.every(row=>row.detail_json==='{}')).toBe(true)
   })

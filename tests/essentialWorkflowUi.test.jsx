@@ -162,13 +162,17 @@ describe('필수 업무 흐름 화면', () => {
     await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/override', expect.objectContaining({ action: 'save_actor', email: 'staff@example.test', active: false, departments: ['인사', '운영'], productIds: ['p1'] })))
   })
   it('미해결 피드백의 연결 문제와 후속 처리 근거를 보여준다', async () => {
+    mocks.post.mockResolvedValueOnce({ ok: true, id: 'f1' })
     mocks.feedback.cases = [{ id: 'case1', event_id: 'e1', product_name: '시험 AI', reason_detail: '제보 내용', updates: [], followups: [followup()] }]
     render(<FieldFeedbackView mode="feedback" role="product" products={[]} />)
     const panel = screen.getByRole('region', { name: '후속 검토' })
     expect(panel.textContent).toContain('c1')
     fireEvent.change(within(panel).getByLabelText('처리 결과와 확인 근거'), { target: { value: '정책 원문과 재확인했습니다.' } })
     fireEvent.submit(panel.querySelector('form'))
-    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/feedback', expect.objectContaining({ action: 'resolve_followup', followupId: 'f1', resolution: '정책 원문과 재확인했습니다.' })))
+    await waitFor(() => expect(mocks.post).toHaveBeenCalledWith('/feedback', expect.objectContaining({ action: 'resolve_followup', followupId: 'f1', resolution: '정책 원문과 재확인했습니다.' }), expect.objectContaining({ validateResponse: expect.any(Function) })))
+    await screen.findByText('기록을 저장했습니다.')
+    expect(mocks.reload).toHaveBeenCalledTimes(1)
+    expect(within(panel).getByLabelText('처리 결과와 확인 근거').value).toBe('')
   })
   it('후속 검토에서 원인이 연결된 반복 문제로 이동한다', async () => {
     mocks.feedback.cases = [{ id: 'case1', event_id: 'e1', updates: [], followups: [followup({ cluster_id: 'other' })] }]

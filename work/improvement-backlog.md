@@ -1,5 +1,25 @@
 # 일손 개선 백로그
 
+## 회차 12 결과 재검증 — 2026-10-04 23:11 KST
+
+23:14 독립 최종 검토의 nonuse 작성자 비노출 단언을 실제 fixture 식별자로 교정했다. 집중8·lint·최종 전체211파일4,090개/exit0 재확인과 독립 읽기 확인까지 마쳤다. 제품 source 추가변경0, 운영 반영만 남았다.
+
+C25는 기존 경로의 필수 P2 최소 보완으로 유지한다. 독립 actual client UI의 malformed200/늦은 reset 손실과 signed PG의 본인 사건 관리 역할 회수 뒤 신규 답변 저장이 채택 근거다. UI29/관련91·신규 PG51/관련87·실제1440/360에서 초안 유지, 확정응답 확인, 미해결 후속 검토1개·다른 초안 보존을 확인했다. 기존 POST확정/GET실패 분리·계정 게이트는 신규 성과가 아니라 회귀다. unknown role은 실제 schema CHECK 부재를 확인한 뒤 이 action에서 기존8role allowlist로 좁게 차단했다. DB/schema/RPC/ACL/공유Auth/구매AX 변경0이다.
+
+첫 전체의 기존 fixture2개 실패를 실제 demo 바인딩/receipt 옵션·응답으로 수정하고 업무 단언을 유지했다. 최종211파일4,090개/exit0·lint/typecheck/137모듈·Worker build/script검증을 통과했고 독립 최종검토·CLI·운영 검증은 남았다. 운영 발생률·직원 시간·다중 세션 부하·영구 intent/초안·과거 receipt를 현재 권한 재승인으로 보는 보장은 없다.
+
+독립 후속 검토: 외부 배포 제어 서비스는 현재 수동 근거/미연결 안내가 있어 폐기한다. 승인 basis UI 재열람은 현재 audit에 저장되지만 최신160 제한·승인 주기 연결·운영 필요 근거가 없어 다음 조사(근거 부족)로 남긴다. 안전 게이트0건 소개의 목표/실적 표시는 선택적 문구 후보이며 변경하지 않았다. 새로운 필수 기능을 찾지 못했다고 기능을 억지로 추가하지 않는다.
+
+## 회차 12 선택 — 2026-10-04 22:54 KST
+
+23:02 C25의 management role 회수 보완을 필수 P2로 추가 채택했다. independent signed PG8경계의 본인 사건 publish_update는 resolve 뒤 product→reviewer에도 새 안내/감사/receipt를 저장했다. 다른사원 source/active0는 이미 차단되므로 전체 권한 우회로 일반화하지 않는다. 기존 DB/ACL 확대 대신 원자 action 안 current actor7필드·기존 정책·현재 label·CAS로 보호한다. 초기 role와 다른 허용 역할도 fingerprint 혼동 없이409로 확인을 요구한다. historical receipt after-read 재생은 신규쓰기0과 구분한다. UI29/관련91/소유검사는 통과했으며 최종 전체/실제화면/CLI는 남았다.
+
+22:55 C24 CI37207150770 success/exit0까지 완료했다. 아래 CI 진행 중 표현은 당시 경과이며 현재 릴리스는 주주소/Production/소스/47개·GitOG/API 경계까지 확인된 상태다.
+
+C24 f7524d5/Pages6186dbef source·47개/GitOG/JSON API 경계는 운영 확인했고 CI는 아직 시험 중이다. C25는 **필수 P2 기존 현장 피드백 UI 보완**으로 채택한다. 사용자: 개선 적용 후에도 불편한 근거를 남기는 제보자와 안내/표본/후속 검토 담당자. 두 독립 actual client/useApi 메모리 재현에서 malformed POST200{} 성공/초기화와 pending 새 입력의 늦은 reset 손실을 확인했다. 기존 대안인 제출 버튼 잠금이나 수동 새로고침은 활성 입력 손실·무검증 성공을 해결하지 못한다. 신규 티켓/알림/DB 서비스 대신 기존7액션 공용 save의 엄격한 응답·동기/native 잠금·현재 대상 수명만 보완한다.
+
+독립 반박으로 POST성공/GET503의 성공 분리와 client/gate의 계정 보호는 이미 정상임을 확인했다. 이 경로는 회귀 검증만 유지한다. existing update/item/followup ID는 legacy를 금지하지 않고 요청 값과 정확히 비교하며 신규 ffu/qsb/nur만 현행 계약을 사용한다. 비용은 컴포넌트·UI 계약 검사와 native layout/초안 회귀다. 운영 빈도·직원 시간과 실제 DB 미저장 빈도는 미측정이다. 모든 후속 상태를 새 서비스로 복제하거나 영구 intent/초안을 추가해야 하는 확장은 폐기한다. 현재 최소 구현 중, 운영/DB/권한/공유Auth/구매AX/외부 호출0, 최종 검증·CLI 반영 전 완료로 적지 않는다.
+
 ## 회차 11 결과 재검증 — 2026-10-04 22:47 KST
 
 22:49 최종 전체 npm test exit0:209파일4,006개(일반4,000+규모6), 마지막 source의 lint/typecheck/build까지 통과했다. 독립 최종검토·CLI/운영 반영 확인은 아직 남았다.

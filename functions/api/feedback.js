@@ -4,6 +4,7 @@ import { resolveOverrideActor, auditOverride } from '../_lib/override.js'
 import { feedbackActorKey } from '../_lib/fieldFeedback.js'
 import { createIssueFollowup } from '../_lib/issueWorkflow.js'
 import { newId } from '../_lib/ids.js'
+import { OVERRIDE_ROLES } from '../../shared/override.js'
 import { canManageFeedback, canReviewQuality, validDate, FEEDBACK_KINDS, FEEDBACK_VERDICTS, QUALITY_VERDICTS, NONUSE_STATES, NONUSE_REASONS } from '../../shared/fieldFeedback.js'
 
 function demand(condition, message, status=400) {
@@ -17,6 +18,33 @@ const has = (object,key) => typeof key==='string' && Object.hasOwn(object,key)
 const CASE_PAGE_SIZE = 100
 const BATCH_PAGE_SIZE = 50
 const FOLLOWUP_OVERVIEW_SIZE = 200
+export const FEEDBACK_ACTOR_SQL = 'SELECT email,display_name,role,active,departments_json,product_ids_json,updated_at FROM override_actor WHERE email=?'
+function demandMutationContext(env,actor) {
+  if(actor.mode==='access') {
+    demand(typeof actor.email==='string' && actor.email.length>0 && env.DB?.actorEmail===actor.email && env.DB.workspace===false,
+      '인증된 사내 계정이 필요합니다.',401)
+  } else {
+    demand(actor.mode==='demo' && !env.AUTH_ACTOR && env.DEMO_WORKSPACE===true && env.DB?.workspace===true,
+      '개인 체험 공간의 데이터 접근 설정이 필요합니다.',503)
+  }
+}
+async function currentMutationActor(DB,actor,action) {
+  if(actor.mode==='demo')return actor
+  // Middleware's actor is a request-time identity, not a write-time authority
+  // snapshot. This explicit read joins the action's commit CAS read set.
+  const current=await DB.prepare(FEEDBACK_ACTOR_SQL).bind(actor.email).first()
+  demand(current && current.email===actor.email && Number(current.active)===1,'현재 계정의 접근 권한을 확인할 수 없습니다.',401)
+  demand(OVERRIDE_ROLES.some(role=>role.key===current.role),'현재 계정에는 이 작업 권한이 없습니다.',403)
+  if(action==='publish_update')demand(canManageFeedback(current.role),'현재 역할에는 답변 권한이 없습니다.',403)
+  if(action==='resolve_followup')demand(canManageFeedback(current.role),'현재 역할에는 후속 과제 처리 권한이 없습니다.',403)
+  if(action==='create_sample' || action==='review_sample')demand(canReviewQuality(current.role),'현재 역할에는 표본 점검 권한이 없습니다.',403)
+  // Existing receipts fingerprint the initial role. Do not commit under a new
+  // allowed role with that old fingerprint and make a fresh retry conflict.
+  demand(current.role===actor.role,'현재 역할이 변경되었습니다. 기록을 확인한 뒤 새로고침해주세요.',409)
+  demand(typeof current.display_name==='string' && current.display_name.trim().length>0 && !current.display_name.includes('\0') && !/[\uD800-\uDFFF]/u.test(current.display_name),
+    '현재 계정의 작성자 정보를 확인할 수 없습니다.',503)
+  return {...actor,label:current.display_name,role:current.role}
+}
 function readCursor(value) {
   if (!value) return null
   try {
@@ -227,10 +255,11 @@ export async function onRequestPost({env,data:requestData,request}) {
   try {
     demand(body && typeof body==='object' && !Array.isArray(body),'요청 형식이 올바르지 않습니다.')
     const actor=await actorFor(env,request,body),key=await feedbackActorKey(actor)
+    demandMutationContext(env,actor)
     const requestId=request.headers.get('X-Idempotency-Key')
     demand(typeof requestId==='string'&&/^[a-zA-Z0-9_-]{16,100}$/.test(requestId),'중복 방지 요청 번호가 필요합니다.')
     return await atomicMutation(env.DB,requestId,await mutationFingerprint({body,identity:key,role:actor.role}),
-      DB=>act({...env,DB},actor,key,body))
+      async DB=>act({...env,DB},await currentMutationActor(DB,actor,body.action),key,body))
   } catch(error) {
     if(error.publicStatus)return jsonError(error.message,error.publicStatus)
     if(/\/(40001|23505)/.test(error.message))return jsonError('다른 요청으로 기록이 변경되었습니다. 새로고침 후 확인해주세요.',409)

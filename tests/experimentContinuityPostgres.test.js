@@ -55,7 +55,7 @@ const viewedRequest = viewedOverrideRequests()
 async function post(scope, body, role = 'product', key = crypto.randomUUID()) {
   if (body.action === 'record_run') testNow = Math.max(testNow, Date.parse(body.measurementEnd) + 1)
   const actor = { email: role + '@local.invalid', role: role === 'other' ? 'product' : role, label: role, mode: 'access' }
-  const env = scope.mode === 'demo' ? { DB: scope.DB, OVERRIDE_DEMO_MODE: 'true' }
+  const env = scope.mode === 'demo' ? { DB: scope.DB, DEMO_WORKSPACE: true, OVERRIDE_DEMO_MODE: 'true' }
     : { DB: DB.forActor(actor.email), UNSCOPED_DB: DB, AUTH_ACTOR: actor, OVERRIDE_DEMO_MODE: 'false' }
   const feedback = ['publish_update','confirm_update'].includes(body.action)
   const response = await (feedback ? feedbackPost : onRequestPost)({ env, request: new Request('https://local.invalid/api/' + (feedback ? 'feedback' : 'override'), {

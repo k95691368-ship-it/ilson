@@ -10,7 +10,7 @@ const empty = () => ({ cases: [], casePage: { hasMore: false, nextCursor: null }
 const sample = (overrides = {}) => ({ id: 'sample-old', batch_id: 'batch-old', event_id: 'approval-original', snapshot: { ai_decision: '추출 당시 원문', human_decision: '원래 직원 승인', policy_refs_json: '["당시 정책"]' }, ...overrides })
 const batch = (id = 'batch-old') => ({ id, product_name: '테스트 AI', eligible_count: 1, sample_size: 1, requested_size: 1 })
 const show = (mode = 'feedback', role = 'reviewer') => render(<FieldFeedbackView mode={mode} role={role} products={[{ id: 'p', name: '테스트 AI' }]} onCapture={vi.fn()} />)
-beforeEach(() => { client.get.mockReset(); client.post.mockReset(); client.post.mockResolvedValue({ ok: true }) })
+beforeEach(() => { client.get.mockReset(); client.post.mockReset(); client.post.mockImplementation(async (_, body) => ({ ok: true, id: body.updateId ?? body.itemId ?? body.followupId })) })
 afterEach(cleanup)
 
 it('navigates to an old notice, lets its reporter confirm it, and returns to the first page', async () => {
@@ -28,7 +28,7 @@ it('navigates to an old notice, lets its reporter confirm it, and returns to the
   fireEvent.change(screen.getByRole('combobox', { name: '현장에서 다시 확인한 결과' }), { target: { value: 'not_resolved' } })
   fireEvent.change(screen.getByRole('textbox', { name: '추가 설명 · 아직 불편한 경우 필수' }), { target: { value: '여전히 같은 문제입니다.' } })
   fireEvent.submit(screen.getByRole('button', { name: '재확인 남기기' }).closest('form'))
-  await waitFor(() => expect(client.post).toHaveBeenCalledWith('/feedback', expect.objectContaining({ action: 'confirm_update', updateId: 'old-notice', verdict: 'not_resolved', note: '여전히 같은 문제입니다.' })))
+  await waitFor(() => expect(client.post).toHaveBeenCalledWith('/feedback', expect.objectContaining({ action: 'confirm_update', updateId: 'old-notice', verdict: 'not_resolved', note: '여전히 같은 문제입니다.' }), expect.objectContaining({ validateResponse: expect.any(Function) })))
   await waitFor(() => expect(screen.getByRole('button', { name: '이전 페이지' }).disabled).toBe(false))
   fireEvent.click(screen.getByRole('button', { name: '이전 페이지' }))
   await screen.findByText('최근 제보')
@@ -53,7 +53,7 @@ it('offers an insufficient-only recheck while retaining prior history and origin
   client.post.mockImplementation(async (_, body) => {
     const latest = { revision: 2, verdict: body.verdict, reason: body.reason, evidence_refs: body.evidenceRefs, reviewed_by: '새 점검자', reviewed_at: '2026-01-02 00:00:00' }
     current = { ...current, samples: [sample({ ...latest, review_history: [review, latest] })] }
-    return { ok: true }
+    return { ok: true, id: body.itemId }
   })
   show('quality', 'product')
   await screen.findByText('추출 당시 원문')
@@ -70,7 +70,7 @@ it('offers an insufficient-only recheck while retaining prior history and origin
   expect(screen.getByText('이전 판정 사유')).toBeTruthy()
   expect(screen.getByText('추출 당시 원문')).toBeTruthy()
   expect(screen.getByText(/이전 점검자 · 2026-01-01/)).toBeTruthy()
-  expect(client.post).toHaveBeenCalledWith('/feedback', expect.objectContaining({ action: 'review_sample', itemId: 'sample-old', verdict: 'issue', evidenceRefs: '확정 정책 3조' }))
+  expect(client.post).toHaveBeenCalledWith('/feedback', expect.objectContaining({ action: 'review_sample', itemId: 'sample-old', verdict: 'issue', evidenceRefs: '확정 정책 3조' }), expect.objectContaining({ validateResponse: expect.any(Function) }))
 })
 
 it.each(['correct', 'issue'])('never offers a form to overwrite final %s verdicts', async verdict => {
@@ -84,15 +84,18 @@ it('reaches older quality batches separately from cases and resets to newest aft
   let created = false
   client.get.mockImplementation(async path => path.includes('batchCursor=') ? {
     ...empty(), reviewer: true, batches: [batch()], samples: [sample({ verdict: 'insufficient', reason: '오래된 부족 판정' })],
-  } : { ...empty(), reviewer: true, batchPage: { hasMore: true, nextCursor: 'old-batches' }, batches: [batch(created ? 'batch-created' : 'batch-new')] })
-  client.post.mockImplementation(async () => { created = true; return { id: 'batch-created' } })
+  } : { ...empty(), reviewer: true, batchPage: { hasMore: true, nextCursor: 'old-batches' }, batches: [batch(created ? 'qsb_aaaaaaaaaaaaaaaaaaaa' : 'batch-new')] })
+  client.post.mockImplementation(async () => { created = true; return { ok: true, id: 'qsb_aaaaaaaaaaaaaaaaaaaa' } })
   show('quality', 'product')
   fireEvent.click(await screen.findByRole('button', { name: '다음 묶음 페이지' }))
   await screen.findByText('오래된 부족 판정')
   expect(client.get).toHaveBeenLastCalledWith('/feedback?role=product&batchCursor=old-batches', expect.any(Object))
   expect(screen.getByRole('button', { name: '근거 보완 후 재점검' })).toBeTruthy()
+  const samplingForm = screen.getByRole('button', { name: '표본 추출' }).closest('form')
+  fireEvent.change(samplingForm.elements.namedItem('productId'), { target: { value: 'p' } })
   fireEvent.submit(screen.getByRole('button', { name: '표본 추출' }).closest('form'))
-  await waitFor(() => expect(screen.getByRole('combobox', { name: '점검 묶음' }).value).toBe('batch-created'))
+  await waitFor(() => expect(screen.getByRole('combobox', { name: '점검 묶음' }).value).toBe('qsb_aaaaaaaaaaaaaaaaaaaa'))
+  expect(screen.getByText('기록을 저장했습니다.')).toBeTruthy()
   expect(screen.getByRole('button', { name: '이전 묶음 페이지' }).disabled).toBe(true)
   expect(client.get).toHaveBeenLastCalledWith('/feedback?role=product', expect.any(Object))
 })

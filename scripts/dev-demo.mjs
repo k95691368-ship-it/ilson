@@ -34,6 +34,9 @@ const agreementSaveFixture = Boolean(fixture) && process.argv.includes('--agreem
 const feedbackRetryFixture = Boolean(fixture) && process.argv.includes('--feedback-retry-fixture')
 const reportFeedFixture = Boolean(fixture) && process.argv.includes('--report-feed-fixture')
 const reportFixFixture = Boolean(fixture) && process.argv.includes('--report-fix-fixture')
+const fieldFeedbackSaveFixture = Boolean(fixture) && process.argv.includes('--field-feedback-save-fixture')
+let fieldFeedbackReplyMalformed = false
+let fieldFeedbackReadPending = false
 let reportFixReplyLost = false
 let reportFixSourceChanged = false
 let reportPageChanged = false
@@ -43,6 +46,15 @@ let agreementReadRejected = false
 let agreementReadPending = false
 const feedbackRepliesLost = new Set()
 let unclearReadPending = false
+if (fieldFeedbackSaveFixture) {
+  // Add one compact first-page case; keep all previous synthetic rows intact.
+  await pg.exec(`INSERT INTO override_event(id,product_id,reviewer_label,reviewer_role,decision_action,is_override,ai_decision,human_decision,reason_code,reason_detail,model_version,prompt_version,validity,reporter_email)
+    VALUES('c25-local-event','product-local','로컬 실험 담당자','product','modify',1,'합성 AI 원안','근거 확인 후 수정','other','저장 확인과 입력 보존 검증','fixture-1','fixture-1','valid','verification@local.invalid');
+    INSERT INTO field_feedback_case(id,event_id,reporter_key)
+    SELECT 'c25-local-case','c25-local-event',reporter_key FROM field_feedback_case WHERE id='case-local-101';
+    INSERT INTO field_feedback_update(id,case_id,kind,body,effective_on,actor_label)
+    VALUES('c25-local-update','c25-local-case','applied','현장 재확인을 기다리는 합성 개선 안내입니다.','2026-10-01','가상 개선 담당자');`)
+}
 if (reportFixFixture) {
   await pg.exec(`INSERT INTO decision_log(id,application_id,stage,actor,title,what,why,link_kind,link_id,created_at) VALUES
     ('c24-local-lost','app-local-verify','배포','human','가상 제보자','처리 응답이 끊긴 뒤 같은 의도로 확인하는 합성 신고입니다.','합성 재시도 검증','신고','wrong_number','2026-01-01 00:00:00'),
@@ -159,6 +171,21 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
         const bindings = context.env
         // Reproduce Pages: next() gets original bindings and shared request data.
         context.next = async (forwarded = context.request) => {
+          if (fieldFeedbackSaveFixture && url.pathname === '/api/feedback') {
+            if (req.method === 'POST' && !fieldFeedbackReplyMalformed) {
+              const input = await forwarded.clone().json().catch(() => null)
+              if (input?.action === 'confirm_update' && input.updateId === 'c25-local-update') {
+                fieldFeedbackReplyMalformed = true
+                // Invalid success BEFORE a write; no production handler is replaced.
+                await new Promise(resolve => setTimeout(resolve, 3000))
+                return Response.json({}, { status: 200 })
+              }
+            }
+            if (req.method === 'GET' && fieldFeedbackReadPending) {
+              fieldFeedbackReadPending = false
+              return Response.json({ error: '로컬 검증: 확정 피드백 뒤 목록 조회가 실패했습니다.' }, { status: 503 })
+            }
+          }
           if (reportFixFixture && url.pathname === '/api/reports') {
             if (req.method === 'POST' && !reportFixSourceChanged) {
               const input = await forwarded.clone().json().catch(() => null)
@@ -209,6 +236,10 @@ const server = await createServer({ server: { host: '127.0.0.1', port, strictPor
             return Response.json({ error: '로컬 검증: 안내 상태 조회가 실패했습니다.' }, { status: 503 })
           }
           const result = handler ? await handler({ ...context, request: forwarded, env: bindings }) : Response.json({ error: 'Method not allowed' }, { status: 405 })
+          if (fieldFeedbackSaveFixture && url.pathname === '/api/feedback' && req.method === 'POST' && result.ok) {
+            const saved = await result.clone().json()
+            if (saved.ok === true && saved.id === 'c25-local-update') fieldFeedbackReadPending = true
+          }
           if (reportFeedFixture && url.pathname === '/api/reports' && req.method === 'POST' && result.ok) reportRefreshPending = true
           if (reportFixFixture && url.pathname === '/api/reports' && req.method === 'POST' && result.ok) {
             const saved = await result.clone().json()

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
+import { act } from 'react'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import FieldFeedbackView from '../src/components/FieldFeedbackView.jsx'
 const state=vi.hoisted(()=>({data:null,error:null,reload:vi.fn(),post:vi.fn()}))
@@ -35,7 +36,7 @@ it('preserves the entered non-use reason on a failed request and shows the error
   fireEvent.submit(screen.getByRole('button',{name:'사용 의견 남기기'}).closest('form'))
   await waitFor(()=>expect(screen.getByRole('alert').textContent).toBe('저장 실패 테스트'))
   expect(note.value).toBe('다시 입력하지 않아도 됩니다.')
-  expect(state.post).toHaveBeenCalledWith('/feedback',expect.objectContaining({action:'record_nonuse',productId:'p1',role:'reviewer'}))
+  expect(state.post).toHaveBeenCalledWith('/feedback',expect.objectContaining({action:'record_nonuse',productId:'p1',role:'reviewer'}), expect.objectContaining({ validateResponse: expect.any(Function) }))
 })
 it('renders sample eligibility and actual/requested counts rather than a population error rate',()=>{
   state.data={...fixture(),reviewer:true,batches:[{id:'b',product_name:'테스트 AI',eligible_count:3,sample_size:2,requested_size:5}],samples:[{id:'s',batch_id:'b',event_id:'e',snapshot:{ai_decision:'답변',human_decision:'승인'},verdict:'issue',reason:'오류 근거'}]}
@@ -44,4 +45,32 @@ it('renders sample eligibility and actual/requested counts rather than a populat
   expect(screen.getByText('2 / 5건')).toBeTruthy()
   expect(screen.getByText('문제 발견')).toBeTruthy()
   expect(screen.queryByRole('button',{name:'점검 확정'})).toBeNull()
+})
+
+it.each(['changed', 'removed', 'A-to-B-to-A', 'unrelated'])('limits pending source lifetime to the submitted target: %s', async change => {
+  const item = { id: 'case', event_id: 'event', is_mine: true, reason_detail: '원 제보', updates: [{ id: 'legacy-update', kind: 'applied', body: '당시 안내 A' }] }
+  state.data = { ...fixture(), cases: [item] }
+  let resolve
+  state.post.mockReturnValue(new Promise(done => { resolve = done }))
+  const view = show()
+  const note = screen.getByRole('textbox', { name: '추가 설명 · 아직 불편한 경우 필수' })
+  fireEvent.change(note, { target: { value: '내가 작성하던 근거' } })
+  fireEvent.change(screen.getByRole('combobox', { name: '현장에서 다시 확인한 결과' }), { target: { value: 'not_resolved' } })
+  fireEvent.submit(screen.getByRole('button', { name: '재확인 남기기' }).closest('form'))
+  await waitFor(() => expect(state.post).toHaveBeenCalledTimes(1))
+  const renderCurrent = () => view.rerender(<FieldFeedbackView mode="feedback" role="reviewer" products={[{ id: 'p1', name: '테스트 AI' }]} />)
+  if (change === 'unrelated') state.data = { ...state.data, unread: 99, cases: [item, { id: 'other-case', event_id: 'other-event', reason_detail: '무관한 새 제보', updates: [] }] }
+  else state.data = { ...state.data, cases: change === 'removed' ? [] : [{ ...item, updates: [{ ...item.updates[0], body: '새 안내 B' }] }] }
+  renderCurrent()
+  if (change === 'A-to-B-to-A') { state.data = { ...state.data, cases: [item] }; renderCurrent() }
+  await act(async () => { resolve({ ok: true, id: 'legacy-update' }) })
+  if (change === 'unrelated') {
+    expect(screen.getByText('기록을 저장했습니다.')).toBeTruthy()
+    expect(state.reload).toHaveBeenCalledTimes(1)
+    expect(note.value).toBe('')
+  } else {
+    expect(screen.queryByText('기록을 저장했습니다.')).toBeNull()
+    expect(state.reload).not.toHaveBeenCalled()
+    expect(note.value).toBe('내가 작성하던 근거')
+  }
 })
