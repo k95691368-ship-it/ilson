@@ -17,8 +17,23 @@ import { useActionLifetime } from '../hooks/useActionLifetime.js'
 // 이 화면은 이제 넣은 파일만 처리한다.
 
 export default function BuildPage() {
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
   const { data: list } = useApi('/applications')
   const [selectedId, setSelectedId] = useState(null)
+  const [, redraw] = useReducer(value => value + 1, 0)
+  // The current access lifetime owns only projected calculation metadata, never
+  // file buffers/raw cells. Switching applications can restore an uncertain run.
+  const pendingRuns = useMemo(() => ({ session, records: new Map() }), [session])
+  const hasUnconfirmed = [...pendingRuns.records.values()].some(record => !record.receipt)
+  useEffect(() => {
+    if (!hasUnconfirmed) return
+    const warn = event => {
+      if (pendingRuns.session !== getAccessSession()) return
+      event.preventDefault(); event.returnValue = ''
+    }
+    window.addEventListener('beforeunload', warn)
+    return () => window.removeEventListener('beforeunload', warn)
+  }, [hasUnconfirmed, pendingRuns])
 
   const targets = useMemo(
     () => (list?.items ?? []).filter((a) => ['수용', '진행중', '완료'].includes(a.status)),
@@ -54,20 +69,50 @@ export default function BuildPage() {
               </button>
             ))}
           </div>
-          {selectedId && <Build key={selectedId} id={selectedId} />}
+          {selectedId && <Build key={selectedId} id={selectedId} session={session} pendingRuns={pendingRuns} redrawParent={redraw} />}
         </>
       )}
     </div>
   )
 }
 
-function Build({ id }) {
-  const { data, error, loading, reload } = useApi(`/applications/${id}/build?rows=1`)
+function freezeBuildPayload(value) {
+  if (value && typeof value === 'object') {
+    for (const child of Object.values(value)) freezeBuildPayload(child)
+    Object.freeze(value)
+  }
+  return value
+}
+
+function isBuildRunReceipt(value) {
+  return Boolean(value && typeof value === 'object' && !Array.isArray(value) && value.ok === true
+    && typeof value.run_id === 'string' && /^run_[a-f0-9]{20}$/.test(value.run_id)
+    && Number.isSafeInteger(value.seq) && value.seq > 0)
+}
+
+const BUILD_RUN_RETRY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000
+
+function Build({ id, session, pendingRuns, redrawParent }) {
+  const { data, error, errorStatus, loading, reload } = useApi(`/applications/${id}/build?rows=1`)
   const toast = useToast()
-  const [running, setRunning] = useState(false)
-  const [progress, setProgress] = useState('')
+  const [, redraw] = useReducer(value => value + 1, 0)
+  const view = useMemo(() => ({ id, session, pendingRuns, running: false, saving: false, progress: '', denied: '' }), [id, session, pendingRuns])
+  const capture = useActionLifetime(view)
   const [selectedRow, setSelectedRow] = useState(null)
   const fileInput = useRef(null)
+  const deniedRead = [401, 403, 404, 410].includes(errorStatus)
+  if (deniedRead) view.denied = error || '접근 권한과 저장 이력을 다시 확인해주세요.'
+  const current = active => active() && getAccessSession() === view.session
+    && view.pendingRuns.session === view.session && view.session.status === 'active' && !view.denied
+  const record = view.pendingRuns.records.get(view.id)
+  const setRecord = next => {
+    if (next) view.pendingRuns.records.set(view.id, next)
+    else view.pendingRuns.records.delete(view.id)
+    redrawParent()
+  }
+  useEffect(() => {
+    if (deniedRead && pendingRuns.records.delete(id)) redrawParent()
+  }, [deniedRead, pendingRuns, id, redrawParent])
 
   // 사람이 알려 준 상품코드를 합치기 규칙에 넘긴다.
   // 이게 "한 번 알려 주면 다음부터 자동"의 실체다.
@@ -76,37 +121,69 @@ function Build({ id }) {
     [data]
   )
 
-  async function runWith(files) {
-    setRunning(true)
-    setProgress('파일을 읽는 중…')
-    try {
-      const result = await runPipeline({ files, aliases: aliasMap })
-      setProgress('결과를 기록하는 중…')
-
-      await api.post(`/applications/${id}/build`, buildRunPayload(result))
-
-      toast.success(
-        `${num(result.rows.length)}줄을 합쳤습니다. ${num(result.quarantine.length)}줄은 검토함으로 뺐습니다.`
-      )
-      setSelectedRow(null)
-      await reload()
-    } catch (err) {
-      toast.error(err.message)
-    } finally {
-      setRunning(false)
-      setProgress('')
+  async function saveRun(recordToSave, active = capture()) {
+    if (!current(active) || view.saving || view.denied || recordToSave.receipt
+      || view.pendingRuns.records.get(view.id)?.payload !== recordToSave.payload) return
+    // The body intent, not the client's 30-minute transport key, identifies this
+    // run. Do not replay past the server receipt window or after clock reversal.
+    // This conservative browser-clock guard is not permanent exactly-once storage.
+    const age = Date.now() - recordToSave.createdAt
+    if (recordToSave.retryBlocked || !Number.isFinite(age) || age < 0 || age >= BUILD_RUN_RETRY_WINDOW_MS) {
+      setRecord({ ...recordToSave, retryBlocked: true, error: '재시도 확인 기간이 지났거나 브라우저 시간이 바뀌었습니다. 저장 이력을 확인해주세요.', status: 0 })
+      return
     }
+    view.saving = true
+    setRecord({ ...recordToSave, error: '', status: 0 })
+    redraw()
+    try {
+      const receipt = await api.post(`/applications/${view.id}/build`, recordToSave.payload, { validateResponse: isBuildRunReceipt })
+      if (!current(active)) return
+      setRecord({ ...recordToSave, receipt, error: '', status: 0 })
+      toast.success('제작 실행 기록을 저장했습니다.')
+      setSelectedRow(null)
+    } catch (err) {
+      if (!current(active)) return
+      if ([401, 403, 404, 410].includes(err.status)) {
+        setRecord(null)
+        view.denied = err.message || '접근 권한과 저장 이력을 다시 확인해주세요.'
+      } else setRecord({ ...recordToSave, error: err.message, status: err.status, code: err.code })
+      toast.error(err.message)
+      return
+    } finally {
+      view.saving = false
+      if (current(active)) redraw()
+    }
+    // The receipt is final even when its follow-up GET fails.
+    if (current(active)) await reload()
   }
 
   async function runUploaded(fileList) {
+    const active = capture()
+    if (!current(active) || view.running || view.saving || view.denied || error || !data
+      || (view.pendingRuns.records.get(view.id) && !view.pendingRuns.records.get(view.id).receipt)) return
+    const picked = Array.from(fileList ?? [])
+    if (!picked.length) return
+    view.running = true
+    view.progress = '파일을 읽는 중…'
+    redraw()
     try {
-      const files = await readLocalFiles(fileList)
+      const files = await readLocalFiles(picked)
+      if (!current(active)) return
       if (files.length === 0) return
-      await runWith(files)
-    } catch (error) { toast.error(error.message) }
+      view.progress = '계산하는 중…'; redraw()
+      const result = await runPipeline({ files, aliases: aliasMap })
+      if (!current(active)) return
+      const payload = freezeBuildPayload({ ...buildRunPayload(result), run_id: crypto.randomUUID(), run_scope: view.session.scope })
+      const next = { payload, createdAt: Date.now(), fileCount: picked.length, receipt: null, error: '', status: 0 }
+      setRecord(next)
+      view.progress = '결과를 기록하는 중…'; redraw()
+      await saveRun(next, active)
+    } catch (error) { if (current(active)) toast.error(error.message) }
+    finally { view.running = false; view.progress = ''; if (current(active)) redraw() }
   }
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
+  if (view.denied) return <div className="notice notice-danger" role="alert"><p>{view.denied}</p><p>계산 결과를 숨겼습니다. 권한과 저장 이력을 다시 확인해주세요.</p></div>
   if (error && !data) return <div className="notice notice-danger">{error}</div>
   if (!data) return null
 
@@ -141,17 +218,44 @@ function Build({ id }) {
             type="button"
             className="btn-primary"
             onClick={() => fileInput.current?.click()}
-            disabled={running}
+            disabled={view.running || view.saving || Boolean(record && !record.receipt) || Boolean(error) || session.status !== 'active'}
           >
-            {running ? progress || '돌리는 중…' : '파일 넣기'}
+            {view.running ? view.progress || '돌리는 중…' : '파일 넣기'}
           </button>
           {data.aliases.length > 0 && (
             <span className="card-note">
-              알려 준 상품코드 {data.aliases.length}개가 이번 실행에 적용됩니다
+              현재 조회한 상품코드 {data.aliases.length}개로 계산합니다
             </span>
           )}
         </div>
       </section>
+
+      {record && <section className="card" aria-label="이번 계산의 저장 상태">
+        <h2 className="card-title">{record.receipt ? '실행 기록 저장 확인' : '계산 결과 · 저장 확인 전'}</h2>
+        <p>입력 파일 {num(record.fileCount)}개 · 결과 {num(record.payload.rows.length)}줄 · 검토함 {num(record.payload.quarantine.length)}줄 · 계산 {ms(record.payload.duration_ms)}</p>
+        {record.receipt ? <p role="status">{record.receipt.seq}차 실행 · 기록 {record.receipt.run_id}</p>
+          : <p className="card-note">이 계산 결과를 그대로 다시 저장합니다. 파일을 다시 읽거나 계산하지 않습니다. 이 화면을 벗어나거나 새로고침하면 보관 중인 결과가 사라집니다.</p>}
+        <SourceReferences files={record.payload.files} localOnly={!record.receipt} />
+        <details className="disclose"><summary>계산 결과 미리보기</summary>
+          <div className="table-wrap"><table className="data-table"><caption className="sr-only">저장할 정산 계산 결과</caption>
+            <thead><tr><th scope="col">상품</th><th scope="col">순매출</th><th scope="col">원본</th></tr></thead>
+            <tbody>{record.payload.rows.slice(0, 20).map((row, index) => <tr key={index}><td>{row.sku_name || row.sku}</td><td>{krw(row.net_revenue_krw)}</td><td><SourceFile source={row.source} /> · {row.source.sheet || '시트 없음'} · {row.source.rowNo}번째 줄</td></tr>)}</tbody>
+          </table></div><p className="card-note">처음 20줄만 표시합니다. 전체 계산 결과와 원본 참조는 동일한 저장 요청에 보관되어 있습니다.</p>
+        </details>
+        {record.error && <div className="notice notice-warn" role="alert"><p>{record.error}</p>
+          {record.status === 413 && <p>한 번에 저장할 수 있는 범위를 넘었습니다. 파일을 나누어 계산해주세요. 결과를 자동으로 잘라 저장하지 않습니다.</p>}
+          {record.status === 409 && <p>실행 내용이나 저장 상태가 충돌했습니다. 저장 이력을 확인한 뒤 같은 계산으로 재시도할 수 있습니다. 새 실행 번호를 자동으로 만들지 않습니다.</p>}
+        </div>}
+        {!record.receipt && <><div className="row">
+          <button type="button" className="btn-primary" disabled={view.saving || view.running || record.status === 413 || record.retryBlocked} onClick={() => saveRun(record)}>{view.saving ? '저장 확인 중…' : '같은 계산 결과 저장 다시 시도'}</button>
+          <button type="button" className="btn-ghost" disabled={loading || view.saving || view.running} onClick={reload}>저장 이력 다시 확인</button>
+        </div>
+          <details className="disclose"><summary>이 결과 대신 새로 계산하기</summary>
+            <p>미확인 결과가 이미 저장됐을 수 있고 새 실행은 중복될 수 있습니다. 보관을 끝내도 서버 저장이 취소되거나 삭제되지 않습니다.</p>
+            <button type="button" className="btn-ghost" disabled={view.saving || view.running} onClick={() => setRecord(null)}>현재 결과 보관을 끝내고 새 파일 선택</button>
+          </details>
+        </>}
+      </section>}
 
       {latest && (
         <>

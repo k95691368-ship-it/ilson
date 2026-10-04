@@ -38,7 +38,7 @@ beforeEach(() => {
     if (options.method === 'POST') {
       if (JSON.parse(options.body).kind === 'alias') return aliasReply()
       records[id] = buildData('run-next')
-      return Response.json({ ok: true })
+      return Response.json({ ok: true, run_id: 'run_' + '1'.repeat(20), seq: 2 }, { status: 201 })
     }
     return reloadStatus ? failure(reloadStatus, { error: '최신 제작 조회 실패' }) : Response.json(records[id])
   })

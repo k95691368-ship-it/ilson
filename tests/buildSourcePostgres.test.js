@@ -18,8 +18,8 @@ const file = gross => ({ name: 'same.csv', buffer: new TextEncoder().encode([
   `2026-06-01,NR-CM-100,합성 상품,1,${gross},0,${secret}`,
   `2026-06-02,UNKNOWN,검토할 상품,1,${gross},0,${secret}`,
 ].join('\n')) })
-const request = body => new Request('https://local.invalid/api/applications/source-app/build', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-const post = (body, db = DB) => save({ env: { DB: db }, params: { id: application }, request: request(body) })
+const request = body => new Request('https://local.invalid/api/applications/source-app/build', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Idempotency-Key': crypto.randomUUID() }, body: JSON.stringify(body) })
+const post = (body, db = DB) => save({ env: { DB: db, DEMO_WORKSPACE: true }, params: { id: application }, request: request(body) })
 const get = (db = DB) => load({ env: { DB: db }, params: { id: application }, request: new Request('https://local.invalid/api/applications/source-app/build?rows=1') })
 const counts = () => DB.prepare('SELECT (SELECT count(*) FROM build_run) AS runs,(SELECT count(*) FROM build_row) AS rows,(SELECT count(*) FROM build_quarantine) AS quarantine').first()
 beforeAll(async () => {
@@ -30,7 +30,7 @@ beforeAll(async () => {
     if (!String(url).startsWith(base + '/rest/v1/rpc/')) throw Error('External calls forbidden')
     const task = queue.then(async () => {
       try {
-        const body = JSON.parse(options.body), sql = body.p_statements ?? (body.p_sql ? [body.p_sql] : [])
+        const body = JSON.parse(options.body), sql = body.p_writes ?? body.p_statements ?? (body.p_sql ? [body.p_sql] : [])
         statements.push(...sql)
         if (failNextQuarantine && sql.some(text => text.includes('INSERT INTO build_quarantine'))) {
           failNextQuarantine = false
@@ -139,11 +139,11 @@ describe.sequential('browser-only originals and persisted build provenance', () 
     expect(JSON.parse((await DB.prepare('SELECT raw_json FROM build_quarantine WHERE run_id=?').bind(latest.id).first()).raw_json)).toEqual(legacyRaw)
   })
 
-  it('cleans up only the failed new run after a later write failure and keeps earlier records', async () => {
+  it('rolls back only the failed new run after a later write failure and keeps earlier records', async () => {
     const before = await counts(), result = await runPipeline({ files: [file(25000)] })
     failNextQuarantine = true
     const response = await post(buildRunPayload(result))
-    expect(response.status).toBe(500)
+    expect(response.status).toBe(503)
     expect(await counts()).toEqual(before)
     expect((await (await get()).json()).quarantine[0].raw).toEqual(['LEGACY_RAW_PRESERVE'])
   })

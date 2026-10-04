@@ -44,17 +44,40 @@ function resolveRequest(path, body, index = 0, status = 200) {
 }
 
 function Probe({ path }) {
-  const { data, error, loading, reload } = useApi(path)
+  const { data, error, errorStatus, loading, reload } = useApi(path)
   const value = data?.who ?? error ?? (loading ? '불러오는 중' : '비어 있음')
   return createElement(
     'div',
     null,
-    createElement('output', null, value),
+    createElement('output', { 'data-error-status': errorStatus ?? '' }, value),
     createElement('button', { type: 'button', onClick: reload }, '다시 불러오기')
   )
 }
 
 describe('useApi 응답은 요청 URL에 귀속된다', () => {
+  it.each([403, 404, 410, 429, 500, 503])('현재 리소스의 HTTP %s만 노출하고 성공·URL 교체 때 지운다', async status => {
+    const root = createRoot(container)
+    try {
+      await act(async () => { root.render(createElement(Probe, { path: '/applications/A' })) })
+      expect(container.querySelector('output').dataset.errorStatus).toBe('')
+      await act(async () => { resolveRequest('/applications/A', { who: '현재 A' }) })
+      await act(async () => { container.querySelector('button').click() })
+      await act(async () => { resolveRequest('/applications/A', { error: '현재 요청 실패' }, 1, status) })
+      expect(container.querySelector('output').dataset.errorStatus).toBe(String(status))
+      await act(async () => { container.querySelector('button').click() })
+      await act(async () => { resolveRequest('/applications/A', { who: '복구 A' }, 2) })
+      expect(container.querySelector('output').dataset.errorStatus).toBe('')
+      await act(async () => { container.querySelector('button').click() })
+      await act(async () => { resolveRequest('/applications/A', { error: '다시 실패' }, 3, status) })
+      await act(async () => { root.render(createElement(Probe, { path: '/applications/B' })) })
+      expect(container.querySelector('output').dataset.errorStatus).toBe('')
+      await act(async () => { resolveRequest('/applications/B', { who: '현재 B' }) })
+      expect(container.querySelector('output').dataset.errorStatus).toBe('')
+    } finally {
+      await act(async () => { root.unmount() })
+    }
+  })
+
   it.each([401, 403, 404, 410])('재조회 %s 이후 접근할 수 없는 이전 원문을 숨긴다', async status => {
     const root = createRoot(container)
     await act(async () => { root.render(createElement(Probe, { path: '/applications/A' })) })
@@ -90,6 +113,7 @@ describe('useApi 응답은 요청 URL에 귀속된다', () => {
     await act(async () => { resolveRequest('/applications/B', { who: '새 원문 B' }) })
     await act(async () => { resolveRequest('/applications/A', { error: '과거 범위 거절' }, 0, 403) })
     expect(container.querySelector('output').textContent).toBe('새 원문 B')
+    expect(container.querySelector('output').dataset.errorStatus).toBe('')
     await act(async () => { root.unmount() })
   })
 

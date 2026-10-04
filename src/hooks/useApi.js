@@ -30,6 +30,7 @@ export function useApi(path, { skip = false } = {}) {
     key: resourceKey,
     data: null,
     error: null,
+    errorStatus: null,
     loading: Boolean(resourceKey),
   }))
   const alive = useRef(true)
@@ -50,7 +51,7 @@ export function useApi(path, { skip = false } = {}) {
     controller.current?.abort()
     controller.current = null
     if (!resourceKey || blocked) {
-      setSnapshot({ key: null, data: null, error: null, loading: false })
+      setSnapshot({ key: null, data: null, error: null, errorStatus: null, loading: false })
       return
     }
 
@@ -62,12 +63,12 @@ export function useApi(path, { skip = false } = {}) {
     setSnapshot((previous) =>
       previous.key === resourceKey
         ? { ...previous, loading: true }
-        : { key: resourceKey, data: null, error: null, loading: true }
+        : { key: resourceKey, data: null, error: null, errorStatus: null, loading: true }
     )
     try {
       const result = await api.get(resourcePath, { signal: pending.signal })
       if (latest()) {
-        setSnapshot({ key: resourceKey, data: result, error: null, loading: true })
+        setSnapshot({ key: resourceKey, data: result, error: null, errorStatus: null, loading: true })
       }
     } catch (err) {
       if (latest()) {
@@ -76,6 +77,7 @@ export function useApi(path, { skip = false } = {}) {
           key: resourceKey,
           data: !unavailable && previous.key === resourceKey ? previous.data : null,
           error: err.message || '불러오지 못했습니다.',
+          errorStatus: Number.isInteger(err.status) && err.status >= 100 && err.status <= 599 ? err.status : null,
           loading: true,
         }))
       }
@@ -104,6 +106,7 @@ export function useApi(path, { skip = false } = {}) {
           key: resourceKey,
           data: typeof next === 'function' ? next(previousData) : next,
           error: previous.key === resourceKey ? previous.error : null,
+          errorStatus: previous.key === resourceKey ? previous.errorStatus : null,
           loading: previous.key === resourceKey ? previous.loading : false,
         }
       })
@@ -119,5 +122,9 @@ export function useApi(path, { skip = false } = {}) {
     : isCurrentResource ? snapshot.error : null
   const loading = resourcePath ? (blocked ? access.status === 'checking' : isCurrentResource ? snapshot.loading : true) : false
 
-  return { data, error, loading, reload: load, setData }
+  // Expose only the current HTTP result, not a guessed status for an account
+  // transition or a transport error. Consumers can distinguish lost access
+  // from a transient failure without parsing translated error messages.
+  const errorStatus = !blocked && isCurrentResource ? snapshot.errorStatus : null
+  return { data, error, errorStatus, loading, reload: load, setData }
 }

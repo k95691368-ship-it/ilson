@@ -27,6 +27,8 @@ const teachRetryFixture = process.argv.includes('--teach-retry-fixture')
 let teachReplyLost = false
 const codeReviewRetryFixture = process.argv.includes('--code-review-retry-fixture')
 let codeReviewReplyLost = false
+const buildRetryFixture = process.argv.includes('--build-retry-fixture')
+let buildReplyLost = false
 const healthFailureFixture = process.argv.includes('--health-failure-fixture')
 if (codeReviewRetryFixture && fixture) {
   // Explicit synthetic legacy mappings for local UI boundaries, never business data.
@@ -73,6 +75,15 @@ globalThis.fetch = (url, options) => {
         && ['confirm', 'correct'].includes(result.rows[0].data?.response?.body?.action)
         && Array.isArray(args[4]) && args[4].some(sql => sql.includes('ilson-code-review:'))) {
         codeReviewReplyLost = true
+        return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
+      }
+      // After a real synthetic build commit, lose only its first response. The
+      // browser must retry the frozen calculation intent, not calculate again.
+      if (buildRetryFixture && fixture && !buildReplyLost && name === 'ilson_actor_commit'
+        && result.rows[0].data?.response?.status === 201
+        && typeof result.rows[0].data?.response?.body?.run_id === 'string'
+        && Array.isArray(args[4]) && args[4].some(sql => /^\s*INSERT\s+INTO\s+build_run\b/i.test(sql))) {
+        buildReplyLost = true
         return Response.json({ code: 'LOCAL_LOST_REPLY' }, { status: 503 })
       }
       if (fixture?.loseReply(name, args, result.rows[0].data)) return Response.json({code:'LOCAL_LOST_REPLY'},{status:503})

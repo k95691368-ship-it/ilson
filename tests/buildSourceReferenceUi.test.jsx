@@ -3,6 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import BuildPage from '../src/pages/BuildPage.jsx'
+import { beginAccessCheck, completeAccessCheck } from '../src/lib/accessSession.js'
 
 const state = vi.hoisted(() => ({ post: vi.fn(), read: vi.fn(), reload: vi.fn(), success: vi.fn(), error: vi.fn(), data: null }))
 vi.mock('../src/api/client.ts', () => ({ api: { post: state.post } }))
@@ -16,9 +17,10 @@ const entry = (id, sha256) => ({ id, date: '2026-06-01', channel: '자사몰', s
 
 beforeEach(() => {
   vi.clearAllMocks()
+  completeAccessCheck(beginAccessCheck(), { ok: true, mode: 'demo', scope: 'a'.repeat(64) })
   state.data = { runs: [{ id: 'build-1', seq: 1, rows_out: 2, quarantined: 1, files: [{ name: '01_정산.csv', sha256: shaA, ambiguousName: true }, { name: '01_정산.csv', sha256: shaB, ambiguousName: true }] }], aliases: [],
     rows: [entry('row-a', shaA), entry('row-b', shaB)], quarantine: [{ id: 'q-a', reason: 'bad_amount', source_file: '01_정산.csv', source_row_no: 3, source_sha256: shaA, source_ambiguous_name: true, raw: [] }] }
-  state.post.mockResolvedValue({ ok: true }); state.reload.mockResolvedValue(undefined)
+  state.post.mockResolvedValue({ ok: true, run_id: 'run_' + '1'.repeat(20), seq: 2 }); state.reload.mockResolvedValue(undefined)
 })
 afterEach(cleanup)
 

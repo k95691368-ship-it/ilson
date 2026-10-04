@@ -119,7 +119,7 @@ describe('적어 둔 것이 실제로 그런가', () => {
     .map((f) => readFileSync(f, 'utf8'))
     .join('\n')
 
-  it('"Claude Opus 5 분석 초안만 쓴다"가 사실이다', () => {
+  it('조건부 초안의 현재 모델 구현을 설명하고 활성화 여부는 단정하지 않는다', () => {
     // 모델과 책임 경계를 글에만 적고 구현이 다르면 안 된다.
     expect(TECH.llm.inProduct.title).toContain('분석 초안')
     expect(TECH.llm.inProduct.body).toContain('claude-opus-5')
@@ -127,20 +127,30 @@ describe('적어 둔 것이 실제로 그런가', () => {
     expect(src).toContain('api.anthropic.com')
     expect(src).toContain('CLAUDE_API_KEY')
     expect(src).not.toContain('claude-sonnet')
+    expect(TECH.llm.inProduct.body).toContain('사내 권한과 서버 키 설정이 충족되면')
+    expect(TECH.llm.inProduct.body).toContain('키 설정이나 실제 호출 성공을 확인하지 않습니다')
   })
 
-  it('"파일이 서버로 가지 않는다"가 사실이다', () => {
-    // 첨부 기능을 지웠으므로 R2 쓰기 경로가 남아 있으면 안 된다.
+  it('원본 파일 저장소와 정규화된 제작 결과의 DB 저장을 구분한다', () => {
+    // No object-storage write does not imply that calculation rows stay local.
+    // Actual payload/DB behavior is covered by aboutFactBoundary/buildSourcePostgres.
     const pipeline = TECH.sections.find((s) => s.title.includes('파이프라인'))
-    expect(pipeline.body).toContain('파일이 서버로 가지 않으므로')
+    expect(pipeline.body).toContain('원본 파일·버퍼와 임의 셀 배열은 신규 제작 저장에 포함하지 않습니다')
+    expect(pipeline.body).toContain('정규화된 계산 행·격리 사유·출처 참조를 저장')
+    expect(pipeline.body).not.toContain('서버는 실행 메타데이터만')
     expect(src).not.toContain('SOURCES.put')
   })
 
-  it('"인증이 없다"가 사실이다', () => {
-    const auth = TECH.sections.find((s) => s.title.includes('인증 없음'))
-    expect(auth).toBeTruthy()
-    expect(src).not.toContain('bcrypt')
-    expect(src).not.toContain('jsonwebtoken')
+  it('계정 없는 개인 체험과 인증된 사내 접근을 구분한다', () => {
+    // Library-name absence cannot establish absence of authentication: Access
+    // signatures use WebCrypto. Signed middleware contracts run separately.
+    const auth = TECH.sections.find((s) => s.title.includes('체험과 사내 접근'))
+    expect(auth.body).toContain('개인 체험은 계정 생성 없이')
+    expect(auth.body).toContain('서명된 계정')
+    expect(auth.body).toContain('역할과 열람 범위로 읽기·쓰기를 보호')
+    expect(auth.body).toContain('레이트 리밋은 추가 남용 방지이며 인증을 대체하지 않습니다')
+    expect(PLAIN.stages[0].body).toContain('사내 환경은 인증된 계정과 업무 권한이 필요합니다')
+    expect(PLAIN.stages[0].body).not.toContain('로그인은 없습니다')
   })
 
   it('설명한 link_kind 종류 수가 실제 소스 개수와 맞는다', () => {
@@ -162,10 +172,10 @@ describe('적어 둔 것이 실제로 그런가', () => {
     expect(existsSync(join(ROOT, 'tests', 'pageRender.test.jsx'))).toBe(true)
   })
 
-  it('"users·sessions 표를 지웠다"가 사실이다', () => {
-    // 안 쓴다고만 적고 표는 남겨 두면 언젠가 누가 그 표를 쓴다.
-    const auth = TECH.sections.find((s) => s.title.includes('인증 없음'))
+  it('과거 자체 users·sessions 제거를 현재 사내 인증 폐지의 근거로 쓰지 않는다', () => {
+    const auth = TECH.sections.find((s) => s.title.includes('체험과 사내 접근'))
     expect(auth.body).toContain('DROP')
+    expect(auth.body).toContain('현재 사내 인증이나 공통 Auth를 없앴다는 뜻은 아닙니다')
     const sql = readdirSync(join(ROOT, 'migrations'))
       .map((f) => readFileSync(join(ROOT, 'migrations', f), 'utf8'))
       .join('\n')

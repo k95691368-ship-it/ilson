@@ -24,7 +24,10 @@ let queue = Promise.resolve(), app, slug, beforeCommit=null
 const request = (body, method = 'POST') => new Request('https://local.invalid/api/audit', {
   method, headers:{'Content-Type':'application/json','X-Idempotency-Key':crypto.randomUUID()}, body:JSON.stringify(body),
 })
-const call = (handler, body, method) => handler({env, params:{id:app.id}, request:request(body,method)})
+// Build now requires explicit scoped actor proof, as supplied by middleware.
+// Keep the rest of this historical public-fixture journey unchanged.
+const buildActor = 'journey-build@local.invalid'
+const call = (handler, body, method) => handler({env:handler===build?{...env,DB:DB.forActor(buildActor),AUTH_ACTOR:{mode:'access',email:buildActor}}:env, params:{id:app.id}, request:request(body,method)})
 const get = handler => handler({env, params:{id:app.id}, request:new Request('https://local.invalid/api/audit')}).then(response=>response.json())
 beforeAll(async()=>{
   await pg.exec('CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;')
@@ -51,6 +54,7 @@ beforeAll(async()=>{
   app=await response.json()
   // Review is not under audit; begin from the supported accepted state.
   await DB.prepare("UPDATE application SET status='수용' WHERE id=?").bind(app.id).run()
+  await DB.prepare("INSERT INTO override_actor(email,display_name,role,departments_json) VALUES(?,'합성 제작 담당','audit','[]')").bind(buildActor).run()
 },60000)
 afterAll(async()=>{vi.unstubAllGlobals();await pg.close()})
 
