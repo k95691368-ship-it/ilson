@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { PLAIN, TECH, techFacts } from '../shared/about.js'
+import { PLAIN, TECH, techFacts, OVERRIDE_LOOP } from '../shared/about.js'
+import { computeOutcome, buildChallenges, labelForOutcome } from '../shared/outcome.js'
 import { STAGE_ORDER } from '../shared/dossier.js'
 import { inlineParts, plainText } from '../src/lib/inline.js'
 
@@ -256,6 +257,32 @@ describe('LLM 이야기', () => {
 })
 
 describe('숫자는 지어내지 않는다', () => {
+  it('부서 체감 차이는 반박과 미확정 표시이지 자동 금액 감액이 아니다', () => {
+    const outcome = computeOutcome({
+      baseline: { median_seconds: 5400, sample_n: 6, people: 1, frequency: '주 1회', hourly_wage_krw: 20000 },
+      runs: [{ ok: 1, duration_ms: 180000, human_review_seconds: 0, rework_seconds: 0 }],
+    })
+    const before = structuredClone(outcome)
+    const context = { outcome, deptConfirmed: true, baselineAgeDays: 1, quarantineLeft: 0 }
+    for (const [felt, disputed] of [[55, true], [72, true], [73, false]]) {
+      const challenges = buildChallenges({ ...context, deptFelt: felt })
+      expect(challenges.some(item => item.code === 'dept_disagrees')).toBe(disputed)
+    }
+    expect(labelForOutcome(outcome, 1)).toMatchObject({ label: '보수적 추정', note: expect.stringContaining('확정으로 쓰지 마세요') })
+    expect(outcome).toEqual(before)
+    const claim = PLAIN.points.find(item => item.title === '부서가 다르다고 하면 다시 확인합니다').body
+    expect(claim).toContain('20% 이상이면 반박')
+    expect(claim).toContain('미해결 반박')
+    expect(claim).toContain('자동으로 바꾸지는 않습니다')
+    expect(claim).not.toContain('절감액이 그만큼 줄어듭니다')
+  })
+
+  it('고정 안전 목표를 집계된 운영 무사고 실적으로 소개하지 않는다', () => {
+    const target = OVERRIDE_LOOP.outputs.flatMap(block => block.items).find(item => item.name === '안전 목표')
+    expect(target.desc).toContain('0건을 목표')
+    expect(target.desc).toContain('운영 무사고 실적은 아닙니다')
+  })
+
   it('값이 없으면 그 줄을 빼 버린다', () => {
     // 화면에 손으로 적어 두면 그날부터 낡는다.
     expect(techFacts({})).toEqual([])
