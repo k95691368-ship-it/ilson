@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState, useSyncExternalStore } from 'react'
+import { Link } from 'react-router-dom'
 import StageHeader from '../components/StageHeader.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useToast } from '../context/ToastContext.jsx'
@@ -9,6 +10,8 @@ import { SKUS } from '../../shared/master.js'
 import { readLocalFiles } from '../lib/readFiles.js'
 import { buildRunPayload } from '../../shared/buildPayload.js'
 import SourceReferences, { SourceFile } from '../components/SourceReference.jsx'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
+import { useActionLifetime } from '../hooks/useActionLifetime.js'
 
 // 시연용 파일 다섯 장이 여기 박혀 있었다. 카드도 버튼도 실물 파일도 지웠다.
 // 이 화면은 이제 넣은 파일만 처리한다.
@@ -104,13 +107,17 @@ function Build({ id }) {
   }
 
   if (loading && !data) return <div className="page-loading">불러오는 중…</div>
-  if (error) return <div className="notice notice-danger">{error}</div>
+  if (error && !data) return <div className="notice notice-danger">{error}</div>
   if (!data) return null
 
   const latest = data.runs[0] ?? null
 
   return (
     <div className="stack">
+      {error && <div className="notice notice-warn" role="status">
+        <p>{error} 기존 기록을 표시하고 있습니다. 확인된 저장 결과는 유지됩니다.</p>
+        <button type="button" className="btn-ghost btn-sm" disabled={loading} onClick={reload}>최신 제작 기록 다시 읽기</button>
+      </div>}
       <section className="card">
         <div className="card-head">
           <h2 className="card-title">파일을 넣으면 합칩니다</h2>
@@ -338,8 +345,64 @@ function Build({ id }) {
 }
 
 // ── 검토함 ──────────────────────────────────────────────────
+const EMPTY_TEACHING = { canonicalCode: '', saving: false, done: null, error: '', fields: {}, conflict: false }
+
+function isBuildAliasResult(value, command) {
+  if (!value || typeof value !== 'object' || Array.isArray(value) || value.ok !== true
+    || value.external_code !== command.external_code.trim() || value.canonical_code !== command.canonical_code
+    || typeof value.already !== 'boolean'
+    || (value.product_name !== undefined && (typeof value.product_name !== 'string' || !value.product_name.trim()))
+    || (value.teacher !== undefined && typeof value.teacher !== 'string')) return false
+  // A legacy no-op can lack a name/author; a newly written lesson cannot.
+  return value.already || (typeof value.product_name === 'string' && typeof value.teacher === 'string' && Boolean(value.teacher.trim()))
+}
+
 function Quarantine({ data, id, onDone, toast }) {
-  const [teaching, setTeaching] = useState({})
+  const session = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  const [, redraw] = useReducer(value => value + 1, 0)
+  const lifetime = useRef(null)
+  const runId = data.runs[0]?.id
+  // Reloading the same run retains confirmed lessons. A new run, application or
+  // access lifetime cannot inherit drafts/completions or a late old response.
+  if (!lifetime.current || lifetime.current.id !== id || lifetime.current.runId !== runId || lifetime.current.session !== session) {
+    lifetime.current = { id, runId, session, states: new Map() }
+  }
+  const view = lifetime.current
+  view.data = data
+  const capture = useActionLifetime(view)
+  const current = () => lifetime.current === view && getAccessSession() === session && session.status === 'active'
+  const update = (code, change) => {
+    if (!current()) return
+    view.states.set(code, { ...(view.states.get(code) ?? EMPTY_TEACHING), ...change })
+    redraw()
+  }
+
+  async function teach(q) {
+    if (!current()) return
+    const state = view.states.get(q.external_code) ?? EMPTY_TEACHING
+    if (state.saving || state.done || !state.canonicalCode) return
+    const active = capture()
+    const command = { kind: 'alias', external_code: q.external_code, canonical_code: state.canonicalCode }
+    // The synchronous Map lock also covers two clicks before React re-renders.
+    update(q.external_code, { saving: true, error: '', fields: {}, conflict: false })
+    try {
+      const result = await api.post(`/applications/${id}/build`, command, { validateResponse: value => isBuildAliasResult(value, command) })
+      if (!active() || !current()) return
+      update(q.external_code, { saving: false, done: result, confirmedFrom: view.data })
+      toast.success(result.already ? '같은 상품으로 저장된 기록을 확인했습니다.' : '상품 연결을 저장했습니다.')
+    } catch (error) {
+      if (!active() || !current()) return
+      update(q.external_code, { saving: false, error: error.message, fields: error.fields ?? {}, conflict: error.code === 'CODE_BUILD_ALIAS_CONFLICT' })
+      toast.error(error.message)
+      return
+    }
+    // A later read failure must not turn a confirmed write into a retryable one.
+    // useApi keeps data only for transient errors; permission denials remove it.
+    try { await onDone() } catch {
+      if (!active() || !current()) return
+      update(q.external_code, { error: '상품 연결은 저장됐지만 최신 제작 기록을 불러오지 못했습니다.' })
+    }
+  }
 
   const groups = useMemo(() => {
     const m = new Map()
@@ -370,21 +433,38 @@ function Quarantine({ data, id, onDone, toast }) {
 
       {unknownByCode.size > 0 && (
         <>
-          <h3>어느 상품인지 알려주시면 다음부터 자동으로 처리됩니다</h3>
+          <h3>상품 연결은 다음 실행부터 적용됩니다</h3>
           <div className="stack-sm" style={{ marginBottom: 16 }}>
-            {[...unknownByCode.values()].map((q) => (
+            {[...unknownByCode.values()].map((q) => {
+              const state = view.states.get(q.external_code) ?? EMPTY_TEACHING
+              const selectedSku = SKUS.find(sku => sku.canonical_code === state.canonicalCode)
+              // A replayed receipt proves the earlier write, not today's mapping.
+              // Only a fresh read after confirmation describes the current alias.
+              const refreshed = state.done && data !== state.confirmedFrom
+              const currentAlias = refreshed ? data.aliases.find(alias => alias.external_code === state.done.external_code) : null
+              const changed = refreshed && currentAlias?.canonical_code !== state.done.canonical_code
+              return (
               <div key={q.external_code} className="teach-row">
                 <div className="teach-info">
                   <code>{q.external_code}</code>
                   <strong>{q.product_name || '(상품명 없음)'}</strong>
                   <span className="card-note">예: <SourceFile source={storedSource(q)} /> · 전체 {q.count}줄</span>
                 </div>
-                <select
-                  value={teaching[q.external_code] ?? ''}
+                {state.done ? <div className="teach-info" role="status">
+                  <strong>{state.done.already ? '같은 상품으로 저장된 기록을 확인했습니다.' : '상품 연결을 저장했습니다.'}</strong>
+                  <span>저장 당시: {state.done.product_name ?? selectedSku?.name_ko ?? state.done.canonical_code} ({state.done.canonical_code})</span>
+                  {!refreshed ? <p className="card-note">최신 연결 확인 전입니다. 저장 당시 기록이며 현재 연결을 보증하지 않습니다.</p>
+                    : currentAlias ? <p className="card-note">현재 조회: {SKUS.find(sku => sku.canonical_code === currentAlias.canonical_code)?.name_ko ?? currentAlias.canonical_code} ({currentAlias.canonical_code})</p>
+                      : <p className="card-note">현재 조회에서 이 코드의 연결을 확인하지 못했습니다.</p>}
+                  {changed && <p className="card-note">저장 당시와 현재 조회 결과가 다릅니다. <Link to="/codes">기존 코드 확인·정정</Link></p>}
+                  <p className="card-note">연결을 다시 조회한 뒤 새로 실행하면 반영됩니다. 현재 결과는 바뀌지 않고 다른 오류가 있는 줄은 계속 격리됩니다.</p>
+                  {state.done.teacher && <p className="card-note">기록된 작성자: {state.done.teacher}</p>}
+                </div> : <><select
+                  value={state.canonicalCode}
                   aria-label={`${q.external_code}에 해당하는 상품`}
-                  onChange={(e) =>
-                    setTeaching({ ...teaching, [q.external_code]: e.target.value })
-                  }
+                  disabled={state.saving || session.status !== 'active'}
+                  aria-invalid={Boolean(state.fields.canonical_code)}
+                  onChange={event => update(q.external_code, { canonicalCode: event.target.value, error: '', fields: {}, conflict: false })}
                 >
                   <option value="">어느 상품인가요</option>
                   {SKUS.map((s) => (
@@ -396,26 +476,18 @@ function Quarantine({ data, id, onDone, toast }) {
                 <button
                   type="button"
                   className="btn-ghost btn-sm"
-                  disabled={!teaching[q.external_code]}
-                  onClick={async () => {
-                    try {
-                      await api.post(`/applications/${id}/build`, {
-                        kind: 'alias',
-                        external_code: q.external_code,
-                        canonical_code: teaching[q.external_code],
-                        product_name: q.product_name,
-                      })
-                      toast.success('기억했습니다. 다시 돌리면 이 줄은 자동으로 처리됩니다.')
-                      await onDone()
-                    } catch (err) {
-                      toast.error(err.message)
-                    }
-                  }}
+                  disabled={!state.canonicalCode || state.saving || session.status !== 'active'}
+                  onClick={() => teach(q)}
                 >
-                  기억시키기
-                </button>
+                  {state.saving ? '저장 중…' : '기억시키기'}
+                </button></>}
+                {state.error && <div role="alert" className="card-note">
+                  <p>{state.error}</p>
+                  {[...new Set(Object.values(state.fields).filter(value => typeof value === 'string' && value.trim()))].map(message => <p key={message}>{message}</p>)}
+                  {state.conflict && <Link to="/codes">기존 코드 확인·정정</Link>}
+                </div>}
               </div>
-            ))}
+            )})}
           </div>
         </>
       )}

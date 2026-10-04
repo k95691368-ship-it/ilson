@@ -15,11 +15,19 @@ import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { unprovenList } from '../../shared/unproven.js'
 import { readTogether, one } from '../_lib/readTogether.js'
+import { verifiedActorEmail } from '../_lib/dataScope.js'
 
-// 몇 건인지를 말하는 문장은 손으로 적으면 안 된다. 데이터가 바뀌어도 문장은
-// 안 바뀌기 때문이다. 실제로 화면이 여섯 단계를 끝까지 간 것이 한 건 있다고
-// 단언하는 동안 그런 신청서는 한 건도 없었다. 그래서 아래에서 셋을 세어
-// shared/unproven.js 에 넘기고, 문장은 그 숫자를 보고 골라진다.
+// 기록 수는 현재 scoped DB의 조회 결과를 사용한다. 인수인계+성과 기록은
+// 여섯 단계 검증 완료가 아니며, 표본 합계와 실행 수로 통계·기간을 추정하지 않는다.
+function confirmedMode(env) {
+  if (env.DEMO_WORKSPACE === true && env.DB?.workspace === true && !env.DB.actorEmail && !env.AUTH_ACTOR) return 'demo'
+  if (env.DB?.workspace === false) {
+    try {
+      if (env.DB.actorEmail === verifiedActorEmail(env.AUTH_ACTOR)) return 'access'
+    } catch { /* Unconfirmed context is not proof of either operating mode. */ }
+  }
+  return 'unknown'
+}
 
 export async function onRequestGet({ env, data: requestData }) {
   env = requestData?.requestEnv ?? env
@@ -139,10 +147,8 @@ export async function onRequestGet({ env, data: requestData }) {
            WHERE r.verdict = '수용' AND b.application_id IS NULL LIMIT 20`
         ),
 
-        // "증명하지 못한 것" 중 개수를 말하는 세 문장이 쓸 숫자.
-        //
-        // 끝까지 갔다 = 부서에 넘겼고(되돌리지 않았고) 성과까지 냈다.
-        // 둘 중 하나만으로는 여섯 단계를 밟은 것이 아니다.
+        // 열람 가능한 기록 수. finished는 되돌리지 않은 인수인계+성과
+        // 기록이 함께 존재한다는 뜻일 뿐, 전체 단계의 검증 완료가 아니다.
         one(env.DB.prepare(
           `SELECT
              (SELECT COUNT(*) FROM application a
@@ -179,7 +185,7 @@ export async function onRequestGet({ env, data: requestData }) {
       baselines: proof?.baselines,
       baselineSamples: proof?.baseline_samples,
       runs: proof?.runs,
-    })
+    }, { mode: confirmedMode(env) })
 
     return jsonResponse({
       unproven,

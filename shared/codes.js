@@ -8,6 +8,8 @@ import { SKU_BY_CODE } from './master.js'
 
 export const CONFIRM_KIND = '코드확인'
 export const CORRECT_KIND = '코드정정'
+// Builder registration is staff work, not a department's tool feedback.
+export const BUILD_ALIAS_KIND = '제작코드등록'
 
 // 기존 표시명을 이용한 이력 분류이다. 이름만으로 실제 권한이나 확인
 // 근거를 보증하지 않으며, 확인 완료 여부는 별도 버전 근거로 판정한다.

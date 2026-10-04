@@ -3,14 +3,16 @@ import { atomicMutation, mutationFingerprint } from '../_lib/atomicMutation.ts'
 import { isTransactionConflict } from '../_lib/transactionConflict.ts'
 import { canUseBusinessRoute, isAccessAdmin } from '../_lib/authorization.js'
 import { logDecision } from '../_lib/decisions.js'
-import { annotate, sortForReview, summarize, CONFIRM_KIND, CORRECT_KIND } from '../../shared/codes.js'
+import { annotate, sortForReview, summarize, CONFIRM_KIND, CORRECT_KIND, BUILD_ALIAS_KIND } from '../../shared/codes.js'
 import {
   normalizeCodeReviewCommand, codeMappingRevision, codeEditVersion, encodeCodeReviewEvidence,
   nextCodeReviewTimestamp, CodeReviewTimestampError,
 } from '../../shared/codeReviewEvidence.ts'
 import { SKU_BY_CODE, SKUS } from '../../shared/master.js'
 
-const HISTORY_KINDS = ['코드알림', CONFIRM_KIND, CORRECT_KIND]
+const ORIGIN_KINDS = ['코드알림', BUILD_ALIAS_KIND]
+const HISTORY_KINDS = [...ORIGIN_KINDS, CONFIRM_KIND, CORRECT_KIND]
+const HISTORY_PLACEHOLDERS = HISTORY_KINDS.map(() => '?').join(',')
 const HISTORY_COLUMNS = 'id, application_id, title, what, why, alternatives, link_kind, link_id, created_at'
 const conflict = () => jsonResponse({ error: '상품 연결이나 검토 근거·권한이 바뀌었습니다. 작성한 내용은 유지하고 최신 연결을 확인해주세요.', code: 'CODE_REVIEW_CONFLICT' }, 409)
 
@@ -27,7 +29,7 @@ async function authority(env, DB) {
 }
 
 function originOf(history) {
-  const origins = [...new Set(history.filter(row => row.link_kind === '코드알림' && typeof row.application_id === 'string' && row.application_id)
+  const origins = [...new Set(history.filter(row => ORIGIN_KINDS.includes(row.link_kind) && typeof row.application_id === 'string' && row.application_id)
     .map(row => row.application_id))].sort()
   return origins.length === 1 ? { state: 'linked', applicationId: origins[0] }
     : { state: origins.length > 1 ? 'ambiguous' : 'unknown', applicationId: null }
@@ -46,7 +48,7 @@ function reviewReason(alias, origin, who) {
 const available = reason => reason === null || reason === 'origin_unknown_admin'
 
 async function historyFor(DB, code) {
-  return (await DB.prepare('SELECT ' + HISTORY_COLUMNS + ' FROM decision_log WHERE link_id=? AND link_kind IN (?,?,?) ORDER BY created_at,id')
+  return (await DB.prepare('SELECT ' + HISTORY_COLUMNS + ' FROM decision_log WHERE link_id=? AND link_kind IN (' + HISTORY_PLACEHOLDERS + ') ORDER BY created_at,id')
     .bind(code, ...HISTORY_KINDS).all()).results
 }
 
@@ -56,7 +58,7 @@ export async function onRequestGet({ env, data: requestData }) {
     const who = await authority(env, env.DB)
     if (who instanceof Response) return who
     const aliases = (await env.DB.prepare('SELECT * FROM sku_alias ORDER BY created_at DESC,external_code LIMIT 500').all()).results
-    const decisions = aliases.length ? (await env.DB.prepare('SELECT ' + HISTORY_COLUMNS + ' FROM decision_log WHERE link_kind IN (?,?,?) AND link_id IN ('
+    const decisions = aliases.length ? (await env.DB.prepare('SELECT ' + HISTORY_COLUMNS + ' FROM decision_log WHERE link_kind IN (' + HISTORY_PLACEHOLDERS + ') AND link_id IN ('
       + aliases.map(() => '?').join(',') + ') ORDER BY created_at,id').bind(...HISTORY_KINDS, ...aliases.map(row => row.external_code)).all()).results : []
     const byCode = new Map()
     for (const row of decisions) {

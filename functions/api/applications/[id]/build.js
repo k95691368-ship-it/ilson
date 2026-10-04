@@ -10,6 +10,7 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_l
 import { databaseAccessFailure, rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.ts'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { saveBuildAlias } from '../../../_lib/buildAlias.ts'
 import { buildRecordPayload } from '../../../../shared/buildPayload.js'
 import { validateBuildRecordSources, encodeBuildTrace, encodeBuildQuarantine, decodeBuildTrace, decodeBuildQuarantine } from '../../../../shared/buildRecordSource.js'
 
@@ -105,34 +106,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
   // 사람이 상품코드를 알려 주는 경우.
   if (body.kind === 'alias') {
-    const external = String(body.external_code ?? '').trim()
-    const canonical = String(body.canonical_code ?? '').trim()
-    if (!external || !canonical) {
-      return failFields({ canonical_code: '어느 상품인지 골라주세요.' })
-    }
-    try {
-      await env.DB.prepare(
-        `INSERT INTO sku_alias (external_code, canonical_code, channel, product_name, note, taught_by)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(external_code) DO UPDATE SET
-           canonical_code = excluded.canonical_code,
-           product_name = excluded.product_name,
-           note = excluded.note,
-           created_at = datetime('now')`
-      )
-        .bind(
-          external,
-          canonical,
-          String(body.channel ?? '').trim() || null,
-          String(body.product_name ?? '').trim() || null,
-          String(body.note ?? '').trim() || null,
-          String(body.taught_by ?? 'AX 담당자').trim()
-        )
-        .run()
-      return jsonResponse({ ok: true, external_code: external, canonical_code: canonical }, 201)
-    } catch (error) {
-      return failUnexpected(error, '저장하지 못했습니다.', 500)
-    }
+    return saveBuildAlias(env, app.id, body, request.headers.get('X-Idempotency-Key'))
   }
 
   // 실행 결과를 기록으로 남기는 경우.

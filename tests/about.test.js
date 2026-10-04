@@ -143,7 +143,7 @@ describe('적어 둔 것이 실제로 그런가', () => {
     expect(src).not.toContain('jsonwebtoken')
   })
 
-  it('"link_kind 32종"이 실제 개수와 맞는다', () => {
+  it('설명한 link_kind 종류 수가 실제 소스 개수와 맞는다', () => {
     // 이런 숫자는 기능을 더할 때마다 조용히 틀려진다. 글에 적힌 수와
     // 소스에 있는 수를 매번 맞춰 본다.
     const kinds = new Set()
