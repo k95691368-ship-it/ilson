@@ -9,6 +9,8 @@ import { assertOverrideEditVersion, withOverrideEditVersion } from '../_lib/over
 import { isAccessAdmin, scopeEnvironment } from '../_lib/authorization.js'
 import { assertClusterClosable } from '../_lib/issueWorkflow.js'
 import { validDate } from '../../shared/fieldFeedback.js'
+import { readTogether } from '../_lib/readTogether.js'
+import { allScopedReads } from '../_lib/allScopedReads.ts'
 import {
   ensureOverrideSchema,
   seedOverrideWorkspace,
@@ -170,10 +172,13 @@ function accountCanHandle(account, product) {
     || account.product_ids.includes(product.id) || account.departments.includes(product.owner_team))
 }
 
-async function assignmentDirectory(env, actor, products) {
+// products may be a promise: the account list does not depend on it, so the caller can start this
+// query together with the workspace reads and the filter waits for the products only at the end.
+async function assignmentDirectory(env, actor, productsReady) {
   if (actor.role === 'reviewer') return {candidates:[],actors:[]}
   const rows = (await (env.UNSCOPED_DB ?? env.DB).prepare('SELECT email,display_name,role,active,departments_json,product_ids_json FROM override_actor ORDER BY display_name,email').all()).results
   const accounts = await Promise.all(rows.map(async row => accountRow(await withOverrideEditVersion('actor', row))))
+  const products = await productsReady
   return {actors:isAccessAdmin(actor) ? accounts : [], candidates:accounts
     .filter(account=>account.active && roleCan(account.role,'update_cluster') && (isAccessAdmin(actor) || products.some(product=>accountCanHandle(account,product))))
     .map(account=>({email:account.email,label:account.display_name,departments:account.departments,product_ids:account.product_ids}))}
@@ -201,23 +206,26 @@ async function acknowledgeCluster(env, actor, body) {
 }
 
 async function loadWorkspace(env) {
-  const [productRows, eventRows, clusterRows, experimentRows, runRows, decisionRows, volumeRows, integrationRows, auditRows, aiRows] =
-    await Promise.all([
-      env.DB.prepare('SELECT * FROM override_product ORDER BY created_at').all(),
+  const reads = readTogether(env.DB, [
+      env.DB.prepare('SELECT * FROM override_product ORDER BY created_at'),
       env.DB.prepare(
         `SELECT e.*, p.name AS product_name
          FROM override_event e JOIN override_product p ON p.id = e.product_id
          ORDER BY e.occurred_at DESC LIMIT 500`
-      ).all(),
-      env.DB.prepare('SELECT * FROM issue_cluster ORDER BY priority_score DESC, last_seen_at DESC').all(),
-      env.DB.prepare('SELECT * FROM change_experiment ORDER BY updated_at DESC').all(),
-      env.DB.prepare('SELECT * FROM experiment_run ORDER BY run_sequence').all(),
-      env.DB.prepare('SELECT * FROM override_decision_record ORDER BY created_at DESC').all(),
-      env.DB.prepare('SELECT * FROM override_volume ORDER BY measured_on DESC').all(),
-      env.DB.prepare('SELECT * FROM override_integration ORDER BY created_at DESC').all(),
-      env.DB.prepare('SELECT * FROM override_audit ORDER BY created_at DESC LIMIT 160').all(),
-      env.DB.prepare('SELECT * FROM override_ai_call ORDER BY created_at DESC LIMIT 80').all(),
+      ),
+      env.DB.prepare('SELECT * FROM issue_cluster ORDER BY priority_score DESC, last_seen_at DESC'),
+      env.DB.prepare('SELECT * FROM change_experiment ORDER BY updated_at DESC'),
+      env.DB.prepare('SELECT * FROM experiment_run ORDER BY run_sequence'),
+      env.DB.prepare('SELECT * FROM override_decision_record ORDER BY created_at DESC'),
+      env.DB.prepare('SELECT * FROM override_volume ORDER BY measured_on DESC'),
+      env.DB.prepare('SELECT * FROM override_integration ORDER BY created_at DESC'),
+      env.DB.prepare('SELECT * FROM override_audit ORDER BY created_at DESC LIMIT 160'),
+      env.DB.prepare('SELECT * FROM override_ai_call ORDER BY created_at DESC LIMIT 80'),
     ])
+  // The metrics queries do not need the products; only their names are joined afterwards.
+  // Starting them with the reads above removes one sequential database wait.
+  const metrics = overrideMetrics(env.DB, reads.then(([productRows]) => productRows.results ?? []))
+  const [[productRows, eventRows, clusterRows, experimentRows, runRows, decisionRows, volumeRows, integrationRows, auditRows, aiRows], analytics] = await allScopedReads([reads, metrics])
 
   const products = productRows.results ?? []
   const events = await Promise.all((eventRows.results ?? []).map(async row => hydrateEvent(await withOverrideEditVersion('event', row))))
@@ -229,7 +237,6 @@ async function loadWorkspace(env) {
   ))
   const volumes = await Promise.all((volumeRows.results ?? []).map(row => withOverrideEditVersion('volume', row)))
 
-  const analytics = await overrideMetrics(env.DB, products)
   const clusters = rawClusters.map(cluster => ({ ...cluster,
     recurrence_count:analytics.clusterCounts.get(cluster.id)||0,
     visible_event_count:analytics.clusterVisibility.get(cluster.id)?.total || 0,
@@ -312,18 +319,26 @@ export async function onRequestGet({ env, data: requestData, request }) {
           (await env.DB.prepare('SELECT * FROM override_decision_record WHERE experiment_id=? ORDER BY created_at').bind(row.id).all()).results) : versioned
       return jsonResponse({ entity })
     }
-    const workspace = await loadWorkspace(env)
     if (!overrideDemoMode(env)) {
+      // The report product list and the assignment directory are read together with the workspace.
+      const loading = loadWorkspace(env)
+      const productsReady = loading.then(loaded => loaded.products)
+      productsReady.catch(() => {}) // a reviewer's directory returns early without waiting for it
+      const [workspace, captureProducts, directory] = await allScopedReads([
+        loading,
+        // A product name is enough for the first report; no other team's metadata is exposed.
+        env.UNSCOPED_DB.prepare('SELECT id, name FROM override_product ORDER BY name').all(),
+        assignmentDirectory(env, actor, productsReady),
+      ])
       workspace.current_actor = {role:actor.role,label:actor.label,email:actor.email,is_admin:isAccessAdmin(actor)}
-      // A product name is enough for the first report; no other team's metadata is exposed.
-      workspace.capture_products = (await env.UNSCOPED_DB.prepare('SELECT id, name FROM override_product ORDER BY name').all()).results
-      const directory = await assignmentDirectory(env, actor, workspace.products)
+      workspace.capture_products = captureProducts.results
       workspace.assignment_candidates = directory.candidates
       workspace.actors = directory.actors
-    } else {
-      workspace.assignment_candidates = [{email:'demo-owner@ilson.invalid',label:'시연 담당자',departments:[],product_ids:workspace.products.map(item=>item.id)}]
-      workspace.actors = []
+      return jsonResponse(workspace)
     }
+    const workspace = await loadWorkspace(env)
+    workspace.assignment_candidates = [{email:'demo-owner@ilson.invalid',label:'시연 담당자',departments:[],product_ids:workspace.products.map(item=>item.id)}]
+    workspace.actors = []
     return jsonResponse(workspace)
   } catch (error) {
     return failUnexpected(error, 'OverrideLoop 운영 자료를 불러오지 못했습니다.')

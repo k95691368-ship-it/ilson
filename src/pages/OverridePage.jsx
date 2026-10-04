@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { api } from '../api/client.ts'
 import { useApi } from '../hooks/useApi.js'
@@ -6,6 +6,8 @@ import { useOverrideEvents } from '../hooks/useOverrideEvents.js'
 import { useToast } from '../context/ToastContext.jsx'
 import FieldFeedbackView from '../components/FieldFeedbackView.jsx'
 import OverrideEventPager from '../components/OverrideEventPager.jsx'
+import { getAccessSession, subscribeAccessSession } from '../lib/accessSession.js'
+import { readOverrideSource, withoutOverrideSource } from '../lib/overrideSource.js'
 import {
   CAUSES,
   DECISION_ACTIONS,
@@ -143,7 +145,18 @@ function modalEditVersion(modal, target) {
 }
 
 export default function OverridePage() {
-  const { data, error, loading, reload } = useApi('/override')
+  const resource = useApi('/override')
+  const location = useLocation()
+  const access = useSyncExternalStore(subscribeAccessSession, getAccessSession, getAccessSession)
+  const [focusedClusterId, setFocusedClusterId] = useState(null)
+  // Keep the workspace request stable across navigation, but discard forms and
+  // pending source UI whenever the URL or authenticated lifetime changes.
+  return <OverrideWorkspace key={`${access.generation}:${location.key}`} resource={resource}
+    focusedClusterId={focusedClusterId} setFocusedClusterId={setFocusedClusterId} />
+}
+
+function OverrideWorkspace({ resource, focusedClusterId, setFocusedClusterId }) {
+  const { data, error, loading, reload } = resource
   const toast = useToast()
   const location = useLocation()
   const navigate = useNavigate()
@@ -151,13 +164,20 @@ export default function OverridePage() {
   const view = NAV.some(item => item.key === hashView) ? hashView : 'overview'
   const [demoRole, setRole] = useState(() => localStorage.getItem('override-role') || 'product')
   const role = data?.demo_mode === false ? data.current_actor?.role || 'reviewer' : demoRole
-  const [modal, setModal] = useState(null)
+  const source = readOverrideSource(location.search, view)
+  const [localModal, setModal] = useState(null)
+  const modal = localModal ?? (source?.eventId ? { type: 'eventDetail', entity: source.eventId, linked: true } : null)
   const [mutationProblem, setMutationProblem] = useState(null)
   const [busy, setBusy] = useState(false)
   const [aiDraft, setAiDraft] = useState(null)
   const [menuOpen, setMenuOpen] = useState(false)
-  const [focusedClusterId, setFocusedClusterId] = useState(null)
   const menuToggleRef = useRef(null)
+  const alive = useRef(true)
+  useEffect(() => { alive.current = true; return () => { alive.current = false } }, [])
+
+  function clearSource() {
+    navigate({ pathname: location.pathname, search: withoutOverrideSource(location.search), hash: location.hash }, { state: location.state })
+  }
 
   function closeMenu() {
     setMenuOpen(false)
@@ -166,7 +186,8 @@ export default function OverridePage() {
 
   function navigateView(next) {
     if (menuOpen) closeMenu()
-    if (location.hash !== `#${next}`) navigate({ pathname: location.pathname, search: location.search, hash: `#${next}` }, { state: location.state })
+    const search = withoutOverrideSource(location.search)
+    if (location.hash !== `#${next}` || search !== location.search) navigate({ pathname: location.pathname, search, hash: `#${next}` }, { state: location.state })
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
 
@@ -188,18 +209,20 @@ export default function OverridePage() {
         role,
         actorLabel: `${roleLabel(role)} 시연`,
       })
+      if (!alive.current) return null
       toast.success(success)
       setModal(null)
       await reload()
       return result
     } catch (mutationError) {
+      if (!alive.current) return null
       const fields = [...new Set(Object.values(mutationError.fields ?? {}).filter(value => typeof value === 'string' && value.trim()))]
       setMutationProblem({ message: mutationError.message, fields,
         conflict: mutationError.code === 'OVERRIDE_EDIT_CONFLICT' ? target : null })
       toast.error(fields.length ? fields.join(' ') : mutationError.message)
       return null
     } finally {
-      setBusy(false)
+      if (alive.current) setBusy(false)
     }
   }
 
@@ -217,12 +240,13 @@ export default function OverridePage() {
         role,
         actorLabel: `${roleLabel(role)} 시연`,
       })
+      if (!alive.current) return
       setAiDraft(result)
       await reload()
     } catch (assistError) {
-      setAiDraft({ error: assistError.message })
+      if (alive.current) setAiDraft({ error: assistError.message })
     } finally {
-      setBusy(false)
+      if (alive.current) setBusy(false)
     }
   }
 
@@ -238,10 +262,12 @@ export default function OverridePage() {
     setBusy(true)
     try {
       const result = await api.get(`/override?${conflict.query}`)
+      if (!alive.current) return
       setMutationProblem(previous => previous?.conflict?.query === conflict.query ? { ...previous, latest:result.entity, readError:null } : previous)
     } catch (readError) {
+      if (!alive.current) return
       setMutationProblem(previous => previous?.conflict?.query === conflict.query ? { ...previous, latest:null, readError:readError.message } : previous)
-    } finally { setBusy(false) }
+    } finally { if (alive.current) setBusy(false) }
   }
 
   function confirmLatestEdit() {
@@ -305,12 +331,13 @@ export default function OverridePage() {
           )}
           {data && (
             <>
+              {source?.invalid && <div role="alert"><p>연결된 원본 주소가 올바르지 않습니다.</p><button className="ol-secondary" type="button" onClick={clearSource}>원본 선택 해제</button></div>}
               {view === 'overview' && <OverviewView data={data} open={open} go={navigateView} />}
-              {view === 'events' && <EventsView data={data} open={open} askAi={askAi} />}
+              {view === 'events' && !source?.invalid && <EventsView data={data} open={open} askAi={askAi} />}
               {view === 'clusters' && <ClustersView data={data} open={open} askAi={askAi} mutate={mutate} busy={busy} role={role} initialSelectedId={focusedClusterId} />}
-              {view === 'experiments' && <ExperimentsView data={data} open={open} />}
+              {view === 'experiments' && !source?.invalid && <ExperimentsView data={data} open={open} source={source} onClearSource={clearSource} />}
               {view === 'intelligence' && <IntelligenceView data={data} />}
-              {['feedback','quality'].includes(view) && <FieldFeedbackView key={`${role}:${view}`} mode={view} role={role} products={data.capture_products ?? data.products ?? []} onCapture={() => open('event')} onOpenEvent={eventId => open('eventDetail', eventId)} onOpenCluster={async clusterId => { await reload(); setFocusedClusterId(clusterId); navigateView('clusters') }} />}
+              {['feedback','quality'].includes(view) && <FieldFeedbackView key={`${role}:${view}`} mode={view} role={role} products={data.capture_products ?? data.products ?? []} onCapture={() => open('event')} onOpenEvent={eventId => open('eventDetail', eventId)} onOpenCluster={async clusterId => { await reload(); if (!alive.current) return; setFocusedClusterId(clusterId); navigateView('clusters') }} />}
               {view === 'integrations' && (
                 <IntegrationsView data={data} open={open} mutate={mutate} role={role} busy={busy} />
               )}
@@ -320,8 +347,8 @@ export default function OverridePage() {
         </div>
       </div>
 
-      {modal && (
-        <Modal title={MODAL_TITLES[modal.type]} onClose={() => !busy && setModal(null)}>
+      {modal && data && (
+        <Modal title={MODAL_TITLES[modal.type]} onClose={() => { if (!busy) { if (modal.linked) clearSource(); else setModal(null) } }}>
           {mutationProblem && <div className="notice notice-danger" role="alert">
             <p>{mutationProblem.message}</p>
             {mutationProblem.fields.length > 0 && <ul>{mutationProblem.fields.map(message => <li key={message}>{message}</li>)}</ul>}
@@ -680,12 +707,32 @@ function ClustersView({ data, open, askAi, mutate, busy, role, initialSelectedId
   )
 }
 
-function ExperimentsView({ data, open }) {
+function ExperimentsView({ data, open, source, onClearSource }) {
+  const location = useLocation(), navigate = useNavigate()
   const [selectedId, setSelectedId] = useState(data.experiments[0]?.id)
-  const selected = data.experiments.find((experiment) => experiment.id === selectedId) ?? data.experiments[0]
+  const linked = useApi(source?.experimentId
+    ? `/override?${new URLSearchParams({ editKind: 'experiment', editId: source.experimentId, refresh: data.generated_at ?? '' })}` : null)
+  const loaded = source?.experimentId ? linked.data?.entity?.id === source.experimentId ? linked.data.entity : null
+    : data.experiments.find((experiment) => experiment.id === selectedId) ?? data.experiments[0]
+  const missingRecord = Boolean(source && loaded && ((source.runId && !loaded.runs?.some(run => run.id === source.runId))
+    || (source.decisionId && !loaded.decisions?.some(decision => decision.id === source.decisionId))))
+  const selected = missingRecord || linked.error ? null : loaded
   const cluster = data.clusters.find((item) => item.id === selected?.cluster_id)
   const gate = selected ? canExpandExperiment(selected, selected.runs) : null
   const plan = safeJson(selected?.evaluation_plan_json)
+  const sourceRef = useRef(null)
+  useEffect(() => {
+    if (!selected) return
+    sourceRef.current?.focus({ preventScroll: true })
+    sourceRef.current?.scrollIntoView({ block: 'nearest', behavior: 'instant' })
+  }, [selected, source?.experimentId, source?.runId, source?.decisionId])
+
+  function selectExperiment(id) {
+    if (!source) { setSelectedId(id); return }
+    const params = new URLSearchParams(withoutOverrideSource(location.search))
+    params.set('experimentId', id)
+    navigate({ pathname: location.pathname, search: `?${params}`, hash: '#experiments' }, { state: location.state })
+  }
 
   return (
     <div className="ol-page">
@@ -693,10 +740,11 @@ function ExperimentsView({ data, open }) {
         title="개선 실험"
         copy="측정 근거를 기록하고 기준 위반을 판정합니다. 외부 시스템의 배포·중단·롤백은 실행하지 않습니다."
       />
+      {source && <button className="ol-text-button" type="button" onClick={onClearSource}>원본 선택 해제</button>}
       <div className="ol-experiment-board">
         <aside className="ol-experiment-list">
           {data.experiments.map((experiment) => (
-            <button key={experiment.id} type="button" className={selected?.id === experiment.id ? 'active' : ''} onClick={() => setSelectedId(experiment.id)}>
+            <button key={experiment.id} type="button" className={selected?.id === experiment.id ? 'active' : ''} onClick={() => selectExperiment(experiment.id)}>
               <span className={`ol-status-dot ${experiment.status}`} aria-hidden="true" />
               <div><strong>{experiment.title}</strong><small>{statusLabel(experiment.status)} · {experiment.risk_level === 'high' ? '고위험' : '일반'}</small></div>
             </button>
@@ -705,7 +753,8 @@ function ExperimentsView({ data, open }) {
         </aside>
 
         {selected ? (
-          <article className="ol-experiment-detail">
+          <article className="ol-experiment-detail" ref={source && !source.runId && !source.decisionId ? sourceRef : null}
+            tabIndex={source && !source.runId && !source.decisionId ? -1 : undefined} aria-label={source && !source.runId && !source.decisionId ? '연결된 개선 실험' : undefined}>
             <div className="ol-detail-head">
               <div><span className={`ol-risk ${selected.risk_level}`}>{selected.risk_level === 'high' ? '고위험 변경' : '통제된 변경'}</span><span className="ol-status">{statusLabel(selected.status)}</span></div>
               <h2>{selected.title}</h2>
@@ -738,8 +787,9 @@ function ExperimentsView({ data, open }) {
               <div><span>최소 표본 · 측정 시간</span><p>{EXPERIMENT_PHASES.map(phase=>`${phase.label} ${plan.minimumSamples[phase.key]}건`).join(' · ')} / {plan.minimumWindowSeconds}초</p></div>
               <div><span>데이터 · 모델 · 정책 버전</span><p>{plan.datasetVersion} · {plan.modelVersion} · {plan.policyVersion}</p></div>
             </section>}
-            {selected.runs.length>0 && <details className="ol-decision-records"><summary>전체 결과·원본 근거 {selected.runs.length}건</summary>
-              {selected.runs.map(run=><article key={run.id}>
+            {selected.runs.length>0 && <details className="ol-decision-records" open={source?.runId ? true : undefined}><summary>전체 결과·원본 근거 {selected.runs.length}건</summary>
+              {selected.runs.map(run=><article key={run.id} ref={source?.runId === run.id ? sourceRef : null}
+                tabIndex={source?.runId === run.id ? -1 : undefined} aria-label={source?.runId === run.id ? '연결된 실험 결과' : undefined}>
                 <strong>{run.phase} · {runLabel(run.status)}</strong>
                 <p>{run.approval_id === selected.approval_id && run.approval_id ? '현재 승인 주기' : '이전 참고 기록'} · {run.source_kind === 'manual' ? '수동 입력' : '참고 자료'}</p>
                 <p>표본 {run.sample_size}건 · 대조군 {run.control_value} / 변경군 {run.variant_value} · 위반 {run.guardrail_breaches}건</p>
@@ -757,7 +807,8 @@ function ExperimentsView({ data, open }) {
               <section className="ol-decision-records">
                 <div className="ol-section-head"><h3>최종 결정 기록</h3><span>수정 불가 스냅샷</span></div>
                 {selected.decisions.map((decision) => (
-                  <article key={decision.id}>
+                  <article key={decision.id} ref={source?.decisionId === decision.id ? sourceRef : null}
+                    tabIndex={source?.decisionId === decision.id ? -1 : undefined} aria-label={source?.decisionId === decision.id ? '연결된 운영 결정' : undefined}>
                     <div><strong>{statusLabel(decision.decision)}</strong><span>{fmtDate(decision.created_at, true)} · {decision.decided_by}</span></div>
                     <p>{decision.basis}</p>
                     <details><summary>결정 당시 측정 근거</summary><pre className="ol-evidence-json">{JSON.stringify(decision.metrics_snapshot,null,2)}</pre></details>
@@ -780,7 +831,10 @@ function ExperimentsView({ data, open }) {
               <p className="ol-gate-copy">확대 전 확인 · {gate.needsPlan ? '사전 측정 계획 필요' : !gate.stateAllowed ? '현재 상태에서는 확대 불가' : gate.needsApproval ? '현재 시험 주기 승인 필요' : gate.missing.length ? `${gate.missing.join(' → ')} 필요` : gate.timingIssues.length ? gate.timingIssues.map(issue=>`${issue.phase} · ${issue.reason}`).join(' / ') : `${gate.blocked.join(' · ')} 재검토 필요`}</p>
             )}
           </article>
-        ) : <Empty title="아직 만든 개선 실험이 없습니다." />}
+        ) : source ? linked.loading ? <p role="status">연결된 원본 기록을 불러오는 중입니다.</p>
+          : linked.error ? <ErrorState message={linked.error} onRetry={linked.reload} />
+            : <Empty title="연결된 원본 기록을 현재 권한으로 찾을 수 없습니다." />
+          : <Empty title="아직 만든 개선 실험이 없습니다." />}
       </div>
     </div>
   )

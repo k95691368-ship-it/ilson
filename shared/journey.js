@@ -4,6 +4,7 @@ export function buildJourney(record, operations) {
   const add = (kind, id, at, title, detail, href) => entries.push({ key: `${kind}:${id}`, kind, at: at || null, title, detail: detail || '', href })
   const app = record.application
   const recordUrl = `/record/${encodeURIComponent(app.id)}`
+  const sourceUrl = (section, identifiers) => `/override?${new URLSearchParams(identifiers)}#${section}`
   add('신청', app.id, app.created_at, app.title, app.problem, recordUrl)
   const loggedReviews = (record.decisions || []).filter(row => row.stage === '검토')
   for (const row of record.decisions || []) add(row.stage === '검토' ? '검토' : '결정 기록', row.id, row.created_at, row.title, [row.what, row.why].filter(Boolean).join(' · '), recordUrl)
@@ -17,10 +18,10 @@ export function buildJourney(record, operations) {
   if (record.outcome) add('성과', app.id, record.outcome.computed_at, '성과 측정', record.moneyLabel ? [record.moneyLabel.label, record.moneyLabel.note].filter(Boolean).join(' · ') : '기록 문서에서 측정 근거를 확인해 주세요.', recordUrl)
   for (const row of operations.products || []) add('운영 연결', row.id, row.linked_at, row.name, `${row.owner_team} · ${row.status}`, '/override#overview')
   for (const row of operations.linkHistory || []) add('연결 이력', row.id, row.created_at, row.action === 'unlink_product' ? '운영 제품 연결 해제' : '운영 제품 연결', row.detail?.product_name || row.detail?.product_id, recordUrl)
-  for (const row of operations.events || []) add('판단 사건', row.id, row.occurred_at, row.human_decision, row.reason_detail, '/override#events')
-  for (const row of operations.experiments || []) add('개선 실험', row.id, row.created_at, row.title, row.hypothesis, '/override#experiments')
-  for (const row of operations.runs || []) add('실험 결과', row.id, row.created_at, `${row.phase} · ${row.status}`, `표본 ${row.sample_size}건 · 가드레일 위반 ${row.guardrail_breaches}건`, '/override#experiments')
-  for (const row of operations.decisions || []) add('운영 결정', row.id, row.created_at, row.decision, row.basis, '/override#experiments')
+  for (const row of operations.events || []) add('판단 사건', row.id, row.occurred_at, row.human_decision, row.reason_detail, sourceUrl('events', { eventId: row.id }))
+  for (const row of operations.experiments || []) add('개선 실험', row.id, row.created_at, row.title, row.hypothesis, sourceUrl('experiments', { experimentId: row.id }))
+  for (const row of operations.runs || []) add('실험 결과', row.id, row.created_at, `${row.phase} · ${row.status}`, `표본 ${row.sample_size}건 · 가드레일 위반 ${row.guardrail_breaches}건`, sourceUrl('experiments', { experimentId: row.experiment_id, runId: row.id }))
+  for (const row of operations.decisions || []) add('운영 결정', row.id, row.created_at, row.decision, row.basis, sourceUrl('experiments', { experimentId: row.experiment_id, decisionId: row.id }))
   const timestamp = value => {
     if (!value) return 0
     const normalized = value.replace(' ', 'T')

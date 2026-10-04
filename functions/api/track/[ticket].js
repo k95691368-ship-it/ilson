@@ -18,6 +18,8 @@ import { RESUBMIT_KIND, RESUBMIT_BACK_KIND } from '../../../shared/resubmit.js'
 import { fullySignedIds } from '../../_lib/signoff.js'
 import { loadOutcomeEvidence } from '../../_lib/outcomeEvidence.js'
 import { bulkHoldFrom } from '../../../shared/holdlift.js'
+import { readTogether, one } from '../../_lib/readTogether.js'
+import { allScopedReads } from '../../_lib/allScopedReads.ts'
 
 // 기록이 다른 신청서를 가리키고 있으면 그 접수번호를 붙여 준다.
 //
@@ -83,52 +85,52 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
     // 쿼리만 지우고 이름(files)은 안 지워서 그 뒤가 전부 한 칸씩 밀렸다.
     // 부서가 접수번호를 넣으면 그 자리에서 500이 났다. tests/schema.test.js가
     // 이제 개수를 센다.
-    const [review, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, outcomeEvidence, decisions, feedbackCount] =
-      await Promise.all([
-        env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id).first(),
-        env.DB.prepare(
+    // 질의 열두 개는 한 번의 batch 로, 성과 근거는 자기 질의로 함께 읽는다.
+    const [[review, meetings, reqs, criteria, baseline, builds, beta, manual, handover, uses, decisions, feedbackCount], outcomeEvidence] =
+      await allScopedReads([readTogether(env.DB, [
+        one(env.DB.prepare('SELECT * FROM review WHERE application_id = ?').bind(app.id)),
+        one(env.DB.prepare(
           "SELECT COUNT(*) AS n FROM meeting WHERE application_id = ? AND status = '완료'"
         )
           .bind(app.id)
-          .first(),
-        env.DB.prepare(
+          ),
+        one(env.DB.prepare(
           `SELECT COUNT(*) AS total,
                   SUM(CASE WHEN status IN ('채택','수정채택') THEN 1 ELSE 0 END) AS taken,
                   SUM(CASE WHEN status = '기각' THEN 1 ELSE 0 END) AS rejected
            FROM requirement WHERE application_id = ?`
         )
           .bind(app.id)
-          .first(),
-        env.DB.prepare(
+          ),
+        one(env.DB.prepare(
           `SELECT COUNT(*) AS n,
                   SUM(CASE WHEN confirmed_at IS NULL THEN 0 ELSE 1 END) AS confirmed
            FROM acceptance_criterion WHERE application_id = ?`
         )
           .bind(app.id)
-          .first(),
-        env.DB.prepare('SELECT median_seconds, sample_n, sealed_at FROM baseline WHERE application_id = ?')
+          ),
+        one(env.DB.prepare('SELECT median_seconds, sample_n, sealed_at FROM baseline WHERE application_id = ?')
           .bind(app.id)
-          .first(),
-        env.DB.prepare(
+          ),
+        one(env.DB.prepare(
           'SELECT COUNT(*) AS n, MAX(created_at) AS last FROM build_run WHERE application_id = ?'
         )
           .bind(app.id)
-          .first(),
-        env.DB.prepare(
+          ),
+        one(env.DB.prepare(
           'SELECT seq, overall, passed, failed, created_at FROM beta_round WHERE application_id = ? ORDER BY seq DESC LIMIT 1'
         )
           .bind(app.id)
-          .first(),
-        env.DB.prepare('SELECT published_at, contact FROM manual WHERE application_id = ?')
+          ),
+        one(env.DB.prepare('SELECT published_at, contact FROM manual WHERE application_id = ?')
           .bind(app.id)
-          .first(),
-        env.DB.prepare('SELECT slug, handed_to_person, handed_at, accepted_at, rolled_back_at, rollback_reason FROM handover WHERE application_id = ?')
+          ),
+        one(env.DB.prepare('SELECT slug, handed_to_person, handed_at, accepted_at, rolled_back_at, rollback_reason FROM handover WHERE application_id = ?')
           .bind(app.id)
-          .first(),
-        env.DB.prepare('SELECT COUNT(*) AS n, MAX(used_at) AS last FROM tool_use WHERE application_id = ?')
+          ),
+        one(env.DB.prepare('SELECT COUNT(*) AS n, MAX(used_at) AS last FROM tool_use WHERE application_id = ?')
           .bind(app.id)
-          .first(),
-        loadOutcomeEvidence(env.DB, app.id),
+          ),
         // 신청자에게 보여 줄 결정만 고른다. 내부 메모까지 다 보여 주지는 않는다.
         //
         // id와 link_kind를 같이 준다. 담당자가 되물은 것을 부서가 보고
@@ -138,14 +140,13 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
            WHERE application_id = ? AND actor = 'human'
            ORDER BY created_at`
         )
-          .bind(app.id)
-          .all(),
+          .bind(app.id),
         // 이 부서가 시험판을 써 보고 남긴 말이 있는가. 없으면 기계 채점만
         // 통과한 상태고, 그것만으로는 쓸 만한지 알 수 없다.
-        env.DB.prepare('SELECT COUNT(*) AS n FROM beta_feedback WHERE application_id = ?')
+        one(env.DB.prepare('SELECT COUNT(*) AS n FROM beta_feedback WHERE application_id = ?')
           .bind(app.id)
-          .first(),
-      ])
+          ),
+      ]), loadOutcomeEvidence(env.DB, app.id)])
 
     // 한 번에 미룬 기록. review 행이 없는 보류는 여기에만 남아 있다.
     const bulkHold = bulkHoldFrom(decisions.results)

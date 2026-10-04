@@ -6,6 +6,8 @@ import { validateUnclear, SECTION_BY_KEY } from '../../shared/unclear.js'
 import { validateAccept, validateReject, proxyNote } from '../../shared/accept.js'
 import ReportForm from '../components/ReportForm.jsx'
 import TeachQuarantine from '../components/TeachQuarantine.jsx'
+import SourceReferences, { SourceFile } from '../components/SourceReference.jsx'
+import { settlementCsv } from '../../shared/settlementExport.js'
 import Field from '../components/Field.jsx'
 import { quotaState, nextFreeText, whatNow, checkFiles, WHY_LIMIT } from '../../shared/quota.js'
 import { annotateRuns, summarizeRuns, usersOf } from '../../shared/history.js'
@@ -186,23 +188,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
 
   function download() {
     if (!result) return
-    const header = [
-      '날짜', '주차', '채널', '상품코드', '상품명', '수량', '반품수량',
-      '총매출', '할인', '반품액', '순매출', '수수료', '원가', '물류비', '광고비', '기여이익',
-      '원본파일', '원본시트', '원본줄',
-    ]
-    const rows = result.rows.map((r) => [
-      r.date, r.iso_week, r.channel, r.sku, r.sku_name, r.qty, r.return_qty,
-      r.gross_krw, r.discount_krw, r.return_krw, r.net_revenue_krw, r.commission_krw,
-      r.cogs_krw, r.logistics_krw, r.ad_krw, r.contribution_krw,
-      r.source.file, r.source.sheet ?? '', r.source.rowNo,
-    ])
-    // 엑셀이 UTF-8을 알아보게 앞에 표시를 붙인다. 없으면 한글이 깨진다.
-    const csv =
-      '﻿' +
-      [header, ...rows]
-        .map((row) => row.map((c) => `"${String(c ?? '').replace(/"/g, '""')}"`).join(','))
-        .join('\r\n')
+    const csv = settlementCsv(result.rows)
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
@@ -415,6 +401,7 @@ function ToolSession({ slug, data, error, loading, reload }) {
 
       {result && (
         <>
+          <SourceReferences files={result.files} />
           <section className="stat-row">
             <Tile label="합친 줄" value={num(result.rows.length)} />
             <Tile
@@ -493,9 +480,9 @@ function ToolSession({ slug, data, error, loading, reload }) {
                     {result.quarantine.slice(0, 60).map((q, i) => (
                       <tr key={i}>
                         <td>{QUARANTINE_REASONS[q.reason] ?? q.reason}</td>
-                        <td>{q.source.file.replace(/^\d+_/, '')}</td>
+                        <td><SourceFile source={q.source} /></td>
                         <td>{q.source.sheet || '—'}</td>
-                        <td className="num">{q.source.rowNo}</td>
+                        <td className="num">{q.source.rowNo > 0 ? q.source.rowNo : '파일 전체'}</td>
                         <td className="mono">{(q.raw ?? []).slice(0, 5).join(' | ')}</td>
                       </tr>
                     ))}

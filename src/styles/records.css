@@ -241,6 +241,6 @@
   .record-list > li, .record-decisions > li, .record-faq > div { break-inside: avoid; }
   .record :is(.record-why, .record-quote, .record-seal) { background: transparent; border: 1px solid var(--ms-border); }
   .record :is(.record-rail, .badge, .record-mark) { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
-  .record .table-wrap, .record .table-scroll { overflow: visible; border: 0; }
+  .record .table-wrap { overflow: visible; border: 0; }
   .record table { min-width: 0; }
 }

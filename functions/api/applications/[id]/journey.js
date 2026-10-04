@@ -3,6 +3,7 @@ import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { atomicMutation, mutationFingerprint } from '../../../_lib/atomicMutation.ts'
 import { resolveOverrideActor, requireOverridePermission, auditOverride } from '../../../_lib/override.js'
 import { buildJourney } from '../../../../shared/journey.js'
+import { readTogether } from '../../../_lib/readTogether.js'
 
 export async function onRequestGet(context) {
   context = { ...context, env: context.data?.requestEnv ?? context.env }
@@ -12,22 +13,30 @@ export async function onRequestGet(context) {
     const record = await response.json()
     const db = context.env.DB
     const id = record.application.id
-    const products = (await db.prepare(`SELECT p.*, l.linked_at FROM application_product_link l
-      JOIN override_product p ON p.id=l.product_id WHERE l.application_id=? ORDER BY l.linked_at,p.id`).bind(id).all()).results
-    const events = (await db.prepare(`SELECT e.* FROM override_event e JOIN application_product_link l
-      ON l.product_id=e.product_id WHERE l.application_id=? ORDER BY e.occurred_at,e.id`).bind(id).all()).results
-    const experiments = (await db.prepare(`SELECT x.* FROM change_experiment x WHERE EXISTS
+    // These reads do not depend on each other: one batched round trip instead of five serial ones.
+    // Runs and decisions need the experiment ids, so they follow in a second batch.
+    const [products, events, experiments, availableProducts, history] = (await readTogether(db, [
+      db.prepare(`SELECT p.*, l.linked_at FROM application_product_link l
+      JOIN override_product p ON p.id=l.product_id WHERE l.application_id=? ORDER BY l.linked_at,p.id`).bind(id),
+      db.prepare(`SELECT e.* FROM override_event e JOIN application_product_link l
+      ON l.product_id=e.product_id WHERE l.application_id=? ORDER BY e.occurred_at,e.id`).bind(id),
+      db.prepare(`SELECT x.* FROM change_experiment x WHERE EXISTS
       (SELECT 1 FROM override_event e JOIN application_product_link l ON l.product_id=e.product_id
-       WHERE l.application_id=? AND e.cluster_id=x.cluster_id) ORDER BY x.created_at,x.id`).bind(id).all()).results
+       WHERE l.application_id=? AND e.cluster_id=x.cluster_id) ORDER BY x.created_at,x.id`).bind(id),
+      db.prepare('SELECT id,name,owner_team FROM override_product ORDER BY name,id'),
+      db.prepare("SELECT * FROM override_audit WHERE entity_kind='application_product_link' AND entity_id=? ORDER BY created_at,id").bind(id),
+    ])).map(result => result.results)
     const runs = [], decisions = []
     if (experiments.length) {
       const holes = experiments.map(() => '?').join(',')
       const ids = experiments.map(row => row.id)
-      runs.push(...(await db.prepare(`SELECT * FROM experiment_run WHERE experiment_id IN (${holes}) ORDER BY created_at,id`).bind(...ids).all()).results)
-      decisions.push(...(await db.prepare(`SELECT * FROM override_decision_record WHERE experiment_id IN (${holes}) ORDER BY created_at,id`).bind(...ids).all()).results)
+      const [runRows, decisionRows] = await readTogether(db, [
+        db.prepare(`SELECT * FROM experiment_run WHERE experiment_id IN (${holes}) ORDER BY created_at,id`).bind(...ids),
+        db.prepare(`SELECT * FROM override_decision_record WHERE experiment_id IN (${holes}) ORDER BY created_at,id`).bind(...ids),
+      ])
+      runs.push(...runRows.results)
+      decisions.push(...decisionRows.results)
     }
-    const availableProducts = (await db.prepare('SELECT id,name,owner_team FROM override_product ORDER BY name,id').all()).results
-    const history = (await db.prepare("SELECT * FROM override_audit WHERE entity_kind='application_product_link' AND entity_id=? ORDER BY created_at,id").bind(id).all()).results
     const linkHistory = history.map(row=>({...row,detail:JSON.parse(row.detail_json || '{}')}))
     const operations = { products, events, experiments, runs, decisions, linkHistory }
     return jsonResponse({ application: record.application, done: record.done, money: record.money,

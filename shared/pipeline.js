@@ -499,20 +499,28 @@ async function fingerprint(buffer) {
 
 async function dedupeFiles(files) {
   const seen = new Map()
+  const contentsByName = new Map()
   const unique = []
   const skipped = []
 
   for (const file of files) {
     const hash = await fingerprint(file.buffer)
+    if (!contentsByName.has(file.name)) contentsByName.set(file.name, new Set())
+    contentsByName.get(file.name).add(hash)
     if (seen.has(hash)) {
-      skipped.push({ name: file.name, sameAs: seen.get(hash) })
+      skipped.push({ name: file.name, hash, sameAs: seen.get(hash) })
       continue
     }
     seen.set(hash, file.name)
     unique.push({ ...file, hash })
   }
+  for (const file of [...unique, ...skipped]) file.ambiguousName = contentsByName.get(file.name).size > 1
   return { unique, skipped }
 }
+
+// The hash already used for duplicate suppression also identifies the original
+// bytes. A filename is only a label: different contents can have the same name.
+const fileReference = file => ({ name: file.name, sha256: file.hash, ambiguousName: file.ambiguousName })
 
 export async function runPipeline({ files: inputFiles, aliases = {} }) {
   const started = Date.now()
@@ -524,7 +532,8 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
   const { unique: files, skipped } = await dedupeFiles(inputFiles)
   for (const s of skipped) {
     fileReports.push({
-      name: s.name,
+      ...fileReference(s),
+      duplicateOf: { file: s.sameAs, sha256: s.hash },
       ok: true,
       skippedDuplicate: true,
       rowsIn: 0,
@@ -540,7 +549,7 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
       tables = await readFile(file)
     } catch (err) {
       fileReports.push({
-        name: file.name,
+        ...fileReference(file),
         ok: false,
         note: `파일을 열지 못했습니다: ${String(err.message).slice(0, 120)}`,
       })
@@ -548,12 +557,12 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
     }
 
     if (tables.length === 0) {
-      fileReports.push({ name: file.name, ok: false, note: '읽을 수 있는 형식이 아닙니다.' })
+      fileReports.push({ ...fileReference(file), ok: false, note: '읽을 수 있는 형식이 아닙니다.' })
       continue
     }
 
     for (const table of tables) {
-      const source0 = { file: file.name, sheet: table.sheetName }
+      const source0 = { file: file.name, sheet: table.sheetName, sha256: file.hash, ambiguousName: file.ambiguousName }
       const channel = detectChannel(table.header)
 
       if (!channel) {
@@ -566,8 +575,9 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
           note: '머리글이 알고 있는 어느 채널과도 맞지 않습니다. 양식이 바뀌었을 수 있습니다.',
         })
         fileReports.push({
-          name: file.name,
+          ...fileReference(file),
           sheet: table.sheetName,
+          headerRowNo: table.headerRowNo,
           ok: false,
           note: '채널을 알아보지 못했습니다.',
         })
@@ -593,7 +603,7 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
           note: why,
         })
         fileReports.push({
-          name: file.name,
+          ...fileReference(file),
           sheet: table.sheetName,
           ok: false,
           channel,
@@ -606,7 +616,7 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
       // 금액에 영향은 없지만 없어진 칸. 막지는 않고 알려만 준다.
       if (columns.missingCosmetic.length > 0) {
         fileReports.push({
-          name: file.name,
+          ...fileReference(file),
           sheet: table.sheetName,
           ok: true,
           channel,
@@ -627,7 +637,7 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
           })
         }
         fileReports.push({
-          name: file.name,
+          ...fileReference(file),
           sheet: table.sheetName,
           ok: true,
           channel,
@@ -657,7 +667,7 @@ export async function runPipeline({ files: inputFiles, aliases = {} }) {
       }
 
       fileReports.push({
-        name: file.name,
+        ...fileReference(file),
         sheet: table.sheetName,
         ok: true,
         channel,

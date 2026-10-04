@@ -48,6 +48,8 @@ export interface PreparedStatement {
 export interface Database {
   prepare(sql: string): PreparedStatement
   batch(statements: readonly PreparedStatement[]): Promise<DatabaseResult[]>
+  // A distinct capability: staged batch() queues writes and cannot serve reads.
+  readBatch?(statements: readonly PreparedStatement[]): Promise<DatabaseResult[]>
   mutationReceipt?(requestId: string, fingerprint: string): Promise<MutationReceipt | null>
   commitMutation?(requestId: string, fingerprint: string, reads: readonly MutationRead[], writes: readonly MutationWrite[], response: MutationReceipt): Promise<CommittedMutation>
 }

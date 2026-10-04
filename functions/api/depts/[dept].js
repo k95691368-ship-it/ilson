@@ -17,6 +17,7 @@ import { ACCEPT_KIND } from '../../../shared/accept.js'
 import { SIGNOFF_KIND } from '../../../shared/signoff.js'
 import { fullySignedIds } from '../../_lib/signoff.js'
 import { HOLD_LIFT_KIND } from '../../../shared/holdlift.js'
+import { readTogether } from '../../_lib/readTogether.js'
 
 const STALE_HOURS = 24
 
@@ -28,7 +29,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
 
   try {
     const [apps, stakeholders, meetings, reqs, conflicts, tools, feedback, decisions, pendingRows, returnedRows] =
-      await Promise.all([
+      await readTogether(env.DB, [
         env.DB.prepare(
           `SELECT a.id, a.ticket_no, a.title, a.bottleneck, a.status, a.created_at,
                   a.applicant_label, a.current_minutes, a.current_people, a.current_frequency,
@@ -50,7 +51,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            ORDER BY a.created_at DESC`
         )
           .bind(dept)
-          .all(),
+          ,
 
         env.DB.prepare(
           `SELECT s.*, a.ticket_no, a.title AS application_title
@@ -58,7 +59,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            WHERE s.dept = ? ORDER BY s.is_owner DESC, s.created_at`
         )
           .bind(dept)
-          .all(),
+          ,
 
         // 회의 참석 부서는 JSON 배열로 저장돼 있다. 부서 이름을 따옴표째
         // 찾아야 '재무'가 '재무회계'에 걸리지 않는다.
@@ -69,7 +70,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            WHERE m.depts_json LIKE ? ORDER BY m.held_at`
         )
           .bind(`%"${dept}"%`)
-          .all(),
+          ,
 
         env.DB.prepare(
           `SELECT q.*, a.ticket_no FROM requirement q
@@ -77,7 +78,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            WHERE q.dept = ? ORDER BY q.created_at`
         )
           .bind(dept)
-          .all(),
+          ,
 
         // 이 부서가 낸 요구가 낀 충돌. 어느 쪽이 이겼는지가 이 부서에게는
         // 가장 민감한 기록이다.
@@ -93,7 +94,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            ORDER BY c.created_at`
         )
           .bind(dept, dept)
-          .all(),
+          ,
 
         env.DB.prepare(
           `SELECT h.*, a.ticket_no, a.title AS application_title,
@@ -103,7 +104,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            WHERE h.handed_to_dept = ? ORDER BY h.handed_at DESC`
         )
           .bind(dept)
-          .all(),
+          ,
 
         env.DB.prepare(
           `SELECT f.*, a.ticket_no FROM beta_feedback f
@@ -111,7 +112,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            WHERE f.dept = ? ORDER BY f.created_at DESC`
         )
           .bind(dept)
-          .all(),
+          ,
 
         env.DB.prepare(
           `SELECT d.stage, d.title, d.what, d.why, d.alternatives, d.unrequested, d.created_at,
@@ -121,7 +122,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            ORDER BY d.created_at DESC LIMIT 40`
         )
           .bind(dept)
-          .all(),
+          ,
 
         // 이 부서가 아직 답 안 준 것을 세는 데 필요한 것들.
         //
@@ -160,7 +161,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
            WHERE a.dept = ? AND a.status NOT IN ('반려')`
         )
           .bind(SIGNOFF_KIND, ACCEPT_KIND, HOLD_LIFT_KIND, dept)
-          .all(),
+          ,
 
         // 이 부서에 얼마를 돌려드렸는가.
         //
@@ -171,7 +172,7 @@ export async function onRequestGet({ env, data: requestData, params }) {
           `SELECT a.id, a.ticket_no, a.title
            FROM application a JOIN baseline b ON b.application_id = a.id
            WHERE a.dept = ?`
-        ).bind(dept).all(),
+        ).bind(dept),
       ])
 
     const evidence = await loadOutcomeEvidenceMany(env.DB, returnedRows.results.map(row => row.id))

@@ -1,6 +1,7 @@
 // Reads are checked again under a database lock; writes and the audit trail commit together.
 // Handlers must not read their own staged writes. Derived updates belong in SQL.
 import type { Database, MutationRead, MutationWrite, PreparedStatement, SqlRow, SqlValue } from './runtimeTypes.ts'
+import { allScopedReads } from './allScopedReads.ts'
 
 export type MutationAction = (db: Database) => Promise<Response>
 export type MutationOptions = { commitError?: boolean }
@@ -10,6 +11,7 @@ export async function atomicMutation(db: Database, requestId: string, fingerprin
   const prior = await db.mutationReceipt(requestId, fingerprint)
   if (prior) return Response.json(prior.body, { status: prior.status, headers: {'X-Idempotency-Replayed':'1'} })
   const reads: MutationRead[] = [], writes: MutationWrite[] = []
+  const stagedStatements = new WeakSet<PreparedStatement>()
   const prepare = (sql: string, binds: SqlValue[] = []): PreparedStatement => {
     // Generic rows/columns retain the database bridge's schema assertion
     // boundary. Runtime reads still pass through that bridge and are replayed
@@ -34,9 +36,19 @@ export async function atomicMutation(db: Database, requestId: string, fingerprin
         return { success: true, results: [], meta: { changes: 1 } }
       },
     }
+    stagedStatements.add(stmt)
     return stmt
   }
-  const staged: Database = { ...db, prepare, batch: statements => Promise.all(statements.map(statement => statement.run())) }
+  const staged: Database = {
+    ...db, prepare,
+    batch: statements => Promise.all(statements.map(statement => statement.run())),
+    readBatch: async statements => {
+      if (statements.some(statement => !stagedStatements.has(statement))) throw new Error('Invalid read batch statement')
+      // all() records each result in the CAS read set. Never inherit the real
+      // bridge's batch capability, which would bypass this staged boundary.
+      return allScopedReads(statements.map(async statement => statement.all()))
+    },
+  }
   const response = await action(staged)
   if (!response.ok && !commitError) return response
   const body: unknown = await response.json()

@@ -7,6 +7,8 @@ import { krw, num, ms, ago } from '../lib/format.js'
 import { runPipeline, QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { SKUS } from '../../shared/master.js'
 import { readLocalFiles } from '../lib/readFiles.js'
+import { buildRunPayload } from '../../shared/buildPayload.js'
+import SourceReferences, { SourceFile } from '../components/SourceReference.jsx'
 
 // 시연용 파일 다섯 장이 여기 박혀 있었다. 카드도 버튼도 실물 파일도 지웠다.
 // 이 화면은 이제 넣은 파일만 처리한다.
@@ -78,15 +80,7 @@ function Build({ id }) {
       const result = await runPipeline({ files, aliases: aliasMap })
       setProgress('결과를 기록하는 중…')
 
-      await api.post(`/applications/${id}/build`, {
-        kind: 'run',
-        files: result.files,
-        rows: result.rows,
-        quarantine: result.quarantine,
-        totals: result.totals,
-        duplicate_suspects: result.stats.duplicateSuspects,
-        duration_ms: result.stats.durationMs,
-      })
+      await api.post(`/applications/${id}/build`, buildRunPayload(result))
 
       toast.success(
         `${num(result.rows.length)}줄을 합쳤습니다. ${num(result.quarantine.length)}줄은 검토함으로 뺐습니다.`
@@ -154,6 +148,7 @@ function Build({ id }) {
 
       {latest && (
         <>
+          <SourceReferences files={latest.files} localOnly={false} />
           <section className="stat-row">
             <Tile label="합친 줄" value={num(latest.rows_out)} note={`${data.runs.length}번째 실행`} />
             <Tile
@@ -382,7 +377,7 @@ function Quarantine({ data, id, onDone, toast }) {
                 <div className="teach-info">
                   <code>{q.external_code}</code>
                   <strong>{q.product_name || '(상품명 없음)'}</strong>
-                  <span className="card-note">{q.source_file} · {q.count}줄</span>
+                  <span className="card-note">예: <SourceFile source={storedSource(q)} /> · 전체 {q.count}줄</span>
                 </div>
                 <select
                   value={teaching[q.external_code] ?? ''}
@@ -447,10 +442,10 @@ function Quarantine({ data, id, onDone, toast }) {
                   <tbody>
                     {items.slice(0, 40).map((q) => (
                       <tr key={q.id}>
-                        <td>{q.source_file.replace(/^\d+_/, '')}</td>
+                        <td><SourceFile source={storedSource(q)} /></td>
                         <td>{q.source_sheet || '—'}</td>
-                        <td className="num">{q.source_row_no}</td>
-                        <td className="mono">{(q.raw ?? []).slice(0, 6).join(' | ')}</td>
+                        <td className="num">{q.source_row_no > 0 ? q.source_row_no : '파일 전체'}</td>
+                        <td className="mono">{q.raw?.length ? q.raw.slice(0, 6).join(' | ') : '원본 파일에서 확인'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -483,7 +478,8 @@ function Lineage({ row }) {
 
       <div className="lineage-source">
         <div className="card-note">원본</div>
-        <strong>{row.source_file}</strong>
+        <strong><SourceFile source={storedSource(row)} /></strong>
+        {row.source_sha256 ? <details><summary>원본 지문 보기</summary><code>{row.source_sha256}</code></details> : <p className="card-note">이전 기록에는 원본 지문이 없어 동명 파일의 내용을 구별할 수 없습니다.</p>}
         <div className="card-note">
           {row.source_sheet ? `${row.source_sheet} 시트 · ` : ''}
           {row.source_row_no}번째 줄
@@ -524,13 +520,22 @@ function Lineage({ row }) {
         </dd>
       </dl>
 
-      {row.duplicate_of && (
+      {(row.duplicate_of || row.duplicate_source) && (
         <div className="notice notice-warn" style={{ marginTop: 10 }}>
-          {row.duplicate_of} 줄과 내용이 같습니다. 별도 주문일 수 있어 삭제하지 않았습니다.
+          {row.duplicate_source
+            ? <p><SourceFile source={row.duplicate_source} />{row.duplicate_source.sheet ? ` · ${row.duplicate_source.sheet}` : ''} · {row.duplicate_source.rowNo}번째 줄과 내용이 같습니다. 별도 주문일 수 있어 삭제하지 않았습니다.</p>
+            : <p>{row.duplicate_of} 줄과 내용이 같습니다. 별도 주문일 수 있어 삭제하지 않았습니다.</p>}
+          {row.duplicate_source?.sha256
+            ? <details><summary>중복 의심 원본 지문 보기</summary><code>{row.duplicate_source.sha256}</code></details>
+            : <p className="card-note">이전 기록에는 중복 의심 원본의 지문이 없습니다.</p>}
         </div>
       )}
     </div>
   )
+}
+
+function storedSource(row) {
+  return { file: row.source_file, sha256: row.source_sha256, ambiguousName: row.source_ambiguous_name }
 }
 
 function Tile({ label, value, note, tone }) {

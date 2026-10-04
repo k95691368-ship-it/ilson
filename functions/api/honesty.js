@@ -14,6 +14,7 @@
 import { jsonResponse, failUnexpected } from '../_lib/http.ts'
 import { loadOutcomeEvidenceMany } from '../_lib/outcomeEvidence.js'
 import { unprovenList } from '../../shared/unproven.js'
+import { readTogether, one } from '../_lib/readTogether.js'
 
 // 몇 건인지를 말하는 문장은 손으로 적으면 안 된다. 데이터가 바뀌어도 문장은
 // 안 바뀌기 때문이다. 실제로 화면이 여섯 단계를 끝까지 간 것이 한 건 있다고
@@ -34,7 +35,7 @@ export async function onRequestGet({ env, data: requestData }) {
       unusedTools,
       noBaseline,
       proof,
-    ] = await Promise.all([
+    ] = await readTogether(env.DB, [
         // 내가 못 하겠다고 한 것. 대안을 같이 줬는지까지 본다 —
         // 대안 없는 반려는 그냥 거절이다.
         env.DB.prepare(
@@ -42,7 +43,7 @@ export async function onRequestGet({ env, data: requestData }) {
                   r.verdict_reason, r.updated_at
            FROM review r JOIN application a ON a.id = r.application_id
            WHERE r.verdict = '반려' ORDER BY r.updated_at DESC LIMIT 20`
-        ).all(),
+        ),
 
         // 보류는 두 길로 들어온다. 한 건씩 판정하면 review 에 조건이 적히고,
         // 접수함에서 한 번에 미루면 decision_log 에만 남는다. review 만 보면
@@ -62,7 +63,7 @@ export async function onRequestGet({ env, data: requestData }) {
            ) b ON b.application_id = a.id AND b.rn = 1
            WHERE a.status = '보류'
            ORDER BY updated_at DESC LIMIT 20`
-        ).all(),
+        ),
 
         // 접수만 되고 아직 아무도 안 본 것. 이게 가장 정직하게 아픈 숫자다.
         env.DB.prepare(
@@ -71,7 +72,7 @@ export async function onRequestGet({ env, data: requestData }) {
            FROM application a
            WHERE a.status = '접수'
            ORDER BY a.created_at ASC LIMIT 20`
-        ).all(),
+        ),
 
         // 도구가 처리하지 못하고 밀어 둔 줄. 버린 것이 아니라 격리한 것이라
         // 여기서 셀 수 있다.
@@ -81,7 +82,7 @@ export async function onRequestGet({ env, data: requestData }) {
         // 따로 센다.
         env.DB.prepare(
           `SELECT reason, COUNT(*) AS n FROM build_quarantine GROUP BY reason ORDER BY n DESC`
-        ).all(),
+        ),
 
         // 넘긴 뒤 실제 실행에서 밀려난 줄.
         //
@@ -91,10 +92,10 @@ export async function onRequestGet({ env, data: requestData }) {
         //
         // 이유별로는 못 나눈다. 실제 실행은 브라우저에서 돌고 서버에는
         // 개수만 남기 때문이다. 모르는 것은 모른다고 적는다.
-        env.DB.prepare(
+        one(env.DB.prepare(
           `SELECT COALESCE(SUM(u.quarantined), 0) AS n, COUNT(DISTINCT u.application_id) AS tools
            FROM tool_use u`
-        ).first(),
+        )),
 
         // 합격 기준 중 통과 못 한 것.
         env.DB.prepare(
@@ -104,7 +105,7 @@ export async function onRequestGet({ env, data: requestData }) {
            JOIN application a ON a.id = r.application_id
            WHERE br.verdict IN ('실패', '판정불가')
            ORDER BY br.is_required_safety DESC LIMIT 20`
-        ).all(),
+        ),
 
         // 성과 숫자에 붙은 반박 중 아직 못 푼 것. 미해소 반박이 있으면
         // 그 금액은 '보수적 추정치'로 강등된다.
@@ -121,13 +122,13 @@ export async function onRequestGet({ env, data: requestData }) {
           `SELECT a.id, a.ticket_no, a.title
            FROM application a JOIN baseline b ON b.application_id = a.id
            WHERE EXISTS (SELECT 1 FROM tool_use u WHERE u.application_id = a.id)`
-        ).all(),
+        ),
 
         env.DB.prepare(
           `SELECT h.slug, h.title, h.handed_to_dept, h.handed_at,
                   (SELECT COUNT(*) FROM tool_use u WHERE u.application_id = h.application_id) AS runs
            FROM handover h WHERE h.rolled_back_at IS NULL`
-        ).all(),
+        ),
 
         // 수용해 놓고 아직 실측 안 한 것. 재지 않고 만들면 나중에
         // 얼마나 줄었는지 말할 수 없다.
@@ -136,13 +137,13 @@ export async function onRequestGet({ env, data: requestData }) {
            JOIN review r ON r.application_id = a.id
            LEFT JOIN baseline b ON b.application_id = a.id
            WHERE r.verdict = '수용' AND b.application_id IS NULL LIMIT 20`
-        ).all(),
+        ),
 
         // "증명하지 못한 것" 중 개수를 말하는 세 문장이 쓸 숫자.
         //
         // 끝까지 갔다 = 부서에 넘겼고(되돌리지 않았고) 성과까지 냈다.
         // 둘 중 하나만으로는 여섯 단계를 밟은 것이 아니다.
-        env.DB.prepare(
+        one(env.DB.prepare(
           `SELECT
              (SELECT COUNT(*) FROM application a
                WHERE EXISTS (SELECT 1 FROM handover h
@@ -151,7 +152,7 @@ export async function onRequestGet({ env, data: requestData }) {
              (SELECT COUNT(*) FROM baseline) AS baselines,
              (SELECT COALESCE(SUM(sample_n), 0) FROM baseline) AS baseline_samples,
              (SELECT COUNT(*) FROM tool_use) AS runs`
-        ).first(),
+        )),
       ])
 
     const buildQuarantine = quarantine.results.reduce((s, q) => s + q.n, 0)

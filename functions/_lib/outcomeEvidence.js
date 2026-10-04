@@ -2,6 +2,7 @@ import { mutationFingerprint, atomicMutation } from './atomicMutation.ts'
 import { computeOutcome, annualize, buildChallenges, daysSince, labelForOutcome } from '../../shared/outcome.js'
 import { OUTCOME_KIND, OUTCOME_PROXY_KIND } from '../../shared/accept.js'
 import { jsonError, failUnexpected } from './http.ts'
+import { allScopedReads } from './allScopedReads.ts'
 
 export const OUTCOME_RESOLUTION_KIND = '성과검증해소'
 export const OUTCOME_INPUT_KIND = '성과산정변경'
@@ -48,7 +49,7 @@ export async function loadOutcomeEvidenceMany(DB, applicationIds, { detail = fal
     `SELECT * FROM outcome_challenge WHERE application_id IN (${holes}) ORDER BY application_id,rule_code`,
   ]
   if(detail) queries.push(`SELECT id,application_id,used_at,duration_ms,human_review_seconds,rework_seconds,rows_out,quarantined,ok FROM tool_use WHERE application_id IN (${holes}) ORDER BY application_id,used_at,id`)
-  const results = await Promise.all(queries.map((sql, index) => DB.prepare(sql).bind(...ids, ...(index === 3 ? kinds : [])).all()))
+  const results = await allScopedReads(queries.map(async (sql, index) => DB.prepare(sql).bind(...ids, ...(index === 3 ? kinds : [])).all()))
   const grouped = results.map(result => {
     const group = new Map(ids.map(id => [id, []]))
     for (const row of result.results) group.get(row.application_id)?.push(row)

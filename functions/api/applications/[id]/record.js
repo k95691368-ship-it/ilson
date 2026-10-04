@@ -14,6 +14,7 @@
 import { jsonResponse, jsonError, failUnexpected } from '../../../_lib/http.ts'
 import { loadOutcomeEvidence } from '../../../_lib/outcomeEvidence.js'
 import { decodeBetaRound } from '../../../../shared/betaEvidence.ts'
+import { readTogether, one } from '../../../_lib/readTogether.js'
 
 // 봉인한 지 며칠 됐나. 성과 화면과 같은 셈법을 쓴다.
 const q = (env, sql, ...binds) => env.DB.prepare(sql).bind(...binds)
@@ -49,23 +50,23 @@ export async function onRequestGet({ env, data: requestData, params }) {
       handover,
       uses,
       decisions,
-    ] = await Promise.all([
-      q(env, 'SELECT * FROM review WHERE application_id = ?', id).first(),
-      q(env, 'SELECT * FROM stakeholder WHERE application_id = ? ORDER BY is_owner DESC, created_at', id).all(),
-      q(env, 'SELECT * FROM meeting WHERE application_id = ? ORDER BY seq', id).all(),
-      q(env, 'SELECT * FROM requirement WHERE application_id = ? ORDER BY kind, created_at', id).all(),
-      q(env, 'SELECT * FROM requirement_conflict WHERE application_id = ? ORDER BY created_at', id).all(),
-      q(env, 'SELECT * FROM acceptance_criterion WHERE application_id = ? ORDER BY ord', id).all(),
-      q(env, 'SELECT * FROM shadow_run WHERE application_id = ? ORDER BY seq', id).all(),
-      q(env, 'SELECT * FROM baseline WHERE application_id = ?', id).first(),
-      q(env, 'SELECT id, seq, rows_out, quarantined, duplicate_suspects, duration_ms, totals_json, files_json, note, created_at FROM build_run WHERE application_id = ? ORDER BY seq', id).all(),
-      q(env, 'SELECT * FROM beta_round WHERE application_id = ? ORDER BY seq', id).all(),
-      q(env, 'SELECT * FROM beta_feedback WHERE application_id = ? ORDER BY created_at', id).all(),
-      q(env, 'SELECT * FROM manual WHERE application_id = ?', id).first(),
-      q(env, 'SELECT * FROM manual_faq WHERE application_id = ? ORDER BY ord', id).all(),
-      q(env, 'SELECT * FROM handover WHERE application_id = ?', id).first(),
-      q(env, 'SELECT * FROM tool_use WHERE application_id = ? ORDER BY used_at, id', id).all(),
-      q(env, 'SELECT * FROM decision_log WHERE application_id = ? ORDER BY created_at, id', id).all(),
+    ] = await readTogether(env.DB, [
+      one(q(env, 'SELECT * FROM review WHERE application_id = ?', id)),
+      q(env, 'SELECT * FROM stakeholder WHERE application_id = ? ORDER BY is_owner DESC, created_at', id),
+      q(env, 'SELECT * FROM meeting WHERE application_id = ? ORDER BY seq', id),
+      q(env, 'SELECT * FROM requirement WHERE application_id = ? ORDER BY kind, created_at', id),
+      q(env, 'SELECT * FROM requirement_conflict WHERE application_id = ? ORDER BY created_at', id),
+      q(env, 'SELECT * FROM acceptance_criterion WHERE application_id = ? ORDER BY ord', id),
+      q(env, 'SELECT * FROM shadow_run WHERE application_id = ? ORDER BY seq', id),
+      one(q(env, 'SELECT * FROM baseline WHERE application_id = ?', id)),
+      q(env, 'SELECT id, seq, rows_out, quarantined, duplicate_suspects, duration_ms, totals_json, files_json, note, created_at FROM build_run WHERE application_id = ? ORDER BY seq', id),
+      q(env, 'SELECT * FROM beta_round WHERE application_id = ? ORDER BY seq', id),
+      q(env, 'SELECT * FROM beta_feedback WHERE application_id = ? ORDER BY created_at', id),
+      one(q(env, 'SELECT * FROM manual WHERE application_id = ?', id)),
+      q(env, 'SELECT * FROM manual_faq WHERE application_id = ? ORDER BY ord', id),
+      one(q(env, 'SELECT * FROM handover WHERE application_id = ?', id)),
+      q(env, 'SELECT * FROM tool_use WHERE application_id = ? ORDER BY used_at, id', id),
+      q(env, 'SELECT * FROM decision_log WHERE application_id = ? ORDER BY created_at, id', id),
     ])
 
     // The printed record and the live result use the same evidence validity.

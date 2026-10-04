@@ -26,6 +26,7 @@ export interface AssignApplicationOwnerInput {
 
 export interface SupabaseDatabase extends Database {
   provider: 'supabase'
+  readBatch(statements: readonly PreparedStatement[]): Promise<DatabaseResult[]>
   actorEmail: string | null
   workspace: boolean
   forActor(email: string): SupabaseDatabase
@@ -221,8 +222,30 @@ export function createSupabaseDb(url: string, key: string, workspaceToken: strin
     statementData.set(statement, { sql, binds, owner })
     return statement
   }
+  const executeBatch = async (statements: readonly PreparedStatement[], readsOnly = false): Promise<DatabaseResult[]> => {
+    const sql = statements.map(statement => {
+      const data = statementData.get(statement)
+      if (!data || data.owner !== owner) throw new Error('Invalid batch statement')
+      // Trusted server SQL only; this prevents accidental direct writes through
+      // readBatch, not side effects inside SQL functions or writable CTEs.
+      if (readsOnly && !/^\s*(SELECT|WITH)\b/i.test(data.sql)) throw new Error('Expected a read statement')
+      return compileSql(data.sql, data.binds)
+    })
+    if (!sql.length) return []
+    // One RPC = one PostgreSQL transaction. Any failure rolls back the batch.
+    // The existing READ COMMITTED RPC does not promise one SELECT snapshot.
+    const data = actorEmail
+      ? await rpc('ilson_actor_batch', { p_actor: actorEmail, p_statements: sql })
+      : workspaceToken
+      ? await rpc('ilson_workspace_batch', { p_token: workspaceToken, p_statements: sql.map(scopedSql) })
+      : await rpc('ilson_batch', { p_statements: sql })
+    if (!Array.isArray(data) || data.length !== sql.length) throw new Error('Invalid Supabase batch response')
+    return data.map(resultOf)
+  }
   return {
     provider: 'supabase', prepare,
+    batch: statements => executeBatch(statements),
+    readBatch: statements => executeBatch(statements, true),
     actorEmail,
     forActor: (email: string) => {
       if (workspaceToken) throw new Error('A demonstration database cannot switch to production actor scope')
@@ -270,22 +293,6 @@ export function createSupabaseDb(url: string, key: string, workspaceToken: strin
       p_reads: reads.map(row => ({ sql: scopedSql(compileSql(row.sql, row.binds)), rows: row.rows })),
       p_writes: writes.map(row => scopedSql(compileSql(row.sql, row.binds))), p_response: response,
     })),
-    async batch(statements) {
-      const sql = statements.map(statement => {
-        const data = statementData.get(statement)
-        if (!data || data.owner !== owner) throw new Error('Invalid batch statement')
-        return compileSql(data.sql, data.binds)
-      })
-      if (!sql.length) return []
-      // One RPC = one PostgreSQL transaction. Any failure rolls back the batch.
-      const data = actorEmail
-        ? await rpc('ilson_actor_batch', { p_actor: actorEmail, p_statements: sql })
-        : workspaceToken
-        ? await rpc('ilson_workspace_batch', { p_token: workspaceToken, p_statements: sql.map(scopedSql) })
-        : await rpc('ilson_batch', { p_statements: sql })
-      if (!Array.isArray(data) || data.length !== sql.length) throw new Error('Invalid Supabase batch response')
-      return data.map(resultOf)
-    },
   }
 }
 

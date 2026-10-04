@@ -12,6 +12,7 @@ import { passCaveat } from '../../shared/signoff.js'
 import { PERIOD } from '../../shared/master.js'
 import { pendingBetaRound, keepBetaRound, forgetBetaRound, subscribeBetaRounds } from '../lib/pendingBetaRounds.js'
 import HandoverPanel from '../components/HandoverPanel.tsx'
+import SourceReferences from '../components/SourceReference.jsx'
 
 // 시연 파일 다섯 장을 사이트에서 걷어냈다. 그래서 이 화면도 넣은 파일로
 // 채점한다. 정답표가 함께 없어졌으므로 정답 대조 기준 셋은 「판정불가」로
@@ -86,6 +87,7 @@ function BetaSession({ id, data, error, loading, reload }) {
   const fileInput = useRef(null)
   const [fixedWhat, setFixedWhat] = useState('')
   const [saving, setSaving] = useState(false)
+  const [sourceFiles, setSourceFiles] = useState([])
   const busy = useRef(false)
   const saveBusy = useRef(false)
   const runScope = data?.runScope
@@ -170,6 +172,7 @@ function BetaSession({ id, data, error, loading, reload }) {
     if (picked.length === 0) return
     busy.current = true
     setTesting(true)
+    setSourceFiles([])
     const current = () => mounted.current && currentScope.current === runScope
     try {
       setProgress('파일을 읽는 중…')
@@ -196,6 +199,7 @@ function BetaSession({ id, data, error, loading, reload }) {
       if (!current()) return
 
       setProgress('결과를 기록하는 중…')
+      setSourceFiles(graded.sourceFiles ?? [])
       await saveRound({
         kind: 'round',
         run_id: crypto.randomUUID(),
@@ -224,6 +228,7 @@ function BetaSession({ id, data, error, loading, reload }) {
   return (
     <div className="stack">
       {error && <div className="notice notice-warn" role="alert"><p>최신 기준과 회차를 확인하지 못했습니다. 아래 기록은 마지막 조회 상태입니다. {error}</p><button type="button" className="btn-ghost" onClick={reload}>상태 다시 확인</button></div>}
+      <SourceReferences files={sourceFiles} />
       {pendingRound && <section className="notice notice-warn" aria-label="채점 기록 저장 상태">
         <div className="notice-title">{pendingRound.criteriaChanged ? '합격 기준이 바뀌어 저장하지 않았습니다' : '채점 기록의 저장 여부를 확인해 주세요'}</div>
         <p>{pendingRound.error || '같은 채점 결과를 기록하는 중입니다.'}</p>

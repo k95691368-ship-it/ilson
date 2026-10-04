@@ -16,6 +16,8 @@ export type ReceiptBodyIsUntrusted = Assert<Equal<MutationReceipt['body'], unkno
 export type ReplayFlagIsBoolean = Assert<Equal<CommittedMutation['replayed'], boolean>>
 export type LegacyAtomicSupportRemainsOptional = Assert<Equal<undefined extends Database['commitMutation'] ? true : false, true>>
 export type SupabaseAtomicSupportIsRequired = Assert<Equal<undefined extends SupabaseDatabase['commitMutation'] ? true : false, false>>
+export type LegacyReadBatchSupportRemainsOptional = Assert<Equal<undefined extends Database['readBatch'] ? true : false, true>>
+export type SupabaseReadBatchIsRequired = Assert<Equal<undefined extends SupabaseDatabase['readBatch'] ? true : false, false>>
 export type UnmigratedRpcStaysUnknown = Assert<Equal<Awaited<ReturnType<SupabaseDatabase['recordToolRun']>>, unknown>>
 export type BindingValuesMatchSql = Assert<Equal<Parameters<PreparedStatement['bind']>[number], SqlValue>>
 

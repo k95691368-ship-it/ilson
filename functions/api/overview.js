@@ -15,6 +15,7 @@ import { HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND } from '../../shared/holdlift.js'
 import { PICK_KIND, UNPICK_KIND } from '../../shared/priority.js'
 import { unrankedPressure } from '../../shared/waitline.js'
 import { provenanceOf } from '../../shared/provenance.js'
+import { readTogether, one } from '../_lib/readTogether.js'
 
 export async function onRequestGet({ env, data: requestData }) {
   env = requestData?.requestEnv ?? env
@@ -33,19 +34,19 @@ export async function onRequestGet({ env, data: requestData }) {
       answeredWaiting,
       deptAsked,
       unrequestedAll,
-    ] = await Promise.all([
+    ] = await readTogether(env.DB, [
       env.DB.prepare(
         `SELECT id, ticket_no, dept, title, status, created_at, updated_at,
                 current_minutes, current_people, current_frequency,
                 CAST((julianday('now') - julianday(created_at)) AS INTEGER) AS days_since
          FROM application ORDER BY created_at DESC`
-      ).all(),
+      ),
 
       env.DB.prepare(
         `SELECT refuse_code, COUNT(*) AS n FROM review
          WHERE verdict = '반려' AND refuse_code IS NOT NULL
          GROUP BY refuse_code ORDER BY n DESC`
-      ).all(),
+      ),
 
       // 신청서마다 어느 단계까지 갔는지. 산출물이 있으면 지나온 것으로 본다.
       env.DB.prepare(
@@ -57,17 +58,17 @@ export async function onRequestGet({ env, data: requestData }) {
                 (SELECT COUNT(*) FROM manual m WHERE m.application_id = a.id AND m.published_at IS NOT NULL) AS documented,
                 (SELECT COUNT(*) FROM handover h WHERE h.application_id = a.id AND h.rolled_back_at IS NULL) AS handed
          FROM application a`
-      ).all(),
+      ),
 
       env.DB.prepare(
         `SELECT h.application_id, h.handed_at, h.accepted_at, h.rolled_back_at, h.slug,
                 a.created_at AS applied_at, a.title, a.dept, a.ticket_no
          FROM handover h JOIN application a ON a.id = h.application_id`
-      ).all(),
+      ),
 
-      env.DB.prepare(
+      one(env.DB.prepare(
         'SELECT COUNT(*) AS n, SUM(rows_out) AS rows_total, MAX(used_at) AS last FROM tool_use'
-      ).first(),
+      )),
 
       env.DB.prepare(
         `SELECT d.id, d.application_id, d.stage, d.actor, d.title, d.what, d.why, d.created_at,
@@ -78,17 +79,17 @@ export async function onRequestGet({ env, data: requestData }) {
          FROM decision_log d
          LEFT JOIN review r ON r.application_id = d.application_id
          ORDER BY d.created_at DESC LIMIT 8`
-      ).all(),
+      ),
 
       // 기준선 표를 통째로 읽어 개수만 세고 버리던 쿼리가 여기 있었다.
       // 첫 화면을 열 때마다 돌았고, 그 숫자를 그리는 화면은 없었다. 지운다.
 
       // 대안 없이 반려한 것. /honesty가 세는 것과 같은 조건으로 센다 —
       // 두 화면이 서로 다른 말을 하면 둘 다 못 믿는다.
-      env.DB.prepare(
+      one(env.DB.prepare(
         `SELECT COUNT(*) AS n FROM review
          WHERE verdict = '반려' AND (refuse_alternative IS NULL OR TRIM(refuse_alternative) = '')`
-      ).first(),
+      )),
 
       // 부서가 성과 숫자를 직접 확인하면서 남긴 것.
       //
@@ -99,7 +100,7 @@ export async function onRequestGet({ env, data: requestData }) {
       // 부서가 시험판을 써 보고 적었는데 아직 답을 못 준 것.
       env.DB.prepare(
         `SELECT DISTINCT application_id FROM beta_feedback WHERE resolved_at IS NULL`
-      ).all(),
+      ),
 
       // 보류해 둔 것의 조건이 풀렸다고 부서가 알려 온 것.
       //
@@ -114,7 +115,7 @@ export async function onRequestGet({ env, data: requestData }) {
          ORDER BY d.created_at`
       )
         .bind(HOLD_LIFT_KIND, HOLD_LIFT_CANCEL_KIND)
-        .all(),
+        ,
 
       // 먼저 하기로 정해 둔 것. 취소는 자기 앞의 지정을 지운다.
       env.DB.prepare(
@@ -124,7 +125,7 @@ export async function onRequestGet({ env, data: requestData }) {
          ORDER BY d.created_at`
       )
         .bind(PICK_KIND, UNPICK_KIND)
-        .all(),
+        ,
 
       // 되물었고 답을 받았는데 아직 판정 안 한 것.
       //
@@ -147,7 +148,7 @@ export async function onRequestGet({ env, data: requestData }) {
                    WHERE a2.link_kind = '답변' AND a2.link_id = q2.id
                 )
            )`
-      ).all(),
+      ),
 
       // 부서가 먼저 물어 온 것 중 아직 답 안 한 것.
       //
@@ -161,7 +162,7 @@ export async function onRequestGet({ env, data: requestData }) {
              SELECT 1 FROM decision_log r
               WHERE r.link_kind = '담당자답' AND r.link_id = q.id
            )`
-      ).all(),
+      ),
 
       // 요청받지 않았는데 먼저 꺼낸 것 — **전체**를 센다.
       //
@@ -169,12 +170,12 @@ export async function onRequestGet({ env, data: requestData }) {
       // 화면은 3이라고 말했다. 문구는 "요청받지 않았는데 먼저 제안한 것
       // N건"이라 전체처럼 읽히는데 실제로는 최근 것만 본 숫자였다.
       // 두 화면이 다른 숫자를 말하면 둘 다 못 믿는다.
-      env.DB.prepare(
+      one(env.DB.prepare(
         `SELECT COUNT(*) AS n FROM decision_log d
          LEFT JOIN review r ON r.application_id = d.application_id
          WHERE d.unrequested = 1 OR (d.link_kind = 'review' AND r.verdict = '반려'
            AND TRIM(COALESCE(r.refuse_alternative, '')) <> '')`
-      ).first(),
+      )),
     ])
 
     // 취소는 자기 앞의 요청을 지우고, 요청 뒤에 다시 판정했으면 답을 준 것이다.

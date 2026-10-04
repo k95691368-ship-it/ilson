@@ -10,8 +10,10 @@ import { jsonResponse, jsonError, failFields, failUnexpected } from '../../../_l
 import { databaseAccessFailure, rethrowDatabaseAccessFailure } from '../../../_lib/dbBridge.ts'
 import { newId } from '../../../_lib/ids.js'
 import { logDecision } from '../../../_lib/decisions.js'
+import { buildRecordPayload } from '../../../../shared/buildPayload.js'
+import { validateBuildRecordSources, encodeBuildTrace, encodeBuildQuarantine, decodeBuildTrace, decodeBuildQuarantine } from '../../../../shared/buildRecordSource.js'
 
-// D1은 한 번에 보낼 수 있는 문장 수에 한계가 있다. 500줄씩 끊어 보낸다.
+// Supabase RPC의 문장 수와 요청 크기를 제한하기 위해 500줄씩 나눠 보낸다.
 const CHUNK = 500
 
 // 이 칸이 비면 저장 자체가 안 된다(스키마가 NOT NULL). 사람 말로 짚어 준다.
@@ -64,8 +66,8 @@ export async function onRequestGet({ env, data: requestData, params, request }) 
           .bind(latest.id)
           .all(),
       ])
-      rows = rowsRes.results.map((r) => ({ ...r, trace: safeParse(r.trace_json, []) }))
-      quarantine = quarantineRes.results.map((q) => ({ ...q, raw: safeParse(q.raw_json, []) }))
+      rows = rowsRes.results.map((r) => ({ ...r, ...decodeBuildTrace(r.trace_json) }))
+      quarantine = quarantineRes.results.map((q) => ({ ...q, ...decodeBuildQuarantine(q.raw_json) }))
     }
 
     const { results: aliases } = await env.DB.prepare(
@@ -99,6 +101,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
   } catch {
     return jsonError('요청 형식이 올바르지 않습니다.', 400)
   }
+  if (body === null || typeof body !== 'object' || Array.isArray(body)) return jsonError('요청 형식이 올바르지 않습니다.', 400)
 
   // 사람이 상품코드를 알려 주는 경우.
   if (body.kind === 'alias') {
@@ -134,6 +137,11 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
   // 실행 결과를 기록으로 남기는 경우.
   if (body.kind !== 'run') return jsonError('무엇을 저장할지 알 수 없습니다.', 400)
+  try { validateBuildRecordSources(body) }
+  catch { return jsonError('파일 출처 정보의 형식이나 지문이 올바르지 않습니다.', 400) }
+  // Older clients may still send raw cells. Do not persist them or arbitrary
+  // nested payload fields; retain only calculation and reference metadata.
+  body = buildRecordPayload(body)
 
   const rows = Array.isArray(body.rows) ? body.rows : []
   const quarantine = Array.isArray(body.quarantine) ? body.quarantine : []
@@ -143,7 +151,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
 
   // 줄을 넣기 전에 먼저 본다.
   //
-  // 이 칸들이 비면 D1이 거절한다. 그런데 머리글은 이미 들어간 뒤라서 "2줄
+  // 이 칸들이 비면 DB가 거절한다. 그런데 머리글은 이미 들어간 뒤라서 "2줄
   // 처리함"이라고 적힌 실행이 남고 정작 줄은 0개다. 화면은 그 머리글을 읽어
   // 처리 건수를 말하고, 숫자를 눌러 원본으로 되짚으려 하면 아무것도 없다.
   // 이 앱이 내내 하는 약속이 그 되짚기라서 이건 빈 표가 아니라 거짓말이다.
@@ -193,7 +201,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
       )
       .run()
 
-    // 줄이 많아 나눠 보낸다. 한 번에 전부 보내면 D1이 거절한다.
+    // 줄이 많아도 Supabase batch의 문장 수 제한을 넘지 않도록 나눠 보낸다.
     for (let i = 0; i < rows.length; i += CHUNK) {
       const chunk = rows.slice(i, i + CHUNK)
       await env.DB.batch(
@@ -232,7 +240,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
             r.source?.file ?? '',
             r.source?.sheet ?? null,
             r.source?.rowNo ?? 0,
-            JSON.stringify(r.trace ?? []),
+            encodeBuildTrace(r.trace ?? [], r.source, r.duplicate_of),
             r.has_duplicate ? 1 : 0,
             r.duplicate_of ? `${r.duplicate_of.file}:${r.duplicate_of.rowNo}` : null
           )
@@ -258,7 +266,7 @@ export async function onRequestPost({ env, data: requestData, params, request })
             q.source?.rowNo ?? 0,
             q.externalCode ?? null,
             q.productName ?? null,
-            JSON.stringify(q.raw ?? []),
+            encodeBuildQuarantine(q.source),
             q.note ?? null
           )
         )

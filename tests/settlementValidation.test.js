@@ -15,7 +15,7 @@ describe('unreadable monetary cells cannot become zero', () => {
     expect(result.rows).toHaveLength(2)
     expect(result.totals.all.net_revenue_krw).toBe(25000)
     expect(result.quarantine).toEqual([expect.objectContaining({
-      reason: 'bad_amount', source: { file: 'validation.csv', sheet: '', rowNo: 3 },
+      reason: 'bad_amount', source: { file: 'validation.csv', sheet: '', rowNo: 3, sha256: expect.stringMatching(/^[a-f0-9]{64}$/), ambiguousName: false },
       raw: expect.arrayContaining([discount]), note: expect.stringContaining('할인액'),
     })])
   })

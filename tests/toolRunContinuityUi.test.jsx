@@ -51,6 +51,30 @@ function startRun() {
 }
 
 describe('도구 계산과 실행 기록의 실패 구분', () => {
+  it('실제 내려받기 버튼은 전체 원본 지문을 내보내고 원본 셀·지문을 실행 요약 API로 보내지 않는다', async () => {
+    const hash = 'a'.repeat(64)
+    state.pipeline.mockResolvedValueOnce({
+      files: [{ name: '01_정산.csv', sha256: hash, ambiguousName: true, rowsOut: 1 }],
+      rows: [{ date: '2026-06-01', net_revenue_krw: 10000, source: { file: '01_정산.csv', sheet: '', rowNo: 2, sha256: hash }, raw: ['PRIVATE_LOCAL_CELL'] }],
+      quarantine: [], stats: { durationMs: 1 }, totals: { byChannel: [] },
+    })
+    let downloaded
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation(blob => { downloaded = blob; return 'blob:local-source-test' })
+    const revoke = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    try {
+      startRun()
+      fireEvent.click(await screen.findByRole('button', { name: '엑셀로 내려받기' }))
+      expect(await downloaded.text()).toContain(`"원본SHA256"`)
+      expect(await downloaded.text()).toContain(hash)
+      expect(await downloaded.text()).toContain('01_정산.csv')
+      expect(await downloaded.text()).not.toContain('PRIVATE_LOCAL_CELL')
+      expect(click).toHaveBeenCalledTimes(1)
+      expect(revoke).toHaveBeenCalledWith('blob:local-source-test')
+      expect(JSON.stringify(state.post.mock.calls[0][1])).not.toContain(hash)
+      expect(JSON.stringify(state.post.mock.calls[0][1])).not.toContain('PRIVATE_LOCAL_CELL')
+    } finally { create.mockRestore(); revoke.mockRestore(); click.mockRestore() }
+  })
   it('실행자 이름은 계정·체험 scope별로 기억하고 다른 계정에는 재사용하지 않는다', async () => {
     const view = renderTool()
     fireEvent.change(screen.getByRole('textbox', { name: '돌리시는 분' }), { target: { value: 'A 비공개 이름' } })

@@ -40,12 +40,6 @@
   font-weight: 600;
 }
 
-.page-eyebrow {
-  color: var(--ms-muted);
-  font-size: 14px;
-  line-height: 1.5;
-}
-
 /* Reusable workflow layouts ----------------------------------------------- */
 
 .field-row,
@@ -173,7 +167,6 @@
 }
 
 .app-item,
-.todo-item,
 .tool-card,
 .similar-list > li,
 .thread-msg,
@@ -219,7 +212,6 @@
 .dept-app-title,
 .tool-card-title,
 .similar-item-title,
-.todo-item-title,
 .picked-why,
 .returned-title,
 .pending-what,
@@ -282,7 +274,6 @@
 .retry,
 .unclear,
 .trust-open,
-.refuse-mix,
 .joined,
 .owed,
 .pending-confirm,
@@ -1453,7 +1444,6 @@
   color: var(--warning-text);
 }
 
-.accept-name,
 .accept-reject,
 .myreports,
 .unclear,
@@ -1462,11 +1452,6 @@
   gap: var(--space-4);
 }
 
-.accept-name {
-  width: min(100%, 360px);
-}
-
-.accept-name > span,
 .accept-reject label > span {
   color: var(--ms-ink);
   font-size: 14px;

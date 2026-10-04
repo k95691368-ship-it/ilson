@@ -1,3 +1,4 @@
+import { availableParallelism } from 'node:os'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import viteConfig from './vite.config.js'
 
@@ -26,6 +27,11 @@ export default mergeConfig(
       setupFiles: ['./tests/setup.js'],
       testTimeout: 30000,
       hookTimeout: 30000,
+      // 시험은 CPU 를 다 쓰는 작업이라, 프로세스를 따로 띄우는 기본값(forks)보다
+      // 스레드가 시작 비용이 적다. 이 PC(8코어)에서 tests/scale.test.js 를 뺀 전체가
+      // forks 기본값 중앙값 67초 → threads·코어 수만큼의 작업자 48초였다.
+      pool: 'threads',
+      maxWorkers: availableParallelism(),
     },
   })
 )

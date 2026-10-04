@@ -32,6 +32,21 @@ function cannotJudge(what) {
   }
 }
 
+function quarantineReferences(result, truth) {
+  const hashBoundNames = new Set((result.files ?? []).filter(file => file.ambiguousName).map(file => file.name))
+  // A supplied truth fingerprint must also bind a single, unambiguous name.
+  // Legacy golden sets without hashes retain their existing name/row contract.
+  for (const row of truth.quarantine) if (row.source_sha256 != null) hashBoundNames.add(row.source_file)
+  if (truth.quarantine.some(row => hashBoundNames.has(row.source_file) && !/^[a-f0-9]{64}$/.test(row.source_sha256 ?? ''))) return null
+  const key = (file, sheet, rowNo, sha256) => JSON.stringify([file, sheet ?? '', String(rowNo), hashBoundNames.has(file) ? sha256 : null])
+  return {
+    actual: row => key(row.source.file, row.source.sheet, row.source.rowNo, row.source.sha256),
+    expected: row => key(row.source_file, row.source_sheet, row.source_row_no, row.source_sha256),
+  }
+}
+
+const ambiguousTruth = () => ({ passed: null, evidence: '정답표에 동명 파일을 구별할 원본 SHA-256이 없어 어느 파일의 줄인지 판정할 수 없습니다.' })
+
 // ─────────────────────────────────────────────────────────────
 // 기준별 채점
 // ─────────────────────────────────────────────────────────────
@@ -57,34 +72,38 @@ const CHECKS = {
   // 검토함으로 빼야 할 줄을 빠짐없이 뺐는가
   quarantine_complete({ result, truth }) {
     if (!truth?.quarantine) return cannotJudge('검토함으로 뺄 줄의')
+    const refs = quarantineReferences(result, truth)
+    if (!refs) return ambiguousTruth()
     const mine = new Set(
-      result.quarantine.map((q) => `${q.source.file}|${q.source.sheet ?? ''}|${q.source.rowNo}`)
+      result.quarantine.map(refs.actual)
     )
     const missed = truth.quarantine.filter(
-      (t) => !mine.has(`${t.source_file}|${t.source_sheet}|${t.source_row_no}`)
+      (t) => !mine.has(refs.expected(t))
     )
     return missed.length === 0
       ? pass(`빼야 할 ${truth.quarantine.length}줄을 모두 뺐습니다.`)
       : fail(
           `${missed.length}줄을 그냥 통과시켰습니다. 이 줄들이 합계에 섞여 있습니다.`,
-          missed.slice(0, 8).map((m) => ({ 파일: m.source_file, 줄: m.source_row_no, 이유: m.reason_code }))
+          missed.slice(0, 8).map((m) => ({ 파일: m.source_file, 줄: m.source_row_no, ...(m.source_sha256 ? { 원본SHA256: m.source_sha256 } : {}), 이유: m.reason_code }))
         )
   },
 
   // 멀쩡한 줄을 잘못 빼지는 않았는가
   quarantine_precise({ result, truth }) {
     if (!truth?.quarantine) return cannotJudge('검토함으로 뺄 줄의')
+    const refs = quarantineReferences(result, truth)
+    if (!refs) return ambiguousTruth()
     const truthSet = new Set(
-      truth.quarantine.map((t) => `${t.source_file}|${t.source_sheet}|${t.source_row_no}`)
+      truth.quarantine.map(refs.expected)
     )
     const wrong = result.quarantine.filter(
-      (q) => !truthSet.has(`${q.source.file}|${q.source.sheet ?? ''}|${q.source.rowNo}`)
+      (q) => !truthSet.has(refs.actual(q))
     )
     return wrong.length === 0
       ? pass('멀쩡한 줄을 검토함으로 보내지 않았습니다.')
       : fail(
           `${wrong.length}줄을 괜히 뺐습니다. 검토할 것이 많아지면 담당자가 결국 전부 통과시켜 버립니다.`,
-          wrong.slice(0, 8).map((w) => ({ 파일: w.source.file, 줄: w.source.rowNo, 이유: w.reason }))
+          wrong.slice(0, 8).map((w) => ({ 파일: w.source.file, 줄: w.source.rowNo, 원본SHA256: w.source.sha256, 이유: w.reason }))
         )
   },
 
@@ -98,7 +117,7 @@ const CHECKS = {
       ? pass(`${currencies.join(', ')} ${foreign.length}줄이 모두 원화로 환산됐습니다.`)
       : fail(
           `${bad.length}줄이 환산되지 않은 채 합산됐습니다. 달러 금액이 그대로 더해지면 매출이 1300분의 1로 보입니다.`,
-          bad.slice(0, 8).map((b) => ({ 파일: b.source.file, 줄: b.source.rowNo, 통화: b.src_currency }))
+          bad.slice(0, 8).map((b) => ({ 파일: b.source.file, 줄: b.source.rowNo, 원본SHA256: b.source.sha256, 통화: b.src_currency }))
         )
   },
 
@@ -129,7 +148,7 @@ const CHECKS = {
     const sheets = new Map()
 
     for (const r of result.rows) {
-      const key = `${r.source.file}|${r.source.sheet ?? ''}`
+      const key = JSON.stringify([r.source.file, r.source.sheet ?? '', r.source.sha256])
       if (!sheets.has(key)) sheets.set(key, new Map())
       const months = sheets.get(key)
       const ym = r.date.slice(0, 7)
@@ -140,8 +159,8 @@ const CHECKS = {
     for (const [key, months] of sheets) {
       const [dominant, count] = [...months.entries()].sort((a, b) => b[1] - a[1])[0]
       if (dominant !== target) {
-        const [file, sheet] = key.split('|')
-        wrong.push({ 파일: file, 시트: sheet || '—', 달: dominant, 줄수: count })
+        const [file, sheet, sha256] = JSON.parse(key)
+        wrong.push({ 파일: file, 시트: sheet || '—', 원본SHA256: sha256, 달: dominant, 줄수: count })
       }
     }
 
@@ -164,7 +183,7 @@ const CHECKS = {
       ? pass(`반품 ${returns.length}줄을 매출에서 빼고 반품으로 셌습니다.`)
       : fail(
           `${bad.length}줄이 반품인데 매출로 섞였습니다. 부호를 무시하고 더하면 매출이 부풀려지고 반품률이 0으로 나옵니다.`,
-          bad.slice(0, 8).map((b) => ({ 파일: b.source.file, 줄: b.source.rowNo }))
+          bad.slice(0, 8).map((b) => ({ 파일: b.source.file, 줄: b.source.rowNo, 원본SHA256: b.source.sha256 }))
         )
   },
 
@@ -222,10 +241,13 @@ const CHECKS = {
   // 모든 줄이 원본으로 되짚어지는가
   traceable({ result }) {
     const broken = result.rows.filter(
-      (r) => !r.source?.file || !(r.source.rowNo > 0) || !(r.trace?.length > 0)
+      (r) => !r.source?.file || !(r.source.rowNo > 0) || (r.source.ambiguousName && !/^[a-f0-9]{64}$/.test(r.source.sha256 ?? '')) || !(r.trace?.length > 0)
     )
+    const identified = result.rows.every(r => /^[a-f0-9]{64}$/.test(r.source?.sha256 ?? ''))
     return broken.length === 0
-      ? pass(`${result.rows.length}줄 모두 원본 파일과 줄 번호, 변환 단계를 들고 있습니다.`)
+      ? pass(identified
+          ? `${result.rows.length}줄 모두 원본 파일의 SHA-256과 줄 번호, 변환 단계를 들고 있습니다. 지문은 파일 내용의 구분이며 금액의 정확성 확인은 아닙니다.`
+          : `${result.rows.length}줄 모두 원본 파일과 줄 번호, 변환 단계를 들고 있습니다. 이전 기록의 파일 내용 지문은 확인하지 않았습니다.`)
       : fail(
           `${broken.length}줄이 어디서 왔는지 모릅니다. 회의에서 "이 숫자 어디서 나왔냐"는 질문에 답할 수 없습니다.`
         )
@@ -238,7 +260,7 @@ const CHECKS = {
       const net = round2(r.gross_krw - r.discount_krw - r.return_krw)
       const expected = round2(net - r.commission_krw - r.cogs_krw - r.logistics_krw - r.ad_krw)
       if (Math.abs(net - r.net_revenue_krw) > 0.02 || Math.abs(expected - r.contribution_krw) > 0.02) {
-        wrong.push({ 파일: r.source.file, 줄: r.source.rowNo, 나온값: r.contribution_krw, 계산값: expected })
+        wrong.push({ 파일: r.source.file, 줄: r.source.rowNo, 원본SHA256: r.source.sha256, 나온값: r.contribution_krw, 계산값: expected })
       }
     }
     return wrong.length === 0
@@ -326,6 +348,7 @@ export async function gradeAll({ criteria, files, aliases = {}, truth, period })
     summary: { ...tally(graded), durationMs: Date.now() - started },
     rowsOut: result.rows.length,
     quarantined: result.quarantine.length,
+    sourceFiles: result.files,
   }
 }
 

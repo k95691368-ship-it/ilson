@@ -5,6 +5,7 @@ import { groupQuarantine, affectedRows, catalog } from '../../shared/teach.js'
 import { QUARANTINE_REASONS } from '../../shared/pipeline.js'
 import { num } from '../lib/format.js'
 import Field from './Field.jsx'
+import { SourceFile } from './SourceReference.jsx'
 
 // 밀려난 줄을 부서가 되돌려 알려준다.
 //
@@ -65,8 +66,8 @@ export default function TeachQuarantine({ slug, quarantine, onTaught }) {
                   {g.rows.slice(0, 12).map((r, i) => (
                     <li key={i}>
                       <span className="card-note">
-                        {r.source?.file}
-                        {r.source?.sheet ? ` · ${r.source.sheet}` : ''} · {r.source?.rowNo}번째 줄
+                        <SourceFile source={r.source} />
+                        {r.source?.sheet ? ` · ${r.source.sheet}` : ''} · {r.source?.rowNo > 0 ? `${r.source.rowNo}번째 줄` : '파일 전체'}
                       </span>
                       {r.raw && <span className="teach-raw">{r.raw.slice(0, 5).join(' | ')}</span>}
                     </li>
