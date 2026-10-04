@@ -27,6 +27,7 @@ const teachRetryFixture = process.argv.includes('--teach-retry-fixture')
 let teachReplyLost = false
 const codeReviewRetryFixture = process.argv.includes('--code-review-retry-fixture')
 let codeReviewReplyLost = false
+const healthFailureFixture = process.argv.includes('--health-failure-fixture')
 if (codeReviewRetryFixture && fixture) {
   // Explicit synthetic legacy mappings for local UI boundaries, never business data.
   await pg.query('INSERT INTO sku_alias(external_code,canonical_code,product_name,taught_by,owner_email) VALUES($1,$2,$3,$4,$5)',
@@ -43,6 +44,13 @@ globalThis.fetch = (url, options) => {
       const name = new URL(url).pathname.split('/').at(-1)
       if (!/^ilson_(execute|batch|workspace_(query|batch|open|reset)|mutation_receipt|commit_mutation|claim_rate_limit|record_tool_run|record_beta_round|record_application|assign_application_owner|actor_(query|batch|receipt|commit|claim_rate_limit|rate_state|release_rate_limit)|readiness)$/.test(name)) throw new Error('Unsupported RPC')
       const args = Object.values(JSON.parse(options.body))
+      // Fail local public metadata probes until this test server is restarted
+      // without the flag. This is deterministic even under StrictMode's extra
+      // effect cycle. No business write or external connection is involved.
+      if (healthFailureFixture && name === 'ilson_execute'
+        && typeof args[0] === 'string' && /FROM information_schema\.tables/.test(args[0])) {
+        return Response.json({ code: 'LOCAL_HEALTH_FAILURE' }, { status: 503 })
+      }
       await pg.exec('SET ROLE service_role')
       const result = await pg.query(`SELECT public.${name}(${args.map((_, i) => '$' + (i + 1)).join(',')}) AS data`, args)
       // Local in-memory verification only: commit the first successful form

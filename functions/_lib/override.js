@@ -394,6 +394,28 @@ export async function auditOverride(env, actor, action, entityKind, entityId, de
   return id
 }
 
+/** @param {readonly number[]} octets */
+function isPrivateIntegrationIpv4(octets) {
+  const [first, second] = octets
+  return first === 0 || first === 10 || first === 127
+    || (first === 169 && second === 254) || (first === 192 && second === 168)
+    || (first === 172 && second >= 16 && second <= 31)
+}
+
+/** Expand a bracketed WHATWG URL hostname, not arbitrary input.
+ * @param {string} host
+ * @returns {number[] | null}
+ */
+function integrationIpv6Words(host) {
+  const [head, tail] = host.slice(1, -1).split('::')
+  const leading = head ? head.split(':').map(word => Number.parseInt(word, 16)) : []
+  const trailing = tail ? tail.split(':').map(word => Number.parseInt(word, 16)) : []
+  const omitted = 8 - leading.length - trailing.length
+  if (omitted < 0) return null
+  const words = tail === undefined ? leading : [...leading, ...Array(omitted).fill(0), ...trailing]
+  return words.length === 8 && words.every(word => Number.isInteger(word) && word >= 0 && word <= 0xffff) ? words : null
+}
+
 export function isSafeIntegrationUrl(value) {
   let url
   try {
@@ -402,10 +424,22 @@ export function isSafeIntegrationUrl(value) {
     return false
   }
   if (url.protocol !== 'https:') return false
-  const host = url.hostname.toLowerCase()
-  if (host === 'localhost' || host.endsWith('.local') || host.endsWith('.internal')) return false
-  if (/^(127\.|10\.|0\.|169\.254\.|192\.168\.)/.test(host)) return false
-  const private172 = /^172\.(\d+)\./.exec(host)
-  if (private172 && Number(private172[1]) >= 16 && Number(private172[1]) <= 31) return false
+  // Normalize only for classification. integrationConfig still requires the
+  // original endpoint string to match the server allowlist exactly.
+  const host = url.hostname.toLowerCase().replace(/\.+$/, '')
+  if (['localhost', 'local', 'internal'].some(suffix => host === suffix || host.endsWith('.' + suffix))) return false
+  if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) return !isPrivateIntegrationIpv4(host.split('.').map(Number))
+  if (host.startsWith('[')) {
+    // URL parsing has already canonicalized compressed and IPv4-mapped IPv6.
+    // Classify address words, not substrings occurring inside public addresses.
+    const words = integrationIpv6Words(host)
+    if (!words) return false
+    if (words.slice(0, 7).every(word => word === 0) && words[7] <= 1) return false
+    if ((words[0] & 0xfe00) === 0xfc00 || (words[0] & 0xffc0) === 0xfe80) return false
+    if (words.slice(0, 5).every(word => word === 0) && words[5] === 0xffff) {
+      return !isPrivateIntegrationIpv4([words[6] >>> 8, words[6] & 255, words[7] >>> 8, words[7] & 255])
+    }
+  }
+  // This is a configuration guard, not DNS resolution or a rebinding defense.
   return true
 }

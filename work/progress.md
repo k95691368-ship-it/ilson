@@ -1,5 +1,27 @@
 # 로컬 개선 진행 기록
 
+## 2026-10-04 시간 제한 자율 개선 — 회차 6 검증
+
+20:01 KST에 C06 동결 소스의 lint·typecheck·134모듈/Worker build·script syntax/lint·diff check, 전체 **190파일 3,153개(일반3,147+규모6) 검사 통과**를 확인했다. 신규 public health49개·연동 주소90개·actual client/useApi 화면6개 계약이 CI에 포함된다. 필수 metadata SQL/표 목록/준비식·readiness 운영/정원 검사·200/503·no-store는 유지하고 공개 tables와 누락표/상세 migration 문구만 제외했다. 새 API/사용자자료 SQL/권한 변경은 없다. 익명 성공/필수표 각각 누락/DB와readiness 오류/requestEnv 우선/체험 쿠키 유무에서도 내부 이름·SQL·키를 반사하지 않는다.
+
+URL guard는 WHATWG가 정규화한 hostname만 분류한다. 끝점 localhost/하위 이름/local/internal, IPv6 unspecified/loopback/ULA/link-local과 private IPv4-mapped를 막고, 공개 IPv6·대상 범위 밖 주소·사설 숫자로 시작하는 실제 도메인은 과도한 substring 거절 없이 유지한다. 원문 endpoint의 exact allowlist·전용 secret·역할·idempotency 설정·manual redirect·체험 외부 차단은 그대로다. 기존 native workerd redirect/PG 연동 회귀도 통과했다. 모든 특수 IP·DNS resolution/rebinding 방어·등록된 외부 시스템의 안전을 보증하는 변경은 아니다.
+
+Honesty의 data.tables.length 의존을 제거하고 준비 상태의 literal boolean/checks 일치를 확인한다. 실제503·malformed2xx·모순된 ready/checks·늦은 계정 응답은 현재 준비 완료로 표시하지 않는다. 실패를 특정 DB 원인으로 단정하지 않고 기존 GET 재시도를 제공한다. Supabase capacity는 체험이 꺼진 경우에도 배포 조건을 통과하므로 ‘공간 준비’가 아니라 ‘체험 정원 조건’으로 표현했다. 기존 모두통과 두 항목만으로 더 많은 기능을 증명한다고 주장하지 않는다.
+
+실제 IAB·외부 차단 메모리 PG에서 metadata 조회를 계속 실패시키고1440×1000/360×800의 상태 재시도 버튼을 눌렀다. 실패 동안 현재 준비 완료 문구/원문 오류는 없고 문서폭1425/345px로 넘침이 없다. 메모리 서버 정상 재시작 때 Vite가 자동으로 문서를 다시 읽어 정상 상태를 표시했으므로 **이 동작을 실제 브라우저의 수동 재시도 복구로 주장하지 않는다**. 수동 실패→같은 GET 재시도 성공과 pending/계정변경의 수명은 별도 actual client/useApi DOM6개로 확인했다. 정상1440/360 화면에는 필수 준비 조건만 표시되고 표 개수는 없다. 내가 만든 탭12·viewport·5188 서버만 정리했으며 사용자 탭/운영 자료는 유지했다.
+
+판단 교정: health 소비자가 없다는 첫 조사 누락과 개발 StrictMode의 중복 요청으로 첫503이 가려지는 재현 오류를 각각 찾았다. 기존 소스 문자열 검사/빈응답 pageRender는 tables 필드 제거 crash를 놓쳐 새 계약 렌더 검사를 추가했다. 조사용 ignored 합성 파일4개가 로컬 전체 검사에만 포함될 수 있어 해당 작성자의 파일 하나를 정리한 뒤 전체를 다시 실행했다. 오래된 운영API 응답과 새 로컬산출물을 비교하지 않으며 CLI/CI/Pages 반영은 다음 단계다. 기존 OG변경·구매AX·공유 Auth/ACL은 제외한다. 이 선택적 P3 보완의 편익은 불필요 공개 정보와 오설정 수용 감소이고 실사용 시간 절감의 실증은 아니다. C15와 기존 저장 계약을 유지하는 호환 수정으로 복구한다.
+
+## 2026-10-04 시간 제한 자율 개선 — 회차 6 시작
+
+19:53 KST에 C15 CLI 반영과 현재 소스를 확인했다. C06은 긴급 필수 취약점이 아니라 **P3 선택적 정보 최소화·설정 실수 방어**로 작은 변경만 채택한다. 익명 middleware→health가 public의 불필요한 합성 테이블명까지 반환했다. 실제 업무행/비밀키/구매AX 자료 노출은 입증하지 않았다. integration guard는 끝점 localhost·하위 localhost·비공개IPv6를 허용하지만 서버 exact allowlist·전용 secret·역할 검사·manual redirect·체험 차단이 있어 임의 공개 SSRF로 단정하지 않는다. Supabase HTTPS/.supabase.co guard는 같은 주소를 이미 거절하므로 중복 변경을 제외한다. 새 서비스/진단화면/RPC/DB/ACL/DNS 조회 없이 공개 응답에서 표명·상세 migration을 제외하고 기존 모든 ready 검사는 유지하며, 연동 주소 분류만 보완한다. 공개 IPv6와 정상 도메인·원문 endpoint 정확 일치는 유지한다.
+
+독립 소비처 조사에서 의존이 없다는 첫 판단은 틀렸다. root 재검색으로 HonestyPage.Ready의 data.tables.length 의존을 찾았고 계약 렌더 검사까지 함께 보완한다. 또한 실제503은 useApi가 error로 처리해 기존 Ready가 사라지는 문제를 분리했다. 요청 실패를 특정 DB 고장으로 추정하지 않고 ‘배포 상태 미확인’과 기존 GET 재시도만 제공한다. 기술 JSON/실제표명을 오류로 전달하지 않는다. 별도 신뢰성 서비스는 비용만 늘어 제외한다.
+
+기존 업무 흐름의 새 서비스 필요성을 독립 재검토했다. 현장 후속 과제·담당/기한·원사건 참조·열린 과제 종료차단·동일설계 재승인·exact 과거실험조회가 이미 있어 C08 신규 알림함 폐기와 C10 별도 후속측정서비스 보류를 유지한다. 새 실험 버튼이 선택한 실험의 문제 대신 첫 cluster를 여는 합성 탐색 문제는 대상 폼 표시/문제별 정확 생성 대안이 있어 선택적 P3 후보로 남긴다. 실제 직원 탐색 오류/절감시간을 관측한 것은 아니다. 시간 채우기를 위한 새 서비스를 추가하지 않는다.
+
+19:51 KST C15 배포 확인: `72b2b80f917b47b31340d4bd8debc9e2aded2158`를 ilson/main에 CLI로 푸시했다. [CI37196602846](https://github.com/k95691368-ship-it/ilson/actions/runs/37196602846)는 같은 HEAD에서 success이며 Git 연결 Production `d6e666df-ddc3-4476-942a-a0bc142cbfdb` / [배포 주소](https://d6e666df.ilson.pages.dev)의 source는72b2b80이다. 주주소 index/bootstrap/JS/CSS **46개 SHA-256**과 Git원본OG가 검증한 파일과 일치했다. health200/ready:true·workspace200/active:false·session/override428 실제JSON/no-store다. 이번 회차 운영DB/ACL/공유구매AX/Auth/portfolio 변경은 없다. 기존OG변경은 보존하며 이 후속배포문단은 다음회차커밋에 포함한다. Goal을 완료하지 않고 필요성 재검토→C06 작은 보완으로 이어간다.
+
 ## 2026-10-04 시간 제한 자율 개선 — 회차 5 검증
 
 19:47 KST 실제 시각에서 C15 소스를 동결했다. lint·typecheck·134모듈/Worker build·diff check와 전체 **187파일 3,008개(일반3,002+규모6) 검사 통과**, npm audit 알려진 취약점0건을 확인했다. 처음 전체 실패1건은 응답 필드 검사에 인증 계정도 명시적 격리 체험 환경도 없는 fixture가401로 차단된 것이었다. 인증 경계를 완화하지 않고 해당 fixture의 codes 경로에만 격리 체험 계약과200 상태 단언을 추가했다. 독립 actual signed middleware·bridge·현재 migrations 메모리 PostgreSQL의29개 검사를 CI 파일에 보존했다. 운영 침투·실제 다중 PostgreSQL 세션 부하 시험이 아니다.

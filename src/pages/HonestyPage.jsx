@@ -299,22 +299,36 @@ export default function HonestyPage() {
 //
 // 이 화면에 두는 이유는, 여기가 "무엇이 안 됐는가"를 말하는 자리이기 때문이다.
 // 다 준비됐으면 한 줄로 조용히 지나간다 — 늘 상태창이 떠 있으면 아무도 안 읽는다.
-function Ready() {
-  const { data, error } = useApi('/health')
-  if (error || !data) return null
+export function Ready() {
+  const { data, error, loading, reload } = useApi('/health')
+  // A failed refresh must not leave an old success claim visible. The API's
+  // 503 is an unconfirmed state here, not proof of a particular DB failure.
+  if (error) return <ReadinessUnavailable loading={loading} retry={reload} />
+  if (!data) return null
 
   // R2(파일 보관소) 확인도 이 목록에 있었다. 첨부 기능을 걷어낼 때 서버는
   // 그 확인을 지웠는데 목록만 남아서, **"파일 보관소(R2) 연결 — 모두 확인됨"
   // 이 라이브에 떠 있었다.** 있지도 않은 것을 확인했다고 말한 것이다.
   // 하필 이 화면이 그러면 여기 적힌 나머지도 다 못 믿게 된다.
-  const provider = data.checks?.provider === 'supabase' ? 'Supabase' : 'Cloudflare D1'
-  const labels = { db: `데이터베이스(${provider}) 연결`, schema: '표 구조 적용' }
+  const checks = data.checks
+  if (typeof data.ready !== 'boolean' || !checks || typeof checks.db !== 'boolean' || typeof checks.schema !== 'boolean') {
+    return <ReadinessUnavailable loading={loading} retry={reload} />
+  }
+  const supabase = checks.provider === 'supabase'
+  const provider = supabase ? 'Supabase' : checks.provider === 'd1' ? 'Cloudflare D1' : null
+  const labels = { db: provider ? `데이터베이스(${provider}) 연결` : '데이터베이스 연결', schema: '표 구조 적용' }
+  if (supabase) {
+    labels.runtime = '운영 접근 조건'
+    labels.capacity = '체험 정원 조건'
+  }
 
   if (data.ready) {
+    if (!provider || !Object.keys(labels).every(key => checks[key] === true)) {
+      return <ReadinessUnavailable loading={loading} retry={reload} />
+    }
     return (
-      <p className="card-note honest-ready">
-        이 배포는 준비된 상태입니다 — {Object.values(labels).join(' · ')} 모두 확인됨. 표{' '}
-        {num(data.tables.length)}개.
+      <p className="card-note honest-ready" role="status">
+        이 배포는 준비된 상태입니다 — {Object.values(labels).join(' · ')} 모두 확인됨.
       </p>
     )
   }
@@ -325,16 +339,28 @@ function Ready() {
       <ul className="honest-ready-list">
         {Object.entries(labels).map(([key, label]) => (
           <li key={key}>
-            <span aria-hidden="true">{data.checks[key] ? '○' : '✕'}</span> {label}
-            {data.checks[key] ? ' — 됨' : ' — 안 됨'}
+            <span aria-hidden="true">{checks[key] === true ? '○' : '✕'}</span> {label}
+            {checks[key] === true ? ' — 됨' : ' — 안 됨'}
           </li>
         ))}
       </ul>
-      {data.notes.map((n) => (
+      {(Array.isArray(data.notes) ? data.notes.filter(note => typeof note === 'string') : []).map((n) => (
         <p key={n} className="card-note">
           {n}
         </p>
       ))}
+    </section>
+  )
+}
+
+function ReadinessUnavailable({ loading, retry }) {
+  return (
+    <section className="notice notice-warning" role="status">
+      <div className="notice-title">배포 상태를 확인하지 못했습니다</div>
+      <p className="card-note">연결을 다시 확인해 주세요. 이전 확인 결과로 현재 상태를 판단하지 않습니다.</p>
+      <button className="btn btn-ghost btn-sm" type="button" disabled={loading} onClick={retry}>
+        {loading ? '확인 중…' : '상태 다시 확인'}
+      </button>
     </section>
   )
 }

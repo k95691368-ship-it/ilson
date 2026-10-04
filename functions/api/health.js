@@ -36,7 +36,7 @@ export async function onRequestGet({ env, data: requestData }) {
 
   if (!env.DB) {
     notes.push('데이터베이스 바인딩(DB)이 없습니다. wrangler.toml의 바인딩 또는 Supabase 설정을 확인해주세요.')
-    return jsonResponse({ ready: false, checks, tables, notes }, 503)
+    return jsonResponse({ ready: false, checks, notes }, 503)
   }
 
   const isSupabase = Boolean(env.SUPABASE_URL && env.SUPABASE_SERVICE_ROLE_KEY)
@@ -66,7 +66,7 @@ export async function onRequestGet({ env, data: requestData }) {
     const missing = required.filter((t) => !tables.includes(t))
     checks.schema = missing.length === 0
     if (missing.length > 0) {
-      notes.push(`스키마가 덜 적용됐습니다. 없는 표: ${missing.join(', ')}`)
+      notes.push('필수 데이터베이스 구조가 준비되지 않았습니다.')
     }
 
     if (isSupabase) {
@@ -74,7 +74,7 @@ export async function onRequestGet({ env, data: requestData }) {
       const readiness = await env.DB.readiness()
       checks.runtime = readiness.schemaReady === true
       checks.capacity = env.DEMO_WORKSPACES !== 'true' || readiness.capacityAvailable === true
-      if (!checks.runtime) notes.push('운영 RPC 또는 0006~0013 접근 권한·후속 처리·재검토·참여 부서·소유계정·실행·베타·검토 버전 마이그레이션이 준비되지 않았습니다.')
+      if (!checks.runtime) notes.push('운영 데이터 접근 기능이 준비되지 않았습니다.')
       if (!checks.capacity) notes.push('새 체험 공간 정원이 찼습니다. 소개 화면과 기존 체험 공간은 계속 사용할 수 있습니다.')
     }
   } catch {
@@ -85,7 +85,6 @@ export async function onRequestGet({ env, data: requestData }) {
   return jsonResponse({
     ready,
     checks,
-    tables,
     notes,
   }, ready ? 200 : 503)
 }
